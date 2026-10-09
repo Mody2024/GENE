@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentResponse, BuildVersion, GeneProject, Mode, Thinking } from "./lib/types";
 import JSZip from "jszip";
+import ObjViewport from "./components/ObjViewport";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -76,6 +77,12 @@ export default function Home() {
   const [localAgentProjects, setLocalAgentProjects] = useState(0);
   const [lastSyncedUpdatedAt, setLastSyncedUpdatedAt] = useState("");
   const [lastLocalPlayUrl, setLastLocalPlayUrl] = useState("");
+  const [forgePrompt, setForgePrompt] = useState("");
+  const [forgeKind, setForgeKind] = useState<"character" | "vehicle" | "building" | "environment" | "prop" | "weapon">("prop");
+  const [forgeQuality, setForgeQuality] = useState<"performance" | "standard" | "high">("standard");
+  const [forgeBusy, setForgeBusy] = useState(false);
+  const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
+  const [forgeNotice, setForgeNotice] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -196,6 +203,31 @@ export default function Home() {
     ].join("\n");
     return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "'>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
+
+  const savedAssets = useMemo(() => {
+    if (!project) return [];
+    return Object.entries(project.files)
+      .filter(([path]) => /^assets\\/[a-zA-Z0-9_-]+\\/asset\\.json$/.test(path))
+      .map(([path, source]) => {
+        const id = path.split("/")[1];
+        const prefix = "assets/" + id + "/";
+        let manifest: any = {};
+        try { manifest = JSON.parse(source); } catch {}
+        return {
+          id,
+          prefix,
+          name: String(manifest.name || manifest.recipe?.name || id),
+          kind: String(manifest.kind || manifest.recipe?.kind || "prop"),
+          style: String(manifest.style || manifest.recipe?.style || "stylized"),
+          partCount: Number(manifest.partCount || manifest.recipe?.parts?.length || 0),
+          triangleCount: Number(manifest.triangleCount || 0),
+          recipe: manifest.recipe || null,
+          objPath: prefix + "model.obj",
+          mtlPath: prefix + "model.mtl",
+          manifestPath: path
+        };
+      });
+  }, [project?.files, project?.id]);
 
   const addActivity = (entry: string) => setActivity(prev => [new Date().toLocaleTimeString() + "  " + entry, ...prev].slice(0, 80));
 
@@ -435,6 +467,134 @@ export default function Home() {
       addActivity("Local file sync failed: " + why);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function downloadAssetFile(path: string) {
+    if (!project || !project.files[path]) return;
+    const blob = new Blob([project.files[path]], { type: path.endsWith(".mtl") || path.endsWith(".obj") ? "text/plain" : "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = path.split("/").pop() || "asset.txt";
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function generateForgeAsset() {
+    if (!project || forgeBusy || !forgePrompt.trim()) return;
+    const targetId = forgeTargetId;
+    let existingRecipe: unknown = null;
+    if (targetId) {
+      try {
+        existingRecipe = JSON.parse(project.files["assets/" + targetId + "/asset.json"] || "null")?.recipe || null;
+      } catch {}
+      if (!existingRecipe) {
+        setForgeNotice("The selected asset has no readable recipe. Start a new asset instead.");
+        return;
+      }
+    }
+    setForgeBusy(true);
+    setForgeNotice("");
+    addActivity((targetId ? "Editing existing mesh " + targetId : "Generating a new 3D mesh") + " through GENE Forge");
+    try {
+      const response = await fetch("/api/forge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: forgePrompt.trim(),
+          kind: forgeKind,
+          quality: forgeQuality,
+          existingRecipe,
+          projectStyle: [project.initialPrompt, project.plan?.summary, project.plan?.title].filter(Boolean).join("\n"),
+          references: (project.references || []).slice(0, 2)
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok || !data.asset?.files?.["model.obj"] || !data.asset?.files?.["model.mtl"] || !data.asset?.files?.["asset.json"]) {
+        throw new Error(data?.error?.message || "Forge returned no validated mesh files.");
+      }
+      const assetId = targetId || ("asset-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6));
+      const prefix = "assets/" + assetId + "/";
+      const manifest = {
+        ...JSON.parse(data.asset.files["asset.json"]),
+        assetId,
+        name: data.asset.name,
+        kind: data.asset.kind,
+        style: data.asset.style,
+        partCount: data.asset.partCount,
+        triangleCount: data.asset.triangleCount,
+        vertexCount: data.asset.vertexCount,
+        files: { obj: prefix + "model.obj", mtl: prefix + "model.mtl" }
+      };
+      const files = {
+        ...project.files,
+        [prefix + "model.obj"]: String(data.asset.files["model.obj"]),
+        [prefix + "model.mtl"]: String(data.asset.files["model.mtl"]),
+        [prefix + "asset.json"]: JSON.stringify(manifest, null, 2)
+      };
+      const versionNumber = (project.versions[0]?.number || 0) + 1;
+      const version: BuildVersion = {
+        number: versionNumber,
+        label: (targetId ? "Edited asset: " : "Generated asset: ") + String(data.asset.name),
+        files: { ...files },
+        createdAt: now(),
+        testSummary: "GENE generated and validated OBJ geometry, MTL materials and an asset recipe. Game-scene integration and gameplay behavior are not yet verified."
+      };
+      const reply = message("assistant",
+        (targetId ? "Updated" : "Generated") + " **" + data.asset.name + "**. Saved real geometry files at " + prefix + "model.obj and " + prefix + "model.mtl. The mesh contains " + Number(data.asset.triangleCount).toLocaleString() + " triangles across " + data.asset.partCount + " parts. This confirms mesh file generation; integration into the game scene is a separate step.",
+        "build"
+      );
+      const updated: GeneProject = {
+        ...project,
+        files,
+        versions: [version, ...project.versions].slice(0, 8),
+        messages: [...project.messages, reply],
+        updatedAt: now()
+      };
+      setProject(updated);
+      setForgeTargetId(assetId);
+      setForgePrompt("");
+      setSection("assets");
+      addActivity("Wrote " + prefix + "model.obj (" + String(data.asset.triangleCount) + " triangles)");
+      addActivity("Wrote " + prefix + "model.mtl and asset recipe");
+      setForgeNotice("Mesh files saved in project version " + versionNumber + ". Drag the viewport to inspect the actual generated geometry. Use Edit this asset to refine the same recipe.");
+      if (localAgentStatus === "connected" && localAgentToken && updated.files["game.html"] && updated.files["game.js"]) {
+        try {
+          const diskResult = await writeProjectToDisk(updated, localAgentUrl, localAgentToken);
+          addActivity("Forge asset and updated manifest synced to disk at " + diskResult.projectPath);
+          setForgeNotice("Mesh saved as version " + versionNumber + " and synced to disk: " + diskResult.projectPath);
+        } catch (error) {
+          setForgeNotice("Mesh saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry.");
+        }
+      }
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "unknown Forge error";
+      setForgeNotice("Forge failed: " + why + ". No asset files were marked as generated.");
+      addActivity("Forge failed: " + why);
+    } finally {
+      setForgeBusy(false);
+    }
+  }
+
+  function removeForgeAsset(assetId: string) {
+    if (!project || forgeBusy) return;
+    const prefix = "assets/" + assetId + "/";
+    const files = Object.fromEntries(Object.entries(project.files).filter(([path]) => !path.startsWith(prefix)));
+    const versionNumber = (project.versions[0]?.number || 0) + 1;
+    const version: BuildVersion = {
+      number: versionNumber,
+      label: "Removed asset: " + assetId,
+      files: { ...files },
+      createdAt: now(),
+      testSummary: "Asset files were removed from this project version. Runtime integration was not automatically evaluated."
+    };
+    const updated: GeneProject = { ...project, files, versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
+    setProject(updated);
+    if (forgeTargetId === assetId) setForgeTargetId(null);
+    setForgeNotice("Removed asset files in version " + versionNumber + ". Previous files remain in version history.");
+    if (localAgentStatus === "connected" && localAgentToken && updated.files["game.html"] && updated.files["game.js"]) {
+      void writeProjectToDisk(updated, localAgentUrl, localAgentToken).catch(error => setForgeNotice("Asset removed in browser project, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error")));
     }
   }
 
