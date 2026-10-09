@@ -140,6 +140,22 @@ export async function POST(request: NextRequest) {
     thinking: thinkingLevel
   });
 
+  const parts: Array<Record<string, unknown>> = [{ text: userInput }];
+  const references = Array.isArray(body.project?.references) ? body.project.references : [];
+  const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  let imageBytesApprox = 0;
+  let imageCount = 0;
+  for (const ref of references) {
+    if (ref?.kind !== "image" || !ref.dataBase64) continue;
+    if (imageCount >= 4) break;
+    if (!allowedImageTypes.has(ref.mimeType)) return jsonError("Unsupported reference image type: " + String(ref.mimeType), 400, "REFERENCE_TYPE_UNSUPPORTED");
+    if (typeof ref.dataBase64 !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(ref.dataBase64)) return jsonError("A reference image was not valid base64 data.", 400, "REFERENCE_INVALID");
+    imageBytesApprox += ref.dataBase64.length;
+    if (ref.dataBase64.length > 700_000 || imageBytesApprox > 1_100_000) return jsonError("Reference images exceed GENE's request budget. Attach smaller images or fewer references.", 413, "REFERENCE_TOO_LARGE");
+    parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.dataBase64 } });
+    imageCount += 1;
+  }
+
   let response: Response;
   try {
     response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
@@ -147,7 +163,7 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
-        contents: [{ role: "user", parts: [{ text: userInput }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: {
           responseMimeType: "application/json",
           temperature: body.operation === "interview" ? 0.35 : 0.25,
