@@ -139,16 +139,13 @@ try {
   await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
   await sampleFrame.locator("#start-button").click();
   const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
-  await sampleFrame.locator("#game-canvas").click();
-  await sampleFrame.locator("#game-canvas").evaluate(canvas => {
-    canvas.focus();
-    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-  });
+  const rightControl = sampleFrame.locator('[data-dir="right"]');
+  await rightControl.evaluate(el => el.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true })));
   await samplePage.waitForTimeout(250);
-  await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight", bubbles: true })));
+  await rightControl.evaluate(el => el.dispatchEvent(new Event("pointerup", { bubbles: true, cancelable: true })));
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
-  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
+  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to directional control; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
