@@ -32,6 +32,7 @@ const fixture = {
     "game-spec.json": JSON.stringify({
       title: "Playwright Canvas Runner",
       genre: "arcade runner",
+      engine: "canvas2d",
       mechanics: ["Arrow-key movement", "Collectible orbs", "Score increases on collection"],
       controls: ["Arrow keys or WASD"],
       objective: "Collect all four gold orbs in the outpost.",
