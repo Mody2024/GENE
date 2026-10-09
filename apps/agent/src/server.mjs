@@ -198,6 +198,30 @@ export async function createAgentServer({ port = PORT, host = HOST, workspace = 
       return json(res, 200, { ok: true, app: "gene-local-agent", version: "0.1.0", host, port, workspace: root, tokenConfigured: true });
     }
 
+    if (segments[0] === "play" && req.method === "GET" && segments.length >= 3) {
+      const id = segments[1];
+      const relative = safeRelativePath(segments.slice(2).join("/"));
+      if (!safeProjectId(id) || !relative || !relative.startsWith("assets/")) return error(res, 400, "GENE_BAD_ASSET_PATH", "Only safe paths under the project's assets folder are served.");
+      const projectDir = path.join(projectsRoot, id);
+      const assetPath = path.resolve(projectDir, ...relative.split("/"));
+      if (!assetPath.startsWith(path.resolve(projectDir) + path.sep)) return error(res, 400, "GENE_BAD_ASSET_PATH", "Asset path escaped the project root.");
+      try {
+        const info = await stat(assetPath);
+        if (!info.isFile() || info.size > 25 * 1024 * 1024) return error(res, 413, "GENE_ASSET_TOO_LARGE", "Asset is not a file or exceeds 25 MB.");
+        const extension = path.extname(assetPath).toLowerCase();
+        const mime = ({
+          ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
+          ".obj": "text/plain; charset=utf-8", ".mtl": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8",
+          ".glb": "model/gltf-binary", ".gltf": "model/gltf+json", ".bin": "application/octet-stream",
+          ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"
+        })[extension] || "application/octet-stream";
+        res.writeHead(200, { "Content-Type": mime, "Content-Length": info.size, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        return res.end(await readFile(assetPath));
+      } catch {
+        return error(res, 404, "GENE_ASSET_NOT_FOUND", "Asset was not found in the synced project.");
+      }
+    }
+
     if (segments[0] === "play" && req.method === "GET" && segments.length === 2) {
       const id = segments[1];
       if (!safeProjectId(id)) return error(res, 400, "GENE_BAD_PROJECT_ID", "Invalid project id.");
