@@ -27,6 +27,80 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
+function normalizeAgentResult(input: AgentResponse, operation: string): AgentResponse {
+  if (typeof input.reply !== "string" || !input.reply.trim()) throw new Error("GENE response needs a non-empty user-facing reply.");
+  const result: AgentResponse = {
+    reply: input.reply.trim().slice(0, 12_000),
+    files: Array.isArray(input.files) ? input.files : [],
+    question: null,
+    plan: null,
+    complete: Boolean(input.complete),
+    needsUserDecision: Boolean(input.needsUserDecision)
+  };
+
+  if (input.question != null) {
+    const q = input.question as any;
+    if (!q || typeof q !== "object" || typeof q.text !== "string" || !q.text.trim()) {
+      throw new Error("The interview question was malformed; it must contain one clear question.");
+    }
+    if (typeof q.id !== "string" || !q.id.trim()) throw new Error("The interview question is missing its stable id.");
+    result.question = {
+      id: q.id.trim().slice(0, 100),
+      text: q.text.trim().slice(0, 1400),
+      ...(typeof q.why === "string" && q.why.trim() ? { why: q.why.trim().slice(0, 800) } : {}),
+      ...(Array.isArray(q.choices) ? { choices: q.choices.filter((choice: unknown): choice is string => typeof choice === "string" && choice.trim()).slice(0, 8).map((choice: string) => choice.trim().slice(0, 180)) } : {})
+    };
+  }
+
+  if (input.plan != null) {
+    const plan = input.plan as any;
+    if (!plan || typeof plan !== "object") throw new Error("The game plan was malformed.");
+    if (typeof plan.title !== "string" || !plan.title.trim()) throw new Error("The game plan is missing a title.");
+    if (typeof plan.summary !== "string" || !plan.summary.trim()) throw new Error("The game plan is missing its summary.");
+    if (plan.engine !== "canvas2d" && plan.engine !== "webgl3d") throw new Error("The game plan engine must be canvas2d or webgl3d.");
+    const tasks = Array.isArray(plan.tasks) ? plan.tasks.filter((task: unknown): task is string => typeof task === "string" && task.trim()).slice(0, 40).map((task: string) => task.trim().slice(0, 240)) : [];
+    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((mechanic: unknown): mechanic is string => typeof mechanic === "string" && mechanic.trim()).slice(0, 30).map((mechanic: string) => mechanic.trim().slice(0, 180)) : [];
+    if (tasks.length < 3) throw new Error("The game plan must include at least three concrete implementation tasks.");
+    if (mechanics.length < 1) throw new Error("The game plan must identify at least one actual gameplay mechanic.");
+    const budget = plan.performanceBudget || {};
+    const targetFps = Number(budget.targetFps);
+    const maxEnemies = Number(budget.maxEnemies);
+    const maxObjects = Number(budget.maxObjects);
+    const maxParticles = Number(budget.maxParticles);
+    if (![targetFps, maxEnemies, maxObjects, maxParticles].every(Number.isFinite)) throw new Error("The game plan performance budget is malformed.");
+    if (targetFps < 30 || targetFps > 120 || maxEnemies < 0 || maxEnemies > 40 || maxObjects < 0 || maxObjects > 1200 || maxParticles < 0 || maxParticles > 300) {
+      throw new Error("The game plan exceeds GENE's supported performance budget.");
+    }
+    result.plan = {
+      title: plan.title.trim().slice(0, 140),
+      summary: plan.summary.trim().slice(0, 3000),
+      engine: plan.engine,
+      tasks,
+      mechanics,
+      performanceBudget: {
+        targetFps,
+        maxEnemies: Math.floor(maxEnemies),
+        maxObjects: Math.floor(maxObjects),
+        maxParticles: Math.floor(maxParticles)
+      }
+    };
+  }
+
+  if (operation === "interview") {
+    if (result.question && result.plan) throw new Error("Interview must return either one next question or a completed plan, not both.");
+    if (!result.question && !result.plan) throw new Error("Interview must return exactly one next question or a completed plan.");
+  }
+  if (operation === "plan" && !result.plan) throw new Error("Planning response is missing its structured plan. No files were changed.");
+  if (operation === "build" || operation === "surprise") {
+    if (!result.plan) throw new Error("Build response is missing its implementation plan.");
+    if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required game source files.");
+  }
+  if ((operation === "edit" || operation === "chat") && result.files.length > 0 && result.files.length > 4) {
+    throw new Error("Edit response changed too many files for the current browser-game scope.");
+  }
+  return result;
+}
+
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
@@ -232,6 +306,7 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
+    result = normalizeAgentResult(result, body.operation);
     const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine, body.mode);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
