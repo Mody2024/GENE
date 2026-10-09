@@ -24,6 +24,10 @@ assert.equal(webPackage.dependencies.jszip, "3.10.1", "project ZIP packaging is 
 assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
 assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit");
 assert.ok(api.includes("validateFiles"), "server validates model output");
+assert.ok(api.includes("normalizeAgentResult"), "API validates structured response shapes before updating the UI");
+assert.ok(api.includes("at least three concrete implementation tasks"), "plans with no implementation tasks are rejected");
+assert.ok(api.includes("exactly one next question or a completed plan"), "interview responses must be sequential and complete");
+assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
 assert.ok(api.includes('new Function(byPath["game.js"])'), "model-generated JS syntax is checked");
 assert.ok(api.includes("No files were changed"), "failed generation does not claim source changes");
 assert.ok(api.includes("x-goog-api-key"), "Gemini key is passed in server-side request header");
