@@ -29,6 +29,9 @@ function parseModelJson(text: string): AgentResponse {
 
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
+  if ((operation === "plan" || operation === "interview") && files.length > 0) {
+    throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
+  }
   const normalized: Array<{ path: string; content: string }> = [];
   for (const file of files) {
     if (!file || typeof file.path !== "string" || typeof file.content !== "string") throw new Error("A generated file was malformed.");
