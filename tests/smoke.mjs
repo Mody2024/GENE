@@ -76,7 +76,8 @@ const sourceCheck = validateSourceProject(goodFiles);
 assert.equal(sourceCheck.ok, true, "valid small game source passes the local agent source contract");
 assert.equal(validateSourceProject({ ...goodFiles, "game.js": "const = ;" }).ok, false, "broken JS is rejected before sync");
 assert.equal(validateSourceProject({ ...goodFiles, "game.js": 'fetch("https://example.com");requestAnimationFrame(()=>{});' }).ok, false, "external runtime dependencies are rejected");
-const rendered = renderPlayHtml(goodFiles, "Contract Test");
+const rendered = renderPlayHtml(goodFiles, "Contract Test", "/play/test-project-01/");
+assert.ok(rendered.includes("<base href='/play/test-project-01/'>"), "disk play page resolves relative asset paths against the project directory");
 assert.ok(rendered.includes("<canvas id=\"game-canvas\""), "disk play page embeds the actual game canvas");
 assert.ok(rendered.includes("<script>") && rendered.includes("</script>"), "disk play page closes its script tags correctly");
 
