@@ -15,6 +15,7 @@ const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
+const browserSmoke = read("tests/browser-smoke.mjs");
 
 assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
 assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned Next version");
@@ -50,6 +51,8 @@ assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)')
 assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route loads the saved project");
 assert.ok(css.includes(':root[data-theme="light"]'), "light theme is implemented");
 assert.ok(css.includes(".reference-chips"), "reference attachments are styled");
+assert.ok(browserSmoke.includes("coloredPixels > 5000"), "browser suite requires actual painted pixels");
+assert.ok(browserSmoke.includes('page.keyboard.press("ArrowRight")'), "browser suite exercises real keyboard gameplay");
 assert.ok(agentSource.includes("writeTextFile"), "local agent writes actual project files");
 assert.ok(agentSource.includes("historyRoot"), "local agent backs up existing project files");
 assert.ok(agentSource.includes("GENE_AUTH_REQUIRED"), "local agent protects write/read APIs with a token");
@@ -131,4 +134,4 @@ try {
   await rm(tempRoot, { recursive: true, force: true });
 }
 
-console.log("GENE contract tests passed, including authenticated local filesystem sync, disk-backed play URL, source validation, import/export and grounded research.");
+console.log("GENE contract tests passed, including authenticated local filesystem sync, disk-backed play URL, source validation, import/export, grounded research and browser-test contracts.");
