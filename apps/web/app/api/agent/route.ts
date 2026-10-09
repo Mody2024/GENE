@@ -84,6 +84,9 @@ export async function POST(request: NextRequest) {
   const allowedOperations = ["interview", "plan", "build", "edit", "chat", "research", "surprise"];
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
+  if (body.mode === "plan" && ["build", "edit", "surprise"].includes(body.operation)) {
+    return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing game files.", 409, "GENE_PLAN_MODE_READ_ONLY");
+  }
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
   if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
 
@@ -215,6 +218,18 @@ export async function POST(request: NextRequest) {
     }
     const files = validateFiles(result.files || [], body.operation);
     result.files = files;
+    if (body.operation === "interview" && !result.question && !result.plan) {
+      throw new Error("Interview result must ask exactly one next question or return a completed plan.");
+    }
+    if (body.operation === "plan" && !result.plan) {
+      throw new Error("Planning response is missing its structured plan. No files were changed.");
+    }
+    if (body.operation === "research" && files.length > 0) {
+      throw new Error("Research is read-only; source file output was rejected.");
+    }
+    if (body.operation === "edit" && body.project?.files && files.some(file => body.project.files[file.path] === file.content)) {
+      throw new Error("Edit response included unchanged source. No files were changed; ask GENE for a more specific patch.");
+    }
     if (body.operation === "research") {
       const chunks = payload?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const seen = new Set<string>();
