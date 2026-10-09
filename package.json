@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "npm run dev --workspace=@gene/web",
+    "build": "npm run build --workspace=@gene/web",
+    "start": "npm run start --workspace=@gene/web",
+    "typecheck": "npx tsc --noEmit -p apps/web/tsconfig.json",
     "test": "node tests/smoke.mjs"
   }
 }
