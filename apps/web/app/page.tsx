@@ -201,7 +201,8 @@ export default function Home() {
       "setTimeout(report,900);setTimeout(report,2200);",
       "})();"
     ].join("\n");
-    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "'>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+    const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
+    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "'><script>" + instrumentation + "<\/script>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
   const savedAssets = useMemo(() => {
