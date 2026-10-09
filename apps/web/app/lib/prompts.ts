@@ -52,7 +52,7 @@ export function makeAgentInput(input: {
   ];
   if (input.operation === "interview") parts.push("Interview: ask exactly one material question next, based on the latest answer and the full known context. Do not return a batch of questions. If no meaningful question remains, return a complete plan.");
   if (input.operation === "plan") parts.push("Plan only. Give an ordered implementation plan, genre-specific mechanics, engine and conservative performance budget. Do not return source files.");
-  if (input.operation === "build") parts.push("Generate all four files for a complete playable first version, not a mockup. Include a distinctive art direction and implemented controls/objective/win-loss-restart loop.");
+  if (input.operation === "build") parts.push("Generate all four files for a complete playable first version, not a mockup. Include a distinctive art direction and implemented controls/objective/win-loss-restart loop. If no approved plan exists in the input, you must return a complete structured plan alongside the files; use the same engine in the plan and game-spec.json.");
   if (input.operation === "edit") parts.push("Make the requested change against the exact existing source. Return only files that actually changed, with complete contents. Keep edits targeted and preserve existing features.");
   if (input.operation === "chat") parts.push("Speak naturally. If the user clearly asks for changes, implement them in files rather than only describing them.");
   if (input.operation === "research") parts.push("Research the user's question using live Google Search grounding results. Summarize useful findings for this game project and include source URLs/titles in the reply. Do not return source files or claim to have changed anything.");
