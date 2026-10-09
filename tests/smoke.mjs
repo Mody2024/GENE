@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -43,6 +43,9 @@ assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload
 assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
 assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
 assert.ok(page.includes("Automated runtime repair"), "preview failure triggers bounded repair");
+assert.ok(page.includes('await writeProjectToDisk(updated, localAgentUrl, localAgentToken)'), "AI edits auto-sync to connected local disk");
+assert.ok(page.includes('writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)'), "manual saves/restores auto-sync to local disk");
+assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
 assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)'), "fullscreen opens stable project URL");
 assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route loads the saved project");
 assert.ok(css.includes(':root[data-theme="light"]'), "light theme is implemented");
@@ -109,6 +112,17 @@ try {
   const assetResponse = await fetch(base + "/play/test-project-01/assets/marker.txt");
   assert.equal(assetResponse.status, 200, "asset route serves synced asset files");
   assert.equal(await assetResponse.text(), "GENE asset bytes", "served asset bytes match the on-disk asset");
+  const secondFiles = { ...filesWithAsset, "game.js": filesWithAsset["game.js"] + "\n// edited in a subsequent GENE version" };
+  const secondSync = await fetch(base + "/api/projects/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-GENE-TOKEN": "gene-test-token-01234567890123456789" },
+    body: JSON.stringify({ id:"test-project-01", name:"Contract Game", initialPrompt:"test", files:secondFiles, plan:null, versions:[], references:[] })
+  });
+  assert.equal(secondSync.status, 200, "a subsequent project version can be synced");
+  assert.equal(await readFile(path.join(tempRoot, "projects", "test-project-01", "game.js"), "utf8"), secondFiles["game.js"], "subsequent sync updates the actual disk file");
+  const historyEntries = await readdir(path.join(tempRoot, "history", "test-project-01"));
+  assert.ok(historyEntries.length >= 1, "a subsequent sync preserves the previous disk project in history");
+  assert.equal(await readFile(path.join(tempRoot, "history", "test-project-01", historyEntries[0], "game.js"), "utf8"), filesWithAsset["game.js"], "history retains the previous file contents");
   const diskTest = await fetch(base + "/api/projects/test-project-01/test", { method:"POST", headers:{ "X-GENE-TOKEN":"gene-test-token-01234567890123456789" } });
   assert.equal(diskTest.status, 200, "disk-backed source validation passes on the valid project");
   assert.equal((await diskTest.json()).ok, true, "test route reports the validation result");
