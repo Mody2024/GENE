@@ -141,7 +141,7 @@ try {
   const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   await sampleFrame.locator("#game-canvas").click();
   await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
-  await samplePage.keyboard.press("ArrowRight");
+  await sampleFrame.locator("#game-canvas").press("ArrowRight");
   await samplePage.waitForTimeout(250);
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
