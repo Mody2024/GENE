@@ -186,7 +186,8 @@ export default function Home() {
     let operation = operationOverride || "chat";
     if (!operationOverride) {
       if (project.mode === "plan") operation = project.plan ? "plan" : "interview";
-      else operation = Object.keys(project.files).length ? "edit" : "build";
+      else if (!Object.keys(project.files).length) operation = "build";
+      else operation = isConversationOnly(prompt) ? "chat" : "edit";
     }
     if (operation === "surprise") {
       operation = "surprise";
@@ -561,6 +562,13 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+function isConversationOnly(text: string) {
+  const value = text.trim().toLowerCase();
+  const asksToChange = /\\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|give the player|put|delete)\\b/.test(value);
+  const startsAsQuestion = /^(what|why|how|can you explain|explain|tell me|suggest|should we|should i|could we|is it|does it|will it|which|would it|what if|give me ideas)\\b/.test(value);
+  return startsAsQuestion && !asksToChange;
 }
 
 function operationText(mode: Mode, hasGame: boolean) {
