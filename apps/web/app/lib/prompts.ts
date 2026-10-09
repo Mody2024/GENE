@@ -1,3 +1,4 @@
+import { formatGameGuide, selectGameGuide } from "./game-guides";
 import type { GamePlan, GeneProject, Mode } from "./types";
 
 export const AGENT_SYSTEM = [
@@ -24,7 +25,14 @@ export function makeAgentInput(input: {
   thinking?: string;
 }) {
   const p = input.project;
+  const guide = selectGameGuide({
+    message: input.message,
+    initialPrompt: p?.initialPrompt,
+    planTitle: p?.plan?.title,
+    planEngine: p?.plan?.engine
+  });
   const parts = [
+    "GENRE-SPECIFIC IMPLEMENTATION GUIDE AND ACCEPTANCE CHECKLIST:\\n" + formatGameGuide(guide),
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
