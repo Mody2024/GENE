@@ -403,6 +403,11 @@ export default function Home() {
     if (!project) return;
     const zip = new JSZip();
     Object.entries(project.files).forEach(([path, source]) => zip.file(path, source));
+    (project.references || []).forEach(ref => {
+      const safeName = ref.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120) || "reference";
+      if (ref.kind === "image" && ref.dataBase64) zip.file("references/" + safeName, ref.dataBase64, { base64: true });
+      else if (ref.kind === "text" && typeof ref.textContent === "string") zip.file("references/" + safeName, ref.textContent);
+    });
     project.versions.forEach(version => {
       const prefix = "versions/" + String(version.number).padStart(3, "0") + "/";
       Object.entries(version.files).forEach(([path, source]) => zip.file(prefix + path, source));
