@@ -1,50 +1,55 @@
 # GENE — AI Game Studio
 
-GENE is an AI-assisted game-development workspace. The repository is the source of truth: source edits are versioned, generated code is validated before it can be saved, and the UI must never claim that a build or test happened without evidence.
+GENE is an AI-assisted game-development workspace. This repository is the source of truth for the app. Build/test status must describe work the app actually performed; failed generation is rejected rather than presented as a successful game.
 
-## Current milestone: V1.2 Flash foundation
+## Current milestone: GENE 1.2 Flash foundation
 
-- Chat-first workspace with Plan and Build modes
-- Sequential question/answer interview
-- Gemini API endpoint with server-only key handling
-- Canvas/WebGL self-contained game source contract
-- Server-side generated-file validation
-- Local browser project persistence, source editor and version snapshots
-- Sandboxed game preview with runtime error/render telemetry
-- Explicit failure when Gemini is not configured; no fake AI build in fallback mode
+Implemented in this branch:
+- Chat-first workspace inspired by professional AI coding tools, with working navigation and dark/light themes.
+- Plan/Build modes and a sequential one-question-at-a-time interview prompt contract.
+- Gemini server API endpoint with server-only API key handling, thinking levels, response validation, rate limiting, and explicit errors when no key is configured.
+- Read-only grounded Google Search mode; sources are returned from Gemini Search grounding when available.
+- Image and text/source reference attachments, with image bytes passed to Gemini.
+- Browser project state with recent projects, editable game source, version snapshots, restore, preview, runtime error/first-render telemetry, and a bounded two-attempt repair loop.
+- Full-window same-browser play route at `/play/<project-id>`.
+- ZIP source export including current source, version snapshots, references, manifest and README; ZIP/legacy project import.
+- Server-side checks for generated file names/sizes, JavaScript syntax, required canvas, game-spec fields, objective/win/loss declarations, render loop, input hooks, draw operations, external runtime dependencies and conservative object budgets.
+- GitHub Actions contract tests and a Next.js production build.
 
-The currently implemented agent returns generated source files to the browser workspace. Local browser persistence is useful for the first milestone; shared cloud persistence, authenticated multi-user projects, real automated browser gameplay testing, engine exporters, asset workers and publishing remain separate milestones and are not represented as already complete.
+The generation path asks Gemini for the actual source files used by the preview. Source validation and a visible canvas signal are useful diagnostics, but they are not equivalent to full gameplay automation. GENE must not claim that every game mechanic was verified unless it has evidence for that specific test.
 
 ## Stack
 
 - Next.js 14 / React 18 / TypeScript
-- Gemini API through server-side HTTPS (no browser-exposed API key)
-- Browser sandbox for running generated source
-- GitHub Actions for smoke tests and production build validation
+- Gemini API via server-side HTTPS (the API key is never sent to browser code)
+- Sandboxed browser preview for self-contained Canvas 2D / raw WebGL projects
+- JSZip for source project export/import
+- GitHub Actions for contract tests and production builds
 
-## Run locally
+## Local development
 
-Node.js 20 is the recommended development runtime for the web workspace.
+Use Node.js 20 or a newer supported LTS release for the web workspace.
 
 1. Copy `apps/web/.env.example` to `apps/web/.env.local`.
-2. Set `GEMINI_API_KEY` to your own Google AI Studio API key. Keep it secret.
-3. From repository root, run `npm install`.
+2. Set `GEMINI_API_KEY` to your own Google AI Studio API key. Do not commit this file.
+3. From the repository root, run `npm install`.
 4. Run `npm run dev`.
 5. Open `http://localhost:3000`.
 
-The web app can be built with `npm run build` and checked with `npm test`.
+Run `npm test` for contract checks and `npm run build` for the production build.
 
 ## Deploy on Vercel
 
-Import this GitHub repository into Vercel and set the Root Directory to `apps/web`. Add `GEMINI_API_KEY` and optionally `GENE_FAST_MODEL` to Vercel Environment Variables. Do not commit `.env.local`.
+Import this GitHub repository into Vercel. Set the Root Directory to `apps/web`, build command to `next build`, and add `GEMINI_API_KEY` plus optional `GENE_FAST_MODEL` to Vercel Environment Variables. Do not commit `.env.local`.
 
-## Current constraints
+## Honest limitations of this milestone
 
-- This milestone targets small browser games with self-contained Canvas 2D or raw WebGL source.
-- Browser-local projects live in localStorage. Clearing browser storage can remove them; export your project/source regularly.
-- Generated projects are not automatically published to public URLs yet.
-- A successful source validation does not by itself prove that every gameplay path works. The UI reports browser runtime signals but full automated gameplay tests are still planned.
-- GPU-heavy image-to-3D generation is not yet implemented; Forge is currently a contract and pipeline boundary.
+- Projects are stored in browser localStorage. Import/export lets you move them, but cloud persistence and shared accounts are not implemented yet.
+- The full-window game link is local to the same deployment and browser storage. It is not a public/shareable published game URL.
+- GENE returns generated source files and executes them in a sandboxed iframe; there is not yet a dedicated long-running filesystem worker or engine build farm.
+- Static checks plus canvas telemetry cannot prove every gameplay path. Automated gameplay control/screenshot comparison and deterministic behavior tests are planned.
+- 2D/3D games must be self-contained Canvas 2D or raw WebGL at this milestone. Phaser/Three.js adapters, Godot/Unity/Unreal exporters, multiplayer server generation and native EXE builds are not yet implemented.
+- Forge has asset contracts but does not yet perform GPU-heavy image-to-3D generation, Blender retopology/UV/rigging or texture baking.
 
 ## Architecture
 
