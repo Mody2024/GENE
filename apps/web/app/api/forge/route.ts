@@ -42,9 +42,9 @@ function normalizeRecipe(raw: any, kind: string, quality: string): Recipe {
   if (raw.parts.length < 3 || raw.parts.length > limit) throw new Error("Model returned " + raw.parts.length + " parts; expected between 3 and " + limit + ".");
   const parts: Part[] = raw.parts.map((part: any, index: number) => {
     if (!part || typeof part !== "object" || !SHAPES.has(part.shape)) throw new Error("Part " + index + " has an unsupported shape.");
-    const position = isVec3(part.position) ? part.position : [0, 0, 0] as Vec3;
-    const scale = isVec3(part.scale) ? part.scale : [1, 1, 1] as Vec3;
-    const rotation = isVec3(part.rotation) ? part.rotation : [0, 0, 0] as Vec3;
+    const position: Vec3 = isVec3(part.position) ? part.position : [0, 0, 0];
+    const scale: Vec3 = isVec3(part.scale) ? part.scale : [1, 1, 1];
+    const rotation: Vec3 = isVec3(part.rotation) ? part.rotation : [0, 0, 0];
     if (position.some(n => Math.abs(n) > 40)) throw new Error("Part " + index + " position exceeds the asset bounds.");
     if (scale.some(n => n <= 0.03 || n > 20)) throw new Error("Part " + index + " scale is outside the safe range.");
     if (rotation.some(n => Math.abs(n) > 360)) throw new Error("Part " + index + " rotation exceeds 360 degrees.");
