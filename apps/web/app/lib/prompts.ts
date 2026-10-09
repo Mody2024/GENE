@@ -33,6 +33,13 @@ export function makeAgentInput(input: {
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
     "EXISTING PLAN: " + JSON.stringify(p?.plan || null),
     "CURRENT FILES: " + JSON.stringify(p?.files || {}),
+    "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
+      name: ref.name,
+      mimeType: ref.mimeType,
+      kind: ref.kind,
+      textContent: ref.kind === "text" ? (ref.textContent || "").slice(0, 16000) : undefined,
+      imageAttached: ref.kind === "image"
+    }))),
     "RECENT CHAT: " + JSON.stringify((input.history || p?.messages?.map(m => ({role:m.role,content:m.content})) || []).slice(-12))
   ];
   if (input.operation === "interview") parts.push("Interview: ask exactly one material question next, based on the latest answer and the full known context. Do not return a batch of questions. If no meaningful question remains, return a complete plan.");
