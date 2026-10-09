@@ -29,7 +29,7 @@ function parseModelJson(text: string): AgentResponse {
 
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
-  if ((operation === "plan" || operation === "interview") && files.length > 0) {
+  if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
     throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   }
   const normalized: Array<{ path: string; content: string }> = [];
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return jsonError("Request body must be valid JSON."); }
 
-  const allowedOperations = ["interview", "plan", "build", "edit", "chat", "surprise"];
+  const allowedOperations = ["interview", "plan", "build", "edit", "chat", "research", "surprise"];
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
           temperature: body.operation === "interview" ? 0.35 : 0.25,
           maxOutputTokens: body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096,
           thinkingConfig: { thinkingLevel }
-        }
+        },
+        ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
       }),
       signal: AbortSignal.timeout(55_000)
     });
@@ -189,9 +190,30 @@ export async function POST(request: NextRequest) {
 
   let result: AgentResponse;
   try {
-    result = parseModelJson(text);
+    if (body.operation === "research" && !text.trim().startsWith("{") && !text.trim().startsWith("```")) {
+      result = { reply: text.trim(), files: [], question: null, plan: null, complete: true, needsUserDecision: false };
+    } else {
+      result = parseModelJson(text);
+    }
     const files = validateFiles(result.files || [], body.operation);
     result.files = files;
+    if (body.operation === "research") {
+      const chunks = payload?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      const seen = new Set<string>();
+      const sources: Array<{ title: string; uri: string }> = [];
+      for (const chunk of chunks) {
+        const web = chunk?.web;
+        if (typeof web?.uri === "string" && /^https?:\/\//i.test(web.uri) && !seen.has(web.uri)) {
+          seen.add(web.uri);
+          sources.push({ title: String(web.title || web.uri), uri: web.uri });
+        }
+      }
+      if (sources.length) {
+        result.reply += "\n\nSources\n" + sources.slice(0, 8).map((source, index) => (index + 1) + ". " + source.title + " — " + source.uri).join("\n");
+      } else {
+        result.reply += "\n\nGENE did not receive source URLs from Google Search grounding for this response. Treat this as model-generated guidance, not verified live research.";
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid model output.";
     return NextResponse.json({
