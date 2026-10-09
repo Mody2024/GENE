@@ -203,12 +203,14 @@ export async function createAgentServer({ port = PORT, host = HOST, workspace = 
       if (!safeProjectId(id)) return error(res, 400, "GENE_BAD_PROJECT_ID", "Invalid project id.");
       const dir = path.join(projectsRoot, id);
       try {
-        const [html, css, js] = await Promise.all([
+        const [html, css, js, manifestText] = await Promise.all([
           readFile(path.join(dir, "game.html"), "utf8"),
           readFile(path.join(dir, "game.css"), "utf8"),
-          readFile(path.join(dir, "game.js"), "utf8")
+          readFile(path.join(dir, "game.js"), "utf8"),
+          readFile(path.join(dir, "gene.project.json"), "utf8")
         ]);
-        const output = renderPlayHtml({ "game.html": html, "game.css": css, "game.js": js }, id);
+        const manifest = JSON.parse(manifestText);
+        const output = renderPlayHtml({ "game.html": html, "game.css": css, "game.js": js }, manifest.name || id);
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
