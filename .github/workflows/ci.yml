@@ -22,5 +22,21 @@ jobs:
         run: npm run check --workspace=@gene/local-agent
       - name: Run contract and local-agent end-to-end tests
         run: npm test
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Build web app
         run: npm run build
+      - name: Start web app
+        run: |
+          npm run start > /tmp/gene-web.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "GENE web is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/gene-web.log
+          exit 1
+      - name: Test real browser preview and UI controls
+        run: npm run test:browser
