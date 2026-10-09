@@ -177,7 +177,7 @@ export default function Home() {
       answers: nextAnswers,
       question: answerKey ? null : project.question,
       messages: silent
-        ? [...project.messages, message("assistant", "The live preview reported a problem. I’m inspecting the current source and attempting a targeted repair (" + (autoRepairAttempts.current + 1) + "/2).")]
+        ? [...project.messages, message("assistant", "The live preview reported a problem. I’m inspecting the current source and attempting a targeted repair (" + (silent ? autoRepairAttempts.current : autoRepairAttempts.current + 1) + "/2).")]
         : [...project.messages, message("user", prompt)],
       updatedAt: now()
     };
