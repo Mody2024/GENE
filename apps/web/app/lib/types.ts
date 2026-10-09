@@ -4,6 +4,7 @@ export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; c
 export type Question = { id: string; text: string; why?: string; choices?: string[] };
 export type GamePlan = { title: string; summary: string; engine: "canvas2d" | "webgl3d"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
 export type BuildVersion = { number: number; label: string; files: Record<string, string>; createdAt: string; testSummary: string };
+export type ReferenceFile = { id: string; name: string; mimeType: string; kind: "image" | "text"; dataBase64?: string; textContent?: string; size: number };
 export type GeneProject = {
   id: string;
   name: string;
@@ -17,6 +18,7 @@ export type GeneProject = {
   files: Record<string, string>;
   versions: BuildVersion[];
   activeFile: string;
+  references: ReferenceFile[];
   updatedAt: string;
 };
 export type AgentResponse = {
