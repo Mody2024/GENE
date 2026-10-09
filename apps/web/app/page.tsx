@@ -266,7 +266,7 @@ export default function Home() {
         name: result.plan?.title || (nextProject.name === "Untitled game" && isFirstIdea ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name),
         mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
         answers: nextAnswers,
-        question: result.question || null,
+        question: operation === "research" || operation === "chat" ? nextProject.question : (result.question || null),
         plan: result.plan || nextProject.plan,
         files,
         versions,
