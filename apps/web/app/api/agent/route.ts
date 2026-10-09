@@ -53,6 +53,8 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: game-spec.json must be a JSON object.");
     if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: game-spec.json needs a real game title.");
     if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game-spec.json needs a game genre.");
+    if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") throw new Error("Build rejected: game-spec.json engine must be canvas2d or webgl3d.");
+    if (body.project?.plan?.engine && spec.engine !== body.project.plan.engine) throw new Error("Build rejected: game-spec engine does not match the approved plan engine.");
     if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the gameplay mechanics list is missing.");
     if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the controls list is missing.");
     if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
@@ -72,6 +74,19 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: game.css contains an external runtime dependency.");
     if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
     if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
+    if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["']\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+    if (spec.engine === "webgl3d") {
+      if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+      for (const [pattern, requirement] of [
+        [/createShader\s*\(/, "shader creation"],
+        [/shaderSource\s*\(/, "shader source"],
+        [/compileShader\s*\(/, "shader compilation"],
+        [/createProgram\s*\(/, "shader program creation"],
+        [/linkProgram\s*\(/, "shader program linking"],
+        [/bufferData\s*\(/, "GPU geometry buffers"],
+        [/drawArrays\s*\(|drawElements\s*\(/, "GPU geometry draw calls"]
+      ] as Array<[RegExp, string]>) if (!pattern.test(js)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
+    }
     if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
   }
   return normalized;
@@ -218,6 +233,10 @@ export async function POST(request: NextRequest) {
     }
     const files = validateFiles(result.files || [], body.operation);
     result.files = files;
+    if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
+      const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
+      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build");
+    }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
     }
