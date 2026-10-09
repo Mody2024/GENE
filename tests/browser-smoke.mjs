@@ -84,7 +84,7 @@ try {
   await page.getByTitle("Switch theme").click();
   const themeAfter = await page.locator("html").getAttribute("data-theme");
   assert.notEqual(themeAfter, themeBefore, "theme switch responds to user input");
-  await page.getByTitle("Files").click();
+  await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
   console.log("Playwright browser smoke passed: workspace loads, canvas renders visible pixels, ArrowRight moves the player, theme switches, and Files navigation responds.");
