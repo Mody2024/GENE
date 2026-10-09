@@ -7,7 +7,7 @@ import { access, cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } fro
 
 const PORT = Number(process.env.GENE_AGENT_PORT || process.env.PORT || 38421);
 const HOST = process.env.GENE_AGENT_HOST || "127.0.0.1";
-const WORKSPACE = path.resolve(process.env.GENE_WORKSPACE || path.join(os.homedir(), "GENE", "projects"));
+const WORKSPACE = path.resolve(process.env.GENE_WORKSPACE || path.join(os.homedir(), "GENE"));
 const TOKEN_FILE = path.join(os.homedir(), ".gene-agent-token");
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_FILE_CHARS = 600_000;
