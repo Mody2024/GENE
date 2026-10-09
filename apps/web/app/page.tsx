@@ -329,7 +329,7 @@ export default function Home() {
   }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
 
   async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
-    const normalizedUrl = url.trim().replace(/\\/+$/, "");
+    const normalizedUrl = url.trim().replace(/\/+$/, "");
     setLocalAgentStatus("checking");
     try {
       const healthResponse = await fetch(normalizedUrl + "/health", { cache: "no-store" });
@@ -360,7 +360,7 @@ export default function Home() {
     if (!enteredUrl) return null;
     const enteredToken = window.prompt("Paste the private token printed in the Local Agent terminal. Do not share it with anyone.");
     if (!enteredToken) return null;
-    const url = enteredUrl.trim().replace(/\\/+$/, "");
+    const url = enteredUrl.trim().replace(/\/+$/, "");
     const token = enteredToken.trim();
     const connected = await verifyLocalAgent(url, token, true);
     return connected ? { url, token } : null;
@@ -426,7 +426,7 @@ export default function Home() {
   }
 
   function openLocalAgentGame() {
-    const url = lastLocalPlayUrl || (localAgentUrl.replace(/\\/+$/, "") + "/play/" + encodeURIComponent(project?.id || ""));
+    const url = lastLocalPlayUrl || (localAgentUrl.replace(/\/+$/, "") + "/play/" + encodeURIComponent(project?.id || ""));
     if (!project?.id || localAgentStatus !== "connected") {
       setNotice("Connect and sync to the Local Agent first.");
       return;
@@ -671,6 +671,7 @@ export default function Home() {
   if (!project) return <main className="boot"><div className="gene-mark">G</div><p>Opening your workspace…</p></main>;
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
+  const isSyncedToLocal = Boolean(localAgentStatus === "connected" && lastSyncedUpdatedAt && lastSyncedUpdatedAt === project.updatedAt);
   const activeMessages = project.messages;
   const nav = [
     { id: "chat" as const, icon: "◉", label: "Chat" },
@@ -707,6 +708,13 @@ export default function Home() {
         <div className="sidebar-bottom">
           <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "Gemini connected" : "Gemini key missing"}</div>
           <small>{apiReady ? aiModel : "AI builds require a server-side key"}</small>
+          <div className="agent-connection">
+            <div className="connection-row"><span className={"status-dot " + (localAgentStatus === "connected" ? "online" : localAgentStatus === "error" ? "offline" : "")} />{localAgentStatus === "connected" ? "Local Agent connected" : localAgentStatus === "checking" ? "Checking Local Agent" : localAgentStatus === "error" ? "Local Agent error" : "Local Agent disconnected"}</div>
+            {localAgentWorkspace && <small title={localAgentWorkspace}>{localAgentWorkspace}</small>}
+            <button className="agent-connect-button" onClick={connectLocalAgent}>{localAgentStatus === "connected" ? "Agent settings" : "Connect Local Agent"}</button>
+            {hasGame && localAgentStatus === "connected" && <button className="agent-connect-button" onClick={syncToLocalAgent} disabled={busy}>{isSyncedToLocal ? "Resync project files" : "Write project to disk"}</button>}
+            {isSyncedToLocal && <button className="agent-connect-button" onClick={openLocalAgentGame}>Open disk-backed game ↗</button>}
+          </div>
         </div>
       </aside>
 
@@ -721,7 +729,8 @@ export default function Home() {
             <select className="thinking-select" value={project.thinking} aria-label="Thinking mode" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
               <option value="fast">Fast</option><option value="balanced">Balanced</option><option value="deep">Deep</option>
             </select>
-            <button className="icon-button subtle" title="Download project file" onClick={downloadProject}>↓</button>
+            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
+            <button className="icon-button subtle" title="Download project ZIP" onClick={downloadProject}>↓</button>
           </div>
         </header>
 
@@ -792,7 +801,7 @@ export default function Home() {
 
           <aside className={"preview-panel " + (!previewOpen ? "collapsed" : "") + (expandedPreview ? " expanded" : "")}>
             <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title={previewOpen ? "Minimize preview" : "Open preview"} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? "–" : "□"}</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
-            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox="allow-scripts" srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : "No game loaded"}<button onClick={downloadProject}>Export project ↓</button></div></>}
+            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox="allow-scripts" srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : "No game loaded"}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
             {expandedPreview && hasGame && <button className="close-expanded" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
           </aside>
         </div>
