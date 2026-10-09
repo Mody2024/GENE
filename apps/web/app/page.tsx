@@ -207,7 +207,7 @@ export default function Home() {
   const savedAssets = useMemo(() => {
     if (!project) return [];
     return Object.entries(project.files)
-      .filter(([path]) => /^assets\\/[a-zA-Z0-9_-]+\\/asset\\.json$/.test(path))
+      .filter(([path]) => /^assets\/[a-zA-Z0-9_-]+\/asset\.json$/.test(path))
       .map(([path, source]) => {
         const id = path.split("/")[1];
         const prefix = "assets/" + id + "/";
