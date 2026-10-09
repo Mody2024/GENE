@@ -73,6 +73,7 @@ export default function Home() {
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
+  const projectImportRef = useRef<HTMLInputElement>(null);
   const autoRepairAttempts = useRef(0);
 
   useEffect(() => {
@@ -368,6 +369,100 @@ export default function Home() {
     void runAgent("Invent and build an original small browser game with one surprising central mechanic. Choose smart defaults and make it genuinely playable.", "surprise");
   }
 
+  async function importProject(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      setNotice("Import rejected: ZIP is larger than GENE's 25 MB browser import limit.");
+      return;
+    }
+    try {
+      let manifest: any = {};
+      let currentFiles: Record<string, string> = {};
+      let versionsByNumber = new Map<number, BuildVersion>();
+      let references: NonNullable<GeneProject["references"]> = [];
+      if (file.name.toLowerCase().endsWith(".zip")) {
+        const zip = await JSZip.loadAsync(file);
+        const manifestEntry = zip.file("gene.project.json");
+        if (!manifestEntry) throw new Error("This ZIP has no gene.project.json manifest.");
+        manifest = JSON.parse(await manifestEntry.async("string"));
+        let totalChars = 0;
+        for (const [path, entry] of Object.entries(zip.files)) {
+          if ((entry as JSZip.JSZipObject).dir) continue;
+          if (path === "gene.project.json" || path === "README.md" || path.startsWith("references/") || path.startsWith("__MACOSX/")) continue;
+          const versionMatch = path.match(/^versions\/(\d+)\/(.+)$/);
+          const text = await (entry as JSZip.JSZipObject).async("string");
+          totalChars += text.length;
+          if (totalChars > 12_000_000) throw new Error("Import rejected: extracted text exceeds the 12 MB safety limit.");
+          if (versionMatch) {
+            const versionNumber = Number(versionMatch[1]);
+            const restPath = versionMatch[2];
+            if (restPath === "version.json") {
+              const meta = JSON.parse(text);
+              versionsByNumber.set(versionNumber, { number: versionNumber, label: String(meta.label || "Imported version"), createdAt: String(meta.createdAt || now()), testSummary: String(meta.testSummary || "Imported snapshot; runtime verification pending."), files: {} });
+            } else {
+              const previous = versionsByNumber.get(versionNumber) || { number: versionNumber, label: "Imported version", createdAt: now(), testSummary: "Imported snapshot; runtime verification pending.", files: {} };
+              previous.files[restPath] = text;
+              versionsByNumber.set(versionNumber, previous);
+            }
+          } else {
+            currentFiles[path] = text;
+          }
+        }
+        const referenceMeta = Array.isArray(manifest.references) ? manifest.references : [];
+        for (const meta of referenceMeta) {
+          const safeName = String(meta.name || "reference").replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120) || "reference";
+          const entry = zip.file("references/" + safeName);
+          if (!entry) continue;
+          if (meta.kind === "image") {
+            const dataBase64 = await entry.async("base64");
+            references.push({ id: uid(), name: String(meta.name || safeName), mimeType: String(meta.mimeType || "image/png"), kind: "image", dataBase64, size: Number(meta.size || 0) });
+          } else {
+            const textContent = await entry.async("string");
+            references.push({ id: uid(), name: String(meta.name || safeName), mimeType: String(meta.mimeType || "text/plain"), kind: "text", textContent, size: Number(meta.size || textContent.length) });
+          }
+        }
+      } else if (file.name.toLowerCase().endsWith(".gene.json")) {
+        const legacy = JSON.parse(await file.text());
+        manifest = legacy.manifest || legacy;
+        currentFiles = legacy.files || {};
+        if (legacy.plan) manifest.plan = legacy.plan;
+        if (Array.isArray(legacy.versions)) versionsByNumber = new Map(legacy.versions.map((v: BuildVersion) => [v.number, v]));
+      } else {
+        throw new Error("Choose a GENE project ZIP or legacy .gene.json export.");
+      }
+      if (!Object.keys(currentFiles).length) throw new Error("This project archive contains no game source files.");
+      if (!currentFiles["game.html"] || !currentFiles["game.js"]) throw new Error("This archive does not contain both game.html and game.js.");
+      const p: GeneProject = {
+        id: uid(),
+        name: String(manifest.name || file.name.replace(/\\.(zip|gene\\.json)$/i, "")),
+        initialPrompt: String(manifest.initialPrompt || "Imported GENE project"),
+        mode: "build",
+        thinking: "balanced",
+        messages: [message("assistant", "Imported project source from " + file.name + ". I can continue editing these files in this chat. The imported game still needs a fresh runtime check before it should be considered verified.")],
+        answers: {},
+        question: null,
+        plan: manifest.plan || null,
+        files: currentFiles,
+        versions: Array.from(versionsByNumber.values()).sort((a, b) => b.number - a.number),
+        activeFile: currentFiles["game.js"] ? "game.js" : Object.keys(currentFiles)[0],
+        references,
+        updatedAt: now()
+      };
+      setProject(p);
+      setProjects(prev => [p, ...prev.filter(item => item.id !== p.id)].slice(0, 10));
+      setSection("chat");
+      setPreviewKey(n => n + 1);
+      setRuntimeState("idle");
+      setNotice("Imported " + Object.keys(currentFiles).length + " source file(s), " + p.versions.length + " version(s), and " + references.length + " reference(s). Runtime verification is pending.");
+      addActivity("Imported project archive: " + file.name);
+    } catch (error) {
+      setNotice("Could not import project: " + (error instanceof Error ? error.message : "invalid archive"));
+    }
+  }
+
   function createNewProject() {
     const p = newProject();
     setProject(p);
@@ -473,6 +568,8 @@ export default function Home() {
       <aside className="project-sidebar">
         <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
         <button className="new-project" onClick={createNewProject}><span>＋</span> New game project</button>
+        <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
+        <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
         <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? "Playable source created" : "Design in progress"}</small></div>
         {projects.filter(p => p.id !== project.id).length > 0 && <>
