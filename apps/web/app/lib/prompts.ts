@@ -15,7 +15,7 @@ export const AGENT_SYSTEM = [
 ].join("\n");
 
 export function makeAgentInput(input: {
-  operation: "interview" | "plan" | "build" | "edit" | "chat" | "surprise";
+  operation: "interview" | "plan" | "build" | "edit" | "chat" | "surprise" | "research";
   mode: Mode;
   message: string;
   project?: GeneProject | null;
