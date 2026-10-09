@@ -35,7 +35,7 @@ assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is impleme
 assert.ok(page.includes('zip.file("references/" + safeName'), "export preserves reference files");
 assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload control is wired");
 assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
-assert.ok(page.includes("One decision at a time"), "sequential question UI is present");
+assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
 assert.ok(page.includes("Automated runtime repair"), "preview failure can trigger bounded auto-repair");
 assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)'), "fullscreen opens stable project play URL");
 assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route reads saved project state");
