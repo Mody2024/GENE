@@ -103,7 +103,7 @@ try {
   assert.equal(await readFile(path.join(tempRoot, "projects", "test-project-01", "game.js"), "utf8"), goodFiles["game.js"], "disk contents match the source sent by GENE");
   const diskPlay = await fetch(base + "/play/test-project-01");
   assert.equal(diskPlay.status, 200, "local agent serves a stable disk-backed play URL");
-  assert.ok((await diskPlay.text()).includes("Contract Test"), "play URL serves the project HTML shell");
+  assert.ok((await diskPlay.text()).includes("Contract Game"), "play URL serves the saved project name in its HTML shell");
   const diskTest = await fetch(base + "/api/projects/test-project-01/test", { method:"POST", headers:{ "X-GENE-TOKEN":"gene-test-token-01234567890123456789" } });
   assert.equal(diskTest.status, 200, "disk-backed source validation passes on the valid project");
   assert.equal((await diskTest.json()).ok, true, "test route reports the validation result");
