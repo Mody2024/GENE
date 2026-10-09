@@ -74,9 +74,9 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: game.css contains an external runtime dependency.");
     if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
     if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
-    if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["']\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+    if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
     if (spec.engine === "webgl3d") {
-      if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+      if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
       for (const [pattern, requirement] of [
         [/createShader\s*\(/, "shader creation"],
         [/shaderSource\s*\(/, "shader source"],
