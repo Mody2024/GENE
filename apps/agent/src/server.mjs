@@ -84,14 +84,14 @@ export function validateSourceProject(files) {
   let spec;
   try { new Function(js); } catch (e) { issues.push("JavaScript syntax error: " + (e instanceof Error ? e.message : String(e))); }
   try { spec = JSON.parse(files["game-spec.json"]); } catch { issues.push("game-spec.json is not valid JSON."); }
-  if (!/<canvas\\b[^>]*\\bid=["']game-canvas["']/i.test(html)) issues.push("game.html must include canvas id=game-canvas.");
-  if (/<script\\b/i.test(html)) issues.push("Put executable code in game.js, not inline script tags in game.html.");
-  if (/<script\\b[^>]*\\bsrc\\s*=\\s*["']https?:|<link\\b[^>]*\\bhref\\s*=\\s*["']https?:/i.test(html)) issues.push("External HTML script/stylesheet dependencies are not allowed.");
-  if (/\\bimport\\s*\\(|\\bfrom\\s*["']https?:|\\bfetch\\s*\\(\\s*["']https?:/i.test(js)) issues.push("External JavaScript runtime dependencies are not allowed.");
-  if (/@import\\s+url\\s*\\(\\s*["']?https?:|url\\s*\\(\\s*["']https?:/i.test(css)) issues.push("External CSS dependencies are not allowed.");
-  if (!/requestAnimationFrame|\\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
+  if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) issues.push("game.html must include canvas id=game-canvas.");
+  if (/<script\b/i.test(html)) issues.push("Put executable code in game.js, not inline script tags in game.html.");
+  if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\bhref\s*=\s*["']https?:/i.test(html)) issues.push("External HTML script/stylesheet dependencies are not allowed.");
+  if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) issues.push("External JavaScript runtime dependencies are not allowed.");
+  if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) issues.push("External CSS dependencies are not allowed.");
+  if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
   if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) issues.push("No detectable player input/event handling.");
-  if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\\(|\\.fill\\(/.test(js)) issues.push("No detectable draw operation; the game may render blank.");
+  if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) issues.push("No detectable draw operation; the game may render blank.");
   if (spec && typeof spec === "object" && !Array.isArray(spec)) {
     if (typeof spec.title !== "string" || !spec.title.trim()) issues.push("game-spec.json needs a title.");
     if (typeof spec.genre !== "string" || !spec.genre.trim()) issues.push("game-spec.json needs a genre.");
@@ -111,9 +111,9 @@ export function validateSourceProject(files) {
 }
 
 export function renderPlayHtml(files, title = "GENE game") {
-  const html = String(files["game.html"] || "").replace(/<script[\\s\\S]*?<\\/script>/gi, "");
-  const css = String(files["game.css"] || "").replace(/<\\/style/gi, "<\\\\/style");
-  const js = String(files["game.js"] || "").replace(/<\\/script/gi, "<\\\\/script");
+  const html = String(files["game.html"] || "").replace(/<script[\s\S]*?<\/script>/gi, "");
+  const css = String(files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
+  const js = String(files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
   const safeTitle = String(title).replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const telemetry = [
     "(function(){",
@@ -121,7 +121,7 @@ export function renderPlayHtml(files, title = "GENE game") {
     "window.addEventListener('load',function(){document.documentElement.dataset.geneLoaded='true';});",
     "})();"
   ].join("\n");
-  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "<\\/script><script>" + telemetry + "<\\/script></body></html>";
+  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "</script><script>" + telemetry + "</script></body></html>";
 }
 
 async function readJson(req, limit = MAX_BODY_BYTES) {
