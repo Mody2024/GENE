@@ -618,19 +618,31 @@ export default function Home() {
     }
     const updatedFiles = { ...project.files, [project.activeFile]: editedFile };
     const version: BuildVersion = { number: (project.versions[0]?.number || 0) + 1, label: "Manual edit: " + project.activeFile, files: { ...updatedFiles }, createdAt: now(), testSummary: "Manual edit saved. Re-run validation before release." };
-    setProject({ ...project, files: updatedFiles, versions: [version, ...project.versions], updatedAt: now() });
+    const updatedProject = { ...project, files: updatedFiles, versions: [version, ...project.versions], updatedAt: now() };
+    setProject(updatedProject);
     setFileDirty(false);
     setNotice("Saved " + project.activeFile + " as version " + version.number + ". It has not been runtime-verified yet.");
     setPreviewKey(n => n + 1);
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice("Manual edit v" + version.number + " synced to disk at " + data.projectPath + ". Source checks passed; gameplay still needs runtime testing."))
+        .catch(error => setNotice("Manual edit saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
   }
 
   function restoreVersion(version: BuildVersion) {
     if (!project) return;
     const newVersion: BuildVersion = { number: (project.versions[0]?.number || 0) + 1, label: "Restore v" + version.number, files: { ...version.files }, createdAt: now(), testSummary: "Restored snapshot; runtime verification pending." };
-    setProject({ ...project, files: { ...version.files }, versions: [newVersion, ...project.versions], activeFile: "game.js", updatedAt: now() });
+    const updatedProject = { ...project, files: { ...version.files }, versions: [newVersion, ...project.versions], activeFile: "game.js", updatedAt: now() };
+    setProject(updatedProject);
     setSection("chat");
     setPreviewKey(n => n + 1);
     setNotice("Restored version " + version.number + " into new version " + newVersion.number + ".");
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice("Restored v" + version.number + " and synced new version " + newVersion.number + " to disk at " + data.projectPath + "."))
+        .catch(error => setNotice("Restored source in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
   }
 
   async function downloadProject() {
