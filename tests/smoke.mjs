@@ -13,6 +13,7 @@ const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
+const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
 const browserSmoke = read("tests/browser-smoke.mjs");
@@ -70,6 +71,7 @@ const goodFiles = {
   "game-spec.json": JSON.stringify({
     title:"Contract Test",
     genre:"arcade",
+    engine:"canvas2d",
     mechanics:["move","avoid","score"],
     controls:["Arrow keys"],
     objective:"Collect the three tokens.",
@@ -80,6 +82,37 @@ const goodFiles = {
 };
 const sourceCheck = validateSourceProject(goodFiles);
 assert.equal(sourceCheck.ok, true, "valid small game source passes the local agent source contract");
+const fake3dFiles = {
+  ...goodFiles,
+  "game-spec.json": JSON.stringify({
+    title:"Fake 3D",
+    genre:"lane runner",
+    engine:"webgl3d",
+    mechanics:["lane changes"],
+    controls:["Arrow keys"],
+    objective:"Avoid obstacles",
+    winCondition:"Reach the finish",
+    lossCondition:"Hit an obstacle",
+    performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:100,maxParticles:10}
+  })
+};
+assert.equal(validateSourceProject(fake3dFiles).ok, false, "a flat 2D renderer cannot pass a webgl3d project contract");
+const webglFiles = {
+  ...goodFiles,
+  "game.js": 'const c=document.getElementById("game-canvas");const gl=c.getContext("webgl");const vs=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(vs,"attribute vec3 p;void main(){gl_Position=vec4(p,1.0);}");gl.compileShader(vs);const fs=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(fs,"precision mediump float;void main(){gl_FragColor=vec4(0.2,0.7,0.4,1.0);}");gl.compileShader(fs);const pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);gl.useProgram(pr);const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,0,1,0,0,0,1,0]),gl.STATIC_DRAW);window.addEventListener("keydown",()=>{});function frame(){gl.drawArrays(gl.TRIANGLES,0,3);requestAnimationFrame(frame)}requestAnimationFrame(frame);',
+  "game-spec.json": JSON.stringify({
+    title:"Real WebGL Triangle",
+    genre:"3D prototype",
+    engine:"webgl3d",
+    mechanics:["WebGL mesh rendering"],
+    controls:["Arrow keys"],
+    objective:"Inspect a real WebGL render",
+    winCondition:"The test scene initializes successfully",
+    lossCondition:"The context or renderer fails",
+    performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:20,maxParticles:0}
+  })
+};
+assert.equal(validateSourceProject(webglFiles).ok, true, "a real shader/buffer/draw WebGL project passes the local agent contract");
 assert.equal(validateSourceProject({ ...goodFiles, "game.js": "const = ;" }).ok, false, "broken JS is rejected before sync");
 assert.equal(validateSourceProject({ ...goodFiles, "game.js": 'fetch("https://example.com");requestAnimationFrame(()=>{});' }).ok, false, "external runtime dependencies are rejected");
 const rendered = renderPlayHtml(goodFiles, "Contract Test", "/play/test-project-01/");
@@ -134,4 +167,4 @@ try {
   await rm(tempRoot, { recursive: true, force: true });
 }
 
-console.log("GENE contract tests passed, including authenticated local filesystem sync, disk-backed play URL, source validation, import/export, grounded research and browser-test contracts.");
+console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
