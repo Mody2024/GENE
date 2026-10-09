@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
 
 :root{color-scheme:dark;--bg:#111315;--surface:#191c1f;--surface-2:#202428;--surface-3:#262b30;--text:#f0f2f3;--muted:#8e969d;--faint:#69727b;--border:rgba(255,255,255,.085);--border-strong:rgba(255,255,255,.14);--accent:#d5e6d6;--accent-ink:#19221b;--green:#8fce9b;--red:#e28f8a;--blue:#9fc7f2;--shadow:0 18px 48px rgba(0,0,0,.24);--radius:14px}
 :root[data-theme="light"]{color-scheme:light;--bg:#f4f5f3;--surface:#ffffff;--surface-2:#f9faf9;--surface-3:#edf0ec;--text:#202422;--muted:#6f7872;--faint:#9aa19b;--border:rgba(25,35,28,.09);--border-strong:rgba(25,35,28,.16);--accent:#dceade;--accent-ink:#203126;--green:#35734b;--red:#a44742;--blue:#356e9f;--shadow:0 18px 50px rgba(33,44,35,.08)}
