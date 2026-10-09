@@ -328,6 +328,112 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
 
+  async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
+    const normalizedUrl = url.trim().replace(/\\/+$/, "");
+    setLocalAgentStatus("checking");
+    try {
+      const healthResponse = await fetch(normalizedUrl + "/health", { cache: "no-store" });
+      if (!healthResponse.ok) throw new Error("Local Agent health endpoint returned HTTP " + healthResponse.status);
+      const health = await healthResponse.json();
+      if (health.app !== "gene-local-agent") throw new Error("The endpoint answered, but it is not a GENE Local Agent.");
+      const projectsResponse = await fetch(normalizedUrl + "/api/projects", { headers: { "X-GENE-TOKEN": token }, cache: "no-store" });
+      const projectsData = await projectsResponse.json().catch(() => ({}));
+      if (!projectsResponse.ok || !projectsData.ok) throw new Error(projectsData?.error?.message || "Local Agent authentication failed.");
+      setLocalAgentUrl(normalizedUrl);
+      setLocalAgentToken(token);
+      setLocalAgentWorkspace(String(health.workspace || ""));
+      setLocalAgentProjects(Array.isArray(projectsData.projects) ? projectsData.projects.length : 0);
+      setLocalAgentStatus("connected");
+      localStorage.setItem("gene.local-agent-url", normalizedUrl);
+      localStorage.setItem("gene.local-agent-token", token);
+      if (announce) setNotice("Connected to GENE Local Agent. Workspace: " + String(health.workspace || "local workspace") + ".");
+      return true;
+    } catch (error) {
+      setLocalAgentStatus("error");
+      if (announce) setNotice("Local Agent connection failed: " + (error instanceof Error ? error.message : "unknown error") + ". Make sure it is running and GENE_ALLOWED_ORIGINS includes this website's origin.");
+      return false;
+    }
+  }
+
+  async function promptConnectLocalAgent(): Promise<{ url: string; token: string } | null> {
+    const enteredUrl = window.prompt("GENE Local Agent URL", localAgentUrl || "http://127.0.0.1:38421");
+    if (!enteredUrl) return null;
+    const enteredToken = window.prompt("Paste the private token printed in the Local Agent terminal. Do not share it with anyone.");
+    if (!enteredToken) return null;
+    const url = enteredUrl.trim().replace(/\\/+$/, "");
+    const token = enteredToken.trim();
+    const connected = await verifyLocalAgent(url, token, true);
+    return connected ? { url, token } : null;
+  }
+
+  async function connectLocalAgent() {
+    await promptConnectLocalAgent();
+  }
+
+  async function syncToLocalAgent() {
+    if (!project || busy) return;
+    if (!Object.keys(project.files).length) {
+      setNotice("Build the game source first, then sync it to real files.");
+      return;
+    }
+    let url = localAgentUrl;
+    let token = localAgentToken;
+    if (localAgentStatus !== "connected" || !token) {
+      const connection = await promptConnectLocalAgent();
+      if (!connection) return;
+      url = connection.url;
+      token = connection.token;
+    }
+    setBusy(true);
+    setNotice("");
+    addActivity("Syncing actual source files to GENE Local Agent");
+    try {
+      const response = await fetch(url + "/api/projects/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-GENE-TOKEN": token },
+        body: JSON.stringify({
+          id: project.id,
+          name: project.name,
+          initialPrompt: project.initialPrompt,
+          files: project.files,
+          plan: project.plan,
+          versions: project.versions.slice(0, 20),
+          references: (project.references || []).slice(0, 12)
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        const why = data?.error?.message || "Local Agent refused the sync.";
+        addActivity("Local file sync failed: " + why);
+        setNotice("Local sync failed: " + why);
+        return;
+      }
+      localStorage.setItem("gene.local-agent-sync." + project.id, project.updatedAt);
+      setLastSyncedUpdatedAt(project.updatedAt);
+      setLastLocalPlayUrl(String(data.playUrl || ""));
+      setLocalAgentWorkspace(String(data.projectPath || localAgentWorkspace));
+      setNotice("Wrote " + data.filesWritten + " source files to disk at " + data.projectPath + ". Local play URL: " + data.playUrl + ". Existing files were backed up in the Local Agent history folder.");
+      addActivity("Wrote " + data.filesWritten + " source files to " + data.projectPath);
+      if (data.referenceFilesWritten) addActivity("Copied " + data.referenceFilesWritten + " reference files to disk");
+      if (data.versionsWritten) addActivity("Saved " + data.versionsWritten + " historical source snapshots");
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "network error";
+      setNotice("Local file sync failed: " + why + ". A hosted HTTPS page may require GENE_ALLOWED_ORIGINS to include its exact origin.");
+      addActivity("Local file sync failed: " + why);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openLocalAgentGame() {
+    const url = lastLocalPlayUrl || (localAgentUrl.replace(/\\/+$/, "") + "/play/" + encodeURIComponent(project?.id || ""));
+    if (!project?.id || localAgentStatus !== "connected") {
+      setNotice("Connect and sync to the Local Agent first.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   async function addReferences(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const selected = Array.from(input.files || []);
