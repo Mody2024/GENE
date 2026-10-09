@@ -347,9 +347,7 @@ export default function Home() {
 
   function openFullscreenGame() {
     if (!project || !previewDoc) return;
-    const blob = new Blob([previewDoc], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open("/play/" + encodeURIComponent(project.id), "_blank", "noopener,noreferrer");
   }
 
   if (!project) return <main className="boot"><div className="gene-mark">G</div><p>Opening your workspace…</p></main>;
