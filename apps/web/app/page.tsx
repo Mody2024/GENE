@@ -67,6 +67,7 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
   const [showActivity, setShowActivity] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
   const [activity, setActivity] = useState<string[]>([]);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -185,10 +186,12 @@ export default function Home() {
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
     if (!operationOverride) {
-      if (project.mode === "plan") operation = project.plan ? "plan" : "interview";
+      if (searchMode) operation = "research";
+      else if (project.mode === "plan") operation = project.plan ? "plan" : "interview";
       else if (!Object.keys(project.files).length) operation = "build";
       else operation = isConversationOnly(prompt) ? "chat" : "edit";
     }
+    if (operation === "research") setSearchMode(false);
     if (operation === "surprise") {
       operation = "surprise";
     }
@@ -288,7 +291,7 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
-  }, [project, busy, aiModel]);
+  }, [project, busy, aiModel, searchMode]);
 
   useEffect(() => {
     if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
@@ -539,11 +542,11 @@ export default function Home() {
                 <div ref={chatEnd} />
               </div>
               <form className="composer" onSubmit={onSubmit}>
-                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{project.thinking.toUpperCase()} THINKING</span></div>
+                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
-                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach game art, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach game art, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
