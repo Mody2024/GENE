@@ -103,13 +103,43 @@ export default function Home() {
     const listener = (event: MessageEvent) => {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (event.data?.type === "gene-runtime") {
-        setRuntimeState(event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded");
-        if (event.data.state === "error") setNotice("The game runtime reported an error: " + (event.data.message || "unknown runtime error"));
+        const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
+        setRuntimeState(state);
+        if (state === "rendered") {
+          setProject(current => current && current.versions.length ? {
+            ...current,
+            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Server source checks passed. Browser runtime reported a visible render surface." } : v)
+          } : current);
+        }
+        if (state === "error") {
+          const errorText = event.data.message || "unknown runtime error";
+          setNotice("The game runtime reported an error: " + errorText);
+          setProject(current => current && current.versions.length ? {
+            ...current,
+            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Runtime check failed: " + errorText } : v)
+          } : current);
+        }
       }
     };
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
   }, []);
+
+  useEffect(() => {
+    if (!project || !project.files["game.html"] || !project.files["game.js"]) return;
+    const timer = window.setTimeout(() => {
+      setRuntimeState(current => {
+        if (current === "rendered" || current === "error") return current;
+        setNotice("GENE could not confirm a visible game frame. The source exists, but this build is not verified as playable.");
+        setProject(projectNow => projectNow && projectNow.versions.length ? {
+          ...projectNow,
+          versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: no visible render signal received within five seconds." } : v)
+        } : projectNow);
+        return "error";
+      });
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [project?.id, project?.files, previewKey]);
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
@@ -460,7 +490,7 @@ function operationText(mode: Mode, hasGame: boolean) {
   return hasGame ? "Reading and editing existing source…" : "Generating a complete first playable slice…";
 }
 function runtimeLabel(state: "idle" | "loaded" | "rendered" | "error") {
-  if (state === "rendered") return "Canvas rendered";
+  if (state === "rendered") return "Visible render signal";
   if (state === "loaded") return "Runtime loaded · render not yet confirmed";
   if (state === "error") return "Runtime error";
   return "Checking runtime…";
