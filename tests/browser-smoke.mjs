@@ -53,6 +53,7 @@ try {
   const fatalErrors = [];
   page.on("pageerror", error => fatalErrors.push(error.message));
   await page.addInitScript(({ project, storageKey, activeKey }) => {
+    if (window.top !== window.self) return;
     localStorage.setItem(storageKey, JSON.stringify([project]));
     localStorage.setItem(activeKey, project.id);
   }, { project: fixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
@@ -106,6 +107,7 @@ try {
   const webglErrors = [];
   webglPage.on("pageerror", error => webglErrors.push(error.message));
   await webglPage.addInitScript(({ project, storageKey, activeKey }) => {
+    if (window.top !== window.self) return;
     localStorage.setItem(storageKey, JSON.stringify([project]));
     localStorage.setItem(activeKey, project.id);
   }, { project: webglProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
