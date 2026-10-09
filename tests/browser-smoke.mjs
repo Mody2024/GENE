@@ -140,10 +140,12 @@ try {
   await sampleFrame.locator("#start-button").click();
   const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   await sampleFrame.locator("#game-canvas").click();
+  await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
   await samplePage.keyboard.press("ArrowRight");
-  await samplePage.waitForTimeout(150);
+  await samplePage.waitForTimeout(250);
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
-  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement");
+  const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
+  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
