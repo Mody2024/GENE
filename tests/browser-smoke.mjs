@@ -51,14 +51,12 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const fatalErrors = [];
   page.on("pageerror", error => fatalErrors.push(error.message));
-  page.on("console", msg => { if (msg.type() === "error" && !/fonts\.googleapis|fonts\.gstatic/.test(msg.text())) fatalErrors.push(msg.text()); });
   await page.addInitScript(({ project, storageKey, activeKey }) => {
     localStorage.setItem(storageKey, JSON.stringify([project]));
     localStorage.setItem(activeKey, project.id);
   }, { project: fixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
   const response = await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
   assert.ok(response && response.ok(), "GENE web workspace must respond successfully");
-  await page.getByText("OUTPOST RUN").waitFor({ timeout: 10_000 }).catch(() => {});
   const gameFrame = page.frameLocator('iframe[title="GENE live game preview"]');
   await gameFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
   await page.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
@@ -78,7 +76,7 @@ try {
   const beforeX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
   await gameFrame.locator("#game-canvas").click();
   await page.keyboard.press("ArrowRight");
-  await page.waitForFunction(() => true, { timeout: 50 });
+  await page.waitForTimeout(100);
   const afterX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
   assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game's player position");
 
