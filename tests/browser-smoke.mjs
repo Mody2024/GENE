@@ -140,9 +140,12 @@ try {
   await sampleFrame.locator("#start-button").click();
   const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   await sampleFrame.locator("#game-canvas").click();
-  await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
-  await sampleFrame.locator("#game-canvas").press("ArrowRight");
+  await sampleFrame.locator("#game-canvas").evaluate(canvas => {
+    canvas.focus();
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  });
   await samplePage.waitForTimeout(250);
+  await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight", bubbles: true })));
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
   assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
