@@ -429,7 +429,7 @@ export default function Home() {
         manifest = legacy.manifest || legacy;
         currentFiles = legacy.files || {};
         if (legacy.plan) manifest.plan = legacy.plan;
-        if (Array.isArray(legacy.versions)) versionsByNumber = new Map(legacy.versions.map((v: BuildVersion) => [v.number, v]));
+        if (Array.isArray(legacy.versions)) versionsByNumber = new Map<number, BuildVersion>(legacy.versions.map((v: BuildVersion) => [v.number, v] as [number, BuildVersion]));
       } else {
         throw new Error("Choose a GENE project ZIP or legacy .gene.json export.");
       }
@@ -437,7 +437,7 @@ export default function Home() {
       if (!currentFiles["game.html"] || !currentFiles["game.js"]) throw new Error("This archive does not contain both game.html and game.js.");
       const p: GeneProject = {
         id: uid(),
-        name: String(manifest.name || file.name.replace(/\\.(zip|gene\\.json)$/i, "")),
+        name: String(manifest.name || file.name.replace(/\.(zip|gene\.json)$/i, "")),
         initialPrompt: String(manifest.initialPrompt || "Imported GENE project"),
         mode: "build",
         thinking: "balanced",
