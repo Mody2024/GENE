@@ -88,7 +88,37 @@ try {
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
-  console.log("Playwright browser smoke passed: workspace loads, canvas renders visible pixels, ArrowRight moves the player, theme switches, and Files navigation responds.");
+
+  const webglProject = {
+    ...fixture,
+    id: "playwright-webgl-smoke",
+    name: "Playwright WebGL Smoke",
+    initialPrompt: "A minimal self-contained WebGL render used to test the real 3D canvas path.",
+    plan: { ...fixture.plan, title: "Playwright WebGL Smoke", engine: "webgl3d" },
+    files: {
+      "game.html": '<main class="game-shell"><canvas id="game-canvas" width="800" height="480" tabindex="0"></canvas><div class="game-hud"><b>WEBGL RENDER TEST</b></div></main>',
+      "game.css": '.game-shell{width:100vw;height:100vh;background:#101522}#game-canvas{width:100%;height:100%;display:block}.game-hud{position:absolute;top:12px;left:14px;color:#fff;font:12px Arial}',
+      "game.js": '(function(){const c=document.getElementById("game-canvas");const gl=c.getContext("webgl",{alpha:false,antialias:false});if(!gl)throw new Error("WebGL context unavailable");const vs=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(vs,"attribute vec3 aPosition;uniform float uTime;void main(){vec3 p=aPosition;p.x+=sin(uTime)*0.04;gl_Position=vec4(p,1.0);}");gl.compileShader(vs);if(!gl.getShaderParameter(vs,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(vs));const fs=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(fs,"precision mediump float;uniform float uTime;void main(){gl_FragColor=vec4(0.2+0.3*abs(sin(uTime)),0.72,0.48,1.0);}");gl.compileShader(fs);if(!gl.getShaderParameter(fs,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(fs));const program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-0.65,-0.55,0,0.65,-0.55,0,0,0.66,0]),gl.STATIC_DRAW);const loc=gl.getAttribLocation(program,"aPosition");gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);const timeLoc=gl.getUniformLocation(program,"uTime");let draws=0;window.addEventListener("keydown",()=>{});function frame(t){gl.viewport(0,0,c.width,c.height);gl.clearColor(0.035,0.05,0.085,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniform1f(timeLoc,t*0.001);gl.drawArrays(gl.TRIANGLES,0,3);window.__geneWebGLSmoke={draws:++draws,version:gl.getParameter(gl.VERSION)};requestAnimationFrame(frame)}requestAnimationFrame(frame)})();',
+      "game-spec.json": JSON.stringify({ title:"Playwright WebGL Smoke", genre:"3D rendering smoke test", engine:"webgl3d", mechanics:["WebGL shader","GPU buffer","Animated triangle"], controls:["Any key"], objective:"Continuously draw a visible WebGL primitive.", winCondition:"At least 10 WebGL frames have been submitted.", lossCondition:"A WebGL context or shader fails.", performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:12,maxParticles:0} }, null, 2)
+    }
+  };
+  const webglPage = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const webglErrors = [];
+  webglPage.on("pageerror", error => webglErrors.push(error.message));
+  await webglPage.addInitScript(({ project, storageKey, activeKey }) => {
+    localStorage.setItem(storageKey, JSON.stringify([project]));
+    localStorage.setItem(activeKey, project.id);
+  }, { project: webglProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  await webglPage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  const webglFrame = webglPage.frameLocator('iframe[title="GENE live game preview"]');
+  await webglFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
+  await webglPage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
+  const drawState = await webglFrame.locator("body").evaluate(() => window.__geneWebGLSmoke);
+  assert.ok(drawState && drawState.draws >= 10, "3D runtime must compile shaders and submit repeated WebGL geometry draws");
+  assert.ok(String(drawState.version || "").toLowerCase().includes("webgl"), "3D runtime has a real WebGL context");
+  assert.equal(webglErrors.length, 0, "the WebGL project should not emit JavaScript errors: " + webglErrors.join(" | "));
+  await webglPage.close();
+  console.log("Playwright browser smoke passed: 2D pixels + keyboard gameplay, UI/theme controls, and animated WebGL shader/buffer/draw calls.");
 } finally {
   await browser.close();
 }
