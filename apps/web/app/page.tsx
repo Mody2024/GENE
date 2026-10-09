@@ -302,6 +302,17 @@ export default function Home() {
         setPreviewOpen(true);
         setPreviewKey(n => n + 1);
         setRuntimeState("loaded");
+        if (localAgentStatus === "connected" && localAgentToken) {
+          try {
+            const diskResult = await writeProjectToDisk(updated, localAgentUrl, localAgentToken);
+            addActivity("Local Agent wrote version " + String(versions[0]?.number || 0).padStart(3, "0") + " to disk and validated the source.");
+            setNotice("Version " + String(versions[0]?.number || 0).padStart(3, "0") + " was saved to the browser project and synced to disk: " + diskResult.projectPath);
+          } catch (syncError) {
+            const why = syncError instanceof Error ? syncError.message : "unknown local sync error";
+            addActivity("Local Agent auto-sync failed: " + why);
+            setNotice("The source version is saved in GENE, but Local Agent sync failed: " + why + ". Use Sync files to retry.");
+          }
+        }
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : "Network error";
@@ -312,7 +323,7 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
-  }, [project, busy, aiModel, searchMode]);
+  }, [project, busy, aiModel, searchMode, localAgentStatus, localAgentToken, localAgentUrl]);
 
   useEffect(() => {
     if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
@@ -370,6 +381,34 @@ export default function Home() {
     await promptConnectLocalAgent();
   }
 
+  async function writeProjectToDisk(targetProject: GeneProject, url: string, token: string) {
+    const normalizedUrl = url.trim().replace(/\/+$/, "");
+    const response = await fetch(normalizedUrl + "/api/projects/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-GENE-TOKEN": token },
+      body: JSON.stringify({
+        id: targetProject.id,
+        name: targetProject.name,
+        initialPrompt: targetProject.initialPrompt,
+        files: targetProject.files,
+        plan: targetProject.plan,
+        versions: targetProject.versions.slice(0, 20),
+        references: (targetProject.references || []).slice(0, 12)
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data?.error?.message || "Local Agent refused the sync (HTTP " + response.status + ").");
+    localStorage.setItem("gene.local-agent-sync." + targetProject.id, targetProject.updatedAt);
+    setLastSyncedUpdatedAt(targetProject.updatedAt);
+    setLastLocalPlayUrl(String(data.playUrl || ""));
+    setLocalAgentWorkspace(String(data.projectPath || localAgentWorkspace));
+    setLocalAgentStatus("connected");
+    addActivity("Wrote " + data.filesWritten + " source files to " + data.projectPath);
+    if (data.referenceFilesWritten) addActivity("Copied " + data.referenceFilesWritten + " reference files to disk");
+    if (data.versionsWritten) addActivity("Saved " + data.versionsWritten + " historical source snapshots");
+    return data;
+  }
+
   async function syncToLocalAgent() {
     if (!project || busy) return;
     if (!Object.keys(project.files).length) {
@@ -388,34 +427,8 @@ export default function Home() {
     setNotice("");
     addActivity("Syncing actual source files to GENE Local Agent");
     try {
-      const response = await fetch(url + "/api/projects/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-GENE-TOKEN": token },
-        body: JSON.stringify({
-          id: project.id,
-          name: project.name,
-          initialPrompt: project.initialPrompt,
-          files: project.files,
-          plan: project.plan,
-          versions: project.versions.slice(0, 20),
-          references: (project.references || []).slice(0, 12)
-        })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) {
-        const why = data?.error?.message || "Local Agent refused the sync.";
-        addActivity("Local file sync failed: " + why);
-        setNotice("Local sync failed: " + why);
-        return;
-      }
-      localStorage.setItem("gene.local-agent-sync." + project.id, project.updatedAt);
-      setLastSyncedUpdatedAt(project.updatedAt);
-      setLastLocalPlayUrl(String(data.playUrl || ""));
-      setLocalAgentWorkspace(String(data.projectPath || localAgentWorkspace));
+      const data = await writeProjectToDisk(project, url, token);
       setNotice("Wrote " + data.filesWritten + " source files to disk at " + data.projectPath + ". Local play URL: " + data.playUrl + ". Existing files were backed up in the Local Agent history folder.");
-      addActivity("Wrote " + data.filesWritten + " source files to " + data.projectPath);
-      if (data.referenceFilesWritten) addActivity("Copied " + data.referenceFilesWritten + " reference files to disk");
-      if (data.versionsWritten) addActivity("Saved " + data.versionsWritten + " historical source snapshots");
     } catch (error) {
       const why = error instanceof Error ? error.message : "network error";
       setNotice("Local file sync failed: " + why + ". A hosted HTTPS page may require GENE_ALLOWED_ORIGINS to include its exact origin.");
