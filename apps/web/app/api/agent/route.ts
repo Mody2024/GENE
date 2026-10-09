@@ -27,7 +27,7 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
-function validateFiles(files: Array<{ path: string; content: string }>, operation: string) {
+function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
     throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
@@ -54,7 +54,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: game-spec.json needs a real game title.");
     if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game-spec.json needs a game genre.");
     if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") throw new Error("Build rejected: game-spec.json engine must be canvas2d or webgl3d.");
-    if (body.project?.plan?.engine && spec.engine !== body.project.plan.engine) throw new Error("Build rejected: game-spec engine does not match the approved plan engine.");
+    if (plannedEngine && spec.engine !== plannedEngine) throw new Error("Build rejected: game-spec engine does not match the approved plan engine.");
     if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the gameplay mechanics list is missing.");
     if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the controls list is missing.");
     if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
@@ -231,11 +231,11 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
-    const files = validateFiles(result.files || [], body.operation);
+    const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
-      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build");
+      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", body.project?.plan?.engine);
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
