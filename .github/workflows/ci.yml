@@ -18,7 +18,9 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Run contract tests
+      - name: Check local agent syntax
+        run: npm run check --workspace=@gene/local-agent
+      - name: Run contract and local-agent end-to-end tests
         run: npm test
       - name: Build web app
         run: npm run build
