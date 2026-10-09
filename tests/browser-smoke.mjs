@@ -47,7 +47,10 @@ const fixture = {
   updatedAt: new Date().toISOString()
 };
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"]
+});
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const fatalErrors = [];
