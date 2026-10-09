@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useSta
 import type { AgentResponse, BuildVersion, GeneProject, Mode, Thinking } from "./lib/types";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
+import { playableDemoFiles } from "./lib/starter-game";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -194,15 +195,16 @@ export default function Home() {
     const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
     const js = (project.files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
     const spec = project.files["game-spec.json"] || "{}";
+    const engine = (() => { try { return JSON.parse(spec).engine === "webgl3d" ? "webgl3d" : "canvas2d"; } catch { return "canvas2d"; } })();
     const monitor = [
       "(function(){",
-      "function report(){try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(spec.engine==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0&&(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0&&(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
+      "function report(){try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0&&(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0&&(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:e.message||'script error'},'*');});",
       "setTimeout(report,900);setTimeout(report,2200);",
       "})();"
     ].join("\n");
     const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
-    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "'><script>" + instrumentation + "<\/script>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
   const savedAssets = useMemo(() => {
@@ -771,6 +773,30 @@ export default function Home() {
     setActivity([]);
   }
 
+  function loadPlayableDemo() {
+    const files = playableDemoFiles();
+    const stamp = now();
+    const p: GeneProject = {
+      ...newProject(),
+      name: "Outpost: Last Light",
+      initialPrompt: "A playable top-down sci-fi survival arcade game. Collect seven energy cores, evade pursuing drones, use a dash, and support keyboard plus mobile touch controls.",
+      mode: "build",
+      question: null,
+      plan: { title: "Outpost: Last Light", summary: "Restore a dark sci-fi outpost by recovering seven energy cores while corrupted drones hunt you.", engine: "canvas2d", tasks: ["Move around the outpost", "Collect seven cores", "Evade drones and manage shield", "Dash, pause, win, lose and restart"], mechanics: ["Keyboard and touch controls", "Chasing enemies", "Collectibles and scoring", "Three-hit shield", "Dash cooldown", "Win/loss/restart states"], performanceBudget: { targetFps: 60, maxEnemies: 4, maxObjects: 80, maxParticles: 60 } },
+      files,
+      activeFile: "game.js",
+      messages: [message("assistant", "Your first playable game is loaded: **Outpost: Last Light**. Move with WASD or arrow keys, collect all seven glowing cores, and dodge red drones. SPACE dashes, P pauses, and R restarts. Open Files to inspect or edit the actual HTML/CSS/JavaScript source.", "build")],
+      versions: [{ number: 1, label: "First playable game", files: { ...files }, createdAt: stamp, testSummary: "Built-in starter source loaded. Browser preview performs visible-render telemetry; test gameplay in the live preview." }],
+      updatedAt: stamp
+    };
+    setProject(p);
+    setSection("chat");
+    setRuntimeState("idle");
+    setNotice("Playable sample loaded locally. No Gemini API key is needed to run it; add a key to ask the AI to modify the game.");
+    setActivity(["Loaded built-in starter: Outpost: Last Light", "Source files ready for editing and export"]);
+    setPreviewKey(n => n + 1);
+  }
+
   function saveManualEdit() {
     if (!project) return;
     if (project.mode === "plan") {
@@ -881,6 +907,7 @@ export default function Home() {
       <aside className="project-sidebar">
         <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
         <button className="new-project" onClick={createNewProject}><span>＋</span> New game project</button>
+        <button className="import-project-button" onClick={loadPlayableDemo}>▶ Try playable demo</button>
         <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
         <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>

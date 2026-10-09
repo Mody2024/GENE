@@ -49,6 +49,8 @@ const fixture = {
 
 const browser = await chromium.launch({
   headless: true,
+  // The legacy headless shell can silently omit WebGL contexts. Use Chromium's newer headless mode.
+  channel: "chromium",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 });
 try {
@@ -120,11 +122,34 @@ try {
   await webglPage.waitForTimeout(2_500);
   console.log("WebGL preview status:", await webglPage.locator(".preview-title small").textContent());
   const drawState = await webglFrame.locator("body").evaluate(() => window.__geneWebGLSmoke);
-  assert.ok(drawState && drawState.draws >= 10, "3D runtime must compile shaders and submit repeated WebGL geometry draws");
+  const runtimeDetails = await webglFrame.locator("body").evaluate(body => ({ engine: body.getAttribute("data-gene-engine"), spec: body.getAttribute("data-gene-spec"), hasCanvas: Boolean(body.querySelector("canvas")) }));
+  assert.ok(drawState && drawState.draws >= 10, "3D runtime must compile shaders and submit repeated WebGL geometry draws; state=" + JSON.stringify(drawState) + "; runtime=" + JSON.stringify(runtimeDetails) + "; status=" + await webglPage.locator(".preview-title small").textContent());
   assert.ok(String(drawState.version || "").toLowerCase().includes("webgl"), "3D runtime has a real WebGL context");
   assert.equal(webglErrors.length, 0, "the WebGL project should not emit JavaScript errors: " + webglErrors.join(" | "));
   await webglPage.close();
-  console.log("Playwright browser smoke passed: 2D pixels + keyboard gameplay, UI/theme controls, and animated WebGL shader/buffer/draw calls.");
+
+  // Check the first complete starter game with no Gemini API key configured.
+  const samplePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  samplePage.on("pageerror", error => fatalErrors.push("starter: " + error.message));
+  const emptyProject = { ...fixture, id: "playwright-empty-start", name: "Empty starter", initialPrompt: "", mode: "plan", plan: null, files: {}, versions: [], activeFile: "game.js", messages: [{ id: "hello", role: "assistant", content: "Test", createdAt: new Date().toISOString() }] };
+  await samplePage.addInitScript(({ project, storageKey, activeKey }) => { localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  await samplePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await samplePage.getByRole("button", { name: /Try playable demo/i }).click();
+  const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
+  await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
+  await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
+  await sampleFrame.locator("#start-button").click();
+  const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
+  await sampleFrame.locator("#game-canvas").click();
+  await samplePage.keyboard.press("ArrowRight");
+  await samplePage.waitForTimeout(150);
+  const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
+  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement");
+  const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
+  assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
+  assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
+  await samplePage.close();
+  console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, UI/theme controls, WebGL rendering, and the no-key playable starter game.");
 } finally {
   await browser.close();
 }

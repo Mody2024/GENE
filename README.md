@@ -6,6 +6,7 @@ GENE is an AI-assisted game-development workspace. This repository is the source
 
 Implemented in this branch:
 - Chat-first workspace inspired by professional AI coding tools, with working navigation and dark/light themes.
+- A built-in, no-API-key-needed playable starter game (**Outpost: Last Light**) with keyboard/mobile controls, an energy-core objective, pursuing drones, dash, shield, win/loss states, restart, and editable/exportable HTML/CSS/JavaScript source.
 - Plan/Build modes and a sequential one-question-at-a-time interview prompt contract.
 - Gemini server API endpoint with server-only API key handling, thinking levels, response validation, rate limiting, and explicit errors when no key is configured.
 - Read-only grounded Google Search mode; sources are returned from Gemini Search grounding when available.
@@ -17,7 +18,7 @@ Implemented in this branch:
 - Local Agent with token authentication, safe filesystem writes, previous-folder backups, on-disk source validation, real asset serving and a stable disk-backed play URL.
 - GENE Forge: prompt-driven low-poly recipes converted into actual OBJ geometry, MTL materials and JSON asset manifests, plus an interactive WebGL mesh viewport, AI edits and individual file export. This is primitive-based mesh generation, not high-fidelity texturing or image-to-3D.
 - Server-side checks for generated file names/sizes, JavaScript syntax, required canvas, game-spec fields, objective/win/loss declarations, render loop, input hooks, draw operations, external runtime dependencies and conservative object budgets.
-- GitHub Actions contract tests including an HTTP end-to-end test of real local file sync and play serving, a production build, and Playwright browser tests for visible Canvas 2D pixels, keyboard movement, UI controls and real WebGL shader/buffer/draw calls.
+- GitHub Actions contract tests including an HTTP end-to-end test of real local file sync and play serving, a production build, and Playwright browser tests for visible Canvas 2D pixels, keyboard movement, UI controls, a no-key playable starter, and real WebGL shader/buffer/draw calls.
 
 The generation path asks Gemini for the actual source files used by the preview. Source validation and a visible canvas signal are useful diagnostics, but they are not equivalent to full gameplay automation. GENE must not claim that every game mechanic was verified unless it has evidence for that specific test.
 
