@@ -117,7 +117,7 @@ export default function Home() {
     if (!project) return;
     const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 8);
     setProjects(prev => {
-      const next = [project, ...prev.filter(p => p.id !== project.id)].slice(0, 30);
+      const next = [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); localStorage.setItem(ACTIVE_KEY, project.id); } catch {}
       return next;
     });
