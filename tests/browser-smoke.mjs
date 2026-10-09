@@ -49,8 +49,6 @@ const fixture = {
 
 const browser = await chromium.launch({
   headless: true,
-  // The legacy headless shell can silently omit WebGL contexts. Use Chromium's newer headless mode.
-  channel: "chromium",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 });
 try {
@@ -82,6 +80,7 @@ try {
 
   const beforeX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
   await gameFrame.locator("#game-canvas").click();
+  await gameFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(100);
   const afterX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
