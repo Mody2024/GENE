@@ -60,22 +60,42 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    if (body.operation === "interview") {
-      const answers = body.answers || {};
-      const known = Object.keys(answers);
-      const fallbackQuestion = known.length === 0
-        ? { id: "controls", text: "How should the main character be controlled?", why: "Controls shape the player controller and core game feel.", choices: ["Keyboard", "Mouse / touch", "Keyboard + touch", "Use smart defaults"] }
-        : null;
+    const answers = body.answers || {};
+    const known = Object.keys(answers);
+    if (body.operation === "interview" && known.length === 0) {
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "Local preview mode is active. Add GEMINI_API_KEY to enable GENE's actual AI interview and coding. I will not pretend to generate an AI game without a model connection.",
-          question: fallbackQuestion,
+          reply: "Local preview mode is active. This is one local prompt to demonstrate the interview UI, not Gemini reasoning. Add GEMINI_API_KEY to enable the real adaptive interview.",
+          question: { id: "controls", text: "How should the main character be controlled?", why: "Controls shape the player controller and core game feel.", choices: ["Keyboard", "Mouse / touch", "Keyboard + touch", "Use smart defaults"] },
           plan: null,
           files: [],
           complete: false,
-          needsUserDecision: Boolean(fallbackQuestion)
+          needsUserDecision: true
+        }
+      });
+    }
+    if (body.operation === "interview" || body.operation === "plan") {
+      const original = String(body.project?.initialPrompt || body.message || "Untitled game");
+      const is3d = /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
+      return NextResponse.json({
+        ok: true,
+        aiMode: "fallback",
+        result: {
+          reply: "I prepared a rule-based outline only. This is not a Gemini-generated plan, and no source files were created. Add GEMINI_API_KEY to enable GENE's real game-design reasoning.",
+          question: null,
+          plan: {
+            title: original.split(/[.!?]/)[0].slice(0, 64) || "Untitled game",
+            summary: "Local outline based on your request. Review and refine it after connecting Gemini.",
+            engine: is3d ? "webgl3d" : "canvas2d",
+            tasks: ["Create project shell", "Implement player controls", "Build the core mechanic", "Add level-specific obstacles and feedback", "Implement objective and restart", "Validate runtime and performance"],
+            mechanics: ["Player input", "Collision/interaction", "Scoring or objective", "Win/loss and restart"],
+            performanceBudget: { targetFps: 60, maxEnemies: 8, maxObjects: 160, maxParticles: 60 }
+          },
+          files: [],
+          complete: true,
+          needsUserDecision: false
         }
       });
     }
