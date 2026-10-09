@@ -53,6 +53,7 @@ export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const autoRepairAttempts = useRef(0);
 
   useEffect(() => {
     try {
@@ -156,7 +157,7 @@ export default function Home() {
 
   const addActivity = (entry: string) => setActivity(prev => [new Date().toLocaleTimeString() + "  " + entry, ...prev].slice(0, 80));
 
-  const runAgent = useCallback(async (text: string, operationOverride?: string) => {
+  const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || busy || !text.trim()) return;
     const prompt = text.trim();
     const isFirstIdea = !project.initialPrompt;
@@ -175,7 +176,9 @@ export default function Home() {
       initialPrompt: isFirstIdea ? prompt : project.initialPrompt,
       answers: nextAnswers,
       question: answerKey ? null : project.question,
-      messages: [...project.messages, message("user", prompt)],
+      messages: silent
+        ? [...project.messages, message("assistant", "The live preview reported a problem. I’m inspecting the current source and attempting a targeted repair (" + (autoRepairAttempts.current + 1) + "/2).")]
+        : [...project.messages, message("user", prompt)],
       updatedAt: now()
     };
     setProject(nextProject);
@@ -221,6 +224,7 @@ export default function Home() {
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
       let versions = nextProject.versions;
       if (changedPaths.length) {
+        if (operation === "build" || operation === "surprise") autoRepairAttempts.current = 0;
         const version: BuildVersion = {
           number: (versions[0]?.number || 0) + 1,
           label: operation === "surprise" ? "Surprise build" : operation === "build" ? "Initial build" : "AI edit",
@@ -264,6 +268,20 @@ export default function Home() {
       setBusy(false);
     }
   }, [project, busy, aiModel]);
+
+  useEffect(() => {
+    if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
+    autoRepairAttempts.current += 1;
+    const attempt = autoRepairAttempts.current;
+    const timer = window.setTimeout(() => {
+      void runAgent(
+        "Automated runtime repair attempt " + attempt + " of 2. The game preview failed to render or emitted a runtime error. Read the complete current project files and make the smallest safe fix. Runtime status: " + (notice || "no visible frame confirmed") + ". Return only genuinely changed files.",
+        "edit",
+        true
+      );
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
