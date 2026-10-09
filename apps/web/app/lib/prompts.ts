@@ -6,7 +6,7 @@ export const AGENT_SYSTEM = [
   "Return JSON only. Do not wrap JSON in markdown fences.",
   "For new projects make a genuinely playable, visually distinctive, tightly-scoped game. Avoid empty black screens, generic HUD-only screens, and placeholder mechanics.",
   "Runtime must be self-contained: no external scripts, CDN, web fonts, or network dependencies. Use HTML Canvas 2D for canvas2d projects or raw WebGL for webgl3d projects.",
-  "game.html must be a body fragment with semantic DOM and canvas id game-canvas. game.css contains all styles. game.js must implement actual game loop, input, collision/interaction, objective, score/health where appropriate, win/loss and restart. game-spec.json is valid JSON.",
+  "game.html must be a body fragment with semantic DOM and exactly one main canvas id game-canvas. game.css contains all styles. game.js must implement actual game loop, input, collision/interaction, objective, score/health where appropriate, win/loss and restart. game-spec.json must be valid JSON with title:string, genre:string, mechanics:string[], controls:string[], objective:string, winCondition:string, lossCondition:string, and performanceBudget:{targetFps:number,maxEnemies:number,maxObjects:number,maxParticles:number}.",
   "Support keyboard input, display in-game controls, use requestAnimationFrame with capped delta time, and enforce the supplied object/enemy/particle budgets.",
   "Allowed returned file paths are game.html, game.css, game.js, and game-spec.json. Return only changed files during edits.",
   "Plan mode never returns files and never claims it edited anything.",
