@@ -21,6 +21,8 @@ assert.ok(agent.includes("No files were changed"), "failed generation must not c
 assert.ok(agent.includes("GEMINI_API_KEY") && agent.includes("x-goog-api-key"), "Gemini key is used server-side");
 assert.ok(agent.includes("inlineData"), "image reference bytes can be sent to Gemini");
 assert.ok(agent.includes("googleSearch: {}"), "research mode enables Google Search grounding");
+assert.ok(agent.includes("game-spec.json needs a real game title"), "builder requires a meaningful game spec");
+assert.ok(agent.includes("external runtime dependency"), "builder blocks external runtime dependencies");
 assert.ok(agent.includes('body.operation === "research"'), "research sources are returned separately from file mutation");
 assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview stays sequential");
 assert.ok(prompts.includes("Avoid empty black screens"), "agent prompt rejects placeholder black screens");
@@ -29,12 +31,15 @@ assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist i
 assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
 assert.ok(page.includes("Save as version"), "manual edits can be versioned");
 assert.ok(page.includes("new JSZip()"), "export packages actual source files");
+assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
+assert.ok(page.includes('zip.file("references/" + safeName'), "export preserves reference files");
 assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload control is wired");
 assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
+assert.ok(page.includes("One decision at a time"), "sequential question UI is present");
 assert.ok(page.includes("Automated runtime repair"), "preview failure can trigger bounded auto-repair");
 assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)'), "fullscreen opens stable project play URL");
 assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route reads saved project state");
 assert.ok(css.includes(":root[data-theme=\"light\"]"), "light theme has its own token set");
 assert.ok(css.includes(".reference-chips"), "reference attachment chips are styled");
 
-console.log("GENE contract tests passed (25 assertions).");
+console.log("GENE contract tests passed (30 assertions).");
