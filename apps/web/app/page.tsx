@@ -69,6 +69,13 @@ export default function Home() {
   const [showActivity, setShowActivity] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
   const [activity, setActivity] = useState<string[]>([]);
+  const [localAgentUrl, setLocalAgentUrl] = useState("http://127.0.0.1:38421");
+  const [localAgentToken, setLocalAgentToken] = useState("");
+  const [localAgentStatus, setLocalAgentStatus] = useState<"disconnected" | "checking" | "connected" | "error">("disconnected");
+  const [localAgentWorkspace, setLocalAgentWorkspace] = useState("");
+  const [localAgentProjects, setLocalAgentProjects] = useState(0);
+  const [lastSyncedUpdatedAt, setLastSyncedUpdatedAt] = useState("");
+  const [lastLocalPlayUrl, setLastLocalPlayUrl] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -121,6 +128,19 @@ export default function Home() {
     localStorage.setItem("gene.theme", theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    const savedUrl = localStorage.getItem("gene.local-agent-url") || "http://127.0.0.1:38421";
+    const savedToken = localStorage.getItem("gene.local-agent-token") || "";
+    setLocalAgentUrl(savedUrl);
+    setLocalAgentToken(savedToken);
+    if (savedToken) void verifyLocalAgent(savedUrl, savedToken, false);
+  }, []);
+
+  useEffect(() => {
+    if (!project) return;
+    setLastSyncedUpdatedAt(localStorage.getItem("gene.local-agent-sync." + project.id) || "");
+  }, [project?.id, project?.updatedAt]);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
