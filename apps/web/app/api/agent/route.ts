@@ -27,8 +27,9 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
-function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string) {
+function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
+  if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
     throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   }
@@ -231,11 +232,11 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
-    const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine);
+    const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine, body.mode);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
-      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", body.project?.plan?.engine);
+      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", body.project?.plan?.engine, "build");
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
