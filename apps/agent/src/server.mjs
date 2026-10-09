@@ -91,9 +91,9 @@ export function validateSourceProject(files) {
   if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) issues.push("External CSS dependencies are not allowed.");
   if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
   if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) issues.push("No detectable player input/event handling.");
-  if (spec?.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["']\s*\)/.test(js)) issues.push("Canvas 2D game must create a CanvasRenderingContext2D.");
+  if (spec?.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) issues.push("Canvas 2D game must create a CanvasRenderingContext2D.");
   if (spec?.engine === "webgl3d") {
-    if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']\s*\)/i.test(js)) issues.push("WebGL 3D game must request a WebGL context.");
+    if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) issues.push("WebGL 3D game must request a WebGL context.");
     for (const [pattern, requirement] of [
       [/createShader\s*\(/, "shader creation"],
       [/shaderSource\s*\(/, "shader source"],
