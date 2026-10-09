@@ -6,7 +6,7 @@ import JSZip from "jszip";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
-const ALLOWED_REFERENCE_TEXT = /\\.(txt|md|json|js|ts|css|gd|html)$/i;
+const ALLOWED_REFERENCE_TEXT = /\.(txt|md|json|js|ts|css|gd|html)$/i;
 function readDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -316,7 +316,7 @@ export default function Home() {
     for (const file of selected) {
       if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB)"); continue; }
       if (totalBytes + file.size > 950 * 1024) { skipped.push(file.name + " (project reference budget reached)"); continue; }
-      if (/^image\\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      if (/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
         try {
           const dataUrl = await readDataUrl(file);
           const dataBase64 = dataUrl.split(",")[1] || "";
