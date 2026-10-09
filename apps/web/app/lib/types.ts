@@ -1,0 +1,31 @@
+export type Mode = "plan" | "build";
+export type Thinking = "fast" | "balanced" | "deep";
+export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error" };
+export type Question = { id: string; text: string; why?: string; choices?: string[] };
+export type GamePlan = { title: string; summary: string; engine: "canvas2d" | "webgl3d"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
+export type BuildVersion = { number: number; label: string; files: Record<string, string>; createdAt: string; testSummary: string };
+export type GeneProject = {
+  id: string;
+  name: string;
+  initialPrompt: string;
+  mode: Mode;
+  thinking: Thinking;
+  messages: ChatMessage[];
+  answers: Record<string, string>;
+  question?: Question | null;
+  plan?: GamePlan | null;
+  files: Record<string, string>;
+  versions: BuildVersion[];
+  activeFile: string;
+  updatedAt: string;
+};
+export type AgentResponse = {
+  reply: string;
+  question?: Question | null;
+  plan?: GamePlan | null;
+  files?: Array<{ path: string; content: string }>;
+  complete?: boolean;
+  needsUserDecision?: boolean;
+  aiMode?: "gemini" | "fallback";
+  tests?: { passed: string[]; failed: string[] };
+};
