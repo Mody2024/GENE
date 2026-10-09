@@ -6,6 +6,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const ALLOWED_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 18;
+const RATE_WINDOW_MS = 60_000;
 
 function jsonError(message: string, status = 400, code = "GENE_REQUEST_ERROR") {
   return NextResponse.json({ ok: false, error: { code, message } }, { status });
@@ -33,6 +36,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (file.content.length > 500_000) throw new Error("Generated file exceeds the 500 KB safety limit.");
     normalized.push({ path: file.path, content: file.content });
   }
+  for (const file of normalized) {
+    if (file.path === "game.js") new Function(file.content);
+    if (file.path === "game-spec.json") JSON.parse(file.content);
+  }
   if (operation === "build" || operation === "surprise") {
     const byPath = Object.fromEntries(normalized.map(f => [f.path, f.content]));
     for (const path of ["game.html", "game.css", "game.js", "game-spec.json"]) {
@@ -44,6 +51,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
     if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
     if (!/canvas|webgl|WebGL|2d/.test(js + byPath["game.html"])) throw new Error("Build rejected: no canvas/WebGL rendering path was found.");
+    if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
   }
   return normalized;
 }
@@ -57,6 +65,19 @@ export async function POST(request: NextRequest) {
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
   if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
+
+  const now = Date.now();
+  const forwarded = request.headers.get("x-forwarded-for") || "";
+  const clientKey = forwarded.split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
+  const bucket = requestBuckets.get(clientKey);
+  if (!bucket || bucket.resetAt <= now) requestBuckets.set(clientKey, { count: 1, resetAt: now + RATE_WINDOW_MS });
+  else {
+    bucket.count += 1;
+    if (bucket.count > RATE_LIMIT) return jsonError("GENE request limit reached. Please wait one minute before trying again.", 429, "GENE_RATE_LIMIT");
+  }
+  if (requestBuckets.size > 2000) {
+    for (const [key, value] of requestBuckets) if (value.resetAt <= now) requestBuckets.delete(key);
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -118,9 +139,9 @@ export async function POST(request: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(apiKey), {
+    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
         contents: [{ role: "user", parts: [{ text: userInput }] }],
