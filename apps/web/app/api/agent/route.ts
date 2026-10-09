@@ -308,11 +308,11 @@ export async function POST(request: NextRequest) {
       result = parseModelJson(text);
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined);
-    const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine, body.mode);
+    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
-      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", body.project?.plan?.engine, "build");
+      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", result.plan?.engine || body.project?.plan?.engine, "build");
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
