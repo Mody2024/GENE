@@ -27,7 +27,7 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
-function normalizeAgentResult(input: AgentResponse, operation: string): AgentResponse {
+function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"]): AgentResponse {
   if (typeof input.reply !== "string" || !input.reply.trim()) throw new Error("GENE response needs a non-empty user-facing reply.");
   const result: AgentResponse = {
     reply: input.reply.trim().slice(0, 12_000),
@@ -91,6 +91,7 @@ function normalizeAgentResult(input: AgentResponse, operation: string): AgentRes
     if (!result.question && !result.plan) throw new Error("Interview must return exactly one next question or a completed plan.");
   }
   if (operation === "plan" && !result.plan) throw new Error("Planning response is missing its structured plan. No files were changed.");
+  if ((operation === "build" || operation === "surprise") && !result.plan && existingPlan) result.plan = existingPlan;
   if (operation === "build" || operation === "surprise") {
     if (!result.plan) throw new Error("Build response is missing its implementation plan.");
     if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required game source files.");
@@ -306,7 +307,7 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
-    result = normalizeAgentResult(result, body.operation);
+    result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined);
     const files = validateFiles(result.files || [], body.operation, body.project?.plan?.engine, body.mode);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
