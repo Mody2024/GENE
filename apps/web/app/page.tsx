@@ -126,20 +126,17 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!project || !project.files["game.html"] || !project.files["game.js"]) return;
+    if (!project || !project.files["game.html"] || !project.files["game.js"] || runtimeState === "rendered" || runtimeState === "error") return;
     const timer = window.setTimeout(() => {
-      setRuntimeState(current => {
-        if (current === "rendered" || current === "error") return current;
-        setNotice("GENE could not confirm a visible game frame. The source exists, but this build is not verified as playable.");
-        setProject(projectNow => projectNow && projectNow.versions.length ? {
-          ...projectNow,
-          versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: no visible render signal received within five seconds." } : v)
-        } : projectNow);
-        return "error";
-      });
+      setRuntimeState("error");
+      setNotice("GENE could not confirm a visible game frame. The source exists, but this build is not verified as playable.");
+      setProject(projectNow => projectNow && projectNow.versions.length ? {
+        ...projectNow,
+        versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: no visible render signal received within five seconds." } : v)
+      } : projectNow);
     }, 5000);
     return () => window.clearTimeout(timer);
-  }, [project?.id, project?.files, previewKey]);
+  }, [project?.id, project?.files, previewKey, runtimeState]);
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
