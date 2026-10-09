@@ -110,18 +110,19 @@ export function validateSourceProject(files) {
   return { ok: issues.length === 0, issues };
 }
 
-export function renderPlayHtml(files, title = "GENE game") {
+export function renderPlayHtml(files, title = "GENE game", baseHref = "/") {
   const html = String(files["game.html"] || "").replace(/<script[\s\S]*?<\/script>/gi, "");
   const css = String(files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
   const js = String(files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
   const safeTitle = String(title).replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
+  const safeBase = String(baseHref).startsWith("/") && !String(baseHref).includes("..") ? String(baseHref) : "/";
   const telemetry = [
     "(function(){",
     "window.addEventListener('error',function(e){console.error('[GENE runtime]',e.message||'script error');});",
     "window.addEventListener('load',function(){document.documentElement.dataset.geneLoaded='true';});",
     "})();"
   ].join("\n");
-  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "</script><script>" + telemetry + "</script></body></html>";
+  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><base href='" + safeBase + "'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "</script><script>" + telemetry + "</script></body></html>";
 }
 
 async function readJson(req, limit = MAX_BODY_BYTES) {
@@ -234,7 +235,7 @@ export async function createAgentServer({ port = PORT, host = HOST, workspace = 
           readFile(path.join(dir, "gene.project.json"), "utf8")
         ]);
         const manifest = JSON.parse(manifestText);
-        const output = renderPlayHtml({ "game.html": html, "game.css": css, "game.js": js }, manifest.name || id);
+        const output = renderPlayHtml({ "game.html": html, "game.css": css, "game.js": js }, manifest.name || id, "/play/" + encodeURIComponent(id) + "/");
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
