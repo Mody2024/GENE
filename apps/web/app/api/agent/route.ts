@@ -48,7 +48,7 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
       id: q.id.trim().slice(0, 100),
       text: q.text.trim().slice(0, 1400),
       ...(typeof q.why === "string" && q.why.trim() ? { why: q.why.trim().slice(0, 800) } : {}),
-      ...(Array.isArray(q.choices) ? { choices: q.choices.filter((choice: unknown): choice is string => typeof choice === "string" && choice.trim()).slice(0, 8).map((choice: string) => choice.trim().slice(0, 180)) } : {})
+      ...(Array.isArray(q.choices) ? { choices: q.choices.filter((choice: unknown): choice is string => typeof choice === "string" && choice.trim().length > 0).slice(0, 8).map((choice: string) => choice.trim().slice(0, 180)) } : {})
     };
   }
 
@@ -58,8 +58,8 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
     if (typeof plan.title !== "string" || !plan.title.trim()) throw new Error("The game plan is missing a title.");
     if (typeof plan.summary !== "string" || !plan.summary.trim()) throw new Error("The game plan is missing its summary.");
     if (plan.engine !== "canvas2d" && plan.engine !== "webgl3d") throw new Error("The game plan engine must be canvas2d or webgl3d.");
-    const tasks = Array.isArray(plan.tasks) ? plan.tasks.filter((task: unknown): task is string => typeof task === "string" && task.trim()).slice(0, 40).map((task: string) => task.trim().slice(0, 240)) : [];
-    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((mechanic: unknown): mechanic is string => typeof mechanic === "string" && mechanic.trim()).slice(0, 30).map((mechanic: string) => mechanic.trim().slice(0, 180)) : [];
+    const tasks = Array.isArray(plan.tasks) ? plan.tasks.filter((task: unknown): task is string => typeof task === "string" && task.trim().length > 0).slice(0, 40).map((task: string) => task.trim().slice(0, 240)) : [];
+    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((mechanic: unknown): mechanic is string => typeof mechanic === "string" && mechanic.trim().length > 0).slice(0, 30).map((mechanic: string) => mechanic.trim().slice(0, 180)) : [];
     if (tasks.length < 3) throw new Error("The game plan must include at least three concrete implementation tasks.");
     if (mechanics.length < 1) throw new Error("The game plan must identify at least one actual gameplay mechanic.");
     const budget = plan.performanceBudget || {};
