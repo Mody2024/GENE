@@ -9,13 +9,15 @@ Implemented in this branch:
 - Plan/Build modes and a sequential one-question-at-a-time interview prompt contract.
 - Gemini server API endpoint with server-only API key handling, thinking levels, response validation, rate limiting, and explicit errors when no key is configured.
 - Read-only grounded Google Search mode; sources are returned from Gemini Search grounding when available.
+- Genre-specific implementation/acceptance guides for platformers, precision runners, 2D action, tower defense, 3D lane runners and 3D arena games.
 - Image and text/source reference attachments, with image bytes passed to Gemini.
 - Browser project state with recent projects, editable game source, version snapshots, restore, preview, runtime error/first-render telemetry, and a bounded two-attempt repair loop.
 - Full-window same-browser play route at `/play/<project-id>`.
 - ZIP source export including current source, version snapshots, references, manifest and README; ZIP/legacy project import.
-- Local Agent with token authentication, safe filesystem writes, previous-folder backups, on-disk source validation and a stable disk-backed play URL.
+- Local Agent with token authentication, safe filesystem writes, previous-folder backups, on-disk source validation, real asset serving and a stable disk-backed play URL.
+- GENE Forge: prompt-driven low-poly recipes converted into actual OBJ geometry, MTL materials and JSON asset manifests, plus an interactive WebGL mesh viewport, AI edits and individual file export. This is primitive-based mesh generation, not high-fidelity texturing or image-to-3D.
 - Server-side checks for generated file names/sizes, JavaScript syntax, required canvas, game-spec fields, objective/win/loss declarations, render loop, input hooks, draw operations, external runtime dependencies and conservative object budgets.
-- GitHub Actions contract tests including an HTTP end-to-end test of real local file sync and play serving, plus a Next.js production build.
+- GitHub Actions contract tests including an HTTP end-to-end test of real local file sync and play serving, a production build, and Playwright browser tests for visible Canvas 2D pixels, keyboard movement, UI controls and real WebGL shader/buffer/draw calls.
 
 The generation path asks Gemini for the actual source files used by the preview. Source validation and a visible canvas signal are useful diagnostics, but they are not equivalent to full gameplay automation. GENE must not claim that every game mechanic was verified unless it has evidence for that specific test.
 
@@ -49,8 +51,8 @@ Import this GitHub repository into Vercel. Set the Root Directory to `apps/web`,
 - The web preview route uses this browser's saved project. The Local Agent route serves the actual synced files from disk at a localhost URL; that local URL is not a public/shareable deployed game URL.
 - GENE returns generated source files and executes them in a sandboxed iframe; there is not yet a dedicated long-running filesystem worker or engine build farm.
 - Static checks plus canvas telemetry cannot prove every gameplay path. Automated gameplay control/screenshot comparison and deterministic behavior tests are planned.
-- 2D/3D games must be self-contained Canvas 2D or raw WebGL at this milestone. Phaser/Three.js adapters, Godot/Unity/Unreal exporters, multiplayer server generation and native EXE builds are not yet implemented.
-- Forge has asset contracts but does not yet perform GPU-heavy image-to-3D generation, Blender retopology/UV/rigging or texture baking.
+- 2D/3D game runtime targets self-contained Canvas 2D or raw WebGL. Three.js/Phaser adapters, Godot/Unity/Unreal exporters, multiplayer server generation and native EXE builds are not yet implemented.
+- Forge creates real low-poly primitive-composed OBJ assets; it does not yet perform image-to-3D generation, Blender retopology/UV/rigging, advanced textures or texture baking. Mesh creation alone does not claim that the asset has been integrated into a gameplay scene.
 
 ## Architecture
 
