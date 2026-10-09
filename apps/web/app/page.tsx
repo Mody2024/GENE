@@ -94,7 +94,7 @@ export default function Home() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
-      const list: GeneProject[] = stored.map(item => ({ ...item, references: item.references || [] }));
+      const list: GeneProject[] = stored.slice(0, 8).map(item => ({ ...item, references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
       const activeId = localStorage.getItem(ACTIVE_KEY);
       setProjects(list);
       const active = list.find(p => p.id === activeId) || list[0] || newProject();
@@ -115,7 +115,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!project) return;
-    const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 30);
+    const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 8);
     setProjects(prev => {
       const next = [project, ...prev.filter(p => p.id !== project.id)].slice(0, 30);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); localStorage.setItem(ACTIVE_KEY, project.id); } catch {}
@@ -309,7 +309,7 @@ export default function Home() {
           createdAt: now(),
           testSummary: "Server validated required files and JavaScript syntax before returning this version. Browser runtime evidence pending."
         };
-        versions = [version, ...versions];
+        versions = [version, ...versions].slice(0, 8);
         addActivity("Saved version " + String(version.number).padStart(3, "0") + " with " + changedPaths.length + " changed files");
       }
       if (result.plan) addActivity("Plan updated: " + result.plan.tasks.length + " task(s)");
@@ -778,7 +778,7 @@ export default function Home() {
     }
     const updatedFiles = { ...project.files, [project.activeFile]: editedFile };
     const version: BuildVersion = { number: (project.versions[0]?.number || 0) + 1, label: "Manual edit: " + project.activeFile, files: { ...updatedFiles }, createdAt: now(), testSummary: "Manual edit saved. Re-run validation before release." };
-    const updatedProject = { ...project, files: updatedFiles, versions: [version, ...project.versions], updatedAt: now() };
+    const updatedProject = { ...project, files: updatedFiles, versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
     setProject(updatedProject);
     setFileDirty(false);
     setNotice("Saved " + project.activeFile + " as version " + version.number + ". It has not been runtime-verified yet.");
@@ -793,7 +793,7 @@ export default function Home() {
   function restoreVersion(version: BuildVersion) {
     if (!project) return;
     const newVersion: BuildVersion = { number: (project.versions[0]?.number || 0) + 1, label: "Restore v" + version.number, files: { ...version.files }, createdAt: now(), testSummary: "Restored snapshot; runtime verification pending." };
-    const updatedProject = { ...project, files: { ...version.files }, versions: [newVersion, ...project.versions], activeFile: "game.js", updatedAt: now() };
+    const updatedProject = { ...project, files: { ...version.files }, versions: [newVersion, ...project.versions].slice(0, 8), activeFile: "game.js", updatedAt: now() };
     setProject(updatedProject);
     setSection("chat");
     setPreviewKey(n => n + 1);
