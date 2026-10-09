@@ -96,7 +96,8 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
     if (!result.plan) throw new Error("Build response is missing its implementation plan.");
     if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required game source files.");
   }
-  if ((operation === "edit" || operation === "chat") && result.files.length > 0 && result.files.length > 4) {
+  const fileCount = Array.isArray(result.files) ? result.files.length : 0;
+  if ((operation === "edit" || operation === "chat") && fileCount > 4) {
     throw new Error("Edit response changed too many files for the current browser-game scope.");
   }
   return result;
