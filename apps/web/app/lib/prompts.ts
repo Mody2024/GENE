@@ -47,6 +47,7 @@ export function makeAgentInput(input: {
   if (input.operation === "build") parts.push("Generate all four files for a complete playable first version, not a mockup. Include a distinctive art direction and implemented controls/objective/win-loss-restart loop.");
   if (input.operation === "edit") parts.push("Make the requested change against the exact existing source. Return only files that actually changed, with complete contents. Keep edits targeted and preserve existing features.");
   if (input.operation === "chat") parts.push("Speak naturally. If the user clearly asks for changes, implement them in files rather than only describing them.");
+  if (input.operation === "research") parts.push("Research the user's question using live Google Search grounding results. Summarize useful findings for this game project and include source URLs/titles in the reply. Do not return source files or claim to have changed anything.");
   if (input.operation === "surprise") parts.push("Invent an original small browser game with a surprising central mechanic and immediately return a complete playable build. No questions.");
   return parts.join("\n\n");
 }
