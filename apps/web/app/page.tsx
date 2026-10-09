@@ -266,6 +266,10 @@ export default function Home() {
 
   function saveManualEdit() {
     if (!project) return;
+    if (project.mode === "plan") {
+      setNotice("Plan mode is read-only. Switch to Build mode before editing source files.");
+      return;
+    }
     const updatedFiles = { ...project.files, [project.activeFile]: editedFile };
     const version: BuildVersion = { number: (project.versions[0]?.number || 0) + 1, label: "Manual edit: " + project.activeFile, files: { ...updatedFiles }, createdAt: now(), testSummary: "Manual edit saved. Re-run validation before release." };
     setProject({ ...project, files: updatedFiles, versions: [version, ...project.versions], updatedAt: now() });
@@ -349,6 +353,10 @@ export default function Home() {
         <button className="new-project" onClick={createNewProject}><span>＋</span> New game project</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
         <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? "Playable source created" : "Design in progress"}</small></div>
+        {projects.filter(p => p.id !== project.id).length > 0 && <>
+          <div className="sidebar-section-label">RECENT PROJECTS</div>
+          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
+        </>}
         <div className="sidebar-section-label">PROJECT FILES</div>
         {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => { setProject({ ...project, activeFile: path }); setSection("files"); }}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path)}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
         <div className="sidebar-bottom">
@@ -425,7 +433,7 @@ export default function Home() {
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <div className="empty-state">No source files yet. Plan the game, then switch to Build mode and ask GENE to build it.</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => { setProject({ ...project, activeFile: path }); setEditedFile(project.files[path]); setFileDirty(false); }}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty}>Save as version</button></div></>}
+              {!Object.keys(project.files).length ? <div className="empty-state">No source files yet. Plan the game, then switch to Build mode and ask GENE to build it.</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => { setProject({ ...project, activeFile: path }); setEditedFile(project.files[path]); setFileDirty(false); }}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
             </div>}
 
             {section === "tasks" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">PLANNING</div><h2>Plan & tasks</h2><p>Review the scope before building. Plan mode itself does not change source files.</p></div>{project.plan ? <><div className="plan-overview"><h3>{project.plan.title}</h3><p>{project.plan.summary}</p><div className="plan-metrics"><span>{project.plan.engine}</span><span>Target {project.plan.performanceBudget.targetFps} FPS</span><span>Max enemies {project.plan.performanceBudget.maxEnemies}</span></div></div><div className="task-list">{project.plan.tasks.map((task, i) => <div key={task}><span>{String(i + 1).padStart(2, "0")}</span><p>{task}</p><small>{Object.keys(project.files).length ? "Build source exists; task completion requires runtime tests." : "Planned"}</small></div>)}</div><button className="primary-button" onClick={startBuild} disabled={busy}>Start building plan →</button></> : <div className="empty-state">No plan yet. Describe a game in Chat, then GENE will interview you one question at a time.</div>}</div>}
