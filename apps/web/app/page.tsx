@@ -203,7 +203,7 @@ export default function Home() {
     if (!project || busy || !text.trim()) return;
     const prompt = text.trim();
     const isFirstIdea = !project.initialPrompt;
-    const answerKey = project.question?.id;
+    const answerKey = operationOverride ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
     if (!operationOverride) {
