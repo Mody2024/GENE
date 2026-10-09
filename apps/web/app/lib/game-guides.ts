@@ -1,0 +1,197 @@
+export type GameGuide = {
+  id: string;
+  title: string;
+  engine: "canvas2d" | "webgl3d";
+  implementation: string[];
+  acceptance: string[];
+  performance: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number };
+};
+
+const GUIDES: Record<string, GameGuide> = {
+  platformer2d: {
+    id: "platformer2d",
+    title: "2D Platformer",
+    engine: "canvas2d",
+    implementation: [
+      "Use a world coordinate system and camera follow, not a single static screen.",
+      "Implement horizontal acceleration/friction, gravity, ground/platform collision, coyote time and jump buffering.",
+      "Allow variable jump height by cutting upward velocity when the jump button is released.",
+      "Include at least one distinct level layout, platforms at multiple heights, solid terrain, collectibles, a hazard/enemy, and a visible finish/checkpoint.",
+      "Show readable hit feedback and restart after loss; avoid tiny player/collision shapes."
+    ],
+    acceptance: [
+      "Right/left movement changes player world position.",
+      "Jump rises then gravity returns player to a platform without falling through it.",
+      "Platform collision prevents falling through the floor.",
+      "Collectible increments score once and disappears.",
+      "A hazard causes a visible loss or damage state; restart restores a playable state.",
+      "The finish condition is reachable and produces an explicit win state."
+    ],
+    performance: { targetFps: 60, maxEnemies: 8, maxObjects: 220, maxParticles: 50 }
+  },
+  rhythm2d: {
+    id: "rhythm2d",
+    title: "Rhythm / Precision Runner",
+    engine: "canvas2d",
+    implementation: [
+      "Use deterministic horizontal auto-scroll with obstacle placements on a visible rhythm grid.",
+      "Use jump buffering and a stable collision box; obstacles must align with the ground and scrolling coordinate system.",
+      "Make death immediate and restart fast. Keep the next obstacle visible before the player reaches it.",
+      "Use a strong color palette, parallax layers, landing/impact effects and level progression without requiring audio to play correctly."
+    ],
+    acceptance: [
+      "World scroll speed is stable using delta time.",
+      "Space/click jumps and the player lands correctly.",
+      "Touching a spike/hazard causes loss once, not repeated state flicker.",
+      "Restart resets scroll, player and obstacles.",
+      "The level has a reachable finish marker and win state."
+    ],
+    performance: { targetFps: 60, maxEnemies: 0, maxObjects: 180, maxParticles: 35 }
+  },
+  runner2d: {
+    id: "runner2d",
+    title: "2D Endless Runner",
+    engine: "canvas2d",
+    implementation: [
+      "Keep player position and obstacles in world coordinates; recycle off-screen obstacles rather than growing the entity list forever.",
+      "Implement jump, obstacles, collectible pickups, score/speed progression and game over/restart.",
+      "At least three distinct obstacle silhouettes and two parallax environment layers are required."
+    ],
+    acceptance: [
+      "Jump changes vertical state and resolves landing.",
+      "Obstacle collision ends the run or reduces health visibly.",
+      "Pickup collection increments score exactly once.",
+      "Old offscreen entities are recycled/removed and object count remains bounded.",
+      "Restart restores initial speed, score and obstacles."
+    ],
+    performance: { targetFps: 60, maxEnemies: 4, maxObjects: 140, maxParticles: 30 }
+  },
+  topdown: {
+    id: "topdown",
+    title: "Top-down Action",
+    engine: "canvas2d",
+    implementation: [
+      "Implement movement in two axes with normalized diagonal speed and world-space collision.",
+      "Create distinct enemy behavior, player health/damage, attack/projectile behavior, pickups and a wave/objective system.",
+      "Use a camera/world layout large enough to move, not just a single HUD panel."
+    ],
+    acceptance: [
+      "WASD/arrows move the player in four directions with no diagonal speed boost.",
+      "Attack input causes a visible hit/projectile and enemies react or disappear when defeated.",
+      "Enemy contact/projectiles affect player health.",
+      "Pickups or objectives change persistent in-run state.",
+      "Win, loss and restart work."
+    ],
+    performance: { targetFps: 60, maxEnemies: 14, maxObjects: 260, maxParticles: 60 }
+  },
+  towerDefense: {
+    id: "towerDefense",
+    title: "Tower Defense",
+    engine: "canvas2d",
+    implementation: [
+      "Define an explicit path with waypoints; enemies must move along the path toward a base.",
+      "Allow placing at least one turret, selecting targets by distance, firing projectiles or applying visible damage, and spending/earning currency.",
+      "Include wave progression, base health, win/loss and restart."
+    ],
+    acceptance: [
+      "Enemies reach the base unless killed.",
+      "Turret attacks the nearest valid enemy within range.",
+      "Currency changes when placing a turret and defeating an enemy.",
+      "Wave increases after the current wave is cleared.",
+      "Base health reaching zero loses; surviving the defined final wave wins."
+    ],
+    performance: { targetFps: 60, maxEnemies: 30, maxObjects: 360, maxParticles: 45 }
+  },
+  runner3d: {
+    id: "runner3d",
+    title: "3D Lane Runner",
+    engine: "webgl3d",
+    implementation: [
+      "Use an actual WebGL renderer: compile vertex/fragment shaders, link a program, upload vertex/index buffers, set projection/view/model transforms, and call drawArrays or drawElements every frame.",
+      "Render real perspective geometry with a ground plane, three lanes, a chase camera, environment structures, a visible runner, obstacles and coins. Do not draw the whole scene as a 2D HUD.",
+      "Implement left/right lane switching, jump, slide, forward world movement, collision, coins, score, increasing difficulty and game-over/restart.",
+      "Use chunk recycling/object pooling for the endless track and environment; keep meshes/objects within the budget.",
+      "Use shaded colors/material-like variation and a distinct environment silhouette (e.g. rail yard, metro tunnel, elevated city) with depth cues."
+    ],
+    acceptance: [
+      "The JavaScript requests a WebGL context and compiles/links valid shaders.",
+      "The frame loop submits real geometry draw calls after clearing the buffer.",
+      "The runner visibly moves/animates in perspective and the camera follows it.",
+      "Left/right moves between three lanes, jump rises/lands, and slide changes the collision/visual pose.",
+      "Obstacle collision ends the run; coin collection updates score.",
+      "Track chunks are recycled so object count stays bounded.",
+      "Restart resets lane, speed, score, obstacles and game state."
+    ],
+    performance: { targetFps: 60, maxEnemies: 0, maxObjects: 160, maxParticles: 24 }
+  },
+  arena3d: {
+    id: "arena3d",
+    title: "3D Arena / Adventure",
+    engine: "webgl3d",
+    implementation: [
+      "Use actual WebGL shader compilation, GPU buffers, projection/view/model transforms, and repeated geometry draw calls; no flat 2D-only fallback for the requested 3D scene.",
+      "Render a ground plane and a camera perspective with a visible player mesh, multiple environment structures, pickups and enemies.",
+      "Implement movement, world-space enemy approach, melee/projectile attack, health, pickup/objective, win/loss/restart.",
+      "Keep shadow/effect costs low; prioritize clear silhouettes, materials and camera framing over excessive geometry."
+    ],
+    acceptance: [
+      "A real WebGL context, linked shader program and non-empty geometry are present.",
+      "Player movement changes the rendered world position.",
+      "Attack input affects enemy state and player health can change.",
+      "Objective/exit produces a clear win; health reaching zero produces loss.",
+      "Restart resets all runtime state."
+    ],
+    performance: { targetFps: 60, maxEnemies: 8, maxObjects: 120, maxParticles: 20 }
+  },
+  default2d: {
+    id: "default2d",
+    title: "Custom 2D Game",
+    engine: "canvas2d",
+    implementation: [
+      "Build a bespoke game scene around the requested central mechanic, with distinct art direction and visible world elements.",
+      "Implement controls, collision/interaction, feedback, objective, win/loss and restart.",
+      "Use delta time, bounded entities and no dependency on network resources."
+    ],
+    acceptance: [
+      "Input changes player or game state.",
+      "At least one gameplay interaction changes score/health/objectives.",
+      "Win and loss states are distinct and restart works.",
+      "The initial frame has visible scene details, not only a HUD."
+    ],
+    performance: { targetFps: 60, maxEnemies: 8, maxObjects: 180, maxParticles: 40 }
+  }
+};
+
+function is3d(text: string) {
+  return /\b(3d|three.?dimensional|webgl|subway|train runner|metro runner|third.?person|first.?person|driving|racing|small horror|3d adventure)\b/i.test(text);
+}
+
+export function selectGameGuide(input: {
+  message: string;
+  initialPrompt?: string;
+  planTitle?: string;
+  planEngine?: "canvas2d" | "webgl3d";
+}): GameGuide {
+  const text = [input.message, input.initialPrompt || "", input.planTitle || ""].join("\n").toLowerCase();
+  if (/geometry dash|rhythm game|rhythm runner|precision runner|auto.?runner/.test(text)) return GUIDES.rhythm2d;
+  if (/mario|platformer|platform game|side.?scroll/.test(text)) return GUIDES.platformer2d;
+  if (/subway|metro|three.?lane|lane runner|endless runner/.test(text) && is3d(text)) return GUIDES.runner3d;
+  if (/endless runner|runner/.test(text) && !is3d(text)) return GUIDES.runner2d;
+  if (/tower defense|tower defence|td game/.test(text)) return GUIDES.towerDefense;
+  if (/top.?down|twin.?stick|shooter|survival arena/.test(text) && !is3d(text)) return GUIDES.topdown;
+  if (/arena|horror|third.?person|first.?person|3d adventure|wave survival/.test(text) && is3d(text)) return GUIDES.arena3d;
+  if (input.planEngine === "webgl3d" || is3d(text)) return GUIDES.arena3d;
+  return GUIDES.default2d;
+}
+
+export function formatGameGuide(guide: GameGuide): string {
+  return [
+    "GUIDE: " + guide.title + " (" + guide.engine + ")",
+    "Required implementation rules:",
+    ...guide.implementation.map((item, index) => (index + 1) + ". " + item),
+    "Acceptance checks to satisfy:",
+    ...guide.acceptance.map((item, index) => "- " + item),
+    "Performance defaults: " + JSON.stringify(guide.performance),
+    "Make the specific requested game's own objects, setting, mechanics and UI. Do not reuse a generic HUD-only game or claim that acceptance checks passed unless the runtime/test system actually measured them."
+  ].join("\n");
+}
