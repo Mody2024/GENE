@@ -1,11 +1,28 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentResponse, BuildVersion, GeneProject, Mode, Thinking } from "./lib/types";
 import JSZip from "jszip";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
+const ALLOWED_REFERENCE_TEXT = /\\.(txt|md|json|js|ts|css|gd|html)$/i;
+function readDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read " + file.name));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
+}
+function readText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read " + file.name));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsText(file);
+  });
+}
 
 function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
@@ -28,6 +45,7 @@ function newProject(): GeneProject {
     files: {},
     versions: [],
     activeFile: "game.js",
+    references: [],
     updatedAt: now()
   };
 }
@@ -53,12 +71,14 @@ export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
   const autoRepairAttempts = useRef(0);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      const list: GeneProject[] = raw ? JSON.parse(raw) : [];
+      const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
+      const list: GeneProject[] = stored.map(item => ({ ...item, references: item.references || [] }));
       const activeId = localStorage.getItem(ACTIVE_KEY);
       setProjects(list);
       const active = list.find(p => p.id === activeId) || list[0] || newProject();
@@ -283,6 +303,49 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
 
+  async function addReferences(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const selected = Array.from(input.files || []);
+    input.value = "";
+    if (!project || !selected.length) return;
+    const current = project.references || [];
+    let totalBytes = current.reduce((sum, ref) => sum + ref.size, 0);
+    const added: GeneProject["references"] = [];
+    const skipped: string[] = [];
+    for (const file of selected) {
+      if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB)"); continue; }
+      if (totalBytes + file.size > 950 * 1024) { skipped.push(file.name + " (project reference budget reached)"); continue; }
+      if (/^image\\/(jpeg|png|webp|gif)$/.test(file.type)) {
+        try {
+          const dataUrl = await readDataUrl(file);
+          const dataBase64 = dataUrl.split(",")[1] || "";
+          if (!dataBase64) { skipped.push(file.name + " (image data unreadable)"); continue; }
+          added.push({ id: uid(), name: file.name, mimeType: file.type, kind: "image", dataBase64, size: file.size });
+          totalBytes += file.size;
+        } catch { skipped.push(file.name + " (could not read)"); }
+      } else if (ALLOWED_REFERENCE_TEXT.test(file.name) || file.type.startsWith("text/") || file.type === "application/json") {
+        try {
+          const textContent = await readText(file);
+          if (textContent.length > 60_000) { skipped.push(file.name + " (text over 60 KB)"); continue; }
+          added.push({ id: uid(), name: file.name, mimeType: file.type || "text/plain", kind: "text", textContent, size: file.size });
+          totalBytes += file.size;
+        } catch { skipped.push(file.name + " (could not read)"); }
+      } else {
+        skipped.push(file.name + " (use an image or text/source file)");
+      }
+    }
+    if (added.length) {
+      setProject({ ...project, references: [...current, ...added], updatedAt: now() });
+      setNotice("Attached " + added.length + " reference file(s). Gemini will receive these references with the next request.");
+    }
+    if (skipped.length) setNotice((added.length ? "Attached " + added.length + ". " : "") + "Skipped: " + skipped.join(", "));
+  }
+
+  function removeReference(id: string) {
+    if (!project) return;
+    setProject({ ...project, references: (project.references || []).filter(ref => ref.id !== id), updatedAt: now() });
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void runAgent(draft);
@@ -469,8 +532,10 @@ export default function Home() {
               </div>
               <form className="composer" onSubmit={onSubmit}>
                 <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{project.thinking.toUpperCase()} THINKING</span></div>
+                {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); } }} />
-                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
+                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach game art, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
