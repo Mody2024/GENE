@@ -1,3 +1,40 @@
 import assert from "node:assert/strict";
-assert.equal(typeof process.version, "string");
-console.log("GENE smoke test passed");
+import { readFileSync, existsSync } from "node:fs";
+
+const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+const rootPackage = JSON.parse(read("package.json"));
+const webPackage = JSON.parse(read("apps/web/package.json"));
+const agent = read("apps/web/app/api/agent/route.ts");
+const page = read("apps/web/app/page.tsx");
+const prompts = read("apps/web/app/lib/prompts.ts");
+const playPage = read("apps/web/app/play/[id]/page.tsx");
+const css = read("apps/web/app/globals.css");
+
+assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
+assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the selected Next version");
+assert.equal(webPackage.dependencies.jszip, "3.10.1", "project source ZIP packaging is installed");
+assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
+assert.ok(agent.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key must be explicit");
+assert.ok(agent.includes("validateFiles"), "server validates AI-generated source");
+assert.ok(agent.includes('new Function(byPath["game.js"])'), "generated JS syntax is checked");
+assert.ok(agent.includes("No files were changed"), "failed generation must not claim source changes");
+assert.ok(agent.includes("GEMINI_API_KEY") && agent.includes("x-goog-api-key"), "Gemini key is used server-side");
+assert.ok(agent.includes("inlineData"), "image reference bytes can be sent to Gemini");
+assert.ok(agent.includes("googleSearch: {}"), "research mode enables Google Search grounding");
+assert.ok(agent.includes('body.operation === "research"'), "research sources are returned separately from file mutation");
+assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview stays sequential");
+assert.ok(prompts.includes("Avoid empty black screens"), "agent prompt rejects placeholder black screens");
+assert.ok(prompts.includes('input.operation === "research"'), "research-specific prompt exists");
+assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in this browser");
+assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
+assert.ok(page.includes("Save as version"), "manual edits can be versioned");
+assert.ok(page.includes("new JSZip()"), "export packages actual source files");
+assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload control is wired");
+assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
+assert.ok(page.includes("Automated runtime repair"), "preview failure can trigger bounded auto-repair");
+assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)'), "fullscreen opens stable project play URL");
+assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route reads saved project state");
+assert.ok(css.includes(":root[data-theme=\"light\"]"), "light theme has its own token set");
+assert.ok(css.includes(".reference-chips"), "reference attachment chips are styled");
+
+console.log("GENE contract tests passed (25 assertions).");
