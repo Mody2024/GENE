@@ -91,10 +91,24 @@ export function validateSourceProject(files) {
   if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) issues.push("External CSS dependencies are not allowed.");
   if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
   if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) issues.push("No detectable player input/event handling.");
+  if (spec?.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["']\s*\)/.test(js)) issues.push("Canvas 2D game must create a CanvasRenderingContext2D.");
+  if (spec?.engine === "webgl3d") {
+    if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']\s*\)/i.test(js)) issues.push("WebGL 3D game must request a WebGL context.");
+    for (const [pattern, requirement] of [
+      [/createShader\s*\(/, "shader creation"],
+      [/shaderSource\s*\(/, "shader source"],
+      [/compileShader\s*\(/, "shader compilation"],
+      [/createProgram\s*\(/, "program creation"],
+      [/linkProgram\s*\(/, "program linking"],
+      [/bufferData\s*\(/, "geometry buffer upload"],
+      [/drawArrays\s*\(|drawElements\s*\(/, "geometry draw calls"]
+    ]) if (!pattern.test(js)) issues.push("WebGL 3D game is missing " + requirement + ".");
+  }
   if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) issues.push("No detectable draw operation; the game may render blank.");
   if (spec && typeof spec === "object" && !Array.isArray(spec)) {
     if (typeof spec.title !== "string" || !spec.title.trim()) issues.push("game-spec.json needs a title.");
     if (typeof spec.genre !== "string" || !spec.genre.trim()) issues.push("game-spec.json needs a genre.");
+    if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") issues.push("game-spec.json engine must be canvas2d or webgl3d.");
     if (!Array.isArray(spec.mechanics) || spec.mechanics.length === 0 || !spec.mechanics.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty mechanics list.");
     if (!Array.isArray(spec.controls) || spec.controls.length === 0 || !spec.controls.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty controls list.");
     if (typeof spec.objective !== "string" || !spec.objective.trim()) issues.push("game-spec.json needs an objective.");
