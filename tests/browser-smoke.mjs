@@ -138,7 +138,18 @@ try {
   await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
   await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
   await sampleFrame.locator("#start-button").click();
-  const sampleBefore = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
+  await sampleFrame.locator("#game-message").waitFor({ state: "hidden", timeout: 5_000 });
+  const startedState = await sampleFrame.locator("body").evaluate(() => new Promise(resolve => {
+    const deadline = performance.now() + 1_500;
+    function check() {
+      const state = window.__geneStarterDebug;
+      if (state?.started || performance.now() >= deadline) return resolve(state);
+      requestAnimationFrame(check);
+    }
+    check();
+  }));
+  assert.ok(startedState?.started, "starter start button should transition the game into its running state; state=" + JSON.stringify(startedState));
+  const sampleBefore = startedState.x;
   const rightControl = sampleFrame.locator('[data-dir="right"]');
   await rightControl.evaluate(el => el.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true })));
   await samplePage.waitForTimeout(250);
