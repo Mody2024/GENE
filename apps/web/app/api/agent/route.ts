@@ -49,11 +49,29 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (!byPath[path] || byPath[path].trim().length < 8) throw new Error("Build rejected: required file " + path + " is missing or empty.");
     }
     new Function(byPath["game.js"]);
-    JSON.parse(byPath["game-spec.json"]);
+    const spec = JSON.parse(byPath["game-spec.json"]);
+    if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: game-spec.json must be a JSON object.");
+    if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: game-spec.json needs a real game title.");
+    if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game-spec.json needs a game genre.");
+    if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the gameplay mechanics list is missing.");
+    if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the controls list is missing.");
+    if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
+    if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) throw new Error("Build rejected: the win condition is missing.");
+    if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) throw new Error("Build rejected: the lose condition is missing.");
+    const budget = spec.performanceBudget;
+    if (!budget || !Number.isFinite(budget.targetFps) || budget.targetFps < 30 || budget.targetFps > 120) throw new Error("Build rejected: performanceBudget.targetFps must be between 30 and 120.");
+    if (![budget.maxEnemies, budget.maxObjects, budget.maxParticles].every((n: unknown) => Number.isInteger(n) && Number(n) >= 0)) throw new Error("Build rejected: performance budgets must be non-negative integers.");
+    if (budget.maxEnemies > 40 || budget.maxObjects > 1200 || budget.maxParticles > 300) throw new Error("Build rejected: requested object, enemy, or particle budget exceeds GENE's conservative limits.");
+    const html = byPath["game.html"];
+    if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
+    if (/<script\b/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
+    if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: game files may not depend on external script or stylesheet CDNs.");
     const js = byPath["game.js"];
+    const css = byPath["game.css"];
+    if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: game.js contains an external runtime dependency.");
+    if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: game.css contains an external runtime dependency.");
     if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
     if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
-    if (!/canvas|webgl|WebGL|2d/.test(js + byPath["game.html"])) throw new Error("Build rejected: no canvas/WebGL rendering path was found.");
     if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
   }
   return normalized;
