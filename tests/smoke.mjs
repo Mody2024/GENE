@@ -91,19 +91,23 @@ try {
   assert.equal((await health.json()).app, "gene-local-agent", "health identifies the real local agent");
   const unauthenticated = await fetch(base + "/api/projects");
   assert.equal(unauthenticated.status, 401, "local project API requires token auth");
+  const filesWithAsset = { ...goodFiles, "assets/marker.txt": "GENE asset bytes" };
   const sync = await fetch(base + "/api/projects/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-GENE-TOKEN": "gene-test-token-01234567890123456789" },
-    body: JSON.stringify({ id:"test-project-01", name:"Contract Game", initialPrompt:"test", files:goodFiles, plan:null, versions:[], references:[] })
+    body: JSON.stringify({ id:"test-project-01", name:"Contract Game", initialPrompt:"test", files:filesWithAsset, plan:null, versions:[], references:[] })
   });
   assert.equal(sync.status, 200, "valid source sync writes to disk");
   const syncBody = await sync.json();
-  assert.equal(syncBody.filesWritten, 4, "sync reports the four actual source files");
+  assert.equal(syncBody.filesWritten, 5, "sync reports the actual game and asset files");
   assert.ok(existsSync(path.join(tempRoot, "projects", "test-project-01", "game.js")), "the source file exists on disk");
   assert.equal(await readFile(path.join(tempRoot, "projects", "test-project-01", "game.js"), "utf8"), goodFiles["game.js"], "disk contents match the source sent by GENE");
   const diskPlay = await fetch(base + "/play/test-project-01");
   assert.equal(diskPlay.status, 200, "local agent serves a stable disk-backed play URL");
   assert.ok((await diskPlay.text()).includes("Contract Game"), "play URL serves the saved project name in its HTML shell");
+  const assetResponse = await fetch(base + "/play/test-project-01/assets/marker.txt");
+  assert.equal(assetResponse.status, 200, "asset route serves synced asset files");
+  assert.equal(await assetResponse.text(), "GENE asset bytes", "served asset bytes match the on-disk asset");
   const diskTest = await fetch(base + "/api/projects/test-project-01/test", { method:"POST", headers:{ "X-GENE-TOKEN":"gene-test-token-01234567890123456789" } });
   assert.equal(diskTest.status, 200, "disk-backed source validation passes on the valid project");
   assert.equal((await diskTest.json()).ok, true, "test route reports the validation result");
