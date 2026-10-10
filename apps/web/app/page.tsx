@@ -356,6 +356,7 @@ export default function Home() {
     setNotice("");
     setRuntimeState("idle");
     setActivity([]);
+    if (operation === "build" || operation === "surprise") setShowActivity(true);
     addActivity("Request accepted: " + operation);
     setSection("chat");
     try {
@@ -1520,7 +1521,7 @@ export default function Home() {
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow">GENE 1.2 FLASH</div>
+                  <div className="eyebrow">GENE 1.3 FLASH</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
                   <div className="starter-grid">
