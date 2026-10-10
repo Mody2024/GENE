@@ -62,6 +62,7 @@ assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sa
 assert.ok(page.includes("buildRuntimeAssetBootstrap(project.files)"), "live game preview exposes generated model assets");
 assert.ok(playPage.includes("buildRuntimeAssetBootstrap(project?.files)"), "fullscreen play route exposes generated model assets");
 assert.ok(runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("window.__GENE_ASSETS__"), "asset runtime bridge has a size cap and explicit namespace");
+assert.ok(runtimeAssets.includes("window.GENE3D.parseOBJ") && runtimeAssets.includes("window.GENE3D.parseMTL"), "asset runtime bridge provides real OBJ geometry and MTL material parsers");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
 assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
