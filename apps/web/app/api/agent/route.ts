@@ -165,6 +165,27 @@ function ensureProjectSpecTitle(
   return files.map(file => file.path === "game-spec.json" ? { ...file, content: JSON.stringify(spec, null, 2) } : file);
 }
 
+function normalizeExecutableHtmlScripts(files: Array<{ path: string; content: string }>): Array<{ path: string; content: string }> {
+  const htmlFile = files.find(file => file.path === "game.html");
+  const jsFile = files.find(file => file.path === "game.js");
+  if (!htmlFile || !jsFile || !/<script\\b/i.test(htmlFile.content)) return files;
+  const extracted: string[] = [];
+  const html = htmlFile.content.replace(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi, (_whole, attrs: string, body: string) => {
+    if (/\\bsrc\\s*=/i.test(attrs)) return "";
+    if (/\\btype\\s*=\\s*["'](?:application\\/json|application\\/ld\\+json)["']/i.test(attrs)) return "";
+    if (body.trim()) extracted.push(body.trim());
+    return "";
+  });
+  if (/<script\\b/i.test(html)) {
+    throw new Error("Build rejected: external or unsupported script tags are not allowed in game.html. Put executable source in game.js.");
+  }
+  let js = jsFile.content;
+  for (const script of extracted) {
+    if (!js.includes(script)) js += "\\n\\n/* Migrated from inline HTML script for GENE runtime compatibility */\\n" + script + "\\n";
+  }
+  return files.map(file => file.path === "game.html" ? { ...file, content: html } : file.path === "game.js" ? { ...file, content: js } : file);
+}
+
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
