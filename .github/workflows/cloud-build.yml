@@ -64,7 +64,7 @@ jobs:
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
         run: |
-          npm install --no-save --no-audit --no-fund @vercel/blob
+          npm install --workspaces=false --no-save --no-audit --no-fund @vercel/blob
           node scripts/upload-cloud-output.mjs "build-output/GENE-${{ inputs.build_id }}-Setup.exe" "${{ inputs.build_id }}" "GENE-${{ inputs.build_id }}-Setup.exe" "application/vnd.microsoft.portable-executable"
   android:
     if: ${{ inputs.targets == 'both' || inputs.targets == 'android' }}
