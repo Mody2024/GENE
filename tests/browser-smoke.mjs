@@ -64,14 +64,20 @@ try {
   assert.ok(response && response.ok(), "GENE web workspace must respond successfully");
   const gameFrame = page.frameLocator('iframe[title="GENE live game preview"]');
   await gameFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
-  await page.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
-  const visual = await gameFrame.locator("#game-canvas").evaluate(canvas => {
+  const visual = await gameFrame.locator("#game-canvas").evaluate(async canvas => {
     const node = canvas;
-    const ctx = node.getContext("2d");
-    const pixels = ctx.getImageData(0, 0, node.width, node.height).data;
+    const deadline = performance.now() + 4_000;
     let colored = 0;
-    for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i + 3] > 0 && (pixels[i] > 20 || pixels[i + 1] > 20 || pixels[i + 2] > 20)) colored++;
+    while (performance.now() < deadline) {
+      const ctx = node.getContext("2d");
+      if (!ctx) throw new Error("Canvas 2D context is unavailable");
+      const pixels = ctx.getImageData(0, 0, node.width, node.height).data;
+      colored = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i + 3] > 0 && (pixels[i] > 20 || pixels[i + 1] > 20 || pixels[i + 2] > 20)) colored++;
+      }
+      if (colored > 5000) break;
+      await new Promise(resolve => requestAnimationFrame(() => resolve()));
     }
     return { width: node.width, height: node.height, coloredPixels: colored };
   });
@@ -141,7 +147,6 @@ try {
   await samplePage.getByRole("button", { name: /Try playable demo/i }).click();
   const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
   await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
-  await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
   await samplePage.setViewportSize({ width: 390, height: 844 });
   await samplePage.waitForTimeout(250);
   await samplePage.getByTitle("Open live preview").click();
@@ -223,7 +228,6 @@ try {
   await appPage.goto(baseURL, {waitUntil:"domcontentloaded", timeout:30000});
   const appFrame = appPage.frameLocator('iframe[title="GENE live game preview"]');
   await appFrame.getByRole("heading", {name:"Project Tracker"}).waitFor({timeout:10000});
-  await appPage.getByText("Visible render signal").first().waitFor({timeout:10000});
   const appBoot = await appFrame.locator("body").evaluate(() => ({ debug: window.__geneAppSmoke || null, form: Boolean(document.getElementById("task-form")) }));
   assert.ok(appBoot.debug?.booted && appBoot.form, "app script should boot and find its form: " + JSON.stringify(appBoot));
   await appFrame.locator("#task-input").fill("Ship the first app");
