@@ -46,7 +46,7 @@ jobs:
         run: |
           node scripts/cloud-build.mjs unpack "source-input/.gene-builds/${{ inputs.build_id }}.enc" web
           $meta = Get-Content web/gene-build.json -Raw | ConvertFrom-Json
-          node scripts/cloud-build.mjs prepare-electron web desktop $meta.title
+          node scripts/cloud-build.mjs prepare-electron web desktop "$($meta.title)"
       - name: Compile Windows installer
         shell: pwsh
         run: |
@@ -87,6 +87,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+      - name: Install Android platform and build tools
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
       - name: Decrypt and prepare project
         env:
           GENE_BUILD_ENCRYPTION_KEY: ${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
