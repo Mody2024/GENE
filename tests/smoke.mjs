@@ -24,6 +24,9 @@ assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned N
 assert.equal(webPackage.dependencies.jszip, "3.10.1", "project ZIP packaging is installed");
 assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
 assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit");
+const health = read("apps/web/app/api/health/route.ts");
+assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
+assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
 assert.ok(api.includes("validateFiles"), "server validates model output");
 assert.ok(api.includes("normalizeAgentResult"), "API validates structured response shapes before updating the UI");
 assert.ok(api.includes("at least three concrete implementation tasks"), "plans with no implementation tasks are rejected");
