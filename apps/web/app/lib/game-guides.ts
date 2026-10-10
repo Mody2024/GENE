@@ -220,14 +220,13 @@ function is3d(text: string) {
   return /\b(3d|three.?dimensional|webgl|subway|train runner|metro runner|third.?person|first.?person|driving|racing|small horror|3d adventure)\b/i.test(text);
 }
 
-export function selectGameGuide(input: {
+function selectBaseGameGuide(input: {
   message: string;
   initialPrompt?: string;
   planTitle?: string;
   planEngine?: "canvas2d" | "webgl3d";
 }): GameGuide {
   const text = [input.message, input.initialPrompt || "", input.planTitle || ""].join("\n").toLowerCase();
-  if (/local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/.test(text)) return is3d(text) ? GUIDES.localMultiplayer3d : GUIDES.localMultiplayer2d;
   if (/geometry dash|rhythm game|rhythm runner|precision runner|auto.?runner/.test(text)) return GUIDES.rhythm2d;
   if (/mario|platformer|platform game|side.?scroll/.test(text)) return GUIDES.platformer2d;
   if (/subway|metro|three.?lane|lane runner|endless runner/.test(text) && is3d(text)) return GUIDES.runner3d;
@@ -237,6 +236,27 @@ export function selectGameGuide(input: {
   if (/arena|horror|third.?person|first.?person|3d adventure|wave survival/.test(text) && is3d(text)) return GUIDES.arena3d;
   if (input.planEngine === "webgl3d" || is3d(text)) return GUIDES.arena3d;
   return GUIDES.default2d;
+}
+
+export function selectGameGuide(input: {
+  message: string;
+  initialPrompt?: string;
+  planTitle?: string;
+  planEngine?: "canvas2d" | "webgl3d";
+}): GameGuide {
+  const text = [input.message, input.initialPrompt || "", input.planTitle || ""].join("\n");
+  const base = selectBaseGameGuide(input);
+  const isLocalMultiplayer = /local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/i.test(text);
+  if (!isLocalMultiplayer) return base;
+  const multiplayer = base.engine === "webgl3d" || is3d(text) ? GUIDES.localMultiplayer3d : GUIDES.localMultiplayer2d;
+  return {
+    id: base.id + "+local-multiplayer",
+    title: base.title + " + " + multiplayer.title,
+    engine: base.engine,
+    implementation: [...base.implementation, ...multiplayer.implementation],
+    acceptance: [...base.acceptance, ...multiplayer.acceptance],
+    performance: base.performance
+  };
 }
 
 export function formatGameGuide(guide: GameGuide): string {
