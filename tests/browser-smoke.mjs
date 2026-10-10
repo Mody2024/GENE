@@ -186,6 +186,11 @@ try {
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
   assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter's on-screen movement control should move the player; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
+  const overlayVisible = !(await sampleFrame.locator("#game-message").evaluate(el => el.classList.contains("hidden")));
+  if (overlayVisible) {
+    await sampleFrame.locator("#start-button").click();
+    await sampleFrame.locator("#game-message").waitFor({ state: "hidden", timeout: 5_000 });
+  }
   const beforeGamepad = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   await sampleFrame.locator("body").evaluate(() => {
     const buttons = Array.from({ length: 16 }, (_, index) => ({ pressed: index === 0 }));
