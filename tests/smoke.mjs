@@ -29,7 +29,7 @@ assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lit
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
-assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(25_000"), "Gemini requests allow realistic generation time without exceeding route budget");
+assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time without exceeding route budget");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
@@ -250,5 +250,17 @@ try {
   await agent.close().catch(() => {});
   await rm(tempRoot, { recursive: true, force: true });
 }
+
+
+assert.ok(api.includes("normalizeExecutableHtmlScripts"), "inline executable HTML scripts are migrated into game.js before final validation");
+assert.ok(api.includes("Migrated from inline HTML script"), "script normalization preserves inline behavior instead of discarding it");
+assert.ok(api.includes("GROQ_API_KEY") && api.includes("OPENROUTER_API_KEY"), "builder can fall back across Groq and OpenRouter providers");
+assert.ok(api.includes("successfulProvider = provider.name") && api.includes('aiMode: successfulProvider'), "API reports the provider that actually completed the request");
+assert.ok(api.includes("apiKeys.length === 0 && !process.env.GROQ_API_KEY") && api.includes("apiKeys.length ? ["), "alternate providers can run even without a Gemini key");
+assert.ok(api.includes('split(/[.!?\\n]/)'), "title normalization handles punctuation and newlines correctly");
+assert.ok(page.includes("function deleteProject(projectId: string)"), "saved chat projects can be deleted");
+assert.ok(page.includes("preview-reopen-tab") && css.includes(".workspace:has(.preview-reopen-tab)"), "minimized preview restores from a right-edge floating control without leaving a blank grid column");
+assert.ok(page.includes("packageProgress") && page.includes("metadata.percent"), "source ZIP packaging reports real progress");
+assert.ok(prompts.includes("Never add Gemini, OpenAI, Groq, OpenRouter, GENE, or AI-generated watermarks"), "generated app/game UIs avoid provider watermarks unless requested");
 
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
