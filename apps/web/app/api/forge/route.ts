@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
+type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
 type Vec3 = [number, number, number];
 type Part = {
   name: string;
@@ -16,7 +16,7 @@ type Part = {
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "sphere", "cylinder", "cone", "wedge", "torus"]);
+const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
 function json(status: number, body: unknown) {
@@ -71,7 +71,46 @@ function rgb(color: string): [number, number, number] {
 function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[][] } {
   const vertices: Vec3[] = [];
   const faces: number[][] = [];
-  if (shape === "box") {
+  if (shape === "beveledBox") {
+    const half = scale.map(n => n / 2) as Vec3;
+    const bevel = Math.min(...half) * 0.14;
+    const cornerIndices = new Map<string, number[]>();
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const key = [sx, sy, sz].join(",");
+      const points: Vec3[] = [
+        [sx * (half[0] - bevel), sy * half[1], sz * half[2]],
+        [sx * half[0], sy * (half[1] - bevel), sz * half[2]],
+        [sx * half[0], sy * half[1], sz * (half[2] - bevel)]
+      ];
+      const ids: number[] = [];
+      for (const point of points) { vertices.push(point); ids.push(vertices.length); }
+      cornerIndices.set(key, ids);
+      faces.push(ids);
+    }
+    const eps = 1e-5;
+    const triangulate = (ids: number[], u: (p: Vec3) => number, v: (p: Vec3) => number) => {
+      if (ids.length < 3) return;
+      const centerU = ids.reduce((sum, id) => sum + u(vertices[id - 1]), 0) / ids.length;
+      const centerV = ids.reduce((sum, id) => sum + v(vertices[id - 1]), 0) / ids.length;
+      ids.sort((a, b) => Math.atan2(v(vertices[a - 1]) - centerV, u(vertices[a - 1]) - centerU) - Math.atan2(v(vertices[b - 1]) - centerV, u(vertices[b - 1]) - centerU));
+      for (let i = 1; i < ids.length - 1; i++) faces.push([ids[0], ids[i], ids[i + 1]]);
+    };
+    faces.length = 0;
+    for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+      const ids = vertices.map((point, index) => Math.abs(point[axis] - sign * half[axis]) < eps ? index + 1 : 0).filter(Boolean);
+      triangulate(ids, point => point[(axis + 1) % 3], point => point[(axis + 2) % 3]);
+    }
+    for (let axisA = 0; axisA < 3; axisA++) for (let axisB = axisA + 1; axisB < 3; axisB++) {
+      const axisC = 3 - axisA - axisB;
+      for (const signA of [-1, 1]) for (const signB of [-1, 1]) {
+        const ids = vertices.map((point, index) => {
+          const matches = Math.sign(point[axisA]) === signA && Math.sign(point[axisB]) === signB && Math.abs(Math.abs(point[axisC]) - half[axisC]) < eps;
+          return matches && (Math.abs(point[axisA]) < half[axisA] - eps || Math.abs(point[axisB]) < half[axisB] - eps) ? index + 1 : 0;
+        }).filter(Boolean);
+        triangulate(ids, point => signA * point[axisA] - signB * point[axisB], point => point[axisC]);
+      }
+    }
+  } else if (shape === "box") {
     const [x, y, z] = scale.map(n => n / 2) as Vec3;
     vertices.push([-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]);
     const quads = [[1,4,3,2],[5,6,7,8],[1,2,6,5],[2,3,7,6],[3,4,8,7],[4,1,5,8]];
@@ -239,9 +278,9 @@ export async function POST(request: NextRequest) {
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels and spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
-    "Use a coherent art direction, clear primary/secondary forms, deliberate color blocking, aligned components, and grounded proportions. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical.",
+    "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration.",
     "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Use all six shape types where appropriate. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
