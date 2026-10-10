@@ -38,7 +38,7 @@ async function gh(url: string, token: string, init?: RequestInit) {
 }
 function safePath(value: unknown): string {
   const path = String(value || "").replace(/\\/g, "/");
-  if (!path || path.startsWith("/") || /^[a-zA-Z]:/.test(path) || path.split("/").some(p => !p || p === "." || p === "..") || path.includes("\0")) {
+  if (!path || path.startsWith("/") || /^[a-zA-Z]:/.test(path) || path.split("/").some(p => !p || p === "." || p === ".." || /[:*?"<>|]/.test(p) || /[\u0000-\u001f]/.test(p)) || path.includes("\0")) {
     throw new Error("The project contains an unsafe file path.");
   }
   return path;
