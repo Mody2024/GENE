@@ -187,7 +187,7 @@ export default function Home() {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
-        setRuntimeState(state);
+        setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
           setProject(current => current && current.versions.length ? {
             ...current,
@@ -209,17 +209,22 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!project || !project.files["game.html"] || !project.files["game.js"] || runtimeState === "rendered" || runtimeState === "error") return;
+    // A hidden/collapsed preview has no mounted iframe, so it cannot send render
+    // telemetry. Never mark a build broken just because the user closed Preview.
+    if (!project || !project.files["game.html"] || !project.files["game.js"] || !previewOpen || !iframeRef.current || runtimeState === "rendered" || runtimeState === "error") return;
     const timer = window.setTimeout(() => {
-      setRuntimeState("error");
-      setNotice("GENE could not confirm a visible game frame. The source exists, but this build is not verified as playable.");
+      // The monitor can miss a frame during slow startup. Confirm the iframe still
+      // exists and give its render loop a second window before flagging a failure.
+      if (!previewOpen || !iframeRef.current) return;
+      setRuntimeState(current => current === "rendered" ? current : "error");
+      setNotice(current => current || "GENE could not confirm a visible game frame after waiting for the preview. The source is preserved; reopen or refresh Preview to retry verification.");
       setProject(projectNow => projectNow && projectNow.versions.length ? {
         ...projectNow,
-        versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: no visible render signal received within five seconds." } : v)
+        versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: the visible-render monitor did not confirm a frame. Source is preserved." } : v)
       } : projectNow);
-    }, 5000);
+    }, 9000);
     return () => window.clearTimeout(timer);
-  }, [project?.id, project?.files, previewKey, runtimeState]);
+  }, [project?.id, project?.files, previewKey, previewOpen, runtimeState]);
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
