@@ -34,7 +34,12 @@ assert.ok(api.includes("x-goog-api-key"), "Gemini key is passed in server-side r
 assert.ok(api.includes("inlineData"), "image references can be sent to Gemini");
 assert.ok(api.includes("googleSearch: {}"), "research mode enables Google Search grounding");
 assert.ok(api.includes("groundingChunks"), "grounding sources are returned to user");
-assert.ok(api.includes("game-spec.json needs a real game title"), "builder requires meaningful game specs");
+assert.ok(api.includes("project spec needs a title"), "builder requires meaningful project specs");
+assert.ok(api.includes('projectKind === "app"'), "agent validation distinguishes apps from games");
+assert.ok(api.includes("app spec needs a concise summary"), "app builds require structured app metadata");
+assert.ok(page.includes('createNewProject("app")'), "workspace can create a dedicated web app project");
+assert.ok(page.includes('project.kind === "app"'), "preview and workspace logic respect project kind");
+assert.ok(prompts.includes("WEB APP ACCEPTANCE CHECKLIST"), "AI prompt defines app-specific acceptance rules");
 assert.ok(api.includes("external runtime dependency"), "builder blocks external runtime dependencies");
 assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview is sequential");
 assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly rejects placeholder games");
@@ -86,6 +91,14 @@ const goodFiles = {
 };
 const sourceCheck = validateSourceProject(goodFiles);
 assert.equal(sourceCheck.ok, true, "valid small game source passes the local agent source contract");
+const goodAppFiles = {
+  "game.html": '<main class="app-shell"><nav aria-label="Main navigation"><button id="home-tab">Home</button></nav><section><h1>Studio dashboard</h1><label for="project-name">Project name</label><input id="project-name" value="My project"><button id="save-project">Save project</button><p id="status" aria-live="polite">Ready</p></section></main>',
+  "game.css": 'body{font:16px Arial,sans-serif;background:#f5f6f8;color:#18202b}.app-shell{max-width:960px;margin:auto;padding:24px}button,input{font:inherit;padding:8px}',
+  "game.js": 'const button=document.getElementById("save-project");button.addEventListener("click",()=>{document.getElementById("status").textContent="Saved "+document.getElementById("project-name").value;});',
+  "game-spec.json": JSON.stringify({title:"Studio dashboard",kind:"app",engine:"webapp",summary:"A working small studio dashboard.",features:["Edit project name","Save feedback"],routes:["/"],userFlows:["Edit a project and save it"],performanceBudget:{targetFps:60}})
+};
+assert.equal(validateSourceProject(goodAppFiles).ok, true, "semantic web apps with interactive JavaScript pass local-agent validation");
+assert.equal(validateSourceProject({...goodAppFiles,"game.js":"const = ;"}).ok, false, "invalid app JavaScript is rejected");
 const fake3dFiles = {
   ...goodFiles,
   "game-spec.json": JSON.stringify({
