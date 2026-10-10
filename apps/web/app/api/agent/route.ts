@@ -232,15 +232,37 @@ export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return jsonError("Request body must be valid JSON."); }
 
-  const allowedOperations = ["interview", "plan", "build", "edit", "chat", "research", "surprise"];
+  const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise"];
   const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
-  if (body.mode === "plan" && ["build", "edit", "surprise"].includes(body.operation)) {
+  if (body.mode === "plan" && ["build", "buildPart", "edit", "surprise"].includes(body.operation)) {
     return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing project files.", 409, "GENE_PLAN_MODE_READ_ONLY");
   }
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
   if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
+
+  if (body.operation === "validateBuild") {
+    try {
+      const files = Object.entries(body.project?.files || {}).map(([path, content]) => ({ path, content: String(content) }));
+      validateFiles(files, "build", body.project?.plan?.engine, "build", projectKind);
+      return NextResponse.json({
+        ok: true,
+        aiMode: "validation",
+        result: {
+          reply: "Assembled project passed GENE's server-side source and project-contract validation.",
+          files: [],
+          plan: body.project?.plan || null,
+          complete: true,
+          needsUserDecision: false,
+          tests: { passed: ["Required project files present", "Project spec valid", "JavaScript syntax valid", "Runtime contract checks passed"], failed: [] }
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Assembled project failed validation.";
+      return jsonError("The staged project did not pass final validation: " + message + " No files were saved. Retry the build or ask GENE to repair the specific stage.", 422, "GENE_STAGED_BUILD_VALIDATION_FAILED");
+    }
+  }
 
   const now = Date.now();
   const forwarded = request.headers.get("x-forwarded-for") || "";
@@ -370,8 +392,8 @@ export async function POST(request: NextRequest) {
             responseMimeType: "application/json",
             temperature: body.operation === "interview" ? 0.35 : 0.2,
             maxOutputTokens: attempt.fallback
-              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : 1_536)
-              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : 3_072),
+              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : body.operation === "buildPart" ? 4_096 : 1_536)
+              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : body.operation === "buildPart" ? 4_096 : 3_072),
             thinkingConfig: { thinkingLevel: attempt.fallback || body.thinking === "fast" ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
@@ -480,6 +502,18 @@ export async function POST(request: NextRequest) {
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
+    if (body.operation === "buildPart") {
+      const requestedPath = body.stagePath;
+      if (typeof requestedPath !== "string" || !ALLOWED_FILES.has(requestedPath)) {
+        throw new Error("Staged build is missing a valid requested file path.");
+      }
+      if (files.length !== 1 || files[0]?.path !== requestedPath) {
+        throw new Error("Staged build must return exactly the requested file: " + requestedPath + ". No files were changed.");
+      }
+      if (files[0].content.length > 120_000) {
+        throw new Error("Staged file exceeded the compact 120 KB per-file budget. No files were changed.");
+      }
+    }
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
