@@ -309,4 +309,6 @@ assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includ
 assert.ok(page.includes("GENE 1.3 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.3 exposes build progress and adapts retries after cutoff");
 assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
 
+assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
+assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("successfulProvider = provider.name"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
