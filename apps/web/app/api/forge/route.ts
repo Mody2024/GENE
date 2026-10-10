@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels and spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration.",
     "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Use all six shape types where appropriate. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
     if (Date.now() - startedAt > 49_000) break;
     const attempt = attempts[index];
     const compact = index > 0
-      ? "\\n\\nRECOVERY RETRY: Previous output was truncated or invalid. Return a smaller complete asset recipe from scratch, never continue partial JSON. Use fewer parts (18 maximum), concise names/notes, preserve the signature silhouette and correct proportions, and output one complete JSON object only."
+      ? "\n\nRECOVERY RETRY: Previous output was truncated or invalid. Return a smaller complete asset recipe from scratch, never continue partial JSON. Use fewer parts (18 maximum), concise names/notes, preserve the signature silhouette and correct proportions, and output one complete JSON object only."
       : "";
     try {
       const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(Math.min(index === 0 ? 13_000 : 9_000, Math.max(1_000, 49_000 - (Date.now() - startedAt))))
       });
       const payload: any = await response.json().catch(() => null);
-      const candidateText = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\\n") || "";
+      const candidateText = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\n") || "";
       const finishReason = String(payload?.candidates?.[0]?.finishReason || "");
       if (!response.ok) {
         lastDetail = payload?.error?.message || "HTTP " + response.status;
