@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
   let successfulModel = model;
   let lastFailure = { status: 502, detail: "Gemini request did not complete." };
   let attempts = 0;
-  const fallbackModels = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
+  const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const queued: Array<{ key: string; model: string; fallback: boolean }> = [
     { key: apiKeys[0], model, fallback: false }
   ];
@@ -365,14 +365,14 @@ export async function POST(request: NextRequest) {
             responseMimeType: "application/json",
             temperature: body.operation === "interview" ? 0.35 : 0.25,
             maxOutputTokens: attempt.fallback
-              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 8_192 : 2_048)
-              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096),
-            thinkingConfig: { thinkingLevel: attempt.fallback ? "low" : thinkingLevel }
+              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : 1_536)
+              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : 3_072),
+            thinkingConfig: { thinkingLevel: attempt.fallback || body.thinking === "fast" ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
         // Leave time for validation and JSON response before Vercel's maxDuration.
-        signal: AbortSignal.timeout(Math.min(25_000, remainingMs - 1_000))
+        signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))
       });
       const candidatePayload = await candidate.json().catch(() => null);
       if (candidate.ok) {
@@ -411,8 +411,8 @@ export async function POST(request: NextRequest) {
       for (const fallbackModel of fallbackModels.slice(1)) {
         enqueue(attempt.key, fallbackModel, true);
       }
-      // Do not loop through more than one timeout-length wait.
-      if (attempts >= 2) break;
+      // A timeout is a latency failure: move to 3.6 Flash / Flash-Lite immediately.
+      // Do not repeat a deprecated alias that routes back to the same slow model.
     }
   }
 
@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
     const status = failure.code === "GEMINI_QUOTA_EXHAUSTED" ? 429 : failure.code === "GEMINI_KEY_REJECTED" ? 502 : 503;
     return jsonError(
       failure.code === "GEMINI_API_ERROR" && lastFailure.status === 504
-        ? "Gemini timed out after " + attempts + " attempt(s). The request budget was capped to protect the Vercel function. Try Build again; if this persists, reduce the size of the requested feature or use a faster model. Last detail: " + lastFailure.detail + ". No files were changed."
+        ? "Gemini timed out after " + attempts + " attempt(s), including faster-model fallback. GENE now avoids retrying deprecated model aliases and reduces reasoning/output on fallback attempts. Try Build again; if this persists, split the request into a smaller first milestone. Last detail: " + lastFailure.detail + ". No files were changed."
         : failure.message,
       status,
       lastFailure.status === 504 ? "GEMINI_TIMEOUT" : failure.code
