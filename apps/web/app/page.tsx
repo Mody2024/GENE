@@ -413,14 +413,18 @@ export default function Home() {
             payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation." } };
             responseOk = false;
           } else {
+            const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
+              ? validationPayload.result.files as Array<{ path: string; content: string }>
+              : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
+            for (const file of normalizedFiles) stagedFiles[file.path] = file.content;
             payload = {
               ok: true,
-              aiMode: "gemini",
+              aiMode: "multi-provider",
               model: modelUsed,
               result: {
-                reply: "Built the first playable version in four small stages and validated the assembled project. Add advanced features through targeted chat edits.",
+                reply: "Built the first playable version in four small stages, normalized the source files, and passed GENE's structural validation. Play it and request focused improvements.",
                 plan: stagedPlan,
-                files: stagePaths.map(path => ({ path, content: stagedFiles[path] })),
+                files: normalizedFiles,
                 complete: true,
                 needsUserDecision: false
               }
@@ -1148,8 +1152,8 @@ export default function Home() {
         <div className="sidebar-section-label">PROJECT FILES</div>
         {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
         <div className="sidebar-bottom">
-          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "Gemini connected" : "Gemini key missing"}</div>
-          <small>{apiReady ? aiModel : "AI builds require a server-side key"}</small>
+          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "AI providers ready" : "Add an AI provider key"}</div>
+          <small>{apiReady ? aiModel : "Gemini, Groq or OpenRouter key required"}</small>
           <div className="agent-connection">
             <div className="connection-row"><span className={"status-dot " + (localAgentStatus === "connected" ? "online" : localAgentStatus === "error" ? "offline" : "")} />{localAgentStatus === "connected" ? "Local Agent connected" : localAgentStatus === "checking" ? "Checking Local Agent" : localAgentStatus === "error" ? "Local Agent error" : "Local Agent disconnected"}</div>
             {localAgentWorkspace && <small title={localAgentWorkspace}>{localAgentWorkspace}</small>}
