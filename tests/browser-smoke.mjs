@@ -125,9 +125,11 @@ try {
   await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
   const multiBefore = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true })));
+  await multiPage.waitForTimeout(40); // allow the animation loop to publish its next state snapshot
   const afterP1 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   assert.ok(afterP1[0].x > multiBefore[0].x && afterP1[1].x === multiBefore[1].x, "Player 1 input must not move Player 2");
   await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })));
+  await multiPage.waitForTimeout(40);
   const afterP2 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   assert.ok(afterP2[1].x < afterP1[1].x && afterP2[0].x === afterP1[0].x, "Player 2 input must not move Player 1");
   assert.equal(await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.length), 800 * 480 * 4, "multiplayer arena renders a full canvas");
