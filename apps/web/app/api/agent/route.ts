@@ -589,7 +589,6 @@ export async function POST(request: NextRequest) {
       const truncated = outputFailure === "truncated";
       return jsonError(
         (truncated
-          ? (truncated
           ? "The AI response reached an output limit before completing its JSON. GENE tried compact retries and alternate configured models, but none returned a complete file. "
           : "The AI returned malformed JSON after retrying with compact output and alternate configured models. ") +
         "No project files were changed. GENE can safely retry this individual stage with a smaller implementation; keep optional features for later chat edits.",
