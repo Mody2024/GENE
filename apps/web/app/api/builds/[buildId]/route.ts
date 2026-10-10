@@ -31,7 +31,7 @@ export async function GET(_request: NextRequest, context: { params: { buildId: s
       const runs = await runsResponse.json();
       const run = (runs.workflow_runs || []).find((item: any) => String(item.display_title || "").includes(id));
       if (run) {
-        if (run.status === "completed") return NextResponse.json({ ok: true, buildId: id, state: run.conclusion === "success" ? "finalizing" : "failed", runUrl: run.html_url, message: run.conclusion === "success" ? "Binary compilation finished; collecting download links." : "Cloud compilation failed. Open the build log to see the exact compiler error." }, { headers: { "Cache-Control": "no-store" } });
+        if (run.status === "completed") return NextResponse.json({ ok: true, buildId: id, state: "failed", runUrl: run.html_url, message: "The workflow finished without publishing a build result. Open the build log to inspect the finalization or compiler error." }, { headers: { "Cache-Control": "no-store" } });
         return NextResponse.json({ ok: true, buildId: id, state: run.status === "in_progress" ? "building" : "queued", runUrl: run.html_url, message: "Cloud workers are compiling your project." }, { headers: { "Cache-Control": "no-store" } });
       }
     }
