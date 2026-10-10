@@ -399,7 +399,8 @@ export async function POST(request: NextRequest) {
 
   let payload: any = null;
   let successfulModel = model;
-  let lastFailure = { status: 502, detail: "Gemini request did not complete." };
+  let successfulProvider = "gemini";
+  let lastFailure = { status: 502, detail: "Configured AI providers did not complete the request." };
   let attempts = 0;
   let outputFailure: "truncated" | "malformed" | null = null;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
@@ -512,6 +513,71 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Cross-provider fallback: Gemini is the default, not a hard dependency.
+  // Add GROQ_API_KEY and/or OPENROUTER_API_KEY in Vercel to enable these routes.
+  if (!payload) {
+    const alternateProviders: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
+    if (process.env.GROQ_API_KEY?.trim()) {
+      alternateProviders.push({
+        name: "groq",
+        key: process.env.GROQ_API_KEY.trim(),
+        endpoint: "https://api.groq.com/openai/v1/chat/completions",
+        model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
+      });
+    }
+    if (process.env.OPENROUTER_API_KEY?.trim()) {
+      alternateProviders.push({
+        name: "openrouter",
+        key: process.env.OPENROUTER_API_KEY.trim(),
+        endpoint: "https://openrouter.ai/api/v1/chat/completions",
+        model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
+        headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder" }
+      });
+    }
+    for (const provider of alternateProviders) {
+      if (Date.now() - startedAt > totalBudgetMs - 2_500) break;
+      try {
+        const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
+        const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
+        const remainingMs = Math.max(1_000, totalBudgetMs - (Date.now() - startedAt) - 500);
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + provider.key,
+            ...(provider.headers || {})
+          },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [{ role: "system", content: system }, { role: "user", content: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete." }],
+            response_format: { type: "json_object" },
+            temperature: body.operation === "interview" ? 0.35 : 0.2,
+            max_tokens: body.operation === "buildPart" ? 5_000 : isBuild ? 7_000 : 2_000
+          }),
+          signal: AbortSignal.timeout(Math.min(14_000, remainingMs))
+        });
+        const data = await response.json().catch(() => null);
+        const content = data?.choices?.[0]?.message?.content;
+        if (!response.ok || typeof content !== "string" || !content.trim()) {
+          lastFailure = { status: response.status || 502, detail: provider.name + " fallback: " + String(data?.error?.message || "empty response") };
+          continue;
+        }
+        let parsed: unknown;
+        try { parsed = JSON.parse(content); } catch {
+          lastFailure = { status: 422, detail: provider.name + " returned incomplete or invalid JSON." };
+          continue;
+        }
+        payload = { candidates: [{ content: { parts: [{ text: JSON.stringify(parsed) }] }, finishReason: "STOP" }] };
+        successfulModel = provider.model;
+        successfulProvider = provider.name;
+        outputFailure = null;
+        break;
+      } catch (error) {
+        lastFailure = { status: 504, detail: provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network error") };
+      }
+    }
+  }
+
   if (!payload) {
     if (outputFailure) {
       const truncated = outputFailure === "truncated";
@@ -612,5 +678,5 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
-  return NextResponse.json({ ok: true, aiMode: "gemini", model: successfulModel, result });
+  return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, result });
 }
