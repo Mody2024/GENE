@@ -373,6 +373,7 @@ export async function POST(request: NextRequest) {
   const thinkingLevel = body.thinking === "fast" ? "low" : body.thinking === "deep" ? "high" : "medium";
   const userInput = makeAgentInput({
     operation: body.operation,
+    stagePath: typeof body.stagePath === "string" ? body.stagePath : undefined,
     mode: body.mode,
     message: body.message,
     project: body.project || null,
@@ -452,6 +453,14 @@ export async function POST(request: NextRequest) {
         ?.map((p: { text?: string }) => p.text || "").join("\n") || "";
       const finishReason = String(candidatePayload?.candidates?.[0]?.finishReason || "");
 
+      if (candidate.ok && finishReason === "MAX_TOKENS") {
+        outputFailure = "truncated";
+        lastFailure = { status: 422, detail: "Gemini finished with MAX_TOKENS; the JSON response was truncated." };
+        for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
+        for (const key of apiKeys.slice(1, 3)) enqueue(key, fallbackModels[fallbackModels.length - 1], true);
+        continue;
+      }
+
       if (candidate.ok && candidateText.trim()) {
         const expectsJson = body.operation !== "research" || candidateText.trim().startsWith("{") || candidateText.trim().startsWith("```");
         let validJson = !expectsJson;
@@ -466,18 +475,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // HTTP 200 does not imply a complete generation. Gemini tells us explicitly
-        // when its output budget cut a response off; parsing that fragment only gives
-        // users misleading "unterminated string" errors.
-        if (finishReason === "MAX_TOKENS") {
-          outputFailure = "truncated";
-          lastFailure = { status: 422, detail: "Gemini finished with MAX_TOKENS; the JSON response was truncated." };
-          for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
-          // A second key may have a different output configuration/quota, but avoid
-          // wasting time retrying the same model when the text itself was truncated.
-          for (const key of apiKeys.slice(1, 3)) enqueue(key, fallbackModels[fallbackModels.length - 1], true);
-          continue;
-        }
         if (!validJson) {
           outputFailure = "malformed";
           lastFailure = { status: 422, detail: "Gemini returned incomplete or invalid JSON even though the request completed." };
