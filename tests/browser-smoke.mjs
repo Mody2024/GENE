@@ -197,6 +197,8 @@ try {
     window.__geneTestGamepads = [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }];
     if (typeof window.__genePollGamepad !== "function") throw new Error("starter controller poll hook missing");
     window.__genePollGamepad();
+    if (typeof window.__geneTestStep !== "function") throw new Error("starter deterministic update hook missing");
+    window.__geneTestStep(0.32);
   });
   await samplePage.waitForTimeout(320);
   const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
