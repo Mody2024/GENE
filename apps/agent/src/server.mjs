@@ -75,7 +75,7 @@ export function validateSourceProject(files) {
   const issues = [];
   if (!files || typeof files !== "object" || Array.isArray(files)) return { ok: false, issues: ["Files must be an object."] };
   for (const required of ["game.html", "game.css", "game.js", "game-spec.json"]) {
-    if (typeof files[required] !== "string" || files[required].trim().length < 8) issues.push("Missing or empty required file: " + required);
+    if (typeof files[required] !== "string" || files[required].trim().length < 8) issues.push("Missing or empty required project file: " + required);
   }
   if (issues.length) return { ok: false, issues };
   const html = files["game.html"];
@@ -84,40 +84,51 @@ export function validateSourceProject(files) {
   let spec;
   try { new Function(js); } catch (e) { issues.push("JavaScript syntax error: " + (e instanceof Error ? e.message : String(e))); }
   try { spec = JSON.parse(files["game-spec.json"]); } catch { issues.push("game-spec.json is not valid JSON."); }
-  if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) issues.push("game.html must include canvas id=game-canvas.");
   if (/<script\b/i.test(html)) issues.push("Put executable code in game.js, not inline script tags in game.html.");
-  if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\bhref\s*=\s*["']https?:/i.test(html)) issues.push("External HTML script/stylesheet dependencies are not allowed.");
+  if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) issues.push("External HTML script/stylesheet dependencies are not allowed.");
   if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) issues.push("External JavaScript runtime dependencies are not allowed.");
   if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) issues.push("External CSS dependencies are not allowed.");
-  if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
-  if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) issues.push("No detectable player input/event handling.");
-  if (spec?.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) issues.push("Canvas 2D game must create a CanvasRenderingContext2D.");
-  if (spec?.engine === "webgl3d") {
-    if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) issues.push("WebGL 3D game must request a WebGL context.");
-    for (const [pattern, requirement] of [
-      [/createShader\s*\(/, "shader creation"],
-      [/shaderSource\s*\(/, "shader source"],
-      [/compileShader\s*\(/, "shader compilation"],
-      [/createProgram\s*\(/, "program creation"],
-      [/linkProgram\s*\(/, "program linking"],
-      [/bufferData\s*\(/, "geometry buffer upload"],
-      [/drawArrays\s*\(|drawElements\s*\(/, "geometry draw calls"]
-    ]) if (!pattern.test(js)) issues.push("WebGL 3D game is missing " + requirement + ".");
-  }
-  if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) issues.push("No detectable draw operation; the game may render blank.");
   if (spec && typeof spec === "object" && !Array.isArray(spec)) {
-    if (typeof spec.title !== "string" || !spec.title.trim()) issues.push("game-spec.json needs a title.");
-    if (typeof spec.genre !== "string" || !spec.genre.trim()) issues.push("game-spec.json needs a genre.");
-    if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") issues.push("game-spec.json engine must be canvas2d or webgl3d.");
-    if (!Array.isArray(spec.mechanics) || spec.mechanics.length === 0 || !spec.mechanics.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty mechanics list.");
-    if (!Array.isArray(spec.controls) || spec.controls.length === 0 || !spec.controls.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty controls list.");
-    if (typeof spec.objective !== "string" || !spec.objective.trim()) issues.push("game-spec.json needs an objective.");
-    if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) issues.push("game-spec.json needs a win condition.");
-    if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) issues.push("game-spec.json needs a loss condition.");
+    if (typeof spec.title !== "string" || !spec.title.trim()) issues.push("Project spec needs a title.");
+    const app = spec.kind === "app" || spec.engine === "webapp";
+    if (app) {
+      if (spec.engine !== "webapp") issues.push("App projects must declare engine=webapp.");
+      if (typeof spec.summary !== "string" || !spec.summary.trim()) issues.push("App spec needs a concise summary.");
+      for (const key of ["features", "routes", "userFlows"]) {
+        if (!Array.isArray(spec[key]) || spec[key].length < 1 || !spec[key].every(item => typeof item === "string" && item.trim())) issues.push("App spec needs a non-empty " + key + " list.");
+      }
+      if (!/<(?:main|header|nav|section|form|button|h1|h2|article|div|input|label)\b/i.test(html)) issues.push("App HTML must include a recognizable UI.");
+      if (!/addEventListener|onclick|onsubmit|onchange/i.test(js)) issues.push("App JavaScript needs interaction handlers for controls and forms.");
+    } else {
+      if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) issues.push("No requestAnimationFrame game loop detected.");
+      if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) issues.push("No detectable player input/event handling.");
+      if (spec?.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) issues.push("Canvas 2D game must create a CanvasRenderingContext2D.");
+      if (spec?.engine === "webgl3d") {
+        if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) issues.push("WebGL 3D game must request a WebGL context.");
+        for (const [pattern, requirement] of [
+          [/createShader\s*\(/, "shader creation"],
+          [/shaderSource\s*\(/, "shader source"],
+          [/compileShader\s*\(/, "shader compilation"],
+          [/createProgram\s*\(/, "program creation"],
+          [/linkProgram\s*\(/, "program linking"],
+          [/bufferData\s*\(/, "geometry buffer upload"],
+          [/drawArrays\s*\(|drawElements\s*\(/, "geometry draw calls"]
+        ]) if (!pattern.test(js)) issues.push("WebGL 3D game is missing " + requirement + ".");
+      }
+      if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) issues.push("game.html must include canvas id=game-canvas.");
+      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) issues.push("No detectable draw operation; the game may render blank.");
+      if (typeof spec.genre !== "string" || !spec.genre.trim()) issues.push("game-spec.json needs a genre.");
+      if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") issues.push("Game spec engine must be canvas2d or webgl3d.");
+      if (!Array.isArray(spec.mechanics) || spec.mechanics.length === 0 || !spec.mechanics.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty mechanics list.");
+      if (!Array.isArray(spec.controls) || spec.controls.length === 0 || !spec.controls.every(item => typeof item === "string" && item.trim())) issues.push("game-spec.json needs a non-empty controls list.");
+      if (typeof spec.objective !== "string" || !spec.objective.trim()) issues.push("game-spec.json needs an objective.");
+      if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) issues.push("game-spec.json needs a win condition.");
+      if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) issues.push("game-spec.json needs a loss condition.");
+    }
     const budget = spec.performanceBudget;
     if (!budget || !Number.isFinite(budget.targetFps) || budget.targetFps < 30 || budget.targetFps > 120) issues.push("performanceBudget.targetFps must be between 30 and 120.");
-    if (budget && ![budget.maxEnemies, budget.maxObjects, budget.maxParticles].every(n => Number.isInteger(n) && n >= 0)) issues.push("Performance budgets must be non-negative integers.");
-    if (budget && (budget.maxEnemies > 40 || budget.maxObjects > 1200 || budget.maxParticles > 300)) issues.push("Performance budget exceeds GENE's conservative limits.");
+    if (budget && [budget.maxEnemies, budget.maxObjects, budget.maxParticles].some(n => n !== undefined && (!Number.isInteger(n) || n < 0))) issues.push("Performance budgets must be non-negative integers.");
+    if (budget && ((budget.maxEnemies ?? 0) > 40 || budget.maxObjects > 1200 || (budget.maxParticles ?? 0) > 300)) issues.push("Performance budget exceeds GENE's conservative limits.");
   } else {
     issues.push("game-spec.json must be an object.");
   }
