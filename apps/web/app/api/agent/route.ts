@@ -21,7 +21,7 @@ function getGeminiKeys(): string[] {
     process.env.GEMINI_API_KEY_3,
     process.env.GEMINI_API_KEY_4,
     process.env.GEMINI_API_KEY_5,
-    ...(process.env.GEMINI_API_KEYS || "").split(/[\\r\\n,;]+/)
+    ...(process.env.GEMINI_API_KEYS || "").split(",").flatMap(value => value.split(";")).flatMap(value => value.split(String.fromCharCode(10)))
   ];
   return [...new Set(configured.map(key => key?.trim()).filter((key): key is string => Boolean(key)))];
 }
@@ -31,7 +31,6 @@ function isRetryableStatus(status: number): boolean {
 }
 
 function describeGeminiFailure(status: number, detail: string, attempts: number): { code: string; message: string } {
-  const normalized = detail.toLowerCase();
   if (status === 429 || /resource_exhausted|quota exceeded|rate.?limit/i.test(detail)) {
     return {
       code: "GEMINI_QUOTA_EXHAUSTED",
