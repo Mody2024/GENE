@@ -190,6 +190,8 @@ try {
   await sampleFrame.locator("body").evaluate(() => {
     const buttons = Array.from({ length: 16 }, (_, index) => ({ pressed: index === 0 }));
     window.__geneTestGamepads = [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }];
+    if (typeof window.__genePollGamepad !== "function") throw new Error("starter controller poll hook missing");
+    window.__genePollGamepad();
   });
   await samplePage.waitForTimeout(320);
   const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
