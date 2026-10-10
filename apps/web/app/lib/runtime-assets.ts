@@ -16,5 +16,5 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   }
   // Escape HTML opening characters so model text cannot terminate the bootstrap script.
   const serialized = JSON.stringify(assets).replace(/</g, "\\u003c");
-  return "<script>window.__GENE_ASSETS__=" + serialized + ";<\\/script>";
+  return "<script>window.__GENE_ASSETS__=" + serialized + ";</script>";
 }
