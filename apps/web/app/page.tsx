@@ -1387,7 +1387,7 @@ export default function Home() {
   <div className="tool-view-heading">
     <div className="eyebrow">GENE FORGE · REAL MESH FILES</div>
     <h2>Asset workshop</h2>
-    <p>Describe an asset or request changes to a saved one. Gemini returns a structured part recipe; GENE turns it into actual OBJ geometry and MTL materials, then validates and saves the files in this project.</p>
+    <p>Describe an asset or request changes to a saved one. The selected AI provider returns a structured part recipe; GENE turns it into actual OBJ geometry and MTL materials, then validates and saves the files in this project.</p>
   </div>
   <div className="forge-form">
     <div className="forge-form-top">
@@ -1396,7 +1396,7 @@ export default function Home() {
     </div>
     {forgeTargetId && <div className="forge-editing"><span className="status-dot online" /> Editing the saved asset <strong>{savedAssets.find(asset => asset.id === forgeTargetId)?.name || forgeTargetId}</strong><button onClick={() => { setForgeTargetId(null); setForgePrompt(""); setForgeNotice(""); }}>Create new asset instead</button></div>}
     <textarea className="forge-prompt" value={forgePrompt} onChange={e => setForgePrompt(e.target.value)} placeholder={forgeTargetId ? "Describe the changes to this exact mesh — e.g. make the wheels larger, lower the cabin, and add protective side panels." : "Describe the mesh — e.g. a compact metro maintenance rover with four chunky wheels, a sloped glass cabin, protective bumpers, yellow safety markings and a coherent industrial silhouette."} rows={3} />
-    <div className="forge-form-bottom"><span>{apiReady ? "Gemini connected · mesh generation uses the selected model" : "Gemini API key required · no fake local generation"}</span><button className="primary-button" onClick={() => void generateForgeAsset()} disabled={forgeBusy || !forgePrompt.trim() || apiReady !== true}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating mesh…</> : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
+    <div className="forge-form-bottom"><span>{apiReady ? "AI connected · mesh generation uses the selected model" : "Configure Gemini, Groq, or OpenRouter · no fake local generation"}</span><button className="primary-button" onClick={() => void generateForgeAsset()} disabled={forgeBusy || !forgePrompt.trim() || apiReady !== true}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating mesh…</> : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
     {forgeNotice && <div className="forge-notice">{forgeNotice}</div>}
   </div>
   <div className="forge-assets-heading"><div><div className="eyebrow">PROJECT ASSETS</div><h3>Saved meshes <span>{savedAssets.length}</span></h3></div><span>OBJ · MTL · JSON recipe</span></div>
