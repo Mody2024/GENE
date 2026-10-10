@@ -334,16 +334,25 @@ export async function POST(request: NextRequest) {
   let successfulModel = model;
   let lastFailure = { status: 502, detail: "Gemini request did not complete." };
   let attempts = 0;
-  const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
-  const attemptPlan: Array<{ key: string; model: string }> = [];
-  for (const key of apiKeys.slice(0, 3)) attemptPlan.push({ key, model });
-  for (const fallbackModel of fallbackModels.slice(1)) {
-    if (attemptPlan.length >= 5) break;
-    attemptPlan.push({ key: apiKeys[0], model: fallbackModel });
-  }
+  const fallbackModels = [model, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
+  const queued: Array<{ key: string; model: string; fallback: boolean }> = [
+    { key: apiKeys[0], model, fallback: false }
+  ];
+  const queuedIds = new Set<string>([apiKeys[0] + "|" + model]);
+  const enqueue = (key: string, candidateModel: string, fallback: boolean) => {
+    const id = key + "|" + candidateModel;
+    if (!queuedIds.has(id) && queued.length < 8) {
+      queuedIds.add(id);
+      queued.push({ key, model: candidateModel, fallback });
+    }
+  };
+  const startedAt = Date.now();
+  const totalBudgetMs = 52_000;
 
-  let succeeded = false;
-  for (const attempt of attemptPlan) {
+  while (queued.length > 0 && attempts < 8) {
+    const attempt = queued.shift()!;
+    const remainingMs = totalBudgetMs - (Date.now() - startedAt);
+    if (remainingMs < 1_500) break;
     attempts += 1;
     try {
       const candidate = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
@@ -355,34 +364,68 @@ export async function POST(request: NextRequest) {
           generationConfig: {
             responseMimeType: "application/json",
             temperature: body.operation === "interview" ? 0.35 : 0.25,
-            maxOutputTokens: body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096,
-            thinkingConfig: { thinkingLevel }
+            maxOutputTokens: attempt.fallback
+              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 8_192 : 2_048)
+              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096),
+            thinkingConfig: { thinkingLevel: attempt.fallback ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
-        signal: AbortSignal.timeout(10_000)
+        // Leave time for validation and JSON response before Vercel's maxDuration.
+        signal: AbortSignal.timeout(Math.min(25_000, remainingMs - 1_000))
       });
       const candidatePayload = await candidate.json().catch(() => null);
       if (candidate.ok) {
         payload = candidatePayload;
         successfulModel = attempt.model;
-        succeeded = true;
         break;
       }
+
       lastFailure = {
         status: candidate.status,
         detail: candidatePayload?.error?.message || ("Gemini returned HTTP " + candidate.status)
       };
-      if (!isRetryableStatus(candidate.status) && candidate.status !== 401 && candidate.status !== 403) break;
+
+      if (candidate.status === 429 || /resource_exhausted|quota exceeded|rate.?limit/i.test(lastFailure.detail)) {
+        // Quota is project-scoped; only keys from other projects with quota can help.
+        for (const key of apiKeys.slice(1, 5)) enqueue(key, model, false);
+        // If every configured project is out of quota, the same key on another model
+        // may still have model-specific capacity/quota.
+        for (const fallbackModel of fallbackModels.slice(1)) enqueue(apiKeys[0], fallbackModel, true);
+      } else if (candidate.status === 503 || candidate.status === 500 || candidate.status === 502 || candidate.status === 504) {
+        // Provider overload/server errors: change model before spending calls on more keys.
+        for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
+        for (const key of apiKeys.slice(1, 3)) enqueue(key, attempt.model, true);
+      } else if (candidate.status === 401 || candidate.status === 403) {
+        // The current key may be invalid or restricted; try the other configured keys.
+        for (const key of apiKeys.slice(1, 5)) enqueue(key, attempt.model, attempt.fallback);
+      } else {
+        break;
+      }
     } catch (error) {
-      lastFailure = { status: 502, detail: error instanceof Error ? error.message : "Network request failed." };
+      const message = error instanceof Error ? error.message : "Network request failed.";
+      lastFailure = { status: 504, detail: "Gemini request timed out or the connection stalled (" + message + ")" };
+      // A timeout is usually model latency, not a bad key. Retry once on a faster
+      // fallback model with reduced reasoning/output rather than repeating the same
+      // slow request with several keys.
+      for (const fallbackModel of fallbackModels.slice(1)) {
+        enqueue(attempt.key, fallbackModel, true);
+      }
+      // Do not loop through more than one timeout-length wait.
+      if (attempts >= 2) break;
     }
   }
 
-  if (!succeeded || !payload) {
+  if (!payload) {
     const failure = describeGeminiFailure(lastFailure.status, lastFailure.detail, attempts);
     const status = failure.code === "GEMINI_QUOTA_EXHAUSTED" ? 429 : failure.code === "GEMINI_KEY_REJECTED" ? 502 : 503;
-    return jsonError(failure.message, status, failure.code);
+    return jsonError(
+      failure.code === "GEMINI_API_ERROR" && lastFailure.status === 504
+        ? "Gemini timed out after " + attempts + " attempt(s). The request budget was capped to protect the Vercel function. Try Build again; if this persists, reduce the size of the requested feature or use a faster model. Last detail: " + lastFailure.detail + ". No files were changed."
+        : failure.message,
+      status,
+      lastFailure.status === 504 ? "GEMINI_TIMEOUT" : failure.code
+    );
   }
 
   const text = payload?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("\n") || "";
