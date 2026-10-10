@@ -11,6 +11,7 @@ const rootPackage = JSON.parse(read("package.json"));
 const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
+const publishApi = read("apps/web/app/api/publish/route.ts");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
@@ -262,5 +263,15 @@ assert.ok(page.includes("function deleteProject(projectId: string)"), "saved cha
 assert.ok(page.includes("preview-reopen-tab") && css.includes(".workspace:has(.preview-reopen-tab)"), "minimized preview restores from a right-edge floating control without leaving a blank grid column");
 assert.ok(page.includes("packageProgress") && page.includes("metadata.percent"), "source ZIP packaging reports real progress");
 assert.ok(prompts.includes("Never add Gemini, OpenAI, Groq, OpenRouter, GENE, or AI-generated watermarks"), "generated app/game UIs avoid provider watermarks unless requested");
+
+
+assert.ok(publishApi.includes("GENE_PUBLISH_PASSWORD") && publishApi.includes("VERCEL_TOKEN") && publishApi.includes("VERCEL_PROJECT_ID"), "web publishing is protected and uses server-side Vercel credentials");
+assert.ok(publishApi.includes("MAX_BYTES = 4_000_000") && publishApi.includes("GENE_PUBLISH_RATE_LIMIT"), "publishing validates upload size and rate limits");
+assert.ok(page.includes("async function publishProject()") && page.includes('fetch("/api/publish"'), "workspace can publish the current web build and receive a live URL");
+assert.ok(page.includes("desktop-wrapper/package.json") && page.includes("android-wrapper/package.json"), "source export includes real Electron and Capacitor wrapper projects");
+assert.ok(page.includes("manifest.webmanifest") && page.includes("service-worker.js") && page.includes("standaloneDocument"), "web export creates a standalone installable PWA shell");
+assert.ok(page.includes("expanded-live-editor") && page.includes("Apply edit"), "fullscreen live preview supports chat-driven edits without closing the preview");
+assert.ok(page.includes("<GeneMark />") && css.includes(".gene-logo-svg"), "the UI uses the new custom geometric GENE mark");
+assert.ok(health.includes("GROQ_API_KEY") && health.includes("OPENROUTER_API_KEY") && health.includes("publishConfigured"), "health status detects alternate AI providers and publish setup");
 
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
