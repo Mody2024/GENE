@@ -119,6 +119,7 @@ export default function Home() {
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
   const [binaryBuildConfigured, setBinaryBuildConfigured] = useState(false);
   const [binaryBuildId, setBinaryBuildId] = useState("");
+  const [binaryBuildRunUrl, setBinaryBuildRunUrl] = useState("");
   const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string }> | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [publishConfigured, setPublishConfigured] = useState(false);
@@ -1230,6 +1231,7 @@ export default function Home() {
     setBinaryBuildBusy(true);
     setBinaryBuildLinks(null);
     setBinaryBuildId("");
+    setBinaryBuildRunUrl("");
     setNotice("Preparing a standalone build and securely submitting the source…");
     try {
       const projectKind = project.kind || "game";
@@ -1286,6 +1288,7 @@ export default function Home() {
       if (!finalReport) throw new Error("The build is still running after 20 minutes. Build ID: " + id + ". You can retry status checking using this ID.");
       const links = finalReport.targets || {};
       setBinaryBuildLinks(links);
+      setBinaryBuildRunUrl(String(finalReport.runUrl || ""));
       const ready = Object.entries(links).filter(([, target]: [string, any]) => target?.status === "success" && target?.url).length;
       addActivity("Cloud binary build " + finalReport.state + ": " + id);
       if (finalReport.state === "success") setNotice("Build complete. GENE produced real downloadable binary files. Android output is debug-signed for device installation.");
@@ -1501,6 +1504,7 @@ export default function Home() {
 
         {binaryBuildLinks && <div className="binary-build-result" role="status">
           <div className="binary-build-result-heading"><strong>Cloud build results</strong><span>{binaryBuildId ? binaryBuildId.slice(0, 8) : ""}</span></div>
+          {binaryBuildRunUrl && <a className="binary-build-log-link" href={binaryBuildRunUrl} target="_blank" rel="noreferrer">Open detailed build logs ↗</a>}
           <div className="binary-build-result-links">
             {Object.entries(binaryBuildLinks).map(([target, item]) => <div className="binary-build-result-item" key={target}>
               <span className={"binary-build-state " + (item.status === "success" && item.url ? "ready" : "failed")}>{item.status === "success" && item.url ? "Ready" : item.status === "skipped" ? "Not requested" : "Failed"}</span>
