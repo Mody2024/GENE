@@ -27,7 +27,7 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
-function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"]): AgentResponse {
+function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"], projectKind: "game" | "app" = "game"): AgentResponse {
   if (typeof input.reply !== "string" || !input.reply.trim()) throw new Error("GENE response needs a non-empty user-facing reply.");
   const result: AgentResponse = {
     reply: input.reply.trim().slice(0, 12_000),
@@ -54,35 +54,33 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
 
   if (input.plan != null) {
     const plan = input.plan as any;
-    if (!plan || typeof plan !== "object") throw new Error("The game plan was malformed.");
-    if (typeof plan.title !== "string" || !plan.title.trim()) throw new Error("The game plan is missing a title.");
-    if (typeof plan.summary !== "string" || !plan.summary.trim()) throw new Error("The game plan is missing its summary.");
-    if (plan.engine !== "canvas2d" && plan.engine !== "webgl3d") throw new Error("The game plan engine must be canvas2d or webgl3d.");
+    if (!plan || typeof plan !== "object") throw new Error("The implementation plan was malformed.");
+    if (typeof plan.title !== "string" || !plan.title.trim()) throw new Error("The implementation plan is missing a title.");
+    if (typeof plan.summary !== "string" || !plan.summary.trim()) throw new Error("The implementation plan is missing its summary.");
+    const validEngine = projectKind === "app" ? plan.engine === "webapp" : (plan.engine === "canvas2d" || plan.engine === "webgl3d");
+    if (!validEngine) throw new Error(projectKind === "app" ? "Web app plans must use the webapp engine." : "Game plans must use canvas2d or webgl3d.");
+    if (plan.kind && plan.kind !== projectKind) throw new Error("The plan project kind does not match the current project.");
     const tasks = Array.isArray(plan.tasks) ? plan.tasks.filter((task: unknown): task is string => typeof task === "string" && task.trim().length > 0).slice(0, 40).map((task: string) => task.trim().slice(0, 240)) : [];
-    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((mechanic: unknown): mechanic is string => typeof mechanic === "string" && mechanic.trim().length > 0).slice(0, 30).map((mechanic: string) => mechanic.trim().slice(0, 180)) : [];
-    if (tasks.length < 3) throw new Error("The game plan must include at least three concrete implementation tasks.");
-    if (mechanics.length < 1) throw new Error("The game plan must identify at least one actual gameplay mechanic.");
+    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((item: unknown): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 30).map((item: string) => item.trim().slice(0, 180)) : [];
+    if (tasks.length < 3) throw new Error("The plan must include at least three concrete implementation tasks.");
+    if (mechanics.length < 1) throw new Error("The plan must identify at least one concrete feature or gameplay mechanic.");
     const budget = plan.performanceBudget || {};
-    const targetFps = Number(budget.targetFps);
-    const maxEnemies = Number(budget.maxEnemies);
-    const maxObjects = Number(budget.maxObjects);
-    const maxParticles = Number(budget.maxParticles);
-    if (![targetFps, maxEnemies, maxObjects, maxParticles].every(Number.isFinite)) throw new Error("The game plan performance budget is malformed.");
+    const targetFps = Number(budget.targetFps ?? 60);
+    const maxEnemies = Number(budget.maxEnemies ?? 0);
+    const maxObjects = Number(budget.maxObjects ?? 200);
+    const maxParticles = Number(budget.maxParticles ?? 0);
+    if (![targetFps, maxEnemies, maxObjects, maxParticles].every(Number.isFinite)) throw new Error("The plan performance budget is malformed.");
     if (targetFps < 30 || targetFps > 120 || maxEnemies < 0 || maxEnemies > 40 || maxObjects < 0 || maxObjects > 1200 || maxParticles < 0 || maxParticles > 300) {
-      throw new Error("The game plan exceeds GENE's supported performance budget.");
+      throw new Error("The plan exceeds GENE's supported performance budget.");
     }
     result.plan = {
       title: plan.title.trim().slice(0, 140),
       summary: plan.summary.trim().slice(0, 3000),
+      kind: projectKind,
       engine: plan.engine,
       tasks,
       mechanics,
-      performanceBudget: {
-        targetFps,
-        maxEnemies: Math.floor(maxEnemies),
-        maxObjects: Math.floor(maxObjects),
-        maxParticles: Math.floor(maxParticles)
-      }
+      performanceBudget: { targetFps, maxEnemies: Math.floor(maxEnemies), maxObjects: Math.floor(maxObjects), maxParticles: Math.floor(maxParticles) }
     };
   }
 
@@ -103,18 +101,21 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
   return result;
 }
 
-function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string) {
+function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
-    throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
+    throw new Error("Plan/research mode is read-only. Source file output was rejected.");
   }
   const normalized: Array<{ path: string; content: string }> = [];
+  const seen = new Set<string>();
   for (const file of files) {
     if (!file || typeof file.path !== "string" || typeof file.content !== "string") throw new Error("A generated file was malformed.");
     if (!ALLOWED_FILES.has(file.path)) throw new Error("Blocked unexpected generated path: " + file.path);
+    if (seen.has(file.path)) throw new Error("The model returned duplicate source path: " + file.path);
+    seen.add(file.path);
     if (file.content.length > 500_000) throw new Error("Generated file exceeds the 500 KB safety limit.");
-    normalized.push({ path: file.path, content: file.content });
+    normalized.push(file);
   }
   for (const file of normalized) {
     if (file.path === "game.js") new Function(file.content);
@@ -123,48 +124,63 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
   if (operation === "build" || operation === "surprise") {
     const byPath = Object.fromEntries(normalized.map(f => [f.path, f.content]));
     for (const path of ["game.html", "game.css", "game.js", "game-spec.json"]) {
-      if (!byPath[path] || byPath[path].trim().length < 8) throw new Error("Build rejected: required file " + path + " is missing or empty.");
+      if (!byPath[path] || byPath[path].trim().length < 8) throw new Error("Build rejected: required project file " + path + " is missing or empty.");
     }
     new Function(byPath["game.js"]);
     const spec = JSON.parse(byPath["game-spec.json"]);
-    if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: game-spec.json must be a JSON object.");
-    if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: game-spec.json needs a real game title.");
-    if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game-spec.json needs a game genre.");
-    if (spec.engine !== "canvas2d" && spec.engine !== "webgl3d") throw new Error("Build rejected: game-spec.json engine must be canvas2d or webgl3d.");
-    if (plannedEngine && spec.engine !== plannedEngine) throw new Error("Build rejected: game-spec engine does not match the approved plan engine.");
-    if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the gameplay mechanics list is missing.");
-    if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: the controls list is missing.");
-    if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
-    if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) throw new Error("Build rejected: the win condition is missing.");
-    if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) throw new Error("Build rejected: the lose condition is missing.");
-    const budget = spec.performanceBudget;
-    if (!budget || !Number.isFinite(budget.targetFps) || budget.targetFps < 30 || budget.targetFps > 120) throw new Error("Build rejected: performanceBudget.targetFps must be between 30 and 120.");
-    if (![budget.maxEnemies, budget.maxObjects, budget.maxParticles].every((n: unknown) => Number.isInteger(n) && Number(n) >= 0)) throw new Error("Build rejected: performance budgets must be non-negative integers.");
-    if (budget.maxEnemies > 40 || budget.maxObjects > 1200 || budget.maxParticles > 300) throw new Error("Build rejected: requested object, enemy, or particle budget exceeds GENE's conservative limits.");
+    if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: project spec must be a JSON object.");
+    if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: project spec needs a title.");
+    if (spec.kind && spec.kind !== projectKind) throw new Error("Build rejected: project spec kind does not match the selected project type.");
+    const allowedEngine = projectKind === "app" ? spec.engine === "webapp" : (spec.engine === "canvas2d" || spec.engine === "webgl3d");
+    if (!allowedEngine) throw new Error(projectKind === "app" ? "Build rejected: an app must declare engine=webapp." : "Build rejected: a game must use canvas2d or webgl3d.");
+    if (plannedEngine && spec.engine !== plannedEngine) throw new Error("Build rejected: project spec engine does not match the approved plan engine.");
     const html = byPath["game.html"];
-    if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
-    if (/<script\b/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
-    if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: game files may not depend on external script or stylesheet CDNs.");
-    const js = byPath["game.js"];
     const css = byPath["game.css"];
-    if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: game.js contains an external runtime dependency.");
-    if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: game.css contains an external runtime dependency.");
-    if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
-    if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
-    if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
-    if (spec.engine === "webgl3d") {
-      if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
-      for (const [pattern, requirement] of [
-        [/createShader\s*\(/, "shader creation"],
-        [/shaderSource\s*\(/, "shader source"],
-        [/compileShader\s*\(/, "shader compilation"],
-        [/createProgram\s*\(/, "shader program creation"],
-        [/linkProgram\s*\(/, "shader program linking"],
-        [/bufferData\s*\(/, "GPU geometry buffers"],
-        [/drawArrays\s*\(|drawElements\s*\(/, "GPU geometry draw calls"]
-      ] as Array<[RegExp, string]>) if (!pattern.test(js)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
+    const js = byPath["game.js"];
+    if (/<script\b/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
+    if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
+    if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
+    if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: CSS contains an external runtime dependency.");
+    if (projectKind === "app") {
+      if (typeof spec.summary !== "string" || !spec.summary.trim()) throw new Error("Build rejected: app spec needs a concise summary.");
+      for (const key of ["features", "routes", "userFlows"]) {
+        if (!Array.isArray(spec[key]) || spec[key].length < 1 || !spec[key].every((item: unknown) => typeof item === "string" && item.trim())) {
+          throw new Error("Build rejected: app spec needs a non-empty " + key + " list.");
+        }
+      }
+      if (!/<(?:main|header|nav|section|form|button|h1|h2|article|div|input|label)\b/i.test(html)) throw new Error("Build rejected: app HTML must contain a real semantic UI, not an empty body.");
+      if (!spec.performanceBudget || !Number.isFinite(spec.performanceBudget.targetFps) || spec.performanceBudget.targetFps < 30 || spec.performanceBudget.targetFps > 120) {
+        throw new Error("Build rejected: app spec needs a valid performanceBudget.targetFps (30–120).");
+      }
+    } else {
+      if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game spec needs a genre.");
+      if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: gameplay mechanics are missing.");
+      if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: game controls are missing.");
+      if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
+      if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) throw new Error("Build rejected: the win condition is missing.");
+      if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) throw new Error("Build rejected: the loss condition is missing.");
+      const budget = spec.performanceBudget;
+      if (!budget || !Number.isFinite(budget.targetFps) || budget.targetFps < 30 || budget.targetFps > 120) throw new Error("Build rejected: performanceBudget.targetFps must be between 30 and 120.");
+      if (![budget.maxEnemies, budget.maxObjects, budget.maxParticles].every((n: unknown) => Number.isInteger(n) && Number(n) >= 0)) throw new Error("Build rejected: performance budgets must be non-negative integers.");
+      if (budget.maxEnemies > 40 || budget.maxObjects > 1200 || budget.maxParticles > 300) throw new Error("Build rejected: requested object, enemy, or particle budget exceeds GENE's conservative limits.");
+      if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
+      if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
+      if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
+      if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+      if (spec.engine === "webgl3d") {
+        if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+        for (const [pattern, requirement] of [
+          [/createShader\s*\(/, "shader creation"],
+          [/shaderSource\s*\(/, "shader source"],
+          [/compileShader\s*\(/, "shader compilation"],
+          [/createProgram\s*\(/, "shader program creation"],
+          [/linkProgram\s*\(/, "shader program linking"],
+          [/bufferData\s*\(/, "GPU geometry buffers"],
+          [/drawArrays\s*\(|drawElements\s*\(/, "GPU geometry draw calls"]
+        ] as Array<[RegExp, string]>) if (!pattern.test(js)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
+      }
+      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
     }
-    if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
   }
   return normalized;
 }
@@ -174,10 +190,11 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch { return jsonError("Request body must be valid JSON."); }
 
   const allowedOperations = ["interview", "plan", "build", "edit", "chat", "research", "surprise"];
+  const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
   if (body.mode === "plan" && ["build", "edit", "surprise"].includes(body.operation)) {
-    return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing game files.", 409, "GENE_PLAN_MODE_READ_ONLY");
+    return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing project files.", 409, "GENE_PLAN_MODE_READ_ONLY");
   }
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
   if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
@@ -214,8 +231,8 @@ export async function POST(request: NextRequest) {
       });
     }
     if (body.operation === "interview" || body.operation === "plan") {
-      const original = String(body.project?.initialPrompt || body.message || "Untitled game");
-      const is3d = /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
+      const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+      const is3d = projectKind === "game" && /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
@@ -223,12 +240,13 @@ export async function POST(request: NextRequest) {
           reply: "I prepared a rule-based outline only. This is not a Gemini-generated plan, and no source files were created. Add GEMINI_API_KEY to enable GENE's real game-design reasoning.",
           question: null,
           plan: {
-            title: original.split(/[.!?]/)[0].slice(0, 64) || "Untitled game",
+            title: original.split(/[.!?]/)[0].slice(0, 64) || (projectKind === "app" ? "Untitled app" : "Untitled game"),
+            kind: projectKind,
             summary: "Local outline based on your request. Review and refine it after connecting Gemini.",
-            engine: is3d ? "webgl3d" : "canvas2d",
+            engine: projectKind === "app" ? "webapp" : is3d ? "webgl3d" : "canvas2d",
             tasks: ["Create project shell", "Implement player controls", "Build the core mechanic", "Add level-specific obstacles and feedback", "Implement objective and restart", "Validate runtime and performance"],
             mechanics: ["Player input", "Collision/interaction", "Scoring or objective", "Win/loss and restart"],
-            performanceBudget: { targetFps: 60, maxEnemies: 8, maxObjects: 160, maxParticles: 60 }
+            performanceBudget: { targetFps: 60, maxEnemies: projectKind === "app" ? 0 : 8, maxObjects: 160, maxParticles: projectKind === "app" ? 0 : 60 }
           },
           files: [],
           complete: true,
@@ -236,7 +254,7 @@ export async function POST(request: NextRequest) {
         }
       });
     }
-    return jsonError("Gemini is not configured. Add GEMINI_API_KEY to apps/web/.env.local (local development) or your deployment environment. GENE did not generate or change any game files.", 503, "GEMINI_NOT_CONFIGURED");
+    return jsonError("Gemini is not configured. Add GEMINI_API_KEY to apps/web/.env.local (local development) or your deployment environment. GENE did not generate or change any project files.", 503, "GEMINI_NOT_CONFIGURED");
   }
 
   const model = typeof body.model === "string" && /^gemini-[a-zA-Z0-9.-]+$/.test(body.model)
@@ -308,12 +326,12 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
-    result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined);
-    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode);
+    result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
-      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", result.plan?.engine || body.project?.plan?.engine, "build");
+      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
