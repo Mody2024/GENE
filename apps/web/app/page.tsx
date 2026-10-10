@@ -89,6 +89,7 @@ export default function Home() {
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
   const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "versions">("chat");
@@ -1082,7 +1083,9 @@ export default function Home() {
   }
 
   async function downloadProject() {
-    if (!project) return;
+    if (!project || packageProgress !== null) return;
+    setPackageProgress(0);
+    try {
     const zip = new JSZip();
     Object.entries(project.files).forEach(([path, source]) => zip.file(exportProjectPath(path, project.kind || "game"), source));
     (project.references || []).forEach(ref => {
@@ -1116,13 +1119,19 @@ export default function Home() {
       "",
       "Important: download is source packaging, not a platform-specific EXE build."
     ].join("\\n"));
-    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, metadata => setPackageProgress(Math.max(0, Math.min(100, Math.round(metadata.percent)))));
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = (project.name || "gene-project").replace(/[^a-z0-9-_]+/gi, "-") + ".zip";
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    setNotice("Project ZIP packaged successfully (" + Math.round(blob.size / 1024) + " KB). This is a source bundle, not a compiled EXE/APK.");
+    window.setTimeout(() => setPackageProgress(null), 900);
+    } catch (error) {
+      setPackageProgress(null);
+      setNotice("Packaging failed: " + (error instanceof Error ? error.message : "Unknown ZIP error"));
+    }
   }
 
   function openFullscreenGame() {
@@ -1199,7 +1208,7 @@ export default function Home() {
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
-            <button className="icon-button subtle" title="Download project ZIP" onClick={downloadProject}>↓</button>
+            <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
 
