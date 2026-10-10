@@ -417,10 +417,11 @@ export async function POST(request: NextRequest) {
   };
   const startedAt = Date.now();
   const totalBudgetMs = 52_000;
+  const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 34_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
     const attempt = queued.shift()!;
-    const remainingMs = totalBudgetMs - (Date.now() - startedAt);
+    const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
     attempts += 1;
     try {
