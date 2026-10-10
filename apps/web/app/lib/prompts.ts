@@ -24,7 +24,7 @@ export const AGENT_SYSTEM = [
 ].join("\n");
 
 export function makeAgentInput(input: {
-  operation: "interview" | "plan" | "build" | "edit" | "chat" | "surprise" | "research";
+  operation: "interview" | "plan" | "build" | "buildPart" | "edit" | "chat" | "surprise" | "research";
   mode: Mode;
   message: string;
   project?: GeneProject | null;
@@ -66,6 +66,9 @@ export function makeAgentInput(input: {
   if (input.operation === "interview") parts.push("Interview: ask exactly one material question next, based on the latest answer and the full known context. Do not return a batch of questions. If no meaningful question remains, return a complete plan.");
   if (input.operation === "plan") parts.push("Plan only. Give an ordered implementation plan, concrete features/user flows, a project kind and engine (app=webapp, game=canvas2d or webgl3d), and conservative performance budget. Do not return source files.");
   if (input.operation === "build") parts.push(projectKind === "app" ? "Generate all four files for a complete, polished and interactive web app, not a mockup. Implement the central user flow and all visible controls, and include project-spec metadata in game-spec.json with kind=app and engine=webapp. If no approved plan exists, include a structured plan alongside the files." : "Generate all four files for a complete playable game, not a mockup. Implement controls, objective, win/loss and restart loop. If no approved plan exists, include a structured plan alongside the files; use the same engine in the plan and spec.");
+  if (input.operation === "buildPart") parts.push(
+    "STAGED BUILD MODE: Return exactly ONE requested file, not the whole project. The requested file path and stage index are supplied in the final instruction. Return a compact but complete first playable MVP that is consistent with the existing plan and staged files. The response must be one valid JSON object matching {reply:string, plan?:object, files:[{path:string,content:string}], question:null, complete:boolean}. No markdown fences, no extra keys, no partial snippets. For source code, favor simple complete implementations and avoid long comments or repeated boilerplate. game.js must be a complete, syntactically valid file with a working requestAnimationFrame loop for games or working event handlers for apps. Include plan on the first stage only when asked. Keep each file reasonably small; advanced features can be added in later edit requests. Do not claim browser tests were run.");
+
   if (input.operation === "edit") parts.push("Make the requested change against the exact existing source for this project type. Return only files that actually changed, with complete contents. Keep edits targeted, maintain consistency, and preserve existing features and working behavior.");
   if (input.operation === "chat") parts.push("Speak naturally, like a capable coding partner. Answer ordinary questions directly using project context. If the user clearly asks for source changes, implement them in files rather than only describing them; do not turn every conversational question into a build plan.");
   if (input.operation === "research") parts.push("Research the user's question using live Google Search grounding results. Summarize useful findings for this game project and include source URLs/titles in the reply. Do not return source files or claim to have changed anything.");
