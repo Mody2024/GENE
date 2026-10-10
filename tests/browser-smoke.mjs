@@ -222,6 +222,7 @@ try {
   const appErrors = [];
   appPage.on("pageerror", error => appErrors.push(error.message));
   await appPage.addInitScript(({project, storageKey, activeKey}) => {
+    if (window.top !== window.self) return;
     localStorage.setItem(storageKey, JSON.stringify([project]));
     localStorage.setItem(activeKey, project.id);
   }, {project: appFixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1"});
