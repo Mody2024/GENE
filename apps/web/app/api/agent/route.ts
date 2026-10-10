@@ -658,7 +658,7 @@ export async function POST(request: NextRequest) {
             const reviewResult = JSON.parse(reviewContent);
             if (Array.isArray(reviewResult.files) && reviewResult.files.length > 0 &&
                 reviewResult.files.every((file: any) => file && candidatePaths.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
-              const replacements = new Map(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content]));
+              const replacements = new Map<string, string>(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
               result.files = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
               result.reply = result.reply + "\n\nA second AI reviewer checked the code and suggested targeted corrections before validation.";
               reviewedBy = reviewer.name + "/" + reviewer.model;
