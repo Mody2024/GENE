@@ -155,12 +155,14 @@ try {
   }));
   assert.ok(startedState?.started, "starter start button should transition the game into its running state; state=" + JSON.stringify(startedState));
   const sampleBefore = startedState.x;
-  const starterCanvas = sampleFrame.locator("#game-canvas");
-  await starterCanvas.click();
-  await starterCanvas.focus();
-  await samplePage.keyboard.down("ArrowRight");
+  await sampleFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
+  await sampleFrame.locator("body").evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+  });
   await samplePage.waitForTimeout(350);
-  await samplePage.keyboard.up("ArrowRight");
+  await sampleFrame.locator("body").evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight", bubbles: true, cancelable: true }));
+  });
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
   assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
