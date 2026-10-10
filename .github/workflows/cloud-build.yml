@@ -150,7 +150,7 @@ jobs:
             const states = Object.values(targets).map(x => x.status);
             const successful = Object.values(targets).filter(x => x.status === 'success' && x.url).length;
             const state = successful === states.length ? 'success' : successful ? 'partial' : 'failed';
-            const report = { buildId, state, targets, completedAt: new Date().toISOString(), note: 'Android output is a debug-signed APK suitable for direct device installation, not a Play Store release.' };
+            const report = { buildId, state, targets, runUrl: 'https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId, completedAt: new Date().toISOString(), note: 'Android output is a debug-signed APK suitable for direct device installation, not a Play Store release.' };
             const content = Buffer.from(JSON.stringify(report, null, 2)).toString('base64');
             await github.rest.repos.createOrUpdateFileContents({
               owner: context.repo.owner, repo: context.repo.repo,
