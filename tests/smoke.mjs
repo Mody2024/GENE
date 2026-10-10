@@ -44,6 +44,8 @@ assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API s
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(page.includes('const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"]'), "initial builds are generated in four compact stages");
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
+assert.ok(page.includes("stageAttempt <= 2") && page.includes("RETRY: the previous attempt"), "failed file stages retry once with a compact repair prompt");
+assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
 assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
 assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
