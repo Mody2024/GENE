@@ -144,6 +144,27 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
   return result;
 }
 
+function ensureProjectSpecTitle(
+  files: Array<{ path: string; content: string }>,
+  candidates: Array<unknown>
+): Array<{ path: string; content: string }> {
+  const specFile = files.find(file => file.path === "game-spec.json");
+  if (!specFile) return files;
+  let spec: any;
+  try { spec = JSON.parse(specFile.content); } catch { return files; }
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) return files;
+  if (typeof spec.title === "string" && spec.title.trim()) return files;
+
+  const fallback = candidates
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .map(value => value.trim())
+    .find(value => !/^untitled\\s+(game|app)$/i.test(value));
+  const title = (fallback || candidates.find((value): value is string => typeof value === "string" && Boolean(value.trim())) || "Untitled Project")
+    .split(/[.!?\\n]/)[0].trim().slice(0, 100) || "Untitled Project";
+  spec.title = title;
+  return files.map(file => file.path === "game-spec.json" ? { ...file, content: JSON.stringify(spec, null, 2) } : file);
+}
+
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
@@ -244,7 +265,10 @@ export async function POST(request: NextRequest) {
 
   if (body.operation === "validateBuild") {
     try {
-      const files = Object.entries(body.project?.files || {}).map(([path, content]) => ({ path, content: String(content) }));
+      const files = ensureProjectSpecTitle(
+        Object.entries(body.project?.files || {}).map(([path, content]) => ({ path, content: String(content) })),
+        [body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message]
+      );
       validateFiles(files, "build", body.project?.plan?.engine, "build", projectKind);
       return NextResponse.json({
         ok: true,
@@ -501,6 +525,8 @@ export async function POST(request: NextRequest) {
       result = parseModelJson(text);
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
+    result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
@@ -517,7 +543,11 @@ export async function POST(request: NextRequest) {
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
       const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
-      validateFiles(Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })), "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
+      const mergedFiles = ensureProjectSpecTitle(
+        Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
+        titleCandidates
+      );
+      validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
