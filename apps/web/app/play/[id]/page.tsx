@@ -27,7 +27,7 @@ export default function PlayPage() {
   const html = project?.files["game.html"] || "";
   const css = project?.files["game.css"] || "";
   const js = project?.files["game.js"] || "";
-  const documentSource = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;width:100%;" + (isApp ? "min-height:100%;height:auto;overflow:auto;" : "height:100%;overflow:hidden;") + "background:#101419;color:white}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js.replace(/<\/script/gi, "<\\/script") + "</script></body></html>";
+  const documentSource = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;" + (isApp ? "min-height:100%;height:auto;overflow:auto;" : "height:100%;overflow:hidden;") + "background:#101419;color:white}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js.replace(/<\/script/gi, "<\\/script") + "</script></body></html>";
 
   if (!loaded) return <main className="play-missing">Loading saved project…</main>;
   if (missing || !project) return <main className="play-missing"><h1>Saved project not found</h1><p>This project is stored in the browser that created it. Open GENE in the same browser profile.</p><a href="/">Return to GENE</a></main>;
@@ -37,6 +37,6 @@ export default function PlayPage() {
       <a href="/" style={{textDecoration:"none",color:"#cbe2cf",fontWeight:800,fontSize:18}}>G</a><strong style={{flex:1,fontSize:13}}>{project.name}</strong><span style={{color:"#8e969d",fontSize:10}}>{isApp ? "App preview" : "Local playtest"}</span>
       <button onClick={() => setFrameKey(n => n + 1)}>↻ Restart</button><button onClick={() => { if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.(); else void document.exitFullscreen?.(); }}>⛶ Fullscreen</button><a href="/" style={{color:"#cbe2cf",fontSize:11}}>Back to editor</a>
     </header>
-    <iframe key={frameKey} title={project.name + (isApp ? " app" : " game")} sandbox="allow-scripts" srcDoc={documentSource} style={{flex:1,border:0,width:"100%",background:"#101419"}} />
+    <iframe key={frameKey} title={project.name + (isApp ? " app" : " game")} sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={documentSource} style={{flex:1,border:0,width:"100%",background:"#101419"}} />
   </main>;
 }
