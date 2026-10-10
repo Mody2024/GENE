@@ -33,3 +33,19 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 @media(max-width:480px){.topbar{gap:6px}.top-actions{gap:5px;width:100%;justify-content:flex-start}.top-play-button,.mobile-preview-button{font-size:9px;padding:6px 8px}.thinking-select{max-width:80px}.sync-button{font-size:8px;padding:5px 6px}.build-check-head{flex-direction:column}.build-check-head .primary-button{width:100%}.build-check-item{grid-template-columns:22px minmax(88px,1fr)}.check-detail{grid-column:2}.build-check-summary{align-items:flex-start;flex-direction:column}.rename-project{padding:4px}}
 
 .project-kind-chip{display:inline-flex;align-items:center;border:1px solid var(--border);padding:5px 8px;border-radius:999px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.12em;white-space:nowrap}
+
+
+/* GENE v1.2: calmer preview collapse and project chat controls */
+.workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}
+.preview-reopen-tab{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:40;display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--text);box-shadow:0 12px 36px rgba(0,0,0,.28);backdrop-filter:blur(18px);font-size:11px;font-weight:700;cursor:pointer}
+.preview-reopen-tab:hover{border-color:var(--green);transform:translateY(-50%) translateX(-2px)}
+.preview-reopen-tab>span:last-child{color:var(--green);font-size:14px}
+.project-card{padding-right:36px}
+.project-delete,.recent-delete{border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:grid;place-items:center}
+.project-delete{position:absolute;right:6px;top:7px;width:25px;height:25px;font-size:18px}
+.project-delete:hover,.recent-delete:hover{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
+.recent-project-row{display:flex;align-items:center;gap:2px;min-width:0;border-radius:8px;padding-right:3px}
+.recent-project-row .file-row{flex:1;min-width:0;margin:0}
+.recent-delete{flex:0 0 26px;height:28px;font-size:17px;opacity:.65}
+.recent-project-row:hover .recent-delete{opacity:1}
+@media(max-width:800px){.preview-reopen-tab{top:auto;bottom:84px;right:10px;transform:none;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.3)}.preview-reopen-tab:hover{transform:translateY(-2px)}}
