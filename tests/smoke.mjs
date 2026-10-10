@@ -40,6 +40,11 @@ assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidat
 assert.ok(api.includes("validateFiles"), "server validates model output");
 assert.ok(api.includes("normalizeAgentResult"), "API validates structured response shapes before updating the UI");
 assert.ok(api.includes("GEMINI_OUTPUT_TRUNCATED"), "truncated Gemini JSON gets a specific recoverable error");
+assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API supports single-file build stages and offline final assembly validation");
+assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
+assert.ok(page.includes('const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"]'), "initial builds are generated in four compact stages");
+assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
+assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
 assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
 assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
 assert.ok(api.includes("JSON.parse(cleaned)"), "candidate JSON is validated before it can reach file validation");
