@@ -141,13 +141,15 @@ export function renderPlayHtml(files, title = "GENE game", baseHref = "/") {
   const js = String(files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
   const safeTitle = String(title).replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const safeBase = String(baseHref).startsWith("/") && !String(baseHref).includes("..") ? String(baseHref) : "/";
+  let isApp = false;
+  try { isApp = JSON.parse(String(files["game-spec.json"] || "{}"))?.engine === "webapp"; } catch {}
   const telemetry = [
     "(function(){",
     "window.addEventListener('error',function(e){console.error('[GENE runtime]',e.message||'script error');});",
     "window.addEventListener('load',function(){document.documentElement.dataset.geneLoaded='true';});",
     "})();"
   ].join("\n");
-  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><base href='" + safeBase + "'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "</script><script>" + telemetry + "</script></body></html>";
+  return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><base href='" + safeBase + "'><title>" + safeTitle + "</title><style>html,body{margin:0;width:100%;" + (isApp ? "min-height:100%;height:auto;overflow:auto;" : "height:100%;overflow:hidden;") + "background:#11151b;color:#f6f7f8;font-family:Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js + "</script><script>" + telemetry + "</script></body></html>";
 }
 
 async function readJson(req, limit = MAX_BODY_BYTES) {
