@@ -90,6 +90,11 @@ try {
   await page.getByTitle("Switch theme").click();
   const themeAfter = await page.locator("html").getAttribute("data-theme");
   assert.notEqual(themeAfter, themeBefore, "theme switch responds to user input");
+  await page.locator('.rail button[title="Plan & tasks"]').click();
+  await page.getByRole("heading", { name: "Plan & tasks" }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Run build checks" }).click();
+  await page.getByText("JavaScript syntax", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
@@ -161,7 +166,19 @@ try {
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
   await samplePage.close();
-  console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, UI/theme controls, WebGL rendering, and the no-key playable starter game.");
+  const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await mobilePage.addInitScript(({ project, storageKey, activeKey }) => {
+    if (window.top !== window.self) return;
+    localStorage.setItem(storageKey, JSON.stringify([project]));
+    localStorage.setItem(activeKey, project.id);
+  }, { project: fixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  await mobilePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await mobilePage.getByTitle("Open live preview").click();
+  await mobilePage.locator(".preview-panel.expanded").waitFor({ state: "visible", timeout: 5000 });
+  await mobilePage.locator('iframe[title="GENE live game preview"]').waitFor({ timeout: 5000 });
+  assert.equal(await mobilePage.getByTitle("Close expanded preview").isVisible(), true, "mobile users can open and close the live game preview");
+  await mobilePage.close();
+  console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
 } finally {
   await browser.close();
 }

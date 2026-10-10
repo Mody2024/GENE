@@ -53,6 +53,10 @@ function newProject(): GeneProject {
 }
 function fileName(path: string) { return path.split("/").pop() || path; }
 
+type BuildCheckStatus = "pass" | "warn" | "fail";
+type BuildCheck = { label: string; status: BuildCheckStatus; detail: string };
+type BuildReport = { checkedAt: string; projectUpdatedAt: string; checkedDirty: boolean; checkedFile: string; checkedEditorContent: string; checks: BuildCheck[] };
+
 export default function Home() {
   const [project, setProject] = useState<GeneProject | null>(null);
   const [projects, setProjects] = useState<GeneProject[]>([]);
@@ -68,6 +72,7 @@ export default function Home() {
   const [fileDirty, setFileDirty] = useState(false);
   const [notice, setNotice] = useState("");
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
+  const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
   const [activity, setActivity] = useState<string[]>([]);
@@ -765,6 +770,25 @@ export default function Home() {
     }
   }
 
+  function selectProjectFile(path: string) {
+    if (!project) return;
+    if (path !== project.activeFile && fileDirty && !window.confirm("Discard unsaved edits to " + project.activeFile + "?")) return;
+    setProject({ ...project, activeFile: path });
+    setEditedFile(project.files[path] || "");
+    setFileDirty(false);
+    setSection("files");
+  }
+
+  function renameProject() {
+    if (!project) return;
+    const entered = window.prompt("Rename this game project", project.name);
+    if (entered === null) return;
+    const name = entered.trim().replace(/\s+/g, " ").slice(0, 64);
+    if (!name) { setNotice("Project name cannot be empty."); return; }
+    setProject({ ...project, name, updatedAt: now() });
+    setNotice("Project renamed to " + name + ".");
+  }
+
   function createNewProject() {
     const p = newProject();
     setProject(p);
@@ -795,6 +819,43 @@ export default function Home() {
     setNotice("Playable sample loaded locally. No Gemini API key is needed to run it; add a key to ask the AI to modify the game.");
     setActivity(["Loaded built-in starter: Outpost: Last Light", "Source files ready for editing and export"]);
     setPreviewKey(n => n + 1);
+  }
+
+  function runBuildChecks() {
+    if (!project) return;
+    const files = { ...project.files };
+    if (fileDirty) files[project.activeFile] = editedFile;
+    const checks: BuildCheck[] = [];
+    const add = (label: string, status: BuildCheckStatus, detail: string) => checks.push({ label, status, detail });
+    const required = ["game.html", "game.css", "game.js", "game-spec.json"];
+    const missing = required.filter(path => !files[path] || !files[path].trim());
+    add("Required source files", missing.length ? "fail" : "pass", missing.length ? "Missing: " + missing.join(", ") : "HTML, CSS, JavaScript and game specification are present.");
+    const html = files["game.html"] || "";
+    const js = files["game.js"] || "";
+    const combined = html + "\n" + js;
+    let spec: any = null;
+    let specParsed = false;
+    try { spec = JSON.parse(files["game-spec.json"] || ""); specParsed = Boolean(spec && typeof spec === "object" && !Array.isArray(spec)); } catch {}
+    const specValid = specParsed && typeof spec.title === "string" && Boolean(spec.title.trim()) && typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim());
+    add("Game specification", specValid ? "pass" : "fail", specValid ? "Title, engine, mechanics, controls, objective and end states are declared." : "The JSON or required game-spec fields are missing or malformed.");
+    let syntaxValid = false;
+    let syntaxError = "";
+    try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
+    catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
+    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
+    const hasCanvas = /<canvas\b/i.test(html) || /createElement\s*\(\s*["']canvas["']\s*\)/i.test(js);
+    add("Render surface", hasCanvas ? "pass" : "fail", hasCanvas ? "A canvas render surface is present." : "No canvas element or dynamically created canvas was found.");
+    const engine = spec?.engine;
+    const rendererValid = engine === "webgl3d" ? /getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']|createShader\s*\(|drawArrays\s*\(|drawElements\s*\(/i.test(combined) : engine === "canvas2d" && /getContext\s*\(\s*["']2d["']|\.fillRect\s*\(|\.drawImage\s*\(|\.stroke\s*\(/i.test(combined);
+    add("Renderer implementation", rendererValid ? "pass" : "fail", rendererValid ? (engine === "webgl3d" ? "WebGL shader/draw operations are referenced." : "Canvas 2D drawing operations are referenced.") : "The selected engine has no recognizable renderer operations.");
+    const hasLoop = /requestAnimationFrame\s*\(|setInterval\s*\(|setTimeout\s*\(/i.test(js);
+    add("Frame/update loop", hasLoop ? "pass" : "fail", hasLoop ? "A recurring animation or update loop is referenced." : "No animation or update loop was detected.");
+    const hasInput = /addEventListener\s*\(\s*["'](?:keydown|keyup|pointerdown|pointerup|touchstart|click|mousedown)["']|on(?:keydown|keyup|pointerdown|touchstart|click)\s*=/i.test(combined);
+    add("Player input hooks", hasInput ? "pass" : "warn", hasInput ? "Keyboard, pointer or touch input hooks were found." : "No common input handler was detected; check controls manually.");
+    add("Live preview", runtimeState === "rendered" ? "pass" : runtimeState === "error" ? "fail" : "warn", runtimeState === "rendered" ? "The sandbox reported a visible render signal." : runtimeState === "error" ? "The preview reported an error or did not render in time." : "Refresh or start the preview to collect runtime evidence.");
+    add("Gameplay playtest", "warn", "These checks do not simulate collisions, progression, difficulty or win/loss behavior. Play the game and verify those mechanics yourself.");
+    setBuildReport({ checkedAt: now(), projectUpdatedAt: project.updatedAt, checkedDirty: fileDirty, checkedFile: project.activeFile, checkedEditorContent: editedFile, checks });
+    addActivity("Build checks finished: " + checks.filter(check => check.status === "pass").length + " passed, " + checks.filter(check => check.status === "warn").length + " warnings, " + checks.filter(check => check.status === "fail").length + " failed.");
   }
 
   function saveManualEdit() {
@@ -884,6 +945,7 @@ export default function Home() {
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
   const isSyncedToLocal = Boolean(localAgentStatus === "connected" && lastSyncedUpdatedAt && lastSyncedUpdatedAt === project.updatedAt);
+  const reportIsCurrent = Boolean(buildReport && buildReport.projectUpdatedAt === project.updatedAt && (buildReport.checkedDirty ? fileDirty && buildReport.checkedFile === project.activeFile && buildReport.checkedEditorContent === editedFile : !fileDirty));
   const activeMessages = project.messages;
   const nav = [
     { id: "chat" as const, icon: "◉", label: "Chat" },
@@ -917,7 +979,7 @@ export default function Home() {
           {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
         </>}
         <div className="sidebar-section-label">PROJECT FILES</div>
-        {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => { setProject({ ...project, activeFile: path }); setSection("files"); }}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path)}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
+        {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path)}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
         <div className="sidebar-bottom">
           <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "Gemini connected" : "Gemini key missing"}</div>
           <small>{apiReady ? aiModel : "AI builds require a server-side key"}</small>
@@ -933,7 +995,7 @@ export default function Home() {
 
       <section className="main-column">
         <header className="topbar">
-          <div className="breadcrumb"><span>Projects</span><span className="crumb-slash">/</span><strong>{project.name}</strong><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
+          <div className="breadcrumb"><span>Projects</span><span className="crumb-slash">/</span><strong>{project.name}</strong><button className="rename-project" title="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             <div className="mode-switch" role="group" aria-label="Agent mode">
               <button className={project.mode === "plan" ? "active" : ""} onClick={() => setProject({ ...project, mode: "plan" })}>Plan</button>
@@ -942,6 +1004,8 @@ export default function Home() {
             <select className="thinking-select" value={project.thinking} aria-label="Thinking mode" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
               <option value="fast">Fast</option><option value="balanced">Balanced</option><option value="deep">Deep</option>
             </select>
+            <button className="top-play-button" title="Play the current game in a separate tab" onClick={openFullscreenGame} disabled={!hasGame}>▶ Play</button>
+            <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
             <button className="icon-button subtle" title="Download project ZIP" onClick={downloadProject}>↓</button>
           </div>
@@ -1002,10 +1066,23 @@ export default function Home() {
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <div className="empty-state">No source files yet. Plan the game, then switch to Build mode and ask GENE to build it.</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => { setProject({ ...project, activeFile: path }); setEditedFile(project.files[path]); setFileDirty(false); }}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
+              {!Object.keys(project.files).length ? <div className="empty-state">No source files yet. Plan the game, then switch to Build mode and ask GENE to build it.</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => selectProjectFile(path)}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
             </div>}
 
-            {section === "tasks" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">PLANNING</div><h2>Plan & tasks</h2><p>Review the scope before building. Plan mode itself does not change source files.</p></div>{project.plan ? <><div className="plan-overview"><h3>{project.plan.title}</h3><p>{project.plan.summary}</p><div className="plan-metrics"><span>{project.plan.engine}</span><span>Target {project.plan.performanceBudget.targetFps} FPS</span><span>Max enemies {project.plan.performanceBudget.maxEnemies}</span></div></div><div className="task-list">{project.plan.tasks.map((task, i) => <div key={task}><span>{String(i + 1).padStart(2, "0")}</span><p>{task}</p><small>{Object.keys(project.files).length ? "Build source exists; task completion requires runtime tests." : "Planned"}</small></div>)}</div><button className="primary-button" onClick={startBuild} disabled={busy}>Start building plan →</button></> : <div className="empty-state">No plan yet. Describe a game in Chat, then GENE will interview you one question at a time.</div>}</div>}
+            {section === "tasks" && <div className="tool-view">
+              <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter.</p></div>
+              <div className="build-check-panel">
+                <div className="build-check-head"><div><div className="eyebrow">QUALITY GATE</div><h3>Build checks</h3><p>Inspect project structure, syntax, renderer, controls and preview evidence.</p></div><button className="primary-button" onClick={runBuildChecks} disabled={!hasGame}>Run build checks</button></div>
+                {!hasGame && <p className="build-check-empty">Build a game first to run checks on its actual source files.</p>}
+                {buildReport && <div className="build-check-results">
+                  <div className={"build-check-summary " + (reportIsCurrent ? "current" : "stale")}><strong>{reportIsCurrent ? "Latest report" : "Report is out of date"}</strong><span>{buildReport.checks.filter(check => check.status === "pass").length} passed · {buildReport.checks.filter(check => check.status === "warn").length} warnings · {buildReport.checks.filter(check => check.status === "fail").length} failed</span></div>
+                  <div className="build-check-list">{buildReport.checks.map(check => <div className="build-check-item" key={check.label}><span className={"check-status " + check.status}>{check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "×"}</span><strong>{check.label}</strong><span className="check-detail">{check.detail}</span></div>)}</div>
+                  <p className="build-check-timestamp">Checked {new Date(buildReport.checkedAt).toLocaleString()}{buildReport.checkedDirty ? " · includes the editor buffer" : " · saved source files"}</p>
+                </div>}
+                <p className="build-check-disclaimer">A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.</p>
+              </div>
+              {project.plan ? <><div className="plan-overview"><h3>{project.plan.title}</h3><p>{project.plan.summary}</p><div className="plan-metrics"><span>{project.plan.engine}</span><span>Target {project.plan.performanceBudget.targetFps} FPS</span><span>Max enemies {project.plan.performanceBudget.maxEnemies}</span></div></div><div className="task-list">{project.plan.tasks.map((task, i) => <div key={task}><span>{String(i + 1).padStart(2, "0")}</span><p>{task}</p><small>{Object.keys(project.files).length ? "Source exists; verify task completion in the live game." : "Planned"}</small></div>)}</div><button className="primary-button" onClick={startBuild} disabled={busy}>Start building plan →</button></> : <div className="empty-state">No plan yet. Describe a game in Chat, then GENE will interview you one question at a time.</div>}
+            </div>}
 
             {section === "assets" && <div className="tool-view forge-view">
   <div className="tool-view-heading">
@@ -1038,7 +1115,7 @@ export default function Home() {
           <aside className={"preview-panel " + (!previewOpen ? "collapsed" : "") + (expandedPreview ? " expanded" : "")}>
             <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title={previewOpen ? "Minimize preview" : "Open preview"} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? "–" : "□"}</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
             {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox="allow-scripts" srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : "No game loaded"}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
-            {expandedPreview && hasGame && <button className="close-expanded" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
+            {expandedPreview && hasGame && <button className="close-expanded" title="Close expanded preview" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
           </aside>
         </div>
         <footer className="statusbar"><div><span className="status-dot online" /> Workspace local state</div><div>{Object.keys(project.files).length} source files <span className="status-divider">·</span> {project.versions.length} versions <span className="status-divider">·</span> {project.thinking} mode</div><button onClick={() => setShowActivity(!showActivity)}>Activity {showActivity ? "▾" : "▴"}</button></footer>
