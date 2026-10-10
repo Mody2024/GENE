@@ -1362,6 +1362,7 @@ export default function Home() {
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
+             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
             <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
