@@ -334,6 +334,7 @@ export async function POST(request: NextRequest) {
   let successfulModel = model;
   let lastFailure = { status: 502, detail: "Gemini request did not complete." };
   let attempts = 0;
+  let outputFailure: "truncated" | "malformed" | null = null;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const queued: Array<{ key: string; model: string; fallback: boolean }> = [
     { key: apiKeys[0], model, fallback: false }
@@ -355,15 +356,19 @@ export async function POST(request: NextRequest) {
     if (remainingMs < 1_500) break;
     attempts += 1;
     try {
+      const compactInstruction = "\n\nCOMPACT RETRY REQUIREMENTS: An earlier response was incomplete or invalid. Regenerate the ENTIRE response from scratch as exactly one complete, valid JSON object; never continue a partial response. Keep code concise and omit comments, verbose prose, repeated data, and decorative extras. Preserve every required core feature, controls, correct file paths, and valid project spec. For a build, prefer a small complete playable first version over a huge implementation. Keep the combined source compact enough to fit this response; do not put literal unescaped newlines inside JSON string values.";
+      const attemptParts = attempt.fallback
+        ? [{ text: userInput + compactInstruction }, ...parts.slice(1)]
+        : parts;
       const candidate = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
-          contents: [{ role: "user", parts }],
+          contents: [{ role: "user", parts: attemptParts }],
           generationConfig: {
             responseMimeType: "application/json",
-            temperature: body.operation === "interview" ? 0.35 : 0.25,
+            temperature: body.operation === "interview" ? 0.35 : 0.2,
             maxOutputTokens: attempt.fallback
               ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : 1_536)
               : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : 3_072),
@@ -371,33 +376,64 @@ export async function POST(request: NextRequest) {
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
-        // Leave time for validation and JSON response before Vercel's maxDuration.
         signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))
       });
       const candidatePayload = await candidate.json().catch(() => null);
-      if (candidate.ok) {
+      const candidateText = candidatePayload?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text || "").join("\n") || "";
+      const finishReason = String(candidatePayload?.candidates?.[0]?.finishReason || "");
+
+      if (candidate.ok && candidateText.trim()) {
+        const expectsJson = body.operation !== "research" || candidateText.trim().startsWith("{") || candidateText.trim().startsWith("```");
+        let validJson = !expectsJson;
+        if (expectsJson) {
+          try {
+            let cleaned = candidateText.trim();
+            if (cleaned.startsWith("```")) cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+            JSON.parse(cleaned);
+            validJson = true;
+          } catch {
+            validJson = false;
+          }
+        }
+
+        // HTTP 200 does not imply a complete generation. Gemini tells us explicitly
+        // when its output budget cut a response off; parsing that fragment only gives
+        // users misleading "unterminated string" errors.
+        if (finishReason === "MAX_TOKENS") {
+          outputFailure = "truncated";
+          lastFailure = { status: 422, detail: "Gemini finished with MAX_TOKENS; the JSON response was truncated." };
+          for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
+          // A second key may have a different output configuration/quota, but avoid
+          // wasting time retrying the same model when the text itself was truncated.
+          for (const key of apiKeys.slice(1, 3)) enqueue(key, fallbackModels[fallbackModels.length - 1], true);
+          continue;
+        }
+        if (!validJson) {
+          outputFailure = "malformed";
+          lastFailure = { status: 422, detail: "Gemini returned incomplete or invalid JSON even though the request completed." };
+          for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
+          continue;
+        }
+
         payload = candidatePayload;
         successfulModel = attempt.model;
+        outputFailure = null;
         break;
       }
 
       lastFailure = {
-        status: candidate.status,
-        detail: candidatePayload?.error?.message || ("Gemini returned HTTP " + candidate.status)
+        status: candidate.status || 502,
+        detail: candidatePayload?.error?.message || (candidateText ? "Gemini returned no complete candidate text." : "Gemini returned an empty response.")
       };
 
       if (candidate.status === 429 || /resource_exhausted|quota exceeded|rate.?limit/i.test(lastFailure.detail)) {
-        // Quota is project-scoped; only keys from other projects with quota can help.
         for (const key of apiKeys.slice(1, 5)) enqueue(key, model, false);
-        // If every configured project is out of quota, the same key on another model
-        // may still have model-specific capacity/quota.
         for (const fallbackModel of fallbackModels.slice(1)) enqueue(apiKeys[0], fallbackModel, true);
       } else if (candidate.status === 503 || candidate.status === 500 || candidate.status === 502 || candidate.status === 504) {
-        // Provider overload/server errors: change model before spending calls on more keys.
         for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
         for (const key of apiKeys.slice(1, 3)) enqueue(key, attempt.model, true);
       } else if (candidate.status === 401 || candidate.status === 403) {
-        // The current key may be invalid or restricted; try the other configured keys.
         for (const key of apiKeys.slice(1, 5)) enqueue(key, attempt.model, attempt.fallback);
       } else {
         break;
@@ -405,23 +441,27 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Network request failed.";
       lastFailure = { status: 504, detail: "Gemini request timed out or the connection stalled (" + message + ")" };
-      // A timeout is usually model latency, not a bad key. Retry once on a faster
-      // fallback model with reduced reasoning/output rather than repeating the same
-      // slow request with several keys.
-      for (const fallbackModel of fallbackModels.slice(1)) {
-        enqueue(attempt.key, fallbackModel, true);
-      }
-      // A timeout is a latency failure: move to 3.6 Flash / Flash-Lite immediately.
-      // Do not repeat a deprecated alias that routes back to the same slow model.
+      for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
     }
   }
 
   if (!payload) {
+    if (outputFailure) {
+      const truncated = outputFailure === "truncated";
+      return jsonError(
+        (truncated
+          ? "Gemini cut off its response at the output limit. GENE retried with compact output and fallback models, but none returned complete JSON. "
+          : "Gemini returned malformed JSON. GENE retried with compact output and fallback models, but none returned valid JSON. ") +
+        "No files were changed. Retry Build; if this repeats, build the smallest core version first and add features with chat edits.",
+        502,
+        truncated ? "GEMINI_OUTPUT_TRUNCATED" : "GEMINI_OUTPUT_INVALID"
+      );
+    }
     const failure = describeGeminiFailure(lastFailure.status, lastFailure.detail, attempts);
     const status = failure.code === "GEMINI_QUOTA_EXHAUSTED" ? 429 : failure.code === "GEMINI_KEY_REJECTED" ? 502 : 503;
     return jsonError(
-      failure.code === "GEMINI_API_ERROR" && lastFailure.status === 504
-        ? "Gemini timed out after " + attempts + " attempt(s), including faster-model fallback. GENE now avoids retrying deprecated model aliases and reduces reasoning/output on fallback attempts. Try Build again; if this persists, split the request into a smaller first milestone. Last detail: " + lastFailure.detail + ". No files were changed."
+      lastFailure.status === 504
+        ? "Gemini timed out after " + attempts + " attempt(s). The request budget was capped to protect the Vercel function. No files were changed. Last detail: " + lastFailure.detail
         : failure.message,
       status,
       lastFailure.status === 504 ? "GEMINI_TIMEOUT" : failure.code
