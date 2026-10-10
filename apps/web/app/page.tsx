@@ -30,6 +30,14 @@ function readText(file: File): Promise<string> {
 function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
+function GeneMark({ className = "" }: { className?: string }) {
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE">
+    <path d="M20 5.5 31.8 12.3 31.8 26 20 34.5 8.2 27.7 8.2 14Z" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
+    <path d="M8.5 14 20 20.8 31.5 14M20 20.8V34" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
+    <circle cx="20" cy="20.5" r="3.4" fill="currentColor"/>
+    <circle cx="20" cy="5.5" r="2.3" fill="currentColor"/><circle cx="31.8" cy="12.3" r="2.3" fill="currentColor"/><circle cx="31.8" cy="26" r="2.3" fill="currentColor"/><circle cx="8.2" cy="27.7" r="2.3" fill="currentColor"/>
+  </svg>;
+}
 function now() { return new Date().toISOString(); }
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
@@ -1222,7 +1230,7 @@ export default function Home() {
     window.open("/play/" + encodeURIComponent(project.id), "_blank", "noopener,noreferrer");
   }
 
-  if (!project) return <main className="boot"><div className="gene-mark">G</div><p>Opening your workspace…</p></main>;
+  if (!project) return <main className="boot"><div className="gene-mark"><GeneMark /></div><p>Opening your workspace…</p></main>;
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
   const isApp = project.kind === "app";
@@ -1240,12 +1248,12 @@ export default function Home() {
   return (
     <main className={"gene-app " + theme} data-theme={theme}>
       <aside className="rail">
-        <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit">G</span></button>
+        <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
         <div className="rail-separator" />
         {nav.map(item => <button key={item.id} className={"rail-item " + (section === item.id ? "selected" : "")} title={item.label} onClick={() => setSection(item.id)}><span>{item.icon}</span></button>)}
         <div className="rail-spacer" />
         <button className="rail-item" title="Switch theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}><span>{theme === "dark" ? "☼" : "☾"}</span></button>
-        <button className="avatar" title="GENE 1.2 Flash">G</button>
+        <button className="avatar" title="GENE 1.2 Flash"><GeneMark /></button>
       </aside>
 
       <aside className="project-sidebar">
@@ -1302,7 +1310,7 @@ export default function Home() {
             {section === "chat" && <>
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
-                  <div className="welcome-orbit"><span>G</span><i /><b /></div>
+                  <div className="welcome-orbit"><GeneMark /><i /><b /></div>
                   <div className="eyebrow">GENE 1.2 FLASH</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
