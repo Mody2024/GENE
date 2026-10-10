@@ -175,6 +175,15 @@ try {
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
   assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter's on-screen movement control should move the player; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
+  const beforeGamepad = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
+  await sampleFrame.locator("body").evaluate(() => {
+    const buttons = Array.from({ length: 16 }, (_, index) => ({ pressed: index === 0 }));
+    Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }] });
+  });
+  await samplePage.waitForTimeout(320);
+  const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
+  assert.ok(typeof beforeGamepad === "number" && typeof afterGamepad.x === "number" && afterGamepad.x > beforeGamepad, "Gamepad API analog input should move the starter player; before=" + beforeGamepad + "; after=" + JSON.stringify(afterGamepad));
+  assert.equal(afterGamepad.controller?.connected, true, "starter reports a connected gamepad honestly");
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
