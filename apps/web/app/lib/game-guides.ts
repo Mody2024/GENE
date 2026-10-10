@@ -170,6 +170,33 @@ const GUIDES: Record<string, GameGuide> = {
     ],
     performance: { targetFps: 60, maxEnemies: 8, maxObjects: 180, maxParticles: 40 }
   },
+  localMultiplayer3d: {
+    id: "localMultiplayer3d",
+    title: "Local Multiplayer 3D",
+    engine: "webgl3d",
+    implementation: [
+      "Build a genuinely simultaneous local couch-multiplayer 3D game on one machine using raw WebGL. Render real perspective geometry for both players in the same world; do not use a flat 2D-only scene.",
+      "Maintain independent player transforms, velocity, health/lives, cooldowns, score and input ownership. Process both players in one authoritative update loop and resolve their movement/collisions independently.",
+      "Default keyboard layout: Player 1 uses WASD with F for action; Player 2 uses arrow keys with Enter or Right Shift for action. Display both layouts in-game and prevent browser scrolling for handled keys.",
+      "Poll navigator.getGamepads() once per frame, apply stick dead zones and map each connected controller to a distinct player slot by gamepad index. Keyboard controls must remain fully playable without controllers.",
+      "Use a shared arena camera that frames both players for compact arenas; for larger worlds implement split-screen viewports with independent cameras and correct viewport/scissor handling. Never let one player disappear off-camera without a deliberate split-screen design.",
+      "Give players visually distinct meshes/materials and readable player-specific score/health indicators. Implement co-op objectives or clear versus scoring, plus feedback for attacks, pickups and collisions.",
+      "Handle simultaneous input, player-to-player collision if relevant, knockout/round end, whole-game pause/resume, rematch and complete state reset. Pause all player movement, AI and timers together.",
+      "Keep WebGL shaders, geometry, draw calls and world-space collision valid for both players; bound entity counts and provide a visible error if WebGL is unavailable instead of a blank screen.",
+      "Add deterministic test hooks for both player transforms, scores, frame count and round state without affecting normal play. Never claim physical controller testing unless actually performed."
+    ],
+    acceptance: [
+      "The game requests a WebGL context, links valid shaders and draws non-empty perspective geometry containing both players.",
+      "Pressing a Player 1 key changes only Player 1 state; pressing a Player 2 key changes only Player 2 state.",
+      "Both players move simultaneously in the same update loop and remain visible through the chosen camera strategy.",
+      "Keyboard play works when navigator.getGamepads() returns no controllers.",
+      "The core objective/attack mechanic changes the correct player's score or health without double-awarding events.",
+      "Pause freezes both players, enemies and gameplay timers; resume resets frame delta to avoid a movement jump.",
+      "Rematch resets both players, objectives, scores, cooldowns and round state.",
+      "The first render contains the actual 3D world and both player models, not a HUD-only or 2D placeholder."
+    ],
+    performance: { targetFps: 60, maxEnemies: 8, maxObjects: 140, maxParticles: 30 }
+  },
   default2d: {
     id: "default2d",
     title: "Custom 2D Game",
@@ -200,7 +227,7 @@ export function selectGameGuide(input: {
   planEngine?: "canvas2d" | "webgl3d";
 }): GameGuide {
   const text = [input.message, input.initialPrompt || "", input.planTitle || ""].join("\n").toLowerCase();
-  if (/local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/.test(text) && !is3d(text)) return GUIDES.localMultiplayer2d;
+  if (/local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/.test(text)) return is3d(text) ? GUIDES.localMultiplayer3d : GUIDES.localMultiplayer2d;
   if (/geometry dash|rhythm game|rhythm runner|precision runner|auto.?runner/.test(text)) return GUIDES.rhythm2d;
   if (/mario|platformer|platform game|side.?scroll/.test(text)) return GUIDES.platformer2d;
   if (/subway|metro|three.?lane|lane runner|endless runner/.test(text) && is3d(text)) return GUIDES.runner3d;
