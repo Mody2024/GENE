@@ -208,7 +208,7 @@ try {
     files: {
       "game.html": '<main class="app"><header><h1>Project Tracker</h1></header><form id="task-form"><label for="task-input">New task</label><input id="task-input" autocomplete="off"><button type="submit" id="add-task">Add task</button></form><ul id="task-list"></ul></main>',
       "game.css": 'body{margin:0;background:#f3f6f9;color:#16202a;font:16px Arial,sans-serif}.app{max-width:900px;margin:auto;padding:32px}input,button{font:inherit;padding:10px;margin:4px}',
-      "game.js": '(function(){const form=document.getElementById("task-form"),input=document.getElementById("task-input"),list=document.getElementById("task-list");form.addEventListener("submit",function(e){e.preventDefault();const value=input.value.trim();if(!value)return;const li=document.createElement("li");li.textContent=value;list.appendChild(li);input.value="";});})();',
+      "game.js": '(function(){const form=document.getElementById("task-form"),input=document.getElementById("task-input"),list=document.getElementById("task-list");window.__geneAppSmoke={booted:true,submissions:0};form.addEventListener("submit",function(e){e.preventDefault();window.__geneAppSmoke.submissions++;const value=input.value.trim();if(!value)return;const li=document.createElement("li");li.textContent=value;list.appendChild(li);input.value="";});})();',
       "game-spec.json": JSON.stringify({title:"Project Tracker",kind:"app",engine:"webapp",summary:"A tiny project tracker for app preview testing.",features:["Add a task"],routes:["/"],userFlows:["Enter a task and add it to the list"],performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:100,maxParticles:0}},null,2)
     },
     activeFile: "game.js"
@@ -224,9 +224,12 @@ try {
   const appFrame = appPage.frameLocator('iframe[title="GENE live game preview"]');
   await appFrame.getByRole("heading", {name:"Project Tracker"}).waitFor({timeout:10000});
   await appPage.getByText("Visible render signal").first().waitFor({timeout:10000});
+  const appBoot = await appFrame.locator("body").evaluate(() => ({ debug: window.__geneAppSmoke || null, form: Boolean(document.getElementById("task-form")) }));
+  assert.ok(appBoot.debug?.booted && appBoot.form, "app script should boot and find its form: " + JSON.stringify(appBoot));
   await appFrame.locator("#task-input").fill("Ship the first app");
   await appFrame.locator("#add-task").click();
-  assert.equal(await appFrame.locator("#task-list li").textContent(), "Ship the first app", "web app preview runs its real DOM interactions");
+  const appInteraction = await appFrame.locator("body").evaluate(() => ({ debug: window.__geneAppSmoke || null, tasks: Array.from(document.querySelectorAll("#task-list li")).map(item => item.textContent) }));
+  assert.ok(appInteraction.debug?.submissions === 1 && appInteraction.tasks.includes("Ship the first app"), "web app preview should handle its submit event: " + JSON.stringify(appInteraction));
   const appRuntime = await appFrame.locator("body").getAttribute("data-gene-project-kind");
   assert.equal(appRuntime, "app", "web app preview receives an app-specific runtime shell");
   assert.equal(appErrors.length, 0, "the app preview should not emit JavaScript errors: " + appErrors.join(" | "));
