@@ -14,6 +14,49 @@ function jsonError(message: string, status = 400, code = "GENE_REQUEST_ERROR") {
   return NextResponse.json({ ok: false, error: { code, message } }, { status });
 }
 
+function getGeminiKeys(): string[] {
+  const configured = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    ...(process.env.GEMINI_API_KEYS || "").split(",").flatMap(value => value.split(";")).flatMap(value => value.split(String.fromCharCode(10)))
+  ];
+  return [...new Set(configured.map(key => key?.trim()).filter((key): key is string => Boolean(key)))];
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function describeGeminiFailure(status: number, detail: string, attempts: number): { code: string; message: string } {
+  if (status === 429 || /resource_exhausted|quota exceeded|rate.?limit/i.test(detail)) {
+    return {
+      code: "GEMINI_QUOTA_EXHAUSTED",
+      message: "Gemini rejected the request because a quota or rate limit was reached after " + attempts + " attempt(s). " +
+        "GENE tried the configured fallback path. Add keys from separate Google Cloud projects with available Gemini quota, or wait for the limit to reset / enable billing. " +
+        "More detail: " + detail + ". No files were changed."
+    };
+  }
+  if (status === 503 || /overloaded|high demand|temporarily unavailable/i.test(detail)) {
+    return {
+      code: "GEMINI_CAPACITY_BUSY",
+      message: "Gemini is temporarily overloaded. GENE tried its configured fallback path " + attempts + " time(s), but no attempt succeeded. Please retry shortly. No files were changed. Detail: " + detail
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      code: "GEMINI_KEY_REJECTED",
+      message: "Gemini rejected the configured API key(s). Verify that each key is valid, its Generative Language API access is enabled, and its Google Cloud project is permitted to use the selected model. No files were changed. Detail: " + detail
+    };
+  }
+  return {
+    code: "GEMINI_API_ERROR",
+    message: "Gemini request failed after " + attempts + " attempt(s) (HTTP " + status + "): " + detail + ". No files were changed."
+  };
+}
+
 function parseModelJson(text: string): AgentResponse {
   let cleaned = text.trim();
   if (cleaned.startsWith("```")) cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -212,8 +255,8 @@ export async function POST(request: NextRequest) {
     for (const [key, value] of requestBuckets) if (value.resetAt <= now) requestBuckets.delete(key);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const apiKeys = getGeminiKeys();
+  if (apiKeys.length === 0) {
     const answers = body.answers || {};
     const known = Object.keys(answers);
     if (body.operation === "interview" && known.length === 0) {
@@ -287,33 +330,59 @@ export async function POST(request: NextRequest) {
     imageCount += 1;
   }
 
-  let response: Response;
-  try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: body.operation === "interview" ? 0.35 : 0.25,
-          maxOutputTokens: body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096,
-          thinkingConfig: { thinkingLevel }
-        },
-        ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
-      }),
-      signal: AbortSignal.timeout(55_000)
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Network request failed.";
-    return jsonError("Could not reach Gemini: " + message + ". No files were changed.", 502, "GEMINI_NETWORK_ERROR");
+  let payload: any = null;
+  let successfulModel = model;
+  let lastFailure = { status: 502, detail: "Gemini request did not complete." };
+  let attempts = 0;
+  const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
+  const attemptPlan: Array<{ key: string; model: string }> = [];
+  for (const key of apiKeys.slice(0, 3)) attemptPlan.push({ key, model });
+  for (const fallbackModel of fallbackModels.slice(1)) {
+    if (attemptPlan.length >= 5) break;
+    attemptPlan.push({ key: apiKeys[0], model: fallbackModel });
   }
 
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = payload?.error?.message || ("Gemini returned HTTP " + response.status);
-    return jsonError(detail + ". No game files were changed.", response.status === 429 ? 429 : 502, "GEMINI_API_ERROR");
+  let succeeded = false;
+  for (const attempt of attemptPlan) {
+    attempts += 1;
+    try {
+      const candidate = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: body.operation === "interview" ? 0.35 : 0.25,
+            maxOutputTokens: body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096,
+            thinkingConfig: { thinkingLevel }
+          },
+          ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
+        }),
+        signal: AbortSignal.timeout(10_000)
+      });
+      const candidatePayload = await candidate.json().catch(() => null);
+      if (candidate.ok) {
+        payload = candidatePayload;
+        successfulModel = attempt.model;
+        succeeded = true;
+        break;
+      }
+      lastFailure = {
+        status: candidate.status,
+        detail: candidatePayload?.error?.message || ("Gemini returned HTTP " + candidate.status)
+      };
+      if (!isRetryableStatus(candidate.status) && candidate.status !== 401 && candidate.status !== 403) break;
+    } catch (error) {
+      lastFailure = { status: 502, detail: error instanceof Error ? error.message : "Network request failed." };
+    }
+  }
+
+  if (!succeeded || !payload) {
+    const failure = describeGeminiFailure(lastFailure.status, lastFailure.detail, attempts);
+    const status = failure.code === "GEMINI_QUOTA_EXHAUSTED" ? 429 : failure.code === "GEMINI_KEY_REJECTED" ? 502 : 503;
+    return jsonError(failure.message, status, failure.code);
   }
 
   const text = payload?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("\n") || "";
@@ -375,5 +444,5 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
-  return NextResponse.json({ ok: true, aiMode: "gemini", model, result });
+  return NextResponse.json({ ok: true, aiMode: "gemini", model: successfulModel, result });
 }
