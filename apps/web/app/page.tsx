@@ -196,6 +196,19 @@ export default function Home() {
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
+    if (project.kind === "app") {
+      const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
+      const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
+      const js = (project.files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
+      const monitor = [
+        "(function(){",
+        "function report(){try{var b=document.body;var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||b.querySelector('button,input,main,section,nav,form,canvas')));parent.postMessage({type:'gene-runtime',state:visible?'rendered':'loaded',renderer:'webapp'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webapp',message:String(e)},'*');}}",
+        "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webapp',message:e.message||'app script error'},'*');});",
+        "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',report);else report();setTimeout(report,500);setTimeout(report,1400);",
+        "})();"
+      ].join("\n");
+      return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;min-height:100%;width:100%;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-project-kind='app'>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+    }
     const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
     const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
     const js = (project.files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
@@ -836,22 +849,33 @@ export default function Home() {
     let spec: any = null;
     let specParsed = false;
     try { spec = JSON.parse(files["game-spec.json"] || ""); specParsed = Boolean(spec && typeof spec === "object" && !Array.isArray(spec)); } catch {}
-    const specValid = specParsed && typeof spec.title === "string" && Boolean(spec.title.trim()) && typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim());
-    add("Game specification", specValid ? "pass" : "fail", specValid ? "Title, engine, mechanics, controls, objective and end states are declared." : "The JSON or required game-spec fields are missing or malformed.");
+    const isAppSpec = project.kind === "app";
+    const specValid = specParsed && typeof spec.title === "string" && Boolean(spec.title.trim()) &&
+      (isAppSpec
+        ? spec.engine === "webapp" && typeof spec.summary === "string" && Boolean(spec.summary.trim()) && ["features", "routes", "userFlows"].every((key: string) => Array.isArray(spec[key]) && spec[key].length > 0)
+        : typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim()));
+    add(isAppSpec ? "App specification" : "Game specification", specValid ? "pass" : "fail", specValid ? (isAppSpec ? "Title, app engine, summary, features, routes and user flows are declared." : "Title, engine, mechanics, controls, objective and end states are declared.") : "The JSON or required project-spec fields are missing or malformed.");
     let syntaxValid = false;
     let syntaxError = "";
     try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
     catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
     add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
-    const hasCanvas = /<canvas\b/i.test(html) || /createElement\s*\(\s*["']canvas["']\s*\)/i.test(js);
-    add("Render surface", hasCanvas ? "pass" : "fail", hasCanvas ? "A canvas render surface is present." : "No canvas element or dynamically created canvas was found.");
-    const engine = spec?.engine;
-    const rendererValid = engine === "webgl3d" ? /getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']|createShader\s*\(|drawArrays\s*\(|drawElements\s*\(/i.test(combined) : engine === "canvas2d" && /getContext\s*\(\s*["']2d["']|\.fillRect\s*\(|\.drawImage\s*\(|\.stroke\s*\(/i.test(combined);
-    add("Renderer implementation", rendererValid ? "pass" : "fail", rendererValid ? (engine === "webgl3d" ? "WebGL shader/draw operations are referenced." : "Canvas 2D drawing operations are referenced.") : "The selected engine has no recognizable renderer operations.");
-    const hasLoop = /requestAnimationFrame\s*\(|setInterval\s*\(|setTimeout\s*\(/i.test(js);
-    add("Frame/update loop", hasLoop ? "pass" : "fail", hasLoop ? "A recurring animation or update loop is referenced." : "No animation or update loop was detected.");
-    const hasInput = /addEventListener\s*\(\s*["'](?:keydown|keyup|pointerdown|pointerup|touchstart|click|mousedown)["']|on(?:keydown|keyup|pointerdown|touchstart|click)\s*=/i.test(combined);
-    add("Player input hooks", hasInput ? "pass" : "warn", hasInput ? "Keyboard, pointer or touch input hooks were found." : "No common input handler was detected; check controls manually.");
+    if (isAppSpec) {
+      const hasUI = /<(?:main|header|nav|section|form|button|h1|h2|article|input|label)\b/i.test(html);
+      add("App interface", hasUI ? "pass" : "fail", hasUI ? "Semantic UI elements are present in the app source." : "No recognizable user interface elements were found.");
+      const hasInput = /addEventListener\s*\(\s*["'](?:click|submit|change|input|keydown|pointerdown)["']|on(?:click|submit|change)\s*=/i.test(combined);
+      add("Interactive behavior", hasInput ? "pass" : "warn", hasInput ? "Event handlers for app interactions were found." : "No common app interaction handler was detected; check its buttons and forms manually.");
+    } else {
+      const hasCanvas = /<canvas\b/i.test(html) || /createElement\s*\(\s*["']canvas["']\s*\)/i.test(js);
+      add("Render surface", hasCanvas ? "pass" : "fail", hasCanvas ? "A canvas render surface is present." : "No canvas element or dynamically created canvas was found.");
+      const engine = spec?.engine;
+      const rendererValid = engine === "webgl3d" ? /getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["']|createShader\s*\(|drawArrays\s*\(|drawElements\s*\(/i.test(combined) : engine === "canvas2d" && /getContext\s*\(\s*["']2d["']|\.fillRect\s*\(|\.drawImage\s*\(|\.stroke\s*\(/i.test(combined);
+      add("Renderer implementation", rendererValid ? "pass" : "fail", rendererValid ? (engine === "webgl3d" ? "WebGL shader/draw operations are referenced." : "Canvas 2D drawing operations are referenced.") : "The selected engine has no recognizable renderer operations.");
+      const hasLoop = /requestAnimationFrame\s*\(|setInterval\s*\(|setTimeout\s*\(/i.test(js);
+      add("Frame/update loop", hasLoop ? "pass" : "fail", hasLoop ? "A recurring animation or update loop is referenced." : "No animation or update loop was detected.");
+      const hasInput = /addEventListener\s*\(\s*["'](?:keydown|keyup|pointerdown|pointerup|touchstart|click|mousedown)["']|on(?:keydown|keyup|pointerdown|touchstart|click)\s*=/i.test(combined);
+      add("Player input hooks", hasInput ? "pass" : "warn", hasInput ? "Keyboard, pointer or touch input hooks were found." : "No common input handler was detected; check controls manually.");
+    }
     add("Live preview", runtimeState === "rendered" ? "pass" : runtimeState === "error" ? "fail" : "warn", runtimeState === "rendered" ? "The sandbox reported a visible render signal." : runtimeState === "error" ? "The preview reported an error or did not render in time." : "Refresh or start the preview to collect runtime evidence.");
     add("Gameplay playtest", "warn", "These checks do not simulate collisions, progression, difficulty or win/loss behavior. Play the game and verify those mechanics yourself.");
     setBuildReport({ checkedAt: now(), projectUpdatedAt: project.updatedAt, checkedDirty: fileDirty, checkedFile: project.activeFile, checkedEditorContent: editedFile, checks });
