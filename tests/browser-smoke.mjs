@@ -136,7 +136,7 @@ try {
   const samplePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   samplePage.on("pageerror", error => fatalErrors.push("starter: " + error.message));
   const emptyProject = { ...fixture, id: "playwright-empty-start", name: "Empty starter", initialPrompt: "", mode: "plan", plan: null, files: {}, versions: [], activeFile: "game.js", messages: [{ id: "hello", role: "assistant", content: "Test", createdAt: new Date().toISOString() }] };
-  await samplePage.addInitScript(({ project, storageKey, activeKey }) => { localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  await samplePage.addInitScript(({ project, storageKey, activeKey }) => { if (window.top !== window.self) return; localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
   await samplePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await samplePage.getByRole("button", { name: /Try playable demo/i }).click();
   const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
