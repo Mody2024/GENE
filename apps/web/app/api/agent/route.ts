@@ -222,7 +222,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const html = byPath["game.html"];
     const css = byPath["game.css"];
     const js = byPath["game.js"];
-    if (/<script\b/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
+    if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
     if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
     if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
     if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: CSS contains an external runtime dependency.");
