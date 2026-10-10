@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "sphere" | "cylinder" | "cone";
+type Shape = "box" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
 type Vec3 = [number, number, number];
 type Part = {
   name: string;
@@ -16,7 +16,7 @@ type Part = {
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "sphere", "cylinder", "cone"]);
+const SHAPES = new Set<Shape>(["box", "sphere", "cylinder", "cone", "wedge", "torus"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
 function json(status: number, body: unknown) {
@@ -76,6 +76,43 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
     vertices.push([-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]);
     const quads = [[1,4,3,2],[5,6,7,8],[1,2,6,5],[2,3,7,6],[3,4,8,7],[4,1,5,8]];
     for (const q of quads) { faces.push([q[0],q[1],q[2]],[q[0],q[2],q[3]]); }
+  } else if (shape === "wedge") {
+    const [x, y, z] = scale.map(n => n / 2) as Vec3;
+    vertices.push(
+      [-x,-y,-z],[x,-y,-z],[-x,y,-z],[x,y,-z],
+      [-x,-y,z],[x,-y,z]
+    );
+    faces.push(
+      [1,3,2],[2,3,4],
+      [1,2,6],[1,6,5],
+      [1,5,3],[3,5,6],[3,6,4],
+      [2,4,6]
+    );
+  } else if (shape === "torus") {
+    const majorSegments = 16, tubeSegments = 8;
+    const rx = scale[0] * 0.34, rz = scale[2] * 0.34;
+    const tubeXZ = Math.min(scale[0], scale[2]) * 0.16;
+    const tubeY = Math.min(scale[1] * 0.42, tubeXZ);
+    for (let i = 0; i < majorSegments; i++) {
+      const u = i / majorSegments * Math.PI * 2;
+      for (let j = 0; j < tubeSegments; j++) {
+        const v = j / tubeSegments * Math.PI * 2;
+        const radial = Math.cos(v);
+        vertices.push([
+          Math.cos(u) * (rx + tubeXZ * radial),
+          Math.sin(v) * tubeY,
+          Math.sin(u) * (rz + tubeXZ * radial)
+        ]);
+      }
+    }
+    for (let i = 0; i < majorSegments; i++) for (let j = 0; j < tubeSegments; j++) {
+      const nextI = (i + 1) % majorSegments, nextJ = (j + 1) % tubeSegments;
+      const a = i * tubeSegments + j + 1;
+      const b = i * tubeSegments + nextJ + 1;
+      const c = nextI * tubeSegments + nextJ + 1;
+      const d = nextI * tubeSegments + j + 1;
+      faces.push([a,b,d],[b,c,d]);
+    }
   } else if (shape === "sphere") {
     const rings = 5;
     const segments = 10;
@@ -202,10 +239,10 @@ export async function POST(request: NextRequest) {
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
-    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels and spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary forms, deliberate color blocking, aligned components, and grounded proportions. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Only these shapes are allowed. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Use all six shape types where appropriate. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
