@@ -52,6 +52,7 @@ assert.ok(api.includes("external runtime dependency"), "builder blocks external 
 assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview is sequential");
 assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly rejects placeholder games");
 assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
+assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract teaches the model how to consume real Forge assets");
 assert.ok(prompts.includes("local couch multiplayer"), "game builder contract distinguishes local and online multiplayer");
 assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
