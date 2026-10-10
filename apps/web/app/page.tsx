@@ -1104,7 +1104,68 @@ export default function Home() {
     setPackageProgress(0);
     try {
     const zip = new JSZip();
-    Object.entries(project.files).forEach(([path, source]) => zip.file(exportProjectPath(path, project.kind || "game"), source));
+    const projectKind = project.kind || "game";
+    const cssName = projectKind === "app" ? "styles.css" : "game.css";
+    const jsName = projectKind === "app" ? "app.js" : "game.js";
+    const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
+    const projectTitle = project.plan?.title || project.name || "GENE project";
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName);
+    Object.entries(project.files).forEach(([path, source]) => {
+      if (path === "game.html") return;
+      zip.file(exportProjectPath(path, projectKind), source);
+    });
+    zip.file("source/game.html", project.files["game.html"] || "");
+    zip.file("index.html", mainHtml);
+    const webManifest = {
+      name: projectTitle, short_name: projectTitle.slice(0, 24),
+      description: project.plan?.summary || project.initialPrompt || projectTitle,
+      start_url: "./index.html", scope: "./", display: "standalone",
+      background_color: "#101411", theme_color: "#101411",
+      icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }]
+    };
+    const registerSource = "'use strict'; if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function () {}); }); }";
+    const serviceWorkerSource = "'use strict'; const CACHE='gene-" + project.id.replace(/[^a-z0-9-]/gi, "").slice(0, 40) + "-v1'; const FILES=['./','./index.html','./" + cssName + "','./" + jsName + "','./" + specName + "','./manifest.webmanifest','./icon.svg','./pwa-register.js']; self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.filter(Boolean))).then(()=>self.skipWaiting()))); self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('gene-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))); self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==location.origin)return;e.respondWith(caches.match(e.request).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));}return r;}).catch(()=>caches.match('./index.html'))));});";
+    const iconSource = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#101411"/><path d="M91 32A43 43 0 1 0 99 83H70V67h48v10A56 56 0 1 1 105 23z" fill="#77e0a2"/><circle cx="64" cy="64" r="11" fill="#f1f7f3"/></svg>';
+    zip.file("manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("service-worker.js", serviceWorkerSource);
+    zip.file("pwa-register.js", registerSource);
+    zip.file("icon.svg", iconSource);
+    const safePackageName = (project.name || "gene-project").toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 48) || "gene-project";
+    const desktopPackage = {
+      name: safePackageName + "-desktop", version: "1.0.0", private: true, description: projectTitle,
+      main: "main.cjs",
+      scripts: { start: "electron .", "dist:win": "electron-builder --win nsis", "dist:mac": "electron-builder --mac", "dist:linux": "electron-builder --linux" },
+      devDependencies: { electron: "^35.0.0", "electron-builder": "^26.0.0" },
+      build: { appId: "studio.gene.generated", productName: projectTitle.slice(0, 80), files: ["main.cjs", "app/**/*"], directories: { output: "dist" }, win: { target: ["nsis"] }, mac: { target: ["dmg"] }, linux: { target: ["AppImage"] } }
+    };
+    zip.file("desktop-wrapper/package.json", JSON.stringify(desktopPackage, null, 2));
+    zip.file("desktop-wrapper/main.cjs", "'use strict'; const {app,BrowserWindow}=require('electron'); const path=require('node:path'); function createWindow(){const win=new BrowserWindow({width:1280,height:800,minWidth:800,minHeight:560,backgroundColor:'#101411',autoHideMenuBar:true,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); win.loadFile(path.join(__dirname,'app','index.html'));} app.whenReady().then(()=>{createWindow();app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});}); app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});");
+    zip.file("desktop-wrapper/README.md", "# Desktop EXE/installer source kit\n\n1. Install Node.js LTS on the build computer.\n2. Open a terminal in this folder and run npm install.\n3. On Windows run npm run dist:win; on macOS run npm run dist:mac; on Linux run npm run dist:linux.\n4. Find the installer or app image in dist/.\n\nThis kit contains the Electron wrapper and project source. It is not a precompiled EXE; the platform packaging toolchain must run on a suitable computer.");
+    const androidPackage = {
+      name: safePackageName + "-android", version: "1.0.0", private: true,
+      scripts: { "android:init": "cap add android", "android:sync": "cap sync android", "android:open": "cap open android" },
+      dependencies: { "@capacitor/android": "^7.0.0", "@capacitor/core": "^7.0.0" },
+      devDependencies: { "@capacitor/cli": "^7.0.0" }
+    };
+    zip.file("android-wrapper/package.json", JSON.stringify(androidPackage, null, 2));
+    zip.file("android-wrapper/capacitor.config.json", JSON.stringify({ appId: "studio.gene.generated", appName: projectTitle.slice(0, 80), webDir: "www", bundledWebRuntime: false }, null, 2));
+    zip.file("android-wrapper/README.md", "# Android APK source kit\n\n1. Install Node.js LTS and Android Studio with the Android SDK.\n2. Run npm install, then npm run android:init and npm run android:sync.\n3. Open Android Studio with npm run android:open, select Build > Build APK(s), and retrieve the APK from the Android project output.\n\nThis is a Capacitor wrapper project, not a precompiled APK. Android SDK signing/build steps require a configured Android toolchain.");
+    zip.file("android-wrapper/www/index.html", mainHtml);
+    zip.file("android-wrapper/www/" + cssName, project.files["game.css"] || "");
+    zip.file("android-wrapper/www/" + jsName, project.files["game.js"] || "");
+    zip.file("android-wrapper/www/" + specName, project.files["game-spec.json"] || "{}");
+    zip.file("android-wrapper/www/manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("android-wrapper/www/service-worker.js", serviceWorkerSource);
+    zip.file("android-wrapper/www/pwa-register.js", registerSource);
+    zip.file("android-wrapper/www/icon.svg", iconSource);
+    zip.file("desktop-wrapper/app/index.html", mainHtml);
+    zip.file("desktop-wrapper/app/" + cssName, project.files["game.css"] || "");
+    zip.file("desktop-wrapper/app/" + jsName, project.files["game.js"] || "");
+    zip.file("desktop-wrapper/app/" + specName, project.files["game-spec.json"] || "{}");
+    zip.file("desktop-wrapper/app/manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("desktop-wrapper/app/service-worker.js", serviceWorkerSource);
+    zip.file("desktop-wrapper/app/pwa-register.js", registerSource);
+    zip.file("desktop-wrapper/app/icon.svg", iconSource);
     (project.references || []).forEach(ref => {
       const safeName = ref.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120) || "reference";
       if (ref.kind === "image" && ref.dataBase64) zip.file("references/" + safeName, ref.dataBase64, { base64: true });
@@ -1112,7 +1173,12 @@ export default function Home() {
     });
     project.versions.forEach(version => {
       const prefix = "versions/" + String(version.number).padStart(3, "0") + "/";
-      Object.entries(version.files).forEach(([path, source]) => zip.file(prefix + exportProjectPath(path, project.kind || "game"), source));
+      Object.entries(version.files).forEach(([path, source]) => {
+        if (path === "game.html") return;
+        zip.file(prefix + exportProjectPath(path, projectKind), source);
+      });
+      zip.file(prefix + "source/game.html", version.files["game.html"] || "");
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
@@ -1134,8 +1200,8 @@ export default function Home() {
       "",
       "Initial request: " + project.initialPrompt,
       "",
-      "Important: download is source packaging, not a platform-specific EXE build."
-    ].join("\\n"));
+      "The root index.html is a standalone web/PWA package. desktop-wrapper contains an Electron installer project and android-wrapper contains a Capacitor project for generating an APK with Android Studio. Compiled EXE/APK binaries are not generated inside this browser session; run the included platform build steps."
+    ].join("\n"));
     const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, metadata => setPackageProgress(Math.max(0, Math.min(100, Math.round(metadata.percent)))));
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
