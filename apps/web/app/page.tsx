@@ -1409,7 +1409,7 @@ export default function Home() {
           </div>
         </header>
 
-        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { void navigator.clipboard?.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
+        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
 
         <div className="workspace">
           <section className="conversation-panel">
