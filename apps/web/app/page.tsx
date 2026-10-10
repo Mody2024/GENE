@@ -80,7 +80,7 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
   return mapped;
 }
 
-function standaloneDocument(source: string, title: string, cssName: string, jsName: string) {
+function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "") {
   const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
   const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
   let body = bodyMatch ? bodyMatch[1] : source
@@ -1109,7 +1109,7 @@ export default function Home() {
     const jsName = projectKind === "app" ? "app.js" : "game.js";
     const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
     const projectTitle = project.plan?.title || project.name || "GENE project";
-    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName);
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
     Object.entries(project.files).forEach(([path, source]) => {
       if (path === "game.html") return;
       zip.file(exportProjectPath(path, projectKind), source);
@@ -1178,7 +1178,7 @@ export default function Home() {
         zip.file(prefix + exportProjectPath(path, projectKind), source);
       });
       zip.file(prefix + "source/game.html", version.files["game.html"] || "");
-      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName));
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files)));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
