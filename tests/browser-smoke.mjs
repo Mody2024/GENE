@@ -133,7 +133,7 @@ try {
   await webglPage.close();
 
   // Check the first complete starter game with no Gemini API key configured.
-  const samplePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  const samplePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   samplePage.on("pageerror", error => fatalErrors.push("starter: " + error.message));
   const emptyProject = { ...fixture, id: "playwright-empty-start", name: "Empty starter", initialPrompt: "", mode: "plan", plan: null, files: {}, versions: [], activeFile: "game.js", messages: [{ id: "hello", role: "assistant", content: "Test", createdAt: new Date().toISOString() }] };
   await samplePage.addInitScript(({ project, storageKey, activeKey }) => { localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
@@ -142,6 +142,8 @@ try {
   const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
   await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
   await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
+  await samplePage.getByTitle("Open live preview").click();
+  await samplePage.locator(".preview-panel.expanded").waitFor({ state: "visible", timeout: 5_000 });
   await sampleFrame.locator("#start-button").click();
   await sampleFrame.locator("#game-message").waitFor({ state: "hidden", timeout: 5_000 });
   const startedState = await sampleFrame.locator("body").evaluate(() => new Promise(resolve => {
@@ -155,17 +157,21 @@ try {
   }));
   assert.ok(startedState?.started, "starter start button should transition the game into its running state; state=" + JSON.stringify(startedState));
   const sampleBefore = startedState.x;
-  const starterCanvas = sampleFrame.locator("#game-canvas");
-  await starterCanvas.focus();
-  for (let i = 0; i < 8; i++) await starterCanvas.press("ArrowRight");
-  await samplePage.waitForTimeout(150);
+  const rightControl = sampleFrame.locator('[data-dir="right"]');
+  await rightControl.waitFor({ state: "visible", timeout: 5_000 });
+  const rightBox = await rightControl.boundingBox();
+  assert.ok(rightBox, "mobile right-direction control should have a visible hit area");
+  await samplePage.mouse.move(rightBox.x + rightBox.width / 2, rightBox.y + rightBox.height / 2);
+  await samplePage.mouse.down();
+  await samplePage.waitForTimeout(350);
+  await samplePage.mouse.up();
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
-  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter starts and responds to keyboard movement; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
+  assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter's on-screen movement control should move the player; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
-  await samplePage.close();
+
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mobilePage.addInitScript(({ project, storageKey, activeKey }) => {
     if (window.top !== window.self) return;
