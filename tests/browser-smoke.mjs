@@ -92,6 +92,47 @@ try {
   const afterX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
   assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game's player position");
 
+  // Verify local couch multiplayer routes keyboard input to the correct player only.
+  const multiplayerFixture = {
+    ...fixture,
+    id: "playwright-local-multiplayer",
+    name: "Playwright Local Multiplayer",
+    initialPrompt: "A 2-player local multiplayer arena with independent WASD and arrow-key controls.",
+    plan: {
+      ...fixture.plan,
+      title: "Playwright Local Multiplayer",
+      tasks: ["Render two players", "Route independent controls", "Keep both players visible"],
+      mechanics: ["Two independent player states", "WASD for player one", "Arrow keys for player two"]
+    },
+    files: {
+      "game.html": '<main class="game-shell"><canvas id="game-canvas" width="800" height="480" tabindex="0" aria-label="Local multiplayer test arena"></canvas><div class="game-hud"><b>LOCAL MULTIPLAYER</b><span>PLAYER 1 · WASD</span><span>PLAYER 2 · ARROWS</span></div></main>',
+      "game.css": '.game-shell{position:relative;width:100vw;height:100vh;background:#101827;color:white;font:14px Arial}#game-canvas{width:100%;height:100%;display:block;outline:none}.game-hud{position:absolute;top:16px;left:16px;right:16px;display:flex;gap:24px;pointer-events:none}',
+      "game.js": '(function(){const c=document.getElementById("game-canvas"),ctx=c.getContext("2d");const p=[{x:220,y:240,color:"#6de5b1"},{x:580,y:240,color:"#ffb86c"}];window.__geneLocalMultiState={players:p.map(q=>({x:q.x,y:q.y})),frames:0};function draw(){ctx.fillStyle="#101827";ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle="#26384b";for(let x=0;x<c.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke()}for(let y=0;y<c.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke()}p.forEach((q,i)=>{ctx.fillStyle=q.color;ctx.beginPath();ctx.arc(q.x,q.y,20,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 12px Arial";ctx.fillText("P"+(i+1),q.x-8,q.y+4)});window.__geneLocalMultiState={players:p.map(q=>({x:q.x,y:q.y})),frames:window.__geneLocalMultiState.frames+1};requestAnimationFrame(draw)}window.addEventListener("keydown",e=>{const k=e.key.toLowerCase();if(["w","a","s","d","arrowup","arrowleft","arrowdown","arrowright"].includes(k))e.preventDefault();if(k==="w")p[0].y-=12;if(k==="s")p[0].y+=12;if(k==="a")p[0].x-=12;if(k==="d")p[0].x+=12;if(k==="arrowup")p[1].y-=12;if(k==="arrowdown")p[1].y+=12;if(k==="arrowleft")p[1].x-=12;if(k==="arrowright")p[1].x+=12;p.forEach(q=>{q.x=Math.max(22,Math.min(778,q.x));q.y=Math.max(22,Math.min(458,q.y))})});draw()})();',
+      "game-spec.json": JSON.stringify({title:"Playwright Local Multiplayer",genre:"local multiplayer arena",engine:"canvas2d",mechanics:["Independent player states","Shared arena"],controls:["Player 1: WASD","Player 2: Arrow keys"],objective:"Verify two players can move independently.",winCondition:"Both player input paths are active.",lossCondition:"This fixture tests input routing only.",performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:2,maxParticles:0}},null,2)
+    }
+  };
+  const multiPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  multiPage.on("pageerror", error => fatalErrors.push("multiplayer: " + error.message));
+  await multiPage.addInitScript(({ project, storageKey, activeKey }) => {
+    if (window.top !== window.self) return;
+    localStorage.setItem(storageKey, JSON.stringify([project]));
+    localStorage.setItem(activeKey, project.id);
+  }, { project: multiplayerFixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  await multiPage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30000 });
+  const multiFrame = multiPage.frameLocator('iframe[title="GENE live game preview"]');
+  await multiFrame.locator("#game-canvas").waitFor({ timeout: 10000 });
+  await multiFrame.locator("#game-canvas").click();
+  await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
+  const multiBefore = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
+  await multiPage.keyboard.press("d");
+  const afterP1 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
+  assert.ok(afterP1[0].x > multiBefore[0].x && afterP1[1].x === multiBefore[1].x, "Player 1 input must not move Player 2");
+  await multiPage.keyboard.press("ArrowLeft");
+  const afterP2 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
+  assert.ok(afterP2[1].x < afterP1[1].x && afterP2[0].x === afterP1[0].x, "Player 2 input must not move Player 1");
+  assert.equal(await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.length), 800 * 480 * 4, "multiplayer arena renders a full canvas");
+  await multiPage.close();
+
   const themeBefore = await page.locator("html").getAttribute("data-theme");
   await page.getByTitle("Switch theme").click();
   const themeAfter = await page.locator("html").getAttribute("data-theme");
