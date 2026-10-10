@@ -323,7 +323,7 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKeys = getGeminiKeys();
-  if (apiKeys.length === 0) {
+  if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
     const answers = body.answers || {};
     const known = Object.keys(answers);
     if (body.operation === "interview" && known.length === 0) {
@@ -404,10 +404,10 @@ export async function POST(request: NextRequest) {
   let attempts = 0;
   let outputFailure: "truncated" | "malformed" | null = null;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
-  const queued: Array<{ key: string; model: string; fallback: boolean }> = [
+  const queued: Array<{ key: string; model: string; fallback: boolean }> = apiKeys.length ? [
     { key: apiKeys[0], model, fallback: false }
-  ];
-  const queuedIds = new Set<string>([apiKeys[0] + "|" + model]);
+  ] : [];
+  const queuedIds = new Set<string>(apiKeys.length ? [apiKeys[0] + "|" + model] : []);
   const enqueue = (key: string, candidateModel: string, fallback: boolean) => {
     const id = key + "|" + candidateModel;
     if (!queuedIds.has(id) && queued.length < 8) {
