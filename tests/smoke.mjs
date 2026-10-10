@@ -12,6 +12,11 @@ const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
 const publishApi = read("apps/web/app/api/publish/route.ts");
+const buildApi = read("apps/web/app/api/builds/route.ts");
+const buildStatusApi = read("apps/web/app/api/builds/[buildId]/route.ts");
+const buildWorkflow = read(".github/workflows/cloud-build.yml");
+const buildHelper = read("scripts/cloud-build.mjs");
+const buildUpload = read("scripts/upload-cloud-output.mjs");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
@@ -275,5 +280,16 @@ assert.ok(page.includes("manifest.webmanifest") && page.includes("service-worker
 assert.ok(page.includes("expanded-live-editor") && page.includes("Apply edit"), "fullscreen live preview supports chat-driven edits without closing the preview");
 assert.ok(page.includes("<GeneMark />") && css.includes(".gene-logo-svg"), "the UI uses the new custom geometric GENE mark");
 assert.ok(health.includes("GROQ_API_KEY") && health.includes("OPENROUTER_API_KEY") && health.includes("publishConfigured"), "health status detects alternate AI providers and publish setup");
+
+
+assert.ok(buildApi.includes("aes-256-gcm") && buildApi.includes("GENE_BUILD_ENCRYPTION_KEY") && buildApi.includes("timingSafeEqual"), "cloud build source is encrypted and password protected");
+assert.ok(buildApi.includes("GENE_BUILD_RATE_LIMIT") && buildApi.includes("MAX_BYTES = 3_000_000"), "cloud build submissions have request limits");
+assert.ok(buildStatusApi.includes("cloud-build.yml/runs") && buildStatusApi.includes(".result.json"), "workspace can poll real GitHub Actions cloud build status");
+assert.ok(buildWorkflow.includes("runs-on: windows-latest") && buildWorkflow.includes("assembleDebug") && buildWorkflow.includes("electron-builder"), "cloud workers compile Windows installers and Android APKs with real platform toolchains");
+assert.ok(buildWorkflow.includes("BLOB_READ_WRITE_TOKEN") && buildWorkflow.includes("publish-result"), "cloud workers publish direct artifact links and report completion");
+assert.ok(buildHelper.includes("aes-256-gcm") && buildHelper.includes("prepareElectron") && buildHelper.includes("prepareAndroid"), "cloud helper decrypts source safely and prepares desktop/mobile wrappers");
+assert.ok(buildUpload.includes("from \"@vercel/blob\"") && buildUpload.includes("access: \"public\""), "binary upload helper returns direct Vercel Blob download URLs");
+assert.ok(page.includes('fetch("/api/builds"') && page.includes('fetch("/api/builds/" + id') && page.includes("binaryBuildLinks"), "workspace submits cloud builds, polls progress, and displays direct binary links");
+assert.ok(css.includes(".binary-build-button") && css.includes(".binary-build-result"), "cloud build UI is styled for desktop and mobile");
 
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
