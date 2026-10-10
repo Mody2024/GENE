@@ -321,22 +321,107 @@ export default function Home() {
       if (operation === "plan") addActivity("Generating an implementation plan");
       if (operation === "build" || operation === "surprise") addActivity("Requesting " + (nextProject.kind === "app" ? "web app" : "game") + " source files from the model");
       if (operation === "edit") addActivity("Reading current project source and applying a targeted edit");
-      const response = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation,
-          mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
-          message: prompt,
-          model: aiModel,
-          thinking: nextProject.thinking,
-          project: nextProject,
-          history: nextProject.messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
-          answers: nextAnswers
-        })
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
+      let payload: any;
+      let responseOk = true;
+      const baseRequest = {
+        mode: operation === "build" || operation === "edit" || operation === "surprise" || operation === "buildPart" ? "build" : nextProject.mode,
+        model: aiModel,
+        thinking: nextProject.thinking,
+        history: nextProject.messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
+        answers: nextAnswers
+      };
+      if (operation === "build" || operation === "surprise") {
+        // Generate small, independently validated files rather than asking Gemini
+        // to fit an entire project into one large JSON response.
+        const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
+        const stagedFiles: Record<string, string> = { ...nextProject.files };
+        let stagedPlan = nextProject.plan || null;
+        let modelUsed = aiModel;
+        for (let index = 0; index < stagePaths.length; index++) {
+          const stagePath = stagePaths[index];
+          addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
+          const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
+          const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
+            "Original request: " + prompt + ". " +
+            (index === 0
+              ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
+              : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.");
+          const stageResponse = await fetch("/api/agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...baseRequest,
+              operation: "buildPart",
+              stagePath,
+              message: stageMessage,
+              project: stageProject
+            })
+          });
+          const stagePayload = await stageResponse.json().catch(() => null);
+          if (!stageResponse.ok || !stagePayload?.ok) {
+            payload = stagePayload || { ok: false, error: { message: "Build stage " + (index + 1) + " failed before returning a valid response." } };
+            responseOk = false;
+            addActivity("Build stage failed: " + stagePath);
+            break;
+          }
+          const stageResult = stagePayload.result as AgentResponse;
+          const file = (stageResult.files || []).find(item => item.path === stagePath);
+          if (!file) {
+            payload = { ok: false, error: { message: "Build stage " + (index + 1) + " did not return " + stagePath + ". No generated files were saved." } };
+            responseOk = false;
+            break;
+          }
+          stagedFiles[stagePath] = file.content;
+          if (stageResult.plan) stagedPlan = stageResult.plan;
+          modelUsed = stagePayload.model || modelUsed;
+          addActivity("Validated stage file " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+        }
+        if (responseOk) {
+          addActivity("Checking assembled project contract and source files");
+          const validateResponse = await fetch("/api/agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...baseRequest,
+              operation: "validateBuild",
+              message: "Validate assembled staged project",
+              project: { ...nextProject, files: stagedFiles, plan: stagedPlan }
+            })
+          });
+          const validationPayload = await validateResponse.json().catch(() => null);
+          if (!validateResponse.ok || !validationPayload?.ok) {
+            payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation." } };
+            responseOk = false;
+          } else {
+            payload = {
+              ok: true,
+              aiMode: "gemini",
+              model: modelUsed,
+              result: {
+                reply: "Built the first playable version in four small stages and validated the assembled project. Add advanced features through targeted chat edits.",
+                plan: stagedPlan,
+                files: stagePaths.map(path => ({ path, content: stagedFiles[path] })),
+                complete: true,
+                needsUserDecision: false
+              }
+            };
+          }
+        }
+      } else {
+        const response = await fetch("/api/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...baseRequest,
+            operation,
+            message: prompt,
+            project: nextProject
+          })
+        });
+        payload = await response.json().catch(() => null);
+        responseOk = response.ok;
+      }
+      if (!responseOk || !payload?.ok) {
         const error = payload?.error?.message || "GENE could not complete the request.";
         addActivity("Request failed: " + error);
         const failed = { ...nextProject, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
