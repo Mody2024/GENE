@@ -331,22 +331,19 @@ export async function POST(request: NextRequest) {
     imageCount += 1;
   }
 
-  let response: Response | null = null;
   let payload: any = null;
+  let successfulModel = model;
   let lastFailure = { status: 502, detail: "Gemini request did not complete." };
   let attempts = 0;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const attemptPlan: Array<{ key: string; model: string }> = [];
-  // First rotate across distinct configured keys using the preferred model. This
-  // helps only when keys belong to projects with independent available quota.
   for (const key of apiKeys.slice(0, 3)) attemptPlan.push({ key, model });
-  // Capacity errors can be model-specific. Add low-cost stable fallbacks after
-  // the primary-key attempts, while keeping the total bounded by the function timeout.
   for (const fallbackModel of fallbackModels.slice(1)) {
     if (attemptPlan.length >= 5) break;
     attemptPlan.push({ key: apiKeys[0], model: fallbackModel });
   }
 
+  let succeeded = false;
   for (const attempt of attemptPlan) {
     attempts += 1;
     try {
@@ -368,47 +365,26 @@ export async function POST(request: NextRequest) {
       });
       const candidatePayload = await candidate.json().catch(() => null);
       if (candidate.ok) {
-        response = candidate;
         payload = candidatePayload;
-        (globalThis as any).__geneLastSuccessfulModel = attempt.model;
+        successfulModel = attempt.model;
+        succeeded = true;
         break;
       }
-      const detail = candidatePayload?.error?.message || ("Gemini returned HTTP " + candidate.status);
-      lastFailure = { status: candidate.status, detail };
-      // Do not spend more calls on a hard client/request error. Key errors may
-      // recover with another key, and capacity/quota failures may recover by failover.
+      lastFailure = {
+        status: candidate.status,
+        detail: candidatePayload?.error?.message || ("Gemini returned HTTP " + candidate.status)
+      };
       if (!isRetryableStatus(candidate.status) && candidate.status !== 401 && candidate.status !== 403) break;
     } catch (error) {
       lastFailure = { status: 502, detail: error instanceof Error ? error.message : "Network request failed." };
     }
   }
 
-  if (!response || !payload) {
+  if (!succeeded || !payload) {
     const failure = describeGeminiFailure(lastFailure.status, lastFailure.detail, attempts);
     const status = failure.code === "GEMINI_QUOTA_EXHAUSTED" ? 429 : failure.code === "GEMINI_KEY_REJECTED" ? 502 : 503;
     return jsonError(failure.message, status, failure.code);
   }
-
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: body.operation === "interview" ? 0.35 : 0.25,
-          maxOutputTokens: body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 16_384 : 4_096,
-          thinkingConfig: { thinkingLevel }
-        },
-        ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
-      }),
-      signal: AbortSignal.timeout(55_000)
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Network request failed.";
-    return jsonError("Could not reach Gemini: " + message + ". No files were changed.", 502, "GEMINI_NETWORK_ERROR");
-  }
-
 
   const text = payload?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("\n") || "";
   if (!text.trim()) return jsonError("Gemini returned an empty response. No files were changed.", 502, "GEMINI_EMPTY_RESPONSE");
@@ -469,5 +445,5 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
-  return NextResponse.json({ ok: true, aiMode: "gemini", model: (globalThis as any).__geneLastSuccessfulModel || model, result });
+  return NextResponse.json({ ok: true, aiMode: "gemini", model: successfulModel, result });
 }
