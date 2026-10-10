@@ -67,3 +67,37 @@ The Publish action creates a static Vercel deployment only when these server-sid
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+
+## Real cloud EXE/APK builder
+
+The workspace has a one-click cloud packaging path backed by GitHub Actions:
+- Windows workers use Electron Builder on a real Windows runner to compile a Windows installer (.exe).
+- Linux workers provision Java and the Android SDK, then compile a real Capacitor Android debug APK (.apk).
+- GENE sends only an AES-256-GCM encrypted source bundle to a temporary gene-build-* branch. The shared encryption key is never stored in the source repository. Old encrypted source branches are cleaned up after seven days.
+- Build state and direct binary URLs are returned to the workspace. The resulting binary URLs are served from Vercel Blob and can be downloaded without manually extracting a ZIP.
+
+### One-time cloud setup
+
+1. In Vercel, create a Blob store for the gene-flash project and copy its read/write token.
+2. Create a fine-grained GitHub personal access token limited to this repository, with **Contents: Read and write** and **Actions: Read and write**. Store it only in Vercel as GENE_BUILD_GITHUB_TOKEN.
+3. Generate one 32-byte encryption key, for example with Node.js: <code>node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code>.
+4. Add these Vercel Production environment variables, then redeploy:
+   - GENE_BUILD_GITHUB_TOKEN: the fine-grained repository token from step 2.
+   - GENE_BUILD_PASSWORD: a strong private password used to authorize cloud build requests in the workspace.
+   - GENE_BUILD_ENCRYPTION_KEY: the base64 key from step 3.
+   - GENE_BUILD_REPOSITORY: Mody2024/GENE (optional; this is the default).
+5. In **GitHub → Mody2024/GENE → Settings → Secrets and variables → Actions**, add:
+   - GENE_BUILD_ENCRYPTION_KEY: exactly the same key as in Vercel.
+   - BLOB_READ_WRITE_TOKEN: the Vercel Blob read/write token from step 1.
+6. Ensure GitHub Actions are enabled for the repository. Use the workspace's **Build setup** button to check whether Vercel-side configuration is detected.
+
+### Output and security notes
+
+- Build inputs are limited to 100 files and 3 MB of source, with path traversal checks. Do not embed large images/audio/video as data URLs; keep the project lightweight.
+- Build source is encrypted before it is committed to a temporary branch. Temporary encrypted source and status branches are deleted after seven days.
+- Direct artifact URLs use a public Vercel Blob store: anyone who obtains a URL can download that project's EXE/APK. Treat the links as shareable and do not build confidential projects unless this visibility is acceptable.
+- Android output is a **debug-signed APK** suitable for testing and direct installation. Google Play releases require a release keystore, package identity, and release signing configuration.
+- Windows output is a compiled Electron installer, not a signed Windows publisher binary. SmartScreen may warn until it is signed with a trusted code-signing certificate.
+- Cloud builds use GitHub Actions minutes, Vercel Blob storage/bandwidth, and dependency downloads. Free quotas may limit how many projects can be built.
+- This build route packages web apps/games as Electron/Capacitor shells. It is not a Unity/Godot/Unreal native project compiler.

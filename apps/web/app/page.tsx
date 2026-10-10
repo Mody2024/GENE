@@ -115,6 +115,12 @@ export default function Home() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
+  const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
+  const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
+  const [binaryBuildConfigured, setBinaryBuildConfigured] = useState(false);
+  const [binaryBuildId, setBinaryBuildId] = useState("");
+  const [binaryBuildRunUrl, setBinaryBuildRunUrl] = useState("");
+  const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string }> | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [publishConfigured, setPublishConfigured] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -172,6 +178,7 @@ export default function Home() {
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
       setPublishConfigured(Boolean(d.publishConfigured));
+      setBinaryBuildConfigured(Boolean(d.binaryBuildConfigured));
       if (d.model) setAiModel(d.model);
     }).catch(() => setApiReady(false));
   }, []);
@@ -1213,6 +1220,87 @@ export default function Home() {
     }
   }
 
+  async function buildBinary(targets: "both" | "windows" | "android") {
+    if (!project || !hasGame || binaryBuildBusy || busy) return;
+    if (!binaryBuildConfigured) {
+      setNotice("To enable real EXE/APK builds, configure GENE_BUILD_GITHUB_TOKEN, GENE_BUILD_ENCRYPTION_KEY, and GENE_BUILD_PASSWORD in Vercel, plus GENE_BUILD_ENCRYPTION_KEY and BLOB_READ_WRITE_TOKEN in GitHub Actions secrets. See the cloud builder setup instructions in the GENE repository README.");
+      return;
+    }
+    const buildPassword = window.prompt("Enter the cloud build password configured as GENE_BUILD_PASSWORD in Vercel.");
+    if (!buildPassword) return;
+    setBinaryBuildBusy(true);
+    setBinaryBuildLinks(null);
+    setBinaryBuildId("");
+    setBinaryBuildRunUrl("");
+    setNotice("Preparing a standalone build and securely submitting the source…");
+    try {
+      const projectKind = project.kind || "game";
+      const cssName = projectKind === "app" ? "styles.css" : "game.css";
+      const jsName = projectKind === "app" ? "app.js" : "game.js";
+      const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
+      const title = project.plan?.title || project.name || "GENE Project";
+      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+      const manifest = {
+        name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
+        start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
+        icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }]
+      };
+      const icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#101411"/><path d="M91 32A43 43 0 1 0 99 83H70V67h48v10A56 56 0 1 1 105 23z" fill="#77e0a2"/><circle cx="64" cy="64" r="11" fill="#f1f7f3"/></svg>';
+      const files: Array<{ path: string; content: string }> = [
+        { path: "index.html", content: mainHtml },
+        { path: cssName, content: project.files["game.css"] || "" },
+        { path: jsName, content: project.files["game.js"] || "" },
+        { path: specName, content: project.files["game-spec.json"] || "{}" },
+        { path: "manifest.webmanifest", content: JSON.stringify(manifest, null, 2) },
+        { path: "icon.svg", content: icon }
+      ];
+      for (const [path, content] of Object.entries(project.files)) {
+        if (path === "game.html" || ["game.css", "game.js", "game-spec.json"].includes(path)) continue;
+        files.push({ path: exportProjectPath(path, projectKind), content });
+      }
+      setNotice("Submitting encrypted source. GitHub Actions will compile a real Windows installer and/or Android APK…");
+      const response = await fetch("/api/builds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-gene-build-password": buildPassword },
+        body: JSON.stringify({ title, projectId: project.id, targets, files })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !payload.buildId) {
+        throw new Error(payload?.error?.message || "The cloud builder rejected this project.");
+      }
+      const id = String(payload.buildId);
+      setBinaryBuildId(id);
+      addActivity("Cloud binary build queued: " + id + " (" + targets + ")");
+      setNotice("Build " + id.slice(0, 8) + " queued. Preparing the real " + (targets === "both" ? "EXE and APK" : targets === "windows" ? "Windows EXE" : "Android APK") + " on cloud build machines…");
+      let finalReport: any = null;
+      for (let attempt = 0; attempt < 240; attempt++) {
+        await new Promise(resolve => window.setTimeout(resolve, 5000));
+        const statusResponse = await fetch("/api/builds/" + id, { cache: "no-store" });
+        const status = await statusResponse.json().catch(() => null);
+        if (!statusResponse.ok || !status?.ok) throw new Error(status?.error?.message || "Could not read cloud build status. Build ID: " + id);
+        if (status.state === "success" || status.state === "partial" || status.state === "failed") {
+          finalReport = status;
+          break;
+        }
+        const seconds = (attempt + 1) * 5;
+        setNotice("Cloud build " + id.slice(0, 8) + " · " + status.state + " · " + Math.floor(seconds / 60) + "m " + String(seconds % 60).padStart(2, "0") + "s elapsed. Compilers are running; keep this tab open.");
+      }
+      if (!finalReport) throw new Error("The build is still running after 20 minutes. Build ID: " + id + ". You can retry status checking using this ID.");
+      const links = finalReport.targets || {};
+      setBinaryBuildLinks(links);
+      setBinaryBuildRunUrl(String(finalReport.runUrl || ""));
+      const ready = Object.entries(links).filter(([, target]: [string, any]) => target?.status === "success" && target?.url).length;
+      addActivity("Cloud binary build " + finalReport.state + ": " + id);
+      if (finalReport.state === "success") setNotice("Build complete. GENE produced real downloadable binary files. Android output is debug-signed for device installation.");
+      else if (ready) setNotice("Some outputs built successfully. Download the available file below; open the build log for the failed target.");
+      else setNotice("Cloud build failed. Open the GitHub Actions run to inspect compiler logs, then retry after fixing the reported issue.");
+    } catch (error) {
+      setNotice("Cloud binary build error: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setBinaryBuildBusy(false);
+    }
+  }
+
   async function downloadProject() {
     if (!project || packageProgress !== null) return;
     setPackageProgress(0);
@@ -1406,12 +1494,26 @@ export default function Home() {
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
              <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
+            <select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select>
+            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
             <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
 
         {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
 
+        {binaryBuildLinks && <div className="binary-build-result" role="status">
+          <div className="binary-build-result-heading"><strong>Cloud build results</strong><span>{binaryBuildId ? binaryBuildId.slice(0, 8) : ""}</span></div>
+          {binaryBuildRunUrl && <a className="binary-build-log-link" href={binaryBuildRunUrl} target="_blank" rel="noreferrer">Open detailed build logs ↗</a>}
+          <div className="binary-build-result-links">
+            {Object.entries(binaryBuildLinks).map(([target, item]) => <div className="binary-build-result-item" key={target}>
+              <span className={"binary-build-state " + (item.status === "success" && item.url ? "ready" : "failed")}>{item.status === "success" && item.url ? "Ready" : item.status === "skipped" ? "Not requested" : "Failed"}</span>
+              <span>{target === "windows" ? "Windows installer (.exe)" : "Android app (.apk)"}</span>
+              {item.url && item.status === "success" ? <a href={item.url} target="_blank" rel="noreferrer" download={item.filename || undefined}>Download {target === "windows" ? "EXE" : "APK"} ↓</a> : <span className="binary-build-muted">No artifact</span>}
+            </div>)}
+          </div>
+          <small>Windows output is an Electron installer. Android output is a debug-signed APK for testing and direct installation, not a Play Store release.</small>
+        </div>}
         <div className="workspace">
           <section className="conversation-panel">
             {section === "chat" && <>

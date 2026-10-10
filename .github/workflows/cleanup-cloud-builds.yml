@@ -1,0 +1,38 @@
+name: GENE Cloud Build Cleanup
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const prefix = 'gene-build-';
+            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            let page = 1;
+            let removed = 0;
+            while (page <= 10) {
+              const response = await github.rest.repos.listBranches({owner: context.repo.owner, repo: context.repo.repo, per_page: 100, page});
+              if (!response.data.length) break;
+              for (const branch of response.data) {
+                if (!branch.name.startsWith(prefix)) continue;
+                try {
+                  const commit = await github.rest.repos.getCommit({owner: context.repo.owner, repo: context.repo.repo, ref: branch.commit.sha});
+                  if (Date.parse(commit.data.commit.committer.date) < cutoff) {
+                    await github.rest.git.deleteRef({owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/' + branch.name});
+                    removed++;
+                  }
+                } catch (error) {
+                  core.warning('Could not clean ' + branch.name + ': ' + String(error.message || error));
+                }
+              }
+              if (response.data.length < 100) break;
+              page++;
+            }
+            core.info('Removed ' + removed + ' expired encrypted build workspaces.');

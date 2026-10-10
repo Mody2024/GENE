@@ -23,6 +23,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Check local agent syntax
         run: npm run check --workspace=@gene/local-agent
+      - name: Check cloud build helper syntax
+        run: node --check scripts/cloud-build.mjs && node --check scripts/upload-cloud-output.mjs
       - name: Run contract and local-agent end-to-end tests
         run: npm test
       - name: Install Playwright Chromium
