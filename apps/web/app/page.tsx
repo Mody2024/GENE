@@ -1002,6 +1002,7 @@ export default function Home() {
   if (!project) return <main className="boot"><div className="gene-mark">G</div><p>Opening your workspace…</p></main>;
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
+  const isApp = project.kind === "app";
   const isSyncedToLocal = Boolean(localAgentStatus === "connected" && lastSyncedUpdatedAt && lastSyncedUpdatedAt === project.updatedAt);
   const reportIsCurrent = Boolean(buildReport && buildReport.projectUpdatedAt === project.updatedAt && (buildReport.checkedDirty ? fileDirty && buildReport.checkedFile === project.activeFile && buildReport.checkedEditorContent === editedFile : !fileDirty));
   const activeMessages = project.messages;
