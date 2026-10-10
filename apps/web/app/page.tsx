@@ -85,8 +85,8 @@ function standaloneDocument(source: string, title: string, cssName: string, jsNa
   const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
   let body = bodyMatch ? bodyMatch[1] : source
     .replace(/<!doctype[^>]*>/gi, "")
-    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "")
-    .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, "");
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, "")
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
   body = body.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
   return '<!doctype html>\n<html lang="en">\n<head>\n' +
     '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' +
@@ -1149,7 +1149,7 @@ export default function Home() {
     };
     zip.file("android-wrapper/package.json", JSON.stringify(androidPackage, null, 2));
     zip.file("android-wrapper/capacitor.config.json", JSON.stringify({ appId: "studio.gene.generated", appName: projectTitle.slice(0, 80), webDir: "www", bundledWebRuntime: false }, null, 2));
-    zip.file("android-wrapper/README.md", "# Android APK source kit\n\n1. Install Node.js LTS and Android Studio with the Android SDK.\n2. Run npm install, then npm run android:init and npm run android:sync.\n3. Open Android Studio with npm run android:open, select Build > Build APK(s), and retrieve the APK from the Android project output.\n\nThis is a Capacitor wrapper project, not a precompiled APK. Android SDK signing/build steps require a configured Android toolchain.");
+    zip.file("android-wrapper/README.md", "# Android APK source kit\n\n1. Install Node.js LTS and Android Studio with the Android SDK.\n2. This kit already includes the project in www/. Run npm install, then npm run android:init and npm run android:sync.\n3. Open Android Studio with npm run android:open, select Build > Build APK(s), and retrieve the APK from the Android project output.\n\nThis is a Capacitor wrapper project, not a precompiled APK. Android SDK signing/build steps require a configured Android toolchain.");
     zip.file("android-wrapper/www/index.html", mainHtml);
     zip.file("android-wrapper/www/" + cssName, project.files["game.css"] || "");
     zip.file("android-wrapper/www/" + jsName, project.files["game.js"] || "");
