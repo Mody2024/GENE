@@ -13,6 +13,7 @@ const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
+const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
@@ -57,6 +58,9 @@ assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepa
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
 assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in browser storage");
 assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
+assert.ok(page.includes("buildRuntimeAssetBootstrap(project.files)"), "live game preview exposes generated model assets");
+assert.ok(playPage.includes("buildRuntimeAssetBootstrap(project?.files)"), "fullscreen play route exposes generated model assets");
+assert.ok(runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("window.__GENE_ASSETS__"), "asset runtime bridge has a size cap and explicit namespace");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
 assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
