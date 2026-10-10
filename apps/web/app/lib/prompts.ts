@@ -32,6 +32,7 @@ export const AGENT_SYSTEM = [
 
 export function makeAgentInput(input: {
   operation: "interview" | "plan" | "build" | "buildPart" | "edit" | "chat" | "surprise" | "research";
+  stagePath?: string;
   mode: Mode;
   message: string;
   project?: GeneProject | null;
@@ -41,6 +42,12 @@ export function makeAgentInput(input: {
 }) {
   const p = input.project;
   const projectKind = p?.kind === "app" ? "app" : "game";
+  const isStage = input.operation === "buildPart";
+  const stagePath = input.stagePath || "";
+  const fileBudget: Record<string, number> = { "game-spec.json": 7000, "game.html": 5000, "game.css": 7000, "game.js": 9000 };
+  const stageFiles = Object.fromEntries(Object.entries(p?.files || {})
+    .filter(([path]) => !isStage || (path !== stagePath && (path === "game-spec.json" || (stagePath === "game.js" && ["game.html", "game.css"].includes(path)))))
+    .map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 2500)]));
   const guide = projectKind === "game" ? selectGameGuide({
     message: input.message,
     initialPrompt: p?.initialPrompt,
@@ -57,7 +64,7 @@ export function makeAgentInput(input: {
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
     "EXISTING PLAN: " + JSON.stringify(p?.plan || null),
-    "CURRENT FILES: " + JSON.stringify(p?.files || {}),
+    "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : p?.files || {}),
     "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
       name: ref.name,
       mimeType: ref.mimeType,
@@ -65,7 +72,7 @@ export function makeAgentInput(input: {
       textContent: ref.kind === "text" ? (ref.textContent || "").slice(0, 16000) : undefined,
       imageAttached: ref.kind === "image"
     }))),
-    "RECENT CHAT: " + JSON.stringify((input.history || p?.messages?.map(m => ({role:m.role,content:m.content})) || []).slice(-12))
+    "RECENT CHAT: " + JSON.stringify((input.history || p?.messages?.map(m => ({role:m.role,content:m.content})) || []).slice(isStage ? -3 : -12).map(m => ({ role: m.role, content: String(m.content).slice(0, isStage ? 450 : 800) })))
   ];
   if (projectKind === "game" && /local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/i.test([input.message, p?.initialPrompt || "", p?.plan?.title || "", ...(p?.plan?.mechanics || [])].join("\\n"))) {
     parts.push("LOCAL MULTIPLAYER ACCEPTANCE CONTRACT: this is a core gameplay requirement, not a menu option. Create independent player objects with separate position/velocity/health/score/cooldowns and explicit input ownership. Default keyboard map: P1 WASD + F action; P2 arrow keys + Enter or Right Shift action. Poll Gamepad API once per frame and assign each connected gamepad to one player slot; do not mirror one controller to all players. Both players must update in the same simulation tick. Show both players at once, use distinct visual identities and player-specific HUD, and include start, pause/resume, win/loss, rematch and reset states. Test by pressing each player's controls independently, then both simultaneously, checking no state leaks between players. Preserve the requested engine, including 3D for 3D requests. Do not claim end-to-end validation until tests actually exercise it.");
@@ -80,5 +87,11 @@ export function makeAgentInput(input: {
   if (input.operation === "chat") parts.push("Speak naturally, like a capable coding partner. Answer ordinary questions directly using project context. If the user clearly asks for source changes, implement them in files rather than only describing them; do not turn every conversational question into a build plan.");
   if (input.operation === "research") parts.push("Research the user's question using live Google Search grounding results. Summarize useful findings for this game project and include source URLs/titles in the reply. Do not return source files or claim to have changed anything.");
   if (input.operation === "surprise") parts.push("Invent an original small browser game with a surprising central mechanic and immediately return a complete playable build. No questions.");
+  if (projectKind === "game" && input.operation !== "chat" && input.operation !== "research") parts.push(
+    "GENE 1.3 VISUAL FINISH CHECKLIST: Establish a consistent palette, clear silhouette hierarchy, intentional camera, controlled lighting, readable distance scale, coherent material families and a strong focal point. Prefer handcrafted composition over random primitives. Use bevel highlights, trim, layered forms, environment props with purpose, background depth and restrained particles. Make the HUD feel art-directed and match the game's world; use spacing and typography hierarchy rather than default boxes. Keep frame time stable and the first playable loop reliable. If 3D, build primary, secondary and tertiary model forms; vary proportions and surface materials; give each major object a distinctive silhouette. Avoid claiming rigging, high-resolution textures, realistic sculpting or imported assets that are not actually present."
+  );
+  if (input.operation === "buildPart") parts.push(
+    "STAGE CONTEXT BUDGET: The current files shown are intentionally limited to only dependencies needed by this stage. Follow the supplied project spec and user idea. Do not regenerate or explain other files. Keep this file compact enough to fit one complete JSON response; prioritize the playable loop and style signature over verbose comments, repeated helper code, or optional features."
+  );
   return parts.join("\n\n");
 }
