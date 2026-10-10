@@ -40,7 +40,7 @@ The generation path asks Gemini for the actual source files used by the preview.
 Use Node.js 20 or a newer supported LTS release for the web workspace.
 
 1. Copy `apps/web/.env.example` to `apps/web/.env.local`.
-2. Set `GEMINI_API_KEY`; optionally configure `GROQ_API_KEY` and/or `OPENROUTER_API_KEY` for cross-provider recovery. Never commit secrets.
+2. Set `GEMINI_API_KEY`; optionally configure `GROQ_API_KEY` and/or `OPENROUTER_API_KEY` for cross-provider recovery. Set `GENE_AI_REVIEW=true` to have a different configured provider independently review candidate code before validation (best effort, with extra quota/latency). Never commit secrets.
 3. From the repository root, run `npm install`.
 4. Run `npm run dev`.
 5. Open `http://localhost:3000`.
