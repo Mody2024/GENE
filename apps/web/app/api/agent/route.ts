@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return jsonError("Request body must be valid JSON."); }
 
-  const allowedOperations = ["interview", "plan", "build", "buildPart", "edit", "chat", "research", "surprise"];
+  const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise"];
   const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
@@ -241,6 +241,28 @@ export async function POST(request: NextRequest) {
   }
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
   if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
+
+  if (body.operation === "validateBuild") {
+    try {
+      const files = Object.entries(body.project?.files || {}).map(([path, content]) => ({ path, content: String(content) }));
+      const validated = validateFiles(files, "build", body.project?.plan?.engine, "build", projectKind);
+      return NextResponse.json({
+        ok: true,
+        aiMode: "validation",
+        result: {
+          reply: "Assembled project passed GENE's server-side source and project-contract validation.",
+          files: [],
+          plan: body.project?.plan || null,
+          complete: true,
+          needsUserDecision: false,
+          tests: { passed: ["Required project files present", "Project spec valid", "JavaScript syntax valid", "Runtime contract checks passed"], failed: [] }
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Assembled project failed validation.";
+      return jsonError("The staged project did not pass final validation: " + message + " No files were saved. Retry the build or ask GENE to repair the specific stage.", 422, "GENE_STAGED_BUILD_VALIDATION_FAILED");
+    }
+  }
 
   const now = Date.now();
   const forwarded = request.headers.get("x-forwarded-for") || "";
