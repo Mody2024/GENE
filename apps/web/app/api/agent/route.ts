@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
   if (body.operation === "validateBuild") {
     try {
       const files = Object.entries(body.project?.files || {}).map(([path, content]) => ({ path, content: String(content) }));
-      const validated = validateFiles(files, "build", body.project?.plan?.engine, "build", projectKind);
+      validateFiles(files, "build", body.project?.plan?.engine, "build", projectKind);
       return NextResponse.json({
         ok: true,
         aiMode: "validation",
