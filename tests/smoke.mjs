@@ -50,6 +50,10 @@ assert.ok(prompts.includes("WEB APP ACCEPTANCE CHECKLIST"), "AI prompt defines a
 assert.ok(api.includes("external runtime dependency"), "builder blocks external runtime dependencies");
 assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview is sequential");
 assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly rejects placeholder games");
+assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
+assert.ok(prompts.includes("local couch multiplayer"), "game builder contract distinguishes local and online multiplayer");
+assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
+assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
 assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in browser storage");
 assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
