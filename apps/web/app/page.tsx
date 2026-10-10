@@ -825,7 +825,7 @@ export default function Home() {
     }
     if (added.length) {
       setProject({ ...project, references: [...current, ...added], updatedAt: now() });
-      setNotice("Attached " + added.length + " reference file(s). Gemini will receive these references with the next request.");
+      setNotice("Attached " + added.length + " reference file(s). The selected AI provider will receive these references with the next request.");
     }
     if (skipped.length) setNotice((added.length ? "Attached " + added.length + ". " : "") + "Skipped: " + skipped.join(", "));
   }
@@ -1019,7 +1019,7 @@ export default function Home() {
     setProject(p);
     setSection("chat");
     setRuntimeState("idle");
-    setNotice("Playable sample loaded locally. No Gemini API key is needed to run it; add a key to ask the AI to modify the game.");
+    setNotice("Playable sample loaded locally. No AI API key is needed to run it; configure Gemini, Groq or OpenRouter to ask the AI to modify the game.");
     setActivity(["Loaded built-in starter: Outpost: Last Light", "Source files ready for editing and export"]);
     setPreviewKey(n => n + 1);
   }
