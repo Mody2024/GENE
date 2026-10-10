@@ -111,6 +111,12 @@ assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload
 assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
 assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
 assert.ok(page.includes("Automated runtime repair"), "preview failure triggers bounded repair");
+assert.ok(page.includes("!previewOpen || !iframeRef.current"), "collapsed or unmounted previews cannot trigger false render-timeout failures");
+assert.ok(page.includes("current === \"rendered\" && state === \"loaded\" ? \"rendered\" : state"), "late monitor samples cannot downgrade a confirmed visible frame");
+assert.ok(page.includes("window.__geneFrameConfirmed"), "canvas and WebGL render monitor remembers successful frame evidence");
+assert.ok(page.includes("opaquePixels:alpha"), "solid-color canvas frames count as visible even without color variation");
+assert.ok(page.includes("}, 9000);"), "preview gets a longer startup window before a render timeout");
+
 assert.ok(page.includes('await writeProjectToDisk(updated, localAgentUrl, localAgentToken)'), "AI edits auto-sync to connected local disk");
 assert.ok(page.includes('writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)'), "manual saves/restores auto-sync to local disk");
 assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
