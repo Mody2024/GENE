@@ -527,6 +527,7 @@ export default function Home() {
       }
       const result: AgentResponse = payload.result;
       addActivity("Response received from " + (payload.model || payload.aiMode || "agent"));
+      if (payload.reviewedBy) addActivity("Independent code review completed by " + payload.reviewedBy);
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
