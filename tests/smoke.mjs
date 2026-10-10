@@ -267,6 +267,7 @@ assert.ok(prompts.includes("Never add Gemini, OpenAI, Groq, OpenRouter, GENE, or
 
 
 assert.ok(publishApi.includes("GENE_PUBLISH_PASSWORD") && publishApi.includes("VERCEL_TOKEN") && publishApi.includes("VERCEL_PROJECT_ID"), "web publishing is protected and uses server-side Vercel credentials");
+assert.ok(publishApi.includes('target: "preview"'), "publishing user projects cannot overwrite GENE production deployment");
 assert.ok(publishApi.includes("MAX_BYTES = 4_000_000") && publishApi.includes("GENE_PUBLISH_RATE_LIMIT"), "publishing validates upload size and rate limits");
 assert.ok(page.includes("async function publishProject()") && page.includes('fetch("/api/publish"'), "workspace can publish the current web build and receive a live URL");
 assert.ok(page.includes("desktop-wrapper/package.json") && page.includes("android-wrapper/package.json"), "source export includes real Electron and Capacitor wrapper projects");
