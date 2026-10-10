@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentResponse, BuildVersion, GeneProject, Mode, Thinking } from "./lib/types";
+import type { AgentResponse, BuildVersion, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
@@ -33,14 +33,16 @@ function now() { return new Date().toISOString(); }
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
 }
-function newProject(): GeneProject {
+function newProject(kind: ProjectKind = "game"): GeneProject {
+  const isApp = kind === "app";
   return {
     id: uid(),
-    name: "Untitled game",
+    name: isApp ? "Untitled app" : "Untitled game",
+    kind,
     initialPrompt: "",
     mode: "plan",
     thinking: "balanced",
-    messages: [message("assistant", "Hey, I'm GENE. Tell me the game you're imagining. I'll ask one meaningful question at a time, then we can review the plan before building.")],
+    messages: [message("assistant", isApp ? "Hey, I'm GENE. Tell me what kind of web app you want to build. I'll help shape the plan, then build it here so we can preview and edit it together." : "Hey, I'm GENE. Tell me the game you're imagining. I'll ask one meaningful question at a time, then we can review the plan before building.")],
     answers: {},
     question: null,
     plan: null,
@@ -100,7 +102,7 @@ export default function Home() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
-      const list: GeneProject[] = stored.slice(0, 8).map(item => ({ ...item, references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+      const list: GeneProject[] = stored.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
       const activeId = localStorage.getItem(ACTIVE_KEY);
       setProjects(list);
       const active = list.find(p => p.id === activeId) || list[0] || newProject();
@@ -261,9 +263,10 @@ export default function Home() {
     let operation = operationOverride || "chat";
     if (!operationOverride) {
       if (searchMode) operation = "research";
-      else if (project.mode === "plan") operation = project.plan ? "plan" : "interview";
+      else if (isConversationOnly(prompt)) operation = "chat";
+      else if (project.mode === "plan") operation = project.initialPrompt ? "plan" : "interview";
       else if (!Object.keys(project.files).length) operation = "build";
-      else operation = isConversationOnly(prompt) ? "chat" : "edit";
+      else operation = "edit";
     }
     if (operation === "research") setSearchMode(false);
     if (operation === "surprise") {
@@ -271,7 +274,7 @@ export default function Home() {
     }
     const nextProject: GeneProject = {
       ...project,
-      initialPrompt: isFirstIdea ? prompt : project.initialPrompt,
+      initialPrompt: isFirstIdea && operation !== "chat" && operation !== "research" ? prompt : project.initialPrompt,
       answers: nextAnswers,
       question: answerKey ? null : project.question,
       messages: silent
@@ -290,7 +293,7 @@ export default function Home() {
     try {
       if (operation === "interview") addActivity("Preparing the next interview decision");
       if (operation === "plan") addActivity("Generating an implementation plan");
-      if (operation === "build" || operation === "surprise") addActivity("Requesting game source files from the model");
+      if (operation === "build" || operation === "surprise") addActivity("Requesting " + (nextProject.kind === "app" ? "web app" : "game") + " source files from the model");
       if (operation === "edit") addActivity("Reading current project source and applying a targeted edit");
       const response = await fetch("/api/agent", {
         method: "POST",
@@ -337,7 +340,7 @@ export default function Home() {
       const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : result.plan ? "plan" : result.question ? "question" : undefined);
       const updated: GeneProject = {
         ...nextProject,
-        name: result.plan?.title || (nextProject.name === "Untitled game" && isFirstIdea ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name),
+        name: result.plan?.title || ((nextProject.name === "Untitled game" || nextProject.name === "Untitled app") && isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name),
         mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
         answers: nextAnswers,
         question: operation === "research" || operation === "chat" ? nextProject.question : (result.question || null),
@@ -680,13 +683,13 @@ export default function Home() {
     if (!project) return;
     const next = { ...project, mode: "build" as Mode, question: null, updatedAt: now() };
     setProject(next);
-    void runAgent("Implement the approved plan as a complete playable game. Start with the highest-value vertical slice and include all required source files.", "build");
+    void runAgent(project.kind === "app" ? "Implement the approved plan as a complete, polished and interactive web app. Start with the highest-value user flow and include all required source files." : "Implement the approved plan as a complete playable game. Start with the highest-value vertical slice and include all required source files.", "build");
   }
 
   function surpriseMe() {
     if (!project || busy) return;
     setProject({ ...project, mode: "build", question: null });
-    void runAgent("Invent and build an original small browser game with one surprising central mechanic. Choose smart defaults and make it genuinely playable.", "surprise");
+    void runAgent(project.kind === "app" ? "Invent and build an original, polished web app with one useful central workflow. Choose smart defaults and make every visible control functional." : "Invent and build an original small browser game with one surprising central mechanic. Choose smart defaults and make it genuinely playable.", "surprise");
   }
 
   async function importProject(event: ChangeEvent<HTMLInputElement>) {
@@ -758,6 +761,7 @@ export default function Home() {
       const p: GeneProject = {
         id: uid(),
         name: String(manifest.name || file.name.replace(/\.(zip|gene\.json)$/i, "")),
+        kind: manifest.kind === "app" || manifest.plan?.engine === "webapp" ? "app" : "game",
         initialPrompt: String(manifest.initialPrompt || "Imported GENE project"),
         mode: "build",
         thinking: "balanced",
@@ -802,8 +806,8 @@ export default function Home() {
     setNotice("Project renamed to " + name + ".");
   }
 
-  function createNewProject() {
-    const p = newProject();
+  function createNewProject(kind: ProjectKind = "game") {
+    const p = newProject(kind);
     setProject(p);
     setSection("chat");
     setNotice("");
@@ -934,6 +938,7 @@ export default function Home() {
     zip.file("gene.project.json", JSON.stringify({
       id: project.id,
       name: project.name,
+      kind: project.kind || "game",
       initialPrompt: project.initialPrompt,
       updatedAt: project.updatedAt,
       plan: project.plan,
@@ -992,12 +997,13 @@ export default function Home() {
 
       <aside className="project-sidebar">
         <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
-        <button className="new-project" onClick={createNewProject}><span>＋</span> New game project</button>
+        <button className="new-project" onClick={() => createNewProject("game")}><span>＋</span> New game project</button>
+        <button className="new-project" onClick={() => createNewProject("app")}><span>＋</span> New web app project</button>
         <button className="import-project-button" onClick={loadPlayableDemo}>▶ Try playable demo</button>
         <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
         <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
-        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? "Playable source created" : "Design in progress"}</small></div>
+        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small></div>
         {projects.filter(p => p.id !== project.id).length > 0 && <>
           <div className="sidebar-section-label">RECENT PROJECTS</div>
           {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
@@ -1021,6 +1027,7 @@ export default function Home() {
         <header className="topbar">
           <div className="breadcrumb"><span>Projects</span><span className="crumb-slash">/</span><strong>{project.name}</strong><button className="rename-project" title="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
+            <span className="project-kind-chip">{project.kind === "app" ? "WEB APP" : "GAME"}</span>
             <div className="mode-switch" role="group" aria-label="Agent mode">
               <button className={project.mode === "plan" ? "active" : ""} onClick={() => setProject({ ...project, mode: "plan" })}>Plan</button>
               <button className={project.mode === "build" ? "active" : ""} onClick={() => setProject({ ...project, mode: "build" })}>Build</button>
@@ -1028,7 +1035,7 @@ export default function Home() {
             <select className="thinking-select" value={project.thinking} aria-label="Thinking mode" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
               <option value="fast">Fast</option><option value="balanced">Balanced</option><option value="deep">Deep</option>
             </select>
-            <button className="top-play-button" title="Play the current game in a separate tab" onClick={openFullscreenGame} disabled={!hasGame}>▶ Play</button>
+            <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
             <button className="icon-button subtle" title="Download project ZIP" onClick={downloadProject}>↓</button>
@@ -1138,7 +1145,7 @@ export default function Home() {
 
           <aside className={"preview-panel " + (!previewOpen ? "collapsed" : "") + (expandedPreview ? " expanded" : "")}>
             <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title={previewOpen ? "Minimize preview" : "Open preview"} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? "–" : "□"}</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
-            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox="allow-scripts" srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : "No game loaded"}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
+            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox="allow-scripts" srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : (project.kind === "app" ? "No app loaded" : "No game loaded")}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
             {expandedPreview && hasGame && <button className="close-expanded" title="Close expanded preview" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
           </aside>
         </div>
@@ -1150,8 +1157,8 @@ export default function Home() {
 
 function isConversationOnly(text: string) {
   const value = text.trim().toLowerCase();
-  const asksToChange = /\\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|give the player|put|delete)\\b/.test(value);
-  const startsAsQuestion = /^(what|why|how|can you explain|explain|tell me|suggest|should we|should i|could we|is it|does it|will it|which|would it|what if|give me ideas)\\b/.test(value);
+  const asksToChange = /\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|give the player|put|delete|modify|design)\b/.test(value);
+  const startsAsQuestion = /^(what|why|how|can you explain|explain|tell me|suggest|should we|should i|could we|is it|does it|will it|which|would it|what if|give me ideas|can i|do i)\b/.test(value);
   return startsAsQuestion && !asksToChange;
 }
 
