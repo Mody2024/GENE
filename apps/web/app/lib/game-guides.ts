@@ -143,6 +143,33 @@ const GUIDES: Record<string, GameGuide> = {
     ],
     performance: { targetFps: 60, maxEnemies: 8, maxObjects: 120, maxParticles: 20 }
   },
+  localMultiplayer2d: {
+    id: "localMultiplayer2d",
+    title: "Local Multiplayer 2D",
+    engine: "canvas2d",
+    implementation: [
+      "Build a genuinely simultaneous local couch-multiplayer game on one machine. Both players must be visible and independently controllable during the same update loop.",
+      "Create separate player objects with independent positions, velocities, health/lives, cooldowns, score and input ownership. Never route the same keyboard event to both players.",
+      "Default keyboard layout: Player 1 uses WASD with F for action; Player 2 uses arrow keys with Enter or Right Shift for action. Display these bindings in the game UI and avoid browser scrolling while playing.",
+      "Poll navigator.getGamepads() once per frame and assign connected controllers by stable gamepad index to a distinct player slot; a controller must not silently take over both players. If no controller is connected, keyboard controls must work fully.",
+      "Make the core mechanic support two participants: shared co-op objectives or clear versus scoring. Show distinct player colors/silhouettes, labels, scores and health/lives so the state is readable at a glance.",
+      "Choose a camera that keeps both players visible: a shared fixed/zoomed-out arena is preferred for compact games; for larger worlds use a bounded camera that frames both players or a clear split-screen layout.",
+      "Handle simultaneous opposing inputs, collision between players where appropriate, player knockouts, round end, pause/resume, rematch and full state reset. Pause must freeze the whole simulation, not just one player.",
+      "Provide an accessible start screen that explains the two control sets and lets users choose co-op or versus if both modes fit the requested concept. Keep it playable without a controller or network.",
+      "Use delta time, normalized diagonal movement, bounded world/entity counts and deterministic test hooks for player positions, scores, frame count and round state. Do not claim hardware controller testing unless performed."
+    ],
+    acceptance: [
+      "Pressing a Player 1 key changes only Player 1 state; pressing a Player 2 key changes only Player 2 state.",
+      "Both players can move during the same frame without one overwriting the other's input or position.",
+      "Keyboard controls remain playable when navigator.getGamepads() is empty.",
+      "A collectible, attack, goal or round mechanic changes the correct player's score/health and does not award the same event twice.",
+      "The screen keeps both players visible, clearly distinguishes them and displays their individual scores/status.",
+      "Pause freezes both players and all gameplay timers; resume continues without a jump in delta time.",
+      "Restart/rematch restores both players, objectives, scores, cooldowns and round state.",
+      "The first render shows the arena and both players rather than a placeholder menu or HUD-only screen."
+    ],
+    performance: { targetFps: 60, maxEnemies: 8, maxObjects: 180, maxParticles: 40 }
+  },
   default2d: {
     id: "default2d",
     title: "Custom 2D Game",
@@ -173,6 +200,7 @@ export function selectGameGuide(input: {
   planEngine?: "canvas2d" | "webgl3d";
 }): GameGuide {
   const text = [input.message, input.initialPrompt || "", input.planTitle || ""].join("\n").toLowerCase();
+  if (/local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/.test(text) && !is3d(text)) return GUIDES.localMultiplayer2d;
   if (/geometry dash|rhythm game|rhythm runner|precision runner|auto.?runner/.test(text)) return GUIDES.rhythm2d;
   if (/mario|platformer|platform game|side.?scroll/.test(text)) return GUIDES.platformer2d;
   if (/subway|metro|three.?lane|lane runner|endless runner/.test(text) && is3d(text)) return GUIDES.runner3d;
