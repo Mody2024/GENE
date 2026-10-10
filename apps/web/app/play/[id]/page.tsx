@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { GeneProject } from "../../lib/types";
+import { buildRuntimeAssetBootstrap } from "../../lib/runtime-assets";
 
 export default function PlayPage() {
   const params = useParams();
@@ -27,7 +28,7 @@ export default function PlayPage() {
   const html = project?.files["game.html"] || "";
   const css = project?.files["game.css"] || "";
   const js = project?.files["game.js"] || "";
-  const documentSource = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;" + (isApp ? "min-height:100%;height:auto;overflow:auto;" : "height:100%;overflow:hidden;") + "background:#101419;color:white}*{box-sizing:border-box}" + css + "</style></head><body>" + html + "<script>" + js.replace(/<\/script/gi, "<\\/script") + "</script></body></html>";
+  const documentSource = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;" + (isApp ? "min-height:100%;height:auto;overflow:auto;" : "height:100%;overflow:hidden;") + "background:#101419;color:white}*{box-sizing:border-box}" + css + "</style></head><body>" + (isApp ? "" : buildRuntimeAssetBootstrap(project?.files)) + html + "<script>" + js.replace(/<\/script/gi, "<\\/script") + "</script></body></html>";
 
   if (!loaded) return <main className="play-missing">Loading saved project…</main>;
   if (missing || !project) return <main className="play-missing"><h1>Saved project not found</h1><p>This project is stored in the browser that created it. Open GENE in the same browser profile.</p><a href="/">Return to GENE</a></main>;

@@ -115,7 +115,10 @@ try {
       "game.html": '<main class="game-shell"><canvas id="game-canvas" width="800" height="480" tabindex="0"></canvas><div class="game-hud"><b>WEBGL RENDER TEST</b></div></main>',
       "game.css": '.game-shell{width:100vw;height:100vh;background:#101522}#game-canvas{width:100%;height:100%;display:block}.game-hud{position:absolute;top:12px;left:14px;color:#fff;font:12px Arial}',
       "game.js": "(function(){window.__geneWebGLSmoke={stage:\"entered\"};try{const c=document.getElementById(\"game-canvas\");if(!c)throw new Error(\"canvas missing\");const gl=c.getContext(\"webgl\",{alpha:false,antialias:false});if(!gl)throw new Error(\"WebGL context unavailable\");window.__geneWebGLSmoke={stage:\"context\",version:gl.getParameter(gl.VERSION)};const vs=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(vs,\"attribute vec2 aPosition;void main(){gl_Position=vec4(aPosition,0.0,1.0);}\");gl.compileShader(vs);if(!gl.getShaderParameter(vs,gl.COMPILE_STATUS))throw new Error(\"vertex shader: \"+gl.getShaderInfoLog(vs));window.__geneWebGLSmoke={stage:\"vertex\"};const fs=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(fs,\"precision mediump float;void main(){gl_FragColor=vec4(0.2,0.72,0.48,1.0);}\");gl.compileShader(fs);if(!gl.getShaderParameter(fs,gl.COMPILE_STATUS))throw new Error(\"fragment shader: \"+gl.getShaderInfoLog(fs));window.__geneWebGLSmoke={stage:\"fragment\"};const program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(\"program link: \"+gl.getProgramInfoLog(program));gl.useProgram(program);window.__geneWebGLSmoke={stage:\"program\"};const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-0.65,-0.55,0.65,-0.55,0,0.66]),gl.STATIC_DRAW);const loc=gl.getAttribLocation(program,\"aPosition\");if(loc<0)throw new Error(\"position attribute missing\");gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);let draws=0;function frame(){try{gl.viewport(0,0,c.width,c.height);gl.clearColor(0.035,0.05,0.085,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,3);gl.finish();window.__geneWebGLSmoke={stage:\"drawing\",draws:++draws,version:gl.getParameter(gl.VERSION)};requestAnimationFrame(frame)}catch(e){window.__geneWebGLSmoke={stage:\"frame-error\",message:String(e)};throw e}}requestAnimationFrame(frame)}catch(e){window.__geneWebGLSmoke={stage:\"error\",message:String(e),stack:e&&e.stack};throw e}})()",
-      "game-spec.json": JSON.stringify({ title:"Playwright WebGL Smoke", genre:"3D rendering smoke test", engine:"webgl3d", mechanics:["WebGL shader","GPU buffer","Animated triangle"], controls:["Any key"], objective:"Continuously draw a visible WebGL primitive.", winCondition:"At least 10 WebGL frames have been submitted.", lossCondition:"A WebGL context or shader fails.", performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:12,maxParticles:0} }, null, 2)
+      "game-spec.json": JSON.stringify({ title:"Playwright WebGL Smoke", genre:"3D rendering smoke test", engine:"webgl3d", mechanics:["WebGL shader","GPU buffer","Animated triangle"], controls:["Any key"], objective:"Continuously draw a visible WebGL primitive.", winCondition:"At least 10 WebGL frames have been submitted.", lossCondition:"A WebGL context or shader fails.", performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:12,maxParticles:0} }, null, 2),
+      "assets/crate/model.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3",
+      "assets/crate/model.mtl": "newmtl crate\nKd 0.7 0.3 0.1",
+      "assets/crate/asset.json": JSON.stringify({name:"Smoke crate",kind:"prop"})
     }
   };
   const webglPage = await browser.newPage({ viewport: { width: 1200, height: 800 } });
@@ -129,6 +132,14 @@ try {
   await webglPage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
   const webglFrame = webglPage.frameLocator('iframe[title="GENE live game preview"]');
   await webglFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
+  const runtimeAssets = await webglFrame.locator("body").evaluate(() => window.__GENE_ASSETS__ || {});
+  assert.equal(runtimeAssets["assets/crate/model.obj"], "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3", "live preview exposes real OBJ geometry to the game runtime");
+  assert.equal(runtimeAssets["assets/crate/model.mtl"], "newmtl crate\nKd 0.7 0.3 0.1", "live preview exposes matching MTL materials");
+  const parsedAssets = await webglFrame.locator("body").evaluate(() => ({ mesh: window.GENE3D.parseOBJ("assets/crate/model.obj"), materials: window.GENE3D.parseMTL("assets/crate/model.mtl") }));
+  assert.equal(parsedAssets.mesh.length, 1, "OBJ parser returns one material group");
+  assert.equal(parsedAssets.mesh[0].vertexCount, 3, "OBJ parser triangulates faces into three real vertices");
+  assert.equal(parsedAssets.mesh[0].positions.length, 18, "OBJ parser returns positions and computed normals for each triangle vertex");
+  assert.deepEqual(parsedAssets.materials.crate.kd, [0.7, 0.3, 0.1], "MTL parser preserves diffuse material colors");
   await webglPage.waitForTimeout(2_500);
   console.log("WebGL preview status:", await webglPage.locator(".preview-title small").textContent());
   const drawState = await webglFrame.locator("body").evaluate(() => window.__geneWebGLSmoke);
@@ -175,6 +186,24 @@ try {
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
   assert.ok(typeof sampleBefore === "number" && typeof sampleAfter === "number" && sampleAfter > sampleBefore, "built-in starter's on-screen movement control should move the player; before=" + sampleBefore + "; after=" + sampleAfter + "; debug=" + JSON.stringify(sampleDebug));
+  const overlayVisible = !(await sampleFrame.locator("#game-message").evaluate(el => el.classList.contains("hidden")));
+  if (overlayVisible) {
+    await sampleFrame.locator("#start-button").click();
+    await sampleFrame.locator("#game-message").waitFor({ state: "hidden", timeout: 5_000 });
+  }
+  const beforeGamepad = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
+  await sampleFrame.locator("body").evaluate(() => {
+    const buttons = Array.from({ length: 16 }, (_, index) => ({ pressed: index === 0 }));
+    window.__geneTestGamepads = [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }];
+    if (typeof window.__genePollGamepad !== "function") throw new Error("starter controller poll hook missing");
+    window.__genePollGamepad();
+    if (typeof window.__geneTestStep !== "function") throw new Error("starter deterministic update hook missing");
+    window.__geneTestStep(0.32);
+  });
+  await samplePage.waitForTimeout(320);
+  const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
+  assert.ok(typeof beforeGamepad === "number" && typeof afterGamepad.x === "number" && afterGamepad.x > beforeGamepad, "Gamepad API analog input should move the starter player; before=" + beforeGamepad + "; after=" + JSON.stringify(afterGamepad));
+  assert.equal(afterGamepad.controller?.connected, true, "starter reports a connected gamepad honestly");
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
