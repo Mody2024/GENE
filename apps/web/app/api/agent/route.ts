@@ -317,6 +317,10 @@ export async function POST(request: NextRequest) {
   }
 
   const text = payload?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("\n") || "";
+  const finishReason = payload?.candidates?.[0]?.finishReason;
+  if (finishReason === "MAX_TOKENS") {
+    return jsonError("Gemini cut off this response at its output-token limit. GENE rejected the incomplete result and did not save any files. Retry by asking GENE to build the next smaller milestone first (for example: core gameplay, then enemies, then menus and polish).", 502, "GEMINI_OUTPUT_TRUNCATED");
+  }
   if (!text.trim()) return jsonError("Gemini returned an empty response. No files were changed.", 502, "GEMINI_EMPTY_RESPONSE");
 
   let result: AgentResponse;
