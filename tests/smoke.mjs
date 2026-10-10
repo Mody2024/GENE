@@ -38,6 +38,10 @@ const health = read("apps/web/app/api/health/route.ts");
 assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
 assert.ok(api.includes("validateFiles"), "server validates model output");
+assert.ok(api.includes("ensureProjectSpecTitle"), "missing spec titles are repaired before build and edit validation");
+assert.ok(api.includes("body.project?.plan?.title") && api.includes("body.project?.initialPrompt"), "title repair uses the existing plan, project name, or original prompt");
+assert.ok(api.includes("const mergedFiles = ensureProjectSpecTitle"), "chat edits normalize legacy specs before validating the merged project");
+
 assert.ok(api.includes("normalizeAgentResult"), "API validates structured response shapes before updating the UI");
 assert.ok(api.includes("GEMINI_OUTPUT_TRUNCATED"), "truncated Gemini JSON gets a specific recoverable error");
 assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API supports single-file build stages and offline final assembly validation");
