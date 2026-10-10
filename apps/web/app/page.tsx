@@ -117,6 +117,7 @@ export default function Home() {
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
+  const [binaryBuildConfigured, setBinaryBuildConfigured] = useState(false);
   const [binaryBuildId, setBinaryBuildId] = useState("");
   const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string }> | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
@@ -176,6 +177,7 @@ export default function Home() {
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
       setPublishConfigured(Boolean(d.publishConfigured));
+      setBinaryBuildConfigured(Boolean(d.binaryBuildConfigured));
       if (d.model) setAiModel(d.model);
     }).catch(() => setApiReady(false));
   }, []);
@@ -1484,7 +1486,7 @@ export default function Home() {
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
              <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
             <select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select>
-            <button className="binary-build-button" title="Compile real EXE/APK on cloud build machines" onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : "Build binary ↗"}</button>
+            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
             <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
