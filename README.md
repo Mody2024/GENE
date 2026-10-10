@@ -84,6 +84,7 @@ The workspace has a one-click cloud packaging path backed by GitHub Actions:
 3. Generate one 32-byte encryption key, for example with Node.js: <code>node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code>.
 4. Add these Vercel Production environment variables, then redeploy:
    - GENE_BUILD_GITHUB_TOKEN: the fine-grained repository token from step 2.
+   - GENE_BUILD_PASSWORD: a strong private password used to authorize cloud build requests in the workspace.
    - GENE_BUILD_ENCRYPTION_KEY: the base64 key from step 3.
    - GENE_BUILD_REPOSITORY: Mody2024/GENE (optional; this is the default).
 5. In **GitHub → Mody2024/GENE → Settings → Secrets and variables → Actions**, add:
