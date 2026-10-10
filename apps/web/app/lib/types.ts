@@ -1,13 +1,15 @@
+export type ProjectKind = "game" | "app";
 export type Mode = "plan" | "build";
 export type Thinking = "fast" | "balanced" | "deep";
 export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error" };
 export type Question = { id: string; text: string; why?: string; choices?: string[] };
-export type GamePlan = { title: string; summary: string; engine: "canvas2d" | "webgl3d"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
+export type GamePlan = { title: string; summary: string; kind?: ProjectKind; engine: "canvas2d" | "webgl3d" | "webapp"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
 export type BuildVersion = { number: number; label: string; files: Record<string, string>; createdAt: string; testSummary: string };
 export type ReferenceFile = { id: string; name: string; mimeType: string; kind: "image" | "text"; dataBase64?: string; textContent?: string; size: number };
 export type GeneProject = {
   id: string;
   name: string;
+  kind?: ProjectKind;
   initialPrompt: string;
   mode: Mode;
   thinking: Thinking;
