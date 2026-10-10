@@ -19,8 +19,8 @@ function config() {
   const token = process.env.GENE_BUILD_GITHUB_TOKEN?.trim();
   const password = process.env.GENE_BUILD_PASSWORD?.trim();
   const key = Buffer.from(process.env.GENE_BUILD_ENCRYPTION_KEY || "", "base64");
-  if (!token || key.length !== 32 || REPO.length !== 2 || REPO.some(x => !x)) return null;
-  return { token, key, owner: REPO[0], repo: REPO[1] };
+  if (!token || !password || key.length !== 32 || REPO.length !== 2 || REPO.some(x => !x)) return null;
+  return { token, key, password, owner: REPO[0], repo: REPO[1] };
 }
 async function gh(url: string, token: string, init?: RequestInit) {
   return fetch(API + url, {
