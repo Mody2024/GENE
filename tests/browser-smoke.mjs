@@ -181,7 +181,52 @@ try {
   await mobilePage.locator('iframe[title="GENE live game preview"]').waitFor({ timeout: 5000 });
   assert.equal(await mobilePage.getByTitle("Close expanded preview").isVisible(), true, "mobile users can open and close the live game preview");
   await mobilePage.close();
-  console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
+
+  // Verify a generated web app is rendered as a scrollable DOM and its controls work.
+  const appFixture = {
+    ...fixture,
+    id: "playwright-app-smoke",
+    name: "Playwright App Smoke",
+    kind: "app",
+    initialPrompt: "A tiny project tracker app with an add-task interaction.",
+    mode: "build",
+    plan: {
+      title: "Playwright App Smoke",
+      summary: "A DOM application fixture for app rendering and interaction tests.",
+      kind: "app",
+      engine: "webapp",
+      tasks: ["Render dashboard", "Add a task", "Show the new task"],
+      mechanics: ["DOM-based interface", "Add task interaction"],
+      performanceBudget: { targetFps: 60, maxEnemies: 0, maxObjects: 100, maxParticles: 0 }
+    },
+    files: {
+      "game.html": '<main class="app"><header><h1>Project Tracker</h1></header><form id="task-form"><label for="task-input">New task</label><input id="task-input" autocomplete="off"><button type="submit" id="add-task">Add task</button></form><ul id="task-list"></ul></main>',
+      "game.css": 'body{margin:0;background:#f3f6f9;color:#16202a;font:16px Arial,sans-serif}.app{max-width:900px;margin:auto;padding:32px}input,button{font:inherit;padding:10px;margin:4px}',
+      "game.js": '(function(){const form=document.getElementById("task-form"),input=document.getElementById("task-input"),list=document.getElementById("task-list");form.addEventListener("submit",function(e){e.preventDefault();const value=input.value.trim();if(!value)return;const li=document.createElement("li");li.textContent=value;list.appendChild(li);input.value="";});})();',
+      "game-spec.json": JSON.stringify({title:"Project Tracker",kind:"app",engine:"webapp",summary:"A tiny project tracker for app preview testing.",features:["Add a task"],routes:["/"],userFlows:["Enter a task and add it to the list"],performanceBudget:{targetFps:60,maxEnemies:0,maxObjects:100,maxParticles:0}},null,2)
+    },
+    activeFile: "game.js"
+  };
+  const appPage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  const appErrors = [];
+  appPage.on("pageerror", error => appErrors.push(error.message));
+  await appPage.addInitScript(({project, storageKey, activeKey}) => {
+    localStorage.setItem(storageKey, JSON.stringify([project]));
+    localStorage.setItem(activeKey, project.id);
+  }, {project: appFixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1"});
+  await appPage.goto(baseURL, {waitUntil:"domcontentloaded", timeout:30000});
+  const appFrame = appPage.frameLocator('iframe[title="GENE live game preview"]');
+  await appFrame.getByRole("heading", {name:"Project Tracker"}).waitFor({timeout:10000});
+  await appPage.getByText("Visible render signal").first().waitFor({timeout:10000});
+  await appFrame.locator("#task-input").fill("Ship the first app");
+  await appFrame.locator("#add-task").click();
+  assert.equal(await appFrame.locator("#task-list li").textContent(), "Ship the first app", "web app preview runs its real DOM interactions");
+  const appRuntime = await appFrame.locator("body").getAttribute("data-gene-project-kind");
+  assert.equal(appRuntime, "app", "web app preview receives an app-specific runtime shell");
+  assert.equal(appErrors.length, 0, "the app preview should not emit JavaScript errors: " + appErrors.join(" | "));
+  await appPage.close();
+
+  console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, app DOM rendering and working form, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
 } finally {
   await browser.close();
 }
