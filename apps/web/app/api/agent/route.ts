@@ -634,7 +634,7 @@ export async function POST(request: NextRequest) {
             stagePath: body.stagePath || null,
             projectKind,
             plan: body.project?.plan || result.plan || null,
-            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => candidatePaths.has(path)).map(([path, content]) => [path, String(content).slice(0, 20_000)])),
+            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => ALLOWED_FILES.has(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
             candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
           };
           const reviewResponse = await fetch(reviewer.endpoint, {
