@@ -30,6 +30,14 @@ function readText(file: File): Promise<string> {
 function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
+function GeneMark({ className = "" }: { className?: string }) {
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE">
+    <path d="M20 5.5 31.8 12.3 31.8 26 20 34.5 8.2 27.7 8.2 14Z" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
+    <path d="M8.5 14 20 20.8 31.5 14M20 20.8V34" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
+    <circle cx="20" cy="20.5" r="3.4" fill="currentColor"/>
+    <circle cx="20" cy="5.5" r="2.3" fill="currentColor"/><circle cx="31.8" cy="12.3" r="2.3" fill="currentColor"/><circle cx="31.8" cy="26" r="2.3" fill="currentColor"/><circle cx="8.2" cy="27.7" r="2.3" fill="currentColor"/>
+  </svg>;
+}
 function now() { return new Date().toISOString(); }
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
@@ -80,6 +88,23 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
   return mapped;
 }
 
+function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "") {
+  const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
+  const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
+  let body = bodyMatch ? bodyMatch[1] : source
+    .replace(/<!doctype[^>]*>/gi, "")
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, "")
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+  body = body.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+  return '<!doctype html>\n<html lang="en">\n<head>\n' +
+    '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' +
+    '<meta name="theme-color" content="#101411">\n<meta name="description" content="' + safeTitle + '">\n' +
+    '<title>' + safeTitle + '</title>\n<link rel="manifest" href="manifest.webmanifest">\n' +
+    '<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="stylesheet" href="' + cssName + '">\n' +
+    '</head>\n<body>\n' + body + '\n' + runtimeBootstrap + '\n<script src="' + jsName + '" defer></script>\n<script src="pwa-register.js" defer></script>\n</body>\n</html>';
+}
+
+
 type BuildCheckStatus = "pass" | "warn" | "fail";
 type BuildCheck = { label: string; status: BuildCheckStatus; detail: string };
 type BuildReport = { checkedAt: string; projectUpdatedAt: string; checkedDirty: boolean; checkedFile: string; checkedEditorContent: string; checks: BuildCheck[] };
@@ -89,7 +114,11 @@ export default function Home() {
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [publishConfigured, setPublishConfigured] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState("");
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
   const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "versions">("chat");
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -142,6 +171,7 @@ export default function Home() {
     }
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
+      setPublishConfigured(Boolean(d.publishConfigured));
       if (d.model) setAiModel(d.model);
     }).catch(() => setApiReady(false));
   }, []);
@@ -398,29 +428,75 @@ export default function Home() {
         }
         if (responseOk) {
           addActivity("Checking assembled project contract and source files");
-          const validateResponse = await fetch("/api/agent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...baseRequest,
-              operation: "validateBuild",
-              message: "Validate assembled staged project",
-              project: { ...nextProject, files: stagedFiles, plan: stagedPlan }
-            })
-          });
-          const validationPayload = await validateResponse.json().catch(() => null);
-          if (!validateResponse.ok || !validationPayload?.ok) {
-            payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation." } };
+          let validationPayload: any = null;
+          let validationOk = false;
+          for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
+            const validateResponse = await fetch("/api/agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...baseRequest,
+                operation: "validateBuild",
+                message: "Validate assembled staged project",
+                project: { ...nextProject, files: stagedFiles, plan: stagedPlan }
+              })
+            });
+            validationPayload = await validateResponse.json().catch(() => null);
+            if (validateResponse.ok && validationPayload?.ok) {
+              validationOk = true;
+              break;
+            }
+            const validationError = String(validationPayload?.error?.message || "The assembled project failed validation.");
+            addActivity("Final validation failed: " + validationError.slice(0, 180));
+            if (validationAttempt >= 2) break;
+
+            const repairPath = stagePaths.find(path => validationError.includes(path)) ||
+              (/spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
+               /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
+               /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
+            addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
+            let repaired = false;
+            for (let repairAttempt = 1; repairAttempt <= 2 && !repaired; repairAttempt++) {
+              const repairResponse = await fetch("/api/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...baseRequest,
+                  operation: "buildPart",
+                  stagePath: repairPath,
+                  message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + repairPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + ". Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + repairPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
+                  project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+                })
+              });
+              const repairPayload = await repairResponse.json().catch(() => null);
+              const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === repairPath);
+              if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
+                stagedFiles[repairPath] = repairFile.content;
+                modelUsed = repairPayload.model || modelUsed;
+                repaired = true;
+                addActivity("Repaired " + repairPath + "; rerunning full-project validation");
+              } else {
+                addActivity("Repair attempt for " + repairPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+              }
+            }
+            if (!repaired) break;
+          }
+          if (!validationOk) {
+            payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation after targeted repair attempts." } };
             responseOk = false;
           } else {
+            const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
+              ? validationPayload.result.files as Array<{ path: string; content: string }>
+              : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
+            for (const file of normalizedFiles) stagedFiles[file.path] = file.content;
             payload = {
               ok: true,
-              aiMode: "gemini",
+              aiMode: "multi-provider",
               model: modelUsed,
               result: {
-                reply: "Built the first playable version in four small stages and validated the assembled project. Add advanced features through targeted chat edits.",
+                reply: "Built the first playable version in compact stages, repaired any structural validation issues found, and validated the assembled source. Play it and request focused improvements.",
                 plan: stagedPlan,
-                files: stagePaths.map(path => ({ path, content: stagedFiles[path] })),
+                files: normalizedFiles,
                 complete: true,
                 needsUserDecision: false
               }
@@ -451,6 +527,7 @@ export default function Home() {
       }
       const result: AgentResponse = payload.result;
       addActivity("Response received from " + (payload.model || payload.aiMode || "agent"));
+      if (payload.reviewedBy) addActivity("Independent code review completed by " + payload.reviewedBy);
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
@@ -795,7 +872,7 @@ export default function Home() {
     }
     if (added.length) {
       setProject({ ...project, references: [...current, ...added], updatedAt: now() });
-      setNotice("Attached " + added.length + " reference file(s). Gemini will receive these references with the next request.");
+      setNotice("Attached " + added.length + " reference file(s). The selected AI provider will receive these references with the next request.");
     }
     if (skipped.length) setNotice((added.length ? "Attached " + added.length + ". " : "") + "Skipped: " + skipped.join(", "));
   }
@@ -950,6 +1027,26 @@ export default function Home() {
     setActivity([]);
   }
 
+  function deleteProject(projectId: string) {
+    const target = projects.find(item => item.id === projectId) || (project?.id === projectId ? project : null);
+    if (!target) return;
+    if (!window.confirm("Delete the chat and local project \"" + target.name + "\"? This removes its saved browser history and cannot be undone.")) return;
+    const remaining = projects.filter(item => item.id !== projectId);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+      if (localStorage.getItem(ACTIVE_KEY) === projectId) localStorage.removeItem(ACTIVE_KEY);
+    } catch {}
+    setProjects(remaining);
+    if (project?.id === projectId) {
+      const next = remaining[0] || newProject(target.kind || "game");
+      setProject(next);
+      setSection("chat");
+      setNotice("Deleted \"" + target.name + "\".");
+    } else {
+      setNotice("Deleted \"" + target.name + "\".");
+    }
+  }
+
   function loadPlayableDemo() {
     const files = playableDemoFiles();
     const stamp = now();
@@ -969,7 +1066,7 @@ export default function Home() {
     setProject(p);
     setSection("chat");
     setRuntimeState("idle");
-    setNotice("Playable sample loaded locally. No Gemini API key is needed to run it; add a key to ask the AI to modify the game.");
+    setNotice("Playable sample loaded locally. No AI API key is needed to run it; configure Gemini, Groq or OpenRouter to ask the AI to modify the game.");
     setActivity(["Loaded built-in starter: Outpost: Last Light", "Source files ready for editing and export"]);
     setPreviewKey(n => n + 1);
   }
@@ -1057,10 +1154,132 @@ export default function Home() {
     }
   }
 
+  async function publishProject() {
+    if (!project || !hasGame || publishBusy) return;
+    if (!publishConfigured) {
+      setNotice("To enable publishing, configure VERCEL_TOKEN, VERCEL_PROJECT_ID, and GENE_PUBLISH_PASSWORD in the GENE Vercel project, then redeploy.");
+      return;
+    }
+    const password = window.prompt("Enter the publish password stored in GENE's GENE_PUBLISH_PASSWORD environment variable.");
+    if (!password) return;
+    setPublishBusy(true);
+    setPublishedUrl("");
+    setNotice("Preparing a standalone web build for publishing…");
+    try {
+      const projectKind = project.kind || "game";
+      const cssName = projectKind === "app" ? "styles.css" : "game.css";
+      const jsName = projectKind === "app" ? "app.js" : "game.js";
+      const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
+      const title = project.plan?.title || project.name || "GENE project";
+      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+      const manifest = {
+        name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
+        start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
+        icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }]
+      };
+      const registerSource = "'use strict'; if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function () {}); }); }";
+      const cacheName = "gene-published-" + project.id.replace(/[^a-z0-9-]/gi, "").slice(0, 36);
+      const workerSource = "'use strict'; const CACHE='" + cacheName + "'; const FILES=['./','./index.html','./" + cssName + "','./" + jsName + "','./" + specName + "','./manifest.webmanifest','./icon.svg','./pwa-register.js']; self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))); self.addEventListener('activate',e=>e.waitUntil(self.clients.claim())); self.addEventListener('fetch',e=>{if(e.request.method==='GET'&&new URL(e.request.url).origin===location.origin)e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('./index.html'))));});";
+      const icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#101411"/><path d="M91 32A43 43 0 1 0 99 83H70V67h48v10A56 56 0 1 1 105 23z" fill="#77e0a2"/><circle cx="64" cy="64" r="11" fill="#f1f7f3"/></svg>';
+      const files: Array<{ path: string; content: string }> = [
+        { path: "index.html", content: html },
+        { path: cssName, content: project.files["game.css"] || "" },
+        { path: jsName, content: project.files["game.js"] || "" },
+        { path: specName, content: project.files["game-spec.json"] || "{}" },
+        { path: "manifest.webmanifest", content: JSON.stringify(manifest, null, 2) },
+        { path: "pwa-register.js", content: registerSource },
+        { path: "service-worker.js", content: workerSource },
+        { path: "icon.svg", content: icon }
+      ];
+      for (const [path, content] of Object.entries(project.files)) {
+        if (path === "game.html" || ["game.css", "game.js", "game-spec.json"].includes(path)) continue;
+        files.push({ path: exportProjectPath(path, projectKind), content });
+      }
+      setNotice("Uploading " + files.length + " files to Vercel and waiting for deployment status…");
+      const response = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-gene-publish-password": password },
+        body: JSON.stringify({ name: title, files })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error?.message || "Vercel rejected this publish request.");
+      setPublishedUrl(payload.url);
+      setNotice(payload.ready ? "Your web project is published and ready." : "Vercel accepted the deployment. It may take a moment to finish becoming available.");
+      addActivity("Published web project: " + payload.url + " (" + payload.state + ")");
+    } catch (error) {
+      setNotice("Publish failed: " + (error instanceof Error ? error.message : "Unknown publishing error"));
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   async function downloadProject() {
-    if (!project) return;
+    if (!project || packageProgress !== null) return;
+    setPackageProgress(0);
+    try {
     const zip = new JSZip();
-    Object.entries(project.files).forEach(([path, source]) => zip.file(exportProjectPath(path, project.kind || "game"), source));
+    const projectKind = project.kind || "game";
+    const cssName = projectKind === "app" ? "styles.css" : "game.css";
+    const jsName = projectKind === "app" ? "app.js" : "game.js";
+    const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
+    const projectTitle = project.plan?.title || project.name || "GENE project";
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+    Object.entries(project.files).forEach(([path, source]) => {
+      if (path === "game.html") return;
+      zip.file(exportProjectPath(path, projectKind), source);
+    });
+    zip.file("source/game.html", project.files["game.html"] || "");
+    zip.file("index.html", mainHtml);
+    const webManifest = {
+      name: projectTitle, short_name: projectTitle.slice(0, 24),
+      description: project.plan?.summary || project.initialPrompt || projectTitle,
+      start_url: "./index.html", scope: "./", display: "standalone",
+      background_color: "#101411", theme_color: "#101411",
+      icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }]
+    };
+    const registerSource = "'use strict'; if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function () {}); }); }";
+    const serviceWorkerSource = "'use strict'; const CACHE='gene-" + project.id.replace(/[^a-z0-9-]/gi, "").slice(0, 40) + "-v1'; const FILES=['./','./index.html','./" + cssName + "','./" + jsName + "','./" + specName + "','./manifest.webmanifest','./icon.svg','./pwa-register.js']; self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.filter(Boolean))).then(()=>self.skipWaiting()))); self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('gene-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))); self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==location.origin)return;e.respondWith(caches.match(e.request).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));}return r;}).catch(()=>caches.match('./index.html'))));});";
+    const iconSource = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#101411"/><path d="M91 32A43 43 0 1 0 99 83H70V67h48v10A56 56 0 1 1 105 23z" fill="#77e0a2"/><circle cx="64" cy="64" r="11" fill="#f1f7f3"/></svg>';
+    zip.file("manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("service-worker.js", serviceWorkerSource);
+    zip.file("pwa-register.js", registerSource);
+    zip.file("icon.svg", iconSource);
+    const safePackageName = (project.name || "gene-project").toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 48) || "gene-project";
+    const desktopPackage = {
+      name: safePackageName + "-desktop", version: "1.0.0", private: true, description: projectTitle,
+      main: "main.cjs",
+      scripts: { start: "electron .", "dist:win": "electron-builder --win nsis", "dist:mac": "electron-builder --mac", "dist:linux": "electron-builder --linux" },
+      devDependencies: { electron: "^35.0.0", "electron-builder": "^26.0.0" },
+      build: { appId: "studio.gene.generated", productName: projectTitle.slice(0, 80), files: ["main.cjs", "app/**/*"], directories: { output: "dist" }, win: { target: ["nsis"] }, mac: { target: ["dmg"] }, linux: { target: ["AppImage"] } }
+    };
+    zip.file("desktop-wrapper/package.json", JSON.stringify(desktopPackage, null, 2));
+    zip.file("desktop-wrapper/main.cjs", "'use strict'; const {app,BrowserWindow}=require('electron'); const path=require('node:path'); function createWindow(){const win=new BrowserWindow({width:1280,height:800,minWidth:800,minHeight:560,backgroundColor:'#101411',autoHideMenuBar:true,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); win.loadFile(path.join(__dirname,'app','index.html'));} app.whenReady().then(()=>{createWindow();app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});}); app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});");
+    zip.file("desktop-wrapper/README.md", "# Desktop EXE/installer source kit\n\n1. Install Node.js LTS on the build computer.\n2. Open a terminal in this folder and run npm install.\n3. On Windows run npm run dist:win; on macOS run npm run dist:mac; on Linux run npm run dist:linux.\n4. Find the installer or app image in dist/.\n\nThis kit contains the Electron wrapper and project source. It is not a precompiled EXE; the platform packaging toolchain must run on a suitable computer.");
+    const androidPackage = {
+      name: safePackageName + "-android", version: "1.0.0", private: true,
+      scripts: { "android:init": "cap add android", "android:sync": "cap sync android", "android:open": "cap open android" },
+      dependencies: { "@capacitor/android": "^7.0.0", "@capacitor/core": "^7.0.0" },
+      devDependencies: { "@capacitor/cli": "^7.0.0" }
+    };
+    zip.file("android-wrapper/package.json", JSON.stringify(androidPackage, null, 2));
+    zip.file("android-wrapper/capacitor.config.json", JSON.stringify({ appId: "studio.gene.generated", appName: projectTitle.slice(0, 80), webDir: "www", bundledWebRuntime: false }, null, 2));
+    zip.file("android-wrapper/README.md", "# Android APK source kit\n\n1. Install Node.js LTS and Android Studio with the Android SDK.\n2. This kit already includes the project in www/. Run npm install, then npm run android:init and npm run android:sync.\n3. Open Android Studio with npm run android:open, select Build > Build APK(s), and retrieve the APK from the Android project output.\n\nThis is a Capacitor wrapper project, not a precompiled APK. Android SDK signing/build steps require a configured Android toolchain.");
+    zip.file("android-wrapper/www/index.html", mainHtml);
+    zip.file("android-wrapper/www/" + cssName, project.files["game.css"] || "");
+    zip.file("android-wrapper/www/" + jsName, project.files["game.js"] || "");
+    zip.file("android-wrapper/www/" + specName, project.files["game-spec.json"] || "{}");
+    zip.file("android-wrapper/www/manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("android-wrapper/www/service-worker.js", serviceWorkerSource);
+    zip.file("android-wrapper/www/pwa-register.js", registerSource);
+    zip.file("android-wrapper/www/icon.svg", iconSource);
+    zip.file("desktop-wrapper/app/index.html", mainHtml);
+    zip.file("desktop-wrapper/app/" + cssName, project.files["game.css"] || "");
+    zip.file("desktop-wrapper/app/" + jsName, project.files["game.js"] || "");
+    zip.file("desktop-wrapper/app/" + specName, project.files["game-spec.json"] || "{}");
+    zip.file("desktop-wrapper/app/manifest.webmanifest", JSON.stringify(webManifest, null, 2));
+    zip.file("desktop-wrapper/app/service-worker.js", serviceWorkerSource);
+    zip.file("desktop-wrapper/app/pwa-register.js", registerSource);
+    zip.file("desktop-wrapper/app/icon.svg", iconSource);
     (project.references || []).forEach(ref => {
       const safeName = ref.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120) || "reference";
       if (ref.kind === "image" && ref.dataBase64) zip.file("references/" + safeName, ref.dataBase64, { base64: true });
@@ -1068,7 +1287,12 @@ export default function Home() {
     });
     project.versions.forEach(version => {
       const prefix = "versions/" + String(version.number).padStart(3, "0") + "/";
-      Object.entries(version.files).forEach(([path, source]) => zip.file(prefix + exportProjectPath(path, project.kind || "game"), source));
+      Object.entries(version.files).forEach(([path, source]) => {
+        if (path === "game.html") return;
+        zip.file(prefix + exportProjectPath(path, projectKind), source);
+      });
+      zip.file(prefix + "source/game.html", version.files["game.html"] || "");
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files)));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
@@ -1090,15 +1314,21 @@ export default function Home() {
       "",
       "Initial request: " + project.initialPrompt,
       "",
-      "Important: download is source packaging, not a platform-specific EXE build."
-    ].join("\\n"));
-    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+      "The root index.html is a standalone web/PWA package. desktop-wrapper contains an Electron installer project and android-wrapper contains a Capacitor project for generating an APK with Android Studio. Compiled EXE/APK binaries are not generated inside this browser session; run the included platform build steps."
+    ].join("\n"));
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, metadata => setPackageProgress(Math.max(0, Math.min(100, Math.round(metadata.percent)))));
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = (project.name || "gene-project").replace(/[^a-z0-9-_]+/gi, "-") + ".zip";
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    setNotice("Project ZIP packaged successfully (" + Math.round(blob.size / 1024) + " KB). This is a source bundle, not a compiled EXE/APK.");
+    window.setTimeout(() => setPackageProgress(null), 900);
+    } catch (error) {
+      setPackageProgress(null);
+      setNotice("Packaging failed: " + (error instanceof Error ? error.message : "Unknown ZIP error"));
+    }
   }
 
   function openFullscreenGame() {
@@ -1106,7 +1336,7 @@ export default function Home() {
     window.open("/play/" + encodeURIComponent(project.id), "_blank", "noopener,noreferrer");
   }
 
-  if (!project) return <main className="boot"><div className="gene-mark">G</div><p>Opening your workspace…</p></main>;
+  if (!project) return <main className="boot"><div className="gene-mark"><GeneMark /></div><p>Opening your workspace…</p></main>;
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
   const isApp = project.kind === "app";
@@ -1124,12 +1354,12 @@ export default function Home() {
   return (
     <main className={"gene-app " + theme} data-theme={theme}>
       <aside className="rail">
-        <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit">G</span></button>
+        <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
         <div className="rail-separator" />
         {nav.map(item => <button key={item.id} className={"rail-item " + (section === item.id ? "selected" : "")} title={item.label} onClick={() => setSection(item.id)}><span>{item.icon}</span></button>)}
         <div className="rail-spacer" />
         <button className="rail-item" title="Switch theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}><span>{theme === "dark" ? "☼" : "☾"}</span></button>
-        <button className="avatar" title="GENE 1.2 Flash">G</button>
+        <button className="avatar" title="GENE 1.2 Flash"><GeneMark /></button>
       </aside>
 
       <aside className="project-sidebar">
@@ -1140,16 +1370,16 @@ export default function Home() {
         <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
         <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
-        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small></div>
+        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small><button className="project-delete" title="Delete this chat and project" onClick={() => deleteProject(project.id)}>×</button></div>
         {projects.filter(p => p.id !== project.id).length > 0 && <>
-          <div className="sidebar-section-label">RECENT PROJECTS</div>
-          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
+          <div className="sidebar-section-label">RECENT CHATS</div>
+          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
         </>}
         <div className="sidebar-section-label">PROJECT FILES</div>
         {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
         <div className="sidebar-bottom">
-          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "Gemini connected" : "Gemini key missing"}</div>
-          <small>{apiReady ? aiModel : "AI builds require a server-side key"}</small>
+          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "AI providers ready" : "Add an AI provider key"}</div>
+          <small>{apiReady ? aiModel : "Gemini, Groq or OpenRouter key required"}</small>
           <div className="agent-connection">
             <div className="connection-row"><span className={"status-dot " + (localAgentStatus === "connected" ? "online" : localAgentStatus === "error" ? "offline" : "")} />{localAgentStatus === "connected" ? "Local Agent connected" : localAgentStatus === "checking" ? "Checking Local Agent" : localAgentStatus === "error" ? "Local Agent error" : "Local Agent disconnected"}</div>
             {localAgentWorkspace && <small title={localAgentWorkspace}>{localAgentWorkspace}</small>}
@@ -1175,18 +1405,19 @@ export default function Home() {
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
             <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
-            <button className="icon-button subtle" title="Download project ZIP" onClick={downloadProject}>↓</button>
+             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
+            <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
 
-        {notice && <div className="notice"><span>{notice}</span><button onClick={() => setNotice("")}>Dismiss</button></div>}
+        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
 
         <div className="workspace">
           <section className="conversation-panel">
             {section === "chat" && <>
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
-                  <div className="welcome-orbit"><span>G</span><i /><b /></div>
+                  <div className="welcome-orbit"><GeneMark /><i /><b /></div>
                   <div className="eyebrow">GENE 1.2 FLASH</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
@@ -1263,7 +1494,7 @@ export default function Home() {
   <div className="tool-view-heading">
     <div className="eyebrow">GENE FORGE · REAL MESH FILES</div>
     <h2>Asset workshop</h2>
-    <p>Describe an asset or request changes to a saved one. Gemini returns a structured part recipe; GENE turns it into actual OBJ geometry and MTL materials, then validates and saves the files in this project.</p>
+    <p>Describe an asset or request changes to a saved one. The selected AI provider returns a structured part recipe; GENE turns it into actual OBJ geometry and MTL materials, then validates and saves the files in this project.</p>
   </div>
   <div className="forge-form">
     <div className="forge-form-top">
@@ -1272,7 +1503,7 @@ export default function Home() {
     </div>
     {forgeTargetId && <div className="forge-editing"><span className="status-dot online" /> Editing the saved asset <strong>{savedAssets.find(asset => asset.id === forgeTargetId)?.name || forgeTargetId}</strong><button onClick={() => { setForgeTargetId(null); setForgePrompt(""); setForgeNotice(""); }}>Create new asset instead</button></div>}
     <textarea className="forge-prompt" value={forgePrompt} onChange={e => setForgePrompt(e.target.value)} placeholder={forgeTargetId ? "Describe the changes to this exact mesh — e.g. make the wheels larger, lower the cabin, and add protective side panels." : "Describe the mesh — e.g. a compact metro maintenance rover with four chunky wheels, a sloped glass cabin, protective bumpers, yellow safety markings and a coherent industrial silhouette."} rows={3} />
-    <div className="forge-form-bottom"><span>{apiReady ? "Gemini connected · mesh generation uses the selected model" : "Gemini API key required · no fake local generation"}</span><button className="primary-button" onClick={() => void generateForgeAsset()} disabled={forgeBusy || !forgePrompt.trim() || apiReady !== true}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating mesh…</> : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
+    <div className="forge-form-bottom"><span>{apiReady ? "AI connected · mesh generation uses the selected model" : "Configure Gemini, Groq, or OpenRouter · no fake local generation"}</span><button className="primary-button" onClick={() => void generateForgeAsset()} disabled={forgeBusy || !forgePrompt.trim() || apiReady !== true}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating mesh…</> : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
     {forgeNotice && <div className="forge-notice">{forgeNotice}</div>}
   </div>
   <div className="forge-assets-heading"><div><div className="eyebrow">PROJECT ASSETS</div><h3>Saved meshes <span>{savedAssets.length}</span></h3></div><span>OBJ · MTL · JSON recipe</span></div>
@@ -1287,11 +1518,17 @@ export default function Home() {
 </div>}{section === "versions" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">RECOVERY</div><h2>Versions</h2><p>Every successful source-changing response creates a local snapshot. Restoring creates another snapshot, so history stays intact.</p></div>{project.versions.length ? <div className="version-list">{project.versions.map(version => <div key={version.number} className="version-item"><div className="version-number">v{String(version.number).padStart(3, "0")}</div><div className="version-meta"><strong>{version.label}</strong><small>{new Date(version.createdAt).toLocaleString()} · {Object.keys(version.files).length} files</small><p>{version.testSummary}</p></div><button className="secondary-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}</div> : <div className="empty-state">No versions yet. A version is created when GENE returns files or you save a manual edit.</div>}</div>}
           </section>
 
-          <aside className={"preview-panel " + (!previewOpen ? "collapsed" : "") + (expandedPreview ? " expanded" : "")}>
-            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title={previewOpen ? "Minimize preview" : "Open preview"} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? "–" : "□"}</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
-            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : (project.kind === "app" ? "No app loaded" : "No game loaded")}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
+          {previewOpen ? <aside className={"preview-panel" + (expandedPreview ? " expanded" : "")}>
+            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); }}>–</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
+            <div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div>
+            {expandedPreview && hasGame && <form className="expanded-live-editor" onSubmit={event => { event.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); }}>
+              <div className="expanded-live-editor-label"><span className="live-dot" /> EDIT LIVE <span>Chat edits update this preview</span></div>
+              <textarea value={draft} onChange={event => setDraft(event.target.value)} rows={2} placeholder="Describe what to change in the game or app…" aria-label="Edit the live preview" />
+              <button type="submit" disabled={busy || !draft.trim()}>{busy ? "Applying…" : "Apply edit"} <span>↑</span></button>
+            </form>}
+            <div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : (project.kind === "app" ? "No app loaded" : "No game loaded")}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div>
             {expandedPreview && hasGame && <button className="close-expanded" title="Close expanded preview" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
-          </aside>
+          </aside> : <button className="preview-reopen-tab" title="Reopen live preview" onClick={() => setPreviewOpen(true)}><span className="live-dot" /> Preview <span>↗</span></button>}
         </div>
         <footer className="statusbar"><div><span className="status-dot online" /> Workspace local state</div><div>{Object.keys(project.files).length} source files <span className="status-divider">·</span> {project.versions.length} versions <span className="status-divider">·</span> {project.thinking} mode</div><button onClick={() => setShowActivity(!showActivity)}>Activity {showActivity ? "▾" : "▴"}</button></footer>
       </section>

@@ -155,14 +155,35 @@ function ensureProjectSpecTitle(
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) return files;
   if (typeof spec.title === "string" && spec.title.trim()) return files;
 
-  const fallback = candidates
+  const strings = candidates
     .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
-    .map(value => value.trim())
-    .find(value => !/^untitled\\s+(game|app)$/i.test(value));
-  const title = (fallback || candidates.find((value): value is string => typeof value === "string" && Boolean(value.trim())) || "Untitled Project")
-    .split(/[.!?\\n]/)[0].trim().slice(0, 100) || "Untitled Project";
+    .map(value => value.trim());
+  const fallback = strings.find(value => !/^untitled\s+(game|app)$/i.test(value));
+  const title = (fallback || strings[0] || "Untitled Project")
+    .split(/[.!?\n]/)[0].trim().slice(0, 100) || "Untitled Project";
   spec.title = title;
   return files.map(file => file.path === "game-spec.json" ? { ...file, content: JSON.stringify(spec, null, 2) } : file);
+}
+
+function normalizeExecutableHtmlScripts(files: Array<{ path: string; content: string }>): Array<{ path: string; content: string }> {
+  const htmlFile = files.find(file => file.path === "game.html");
+  const jsFile = files.find(file => file.path === "game.js");
+  if (!htmlFile || !jsFile || !/<script\b/i.test(htmlFile.content)) return files;
+  const extracted: string[] = [];
+  const html = htmlFile.content.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (_whole, attrs: string, body: string) => {
+    if (/\bsrc\s*=/i.test(attrs)) return "";
+    if (/\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["']/i.test(attrs)) return "";
+    if (body.trim()) extracted.push(body.trim());
+    return "";
+  });
+  if (/<script\b/i.test(html)) {
+    throw new Error("Build rejected: external or unsupported script tags are not allowed in game.html. Put executable source in game.js.");
+  }
+  let js = jsFile.content;
+  for (const script of extracted) {
+    if (!js.includes(script)) js += "\n\n/* Migrated from inline HTML script for GENE runtime compatibility */\n" + script + "\n";
+  }
+  return files.map(file => file.path === "game.html" ? { ...file, content: html } : file.path === "game.js" ? { ...file, content: js } : file);
 }
 
 function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
@@ -201,7 +222,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const html = byPath["game.html"];
     const css = byPath["game.css"];
     const js = byPath["game.js"];
-    if (/<script\b/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
+    if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
     if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
     if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
     if (/@import\s+url\s*\(\s*["']?https?:|url\s*\(\s*["']https?:/i.test(css)) throw new Error("Build rejected: CSS contains an external runtime dependency.");
@@ -302,7 +323,7 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKeys = getGeminiKeys();
-  if (apiKeys.length === 0) {
+  if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
     const answers = body.answers || {};
     const known = Object.keys(answers);
     if (body.operation === "interview" && known.length === 0) {
@@ -378,14 +399,15 @@ export async function POST(request: NextRequest) {
 
   let payload: any = null;
   let successfulModel = model;
-  let lastFailure = { status: 502, detail: "Gemini request did not complete." };
+  let successfulProvider = "gemini";
+  let lastFailure = { status: 502, detail: "Configured AI providers did not complete the request." };
   let attempts = 0;
   let outputFailure: "truncated" | "malformed" | null = null;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
-  const queued: Array<{ key: string; model: string; fallback: boolean }> = [
+  const queued: Array<{ key: string; model: string; fallback: boolean }> = apiKeys.length ? [
     { key: apiKeys[0], model, fallback: false }
-  ];
-  const queuedIds = new Set<string>([apiKeys[0] + "|" + model]);
+  ] : [];
+  const queuedIds = new Set<string>(apiKeys.length ? [apiKeys[0] + "|" + model] : []);
   const enqueue = (key: string, candidateModel: string, fallback: boolean) => {
     const id = key + "|" + candidateModel;
     if (!queuedIds.has(id) && queued.length < 8) {
@@ -395,10 +417,11 @@ export async function POST(request: NextRequest) {
   };
   const startedAt = Date.now();
   const totalBudgetMs = 52_000;
+  const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 34_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
     const attempt = queued.shift()!;
-    const remainingMs = totalBudgetMs - (Date.now() - startedAt);
+    const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
     attempts += 1;
     try {
@@ -491,6 +514,71 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Cross-provider fallback: Gemini is the default, not a hard dependency.
+  // Add GROQ_API_KEY and/or OPENROUTER_API_KEY in Vercel to enable these routes.
+  if (!payload) {
+    const alternateProviders: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
+    if (process.env.GROQ_API_KEY?.trim()) {
+      alternateProviders.push({
+        name: "groq",
+        key: process.env.GROQ_API_KEY.trim(),
+        endpoint: "https://api.groq.com/openai/v1/chat/completions",
+        model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
+      });
+    }
+    if (process.env.OPENROUTER_API_KEY?.trim()) {
+      alternateProviders.push({
+        name: "openrouter",
+        key: process.env.OPENROUTER_API_KEY.trim(),
+        endpoint: "https://openrouter.ai/api/v1/chat/completions",
+        model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
+        headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder" }
+      });
+    }
+    for (const provider of alternateProviders) {
+      if (Date.now() - startedAt > totalBudgetMs - 2_500) break;
+      try {
+        const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
+        const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
+        const remainingMs = Math.max(1_000, totalBudgetMs - (Date.now() - startedAt) - 500);
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + provider.key,
+            ...(provider.headers || {})
+          },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [{ role: "system", content: system }, { role: "user", content: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete." }],
+            response_format: { type: "json_object" },
+            temperature: body.operation === "interview" ? 0.35 : 0.2,
+            max_tokens: body.operation === "buildPart" ? 5_000 : isBuild ? 7_000 : 2_000
+          }),
+          signal: AbortSignal.timeout(Math.min(14_000, remainingMs))
+        });
+        const data = await response.json().catch(() => null);
+        const content = data?.choices?.[0]?.message?.content;
+        if (!response.ok || typeof content !== "string" || !content.trim()) {
+          lastFailure = { status: response.status || 502, detail: provider.name + " fallback: " + String(data?.error?.message || "empty response") };
+          continue;
+        }
+        let parsed: unknown;
+        try { parsed = JSON.parse(content); } catch {
+          lastFailure = { status: 422, detail: provider.name + " returned incomplete or invalid JSON." };
+          continue;
+        }
+        payload = { candidates: [{ content: { parts: [{ text: JSON.stringify(parsed) }] }, finishReason: "STOP" }] };
+        successfulModel = provider.model;
+        successfulProvider = provider.name;
+        outputFailure = null;
+        break;
+      } catch (error) {
+        lastFailure = { status: 504, detail: provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network error") };
+      }
+    }
+  }
+
   if (!payload) {
     if (outputFailure) {
       const truncated = outputFailure === "truncated";
@@ -518,6 +606,7 @@ export async function POST(request: NextRequest) {
   if (!text.trim()) return jsonError("Gemini returned an empty response. No files were changed.", 502, "GEMINI_EMPTY_RESPONSE");
 
   let result: AgentResponse;
+  let reviewedBy = "";
   try {
     if (body.operation === "research" && !text.trim().startsWith("{") && !text.trim().startsWith("```")) {
       result = { reply: text.trim(), files: [], question: null, plan: null, complete: true, needsUserDecision: false };
@@ -525,6 +614,63 @@ export async function POST(request: NextRequest) {
       result = parseModelJson(text);
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    if (process.env.GENE_AI_REVIEW?.trim().toLowerCase() === "true" &&
+        ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
+        Array.isArray(result.files) && result.files.length > 0) {
+      const reviewer: { name: string; key: string; endpoint: string; model: string; headers: Record<string, string> } | null = successfulProvider === "groq"
+        ? (process.env.OPENROUTER_API_KEY?.trim() ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } } : null)
+        : successfulProvider === "openrouter"
+          ? (process.env.GROQ_API_KEY?.trim() ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} } : null)
+          : process.env.GROQ_API_KEY?.trim()
+            ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} }
+            : process.env.OPENROUTER_API_KEY?.trim()
+              ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } }
+              : null;
+      if (reviewer) {
+        try {
+          const candidatePaths = new Set(result.files.map(file => file.path));
+          const reviewInput = {
+            operation: body.operation,
+            stagePath: body.stagePath || null,
+            projectKind,
+            plan: body.project?.plan || result.plan || null,
+            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => ALLOWED_FILES.has(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
+            candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
+          };
+          const reviewResponse = await fetch(reviewer.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + reviewer.key, ...reviewer.headers },
+            body: JSON.stringify({
+              model: reviewer.model,
+              messages: [
+                { role: "system", content: "You are GENE's independent code reviewer. Find concrete runtime, syntax, control, and contract bugs; do not redesign working code just for style. Return one JSON object: {reply:string,files:[{path:string,content:string}]}. If the candidate is sound or you cannot confidently fix it, return files:[] and summarize risks briefly. If you change code, return complete replacements only for paths already present in candidateFiles. Preserve the user's request, existing behavior, and no-watermark rule. No markdown." },
+                { role: "user", content: "Review this candidate before GENE validates/saves it. Return full replacement files only for high-confidence fixes.\n" + JSON.stringify(reviewInput) }
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.1,
+              max_tokens: body.operation === "buildPart" ? 3_000 : 4_000
+            }),
+            signal: AbortSignal.timeout(7_000)
+          });
+          const reviewData = await reviewResponse.json().catch(() => null);
+          const reviewContent = reviewData?.choices?.[0]?.message?.content;
+          if (reviewResponse.ok && typeof reviewContent === "string") {
+            const reviewResult = JSON.parse(reviewContent);
+            if (Array.isArray(reviewResult.files) && reviewResult.files.length > 0 &&
+                reviewResult.files.every((file: any) => file && candidatePaths.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
+              const replacements = new Map<string, string>(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
+              result.files = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
+              result.reply = result.reply + "\n\nA second AI reviewer checked the code and suggested targeted corrections before validation.";
+              reviewedBy = reviewer.name + "/" + reviewer.model;
+            } else if (typeof reviewResult.reply === "string" && reviewResult.reply.trim()) {
+              reviewedBy = reviewer.name + "/" + reviewer.model;
+            }
+          }
+        } catch {
+          // Independent review is best-effort; it must never block an otherwise valid build.
+        }
+      }
+    }
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
     result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
@@ -591,5 +737,5 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
-  return NextResponse.json({ ok: true, aiMode: "gemini", model: successfulModel, result });
+  return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }

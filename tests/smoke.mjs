@@ -11,6 +11,7 @@ const rootPackage = JSON.parse(read("package.json"));
 const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
+const publishApi = read("apps/web/app/api/publish/route.ts");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
@@ -29,7 +30,7 @@ assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lit
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
-assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(25_000"), "Gemini requests allow realistic generation time without exceeding route budget");
+assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time without exceeding route budget");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
@@ -50,6 +51,7 @@ assert.ok(page.includes('const stagePaths = ["game-spec.json", "game.html", "gam
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
 assert.ok(page.includes("stageAttempt <= 2") && page.includes("RETRY: the previous attempt"), "failed file stages retry once with a compact repair prompt");
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
+assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
 assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
 assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
@@ -250,5 +252,28 @@ try {
   await agent.close().catch(() => {});
   await rm(tempRoot, { recursive: true, force: true });
 }
+
+
+assert.ok(api.includes("normalizeExecutableHtmlScripts"), "inline executable HTML scripts are migrated into game.js before final validation");
+assert.ok(api.includes("Migrated from inline HTML script"), "script normalization preserves inline behavior instead of discarding it");
+assert.ok(api.includes("GROQ_API_KEY") && api.includes("OPENROUTER_API_KEY"), "builder can fall back across Groq and OpenRouter providers");
+assert.ok(api.includes("successfulProvider = provider.name") && api.includes('aiMode: successfulProvider'), "API reports the provider that actually completed the request");
+assert.ok(api.includes("apiKeys.length === 0 && !process.env.GROQ_API_KEY") && api.includes("apiKeys.length ? ["), "alternate providers can run even without a Gemini key");
+assert.ok(api.includes('split(/[.!?\\n]/)'), "title normalization handles punctuation and newlines correctly");
+assert.ok(page.includes("function deleteProject(projectId: string)"), "saved chat projects can be deleted");
+assert.ok(page.includes("preview-reopen-tab") && css.includes(".workspace:has(.preview-reopen-tab)"), "minimized preview restores from a right-edge floating control without leaving a blank grid column");
+assert.ok(page.includes("packageProgress") && page.includes("metadata.percent"), "source ZIP packaging reports real progress");
+assert.ok(prompts.includes("Never add Gemini, OpenAI, Groq, OpenRouter, GENE, or AI-generated watermarks"), "generated app/game UIs avoid provider watermarks unless requested");
+
+
+assert.ok(publishApi.includes("GENE_PUBLISH_PASSWORD") && publishApi.includes("VERCEL_TOKEN") && publishApi.includes("VERCEL_PROJECT_ID"), "web publishing is protected and uses server-side Vercel credentials");
+assert.ok(publishApi.includes('target: "preview"'), "publishing user projects cannot overwrite GENE production deployment");
+assert.ok(publishApi.includes("MAX_BYTES = 4_000_000") && publishApi.includes("GENE_PUBLISH_RATE_LIMIT"), "publishing validates upload size and rate limits");
+assert.ok(page.includes("async function publishProject()") && page.includes('fetch("/api/publish"'), "workspace can publish the current web build and receive a live URL");
+assert.ok(page.includes("desktop-wrapper/package.json") && page.includes("android-wrapper/package.json"), "source export includes real Electron and Capacitor wrapper projects");
+assert.ok(page.includes("manifest.webmanifest") && page.includes("service-worker.js") && page.includes("standaloneDocument"), "web export creates a standalone installable PWA shell");
+assert.ok(page.includes("expanded-live-editor") && page.includes("Apply edit"), "fullscreen live preview supports chat-driven edits without closing the preview");
+assert.ok(page.includes("<GeneMark />") && css.includes(".gene-logo-svg"), "the UI uses the new custom geometric GENE mark");
+assert.ok(health.includes("GROQ_API_KEY") && health.includes("OPENROUTER_API_KEY") && health.includes("publishConfigured"), "health status detects alternate AI providers and publish setup");
 
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");

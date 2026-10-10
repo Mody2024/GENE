@@ -7,10 +7,11 @@ GENE is an AI-assisted workspace for building and editing self-contained web app
 Implemented in this branch:
 - Chat-first workspace inspired by professional AI coding tools, with working navigation and dark/light themes.
 - Two project types: browser games (Canvas 2D/raw WebGL) and frontend web apps (semantic HTML/CSS/JavaScript), each with separate planning/validation contracts and in-app source editing.
-- App-specific welcome prompts, plans, live DOM preview, scrollable fullscreen preview, editable source tabs and standard ZIP exports (`index.html`, `styles.css`, `app.js`, `app-spec.json`) that can be imported back into GENE.
+- App-specific welcome prompts, plans, live DOM preview, scrollable fullscreen preview with an edit composer, editable source tabs, and a standalone PWA export plus Electron/Capacitor wrapper kits.
 - A built-in, no-API-key-needed playable starter game (**Outpost: Last Light**) with keyboard/mobile controls, an energy-core objective, pursuing drones, dash, shield, win/loss states, restart, and editable/exportable HTML/CSS/JavaScript source.
 - Plan/Build modes and a sequential one-question-at-a-time interview prompt contract.
-- Gemini server API endpoint with server-only API key handling, thinking levels, response validation, rate limiting, and explicit errors when no key is configured.
+- Multi-provider AI endpoint: Gemini is primary, with optional Groq and OpenRouter fallback keys; provider keys remain server-side, and thinking levels affect request strategy.
+- Staged four-file generation, per-file compact retries, source normalization, title repair, and final assembled-project validation to prevent incomplete or invalid AI output from being saved.
 - Read-only grounded Google Search mode; sources are returned from Gemini Search grounding when available.
 - Genre-specific implementation/acceptance guides for platformers, precision runners, 2D action, tower defense, 3D lane runners and 3D arena games.
 - Image and text/source reference attachments, with image bytes passed to Gemini.
@@ -39,7 +40,7 @@ The generation path asks Gemini for the actual source files used by the preview.
 Use Node.js 20 or a newer supported LTS release for the web workspace.
 
 1. Copy `apps/web/.env.example` to `apps/web/.env.local`.
-2. Set `GEMINI_API_KEY` to your own Google AI Studio API key. Do not commit this file.
+2. Set `GEMINI_API_KEY`; optionally configure `GROQ_API_KEY` and/or `OPENROUTER_API_KEY` for cross-provider recovery. Set `GENE_AI_REVIEW=true` to have a different configured provider independently review candidate code before validation (best effort, with extra quota/latency). Never commit secrets.
 3. From the repository root, run `npm install`.
 4. Run `npm run dev`.
 5. Open `http://localhost:3000`.
@@ -49,6 +50,10 @@ Run `npm test` for contract checks and `npm run build` for the production build.
 ## Deploy on Vercel
 
 Import this GitHub repository into Vercel. Set the Root Directory to `apps/web`, build command to `next build`, and add `GEMINI_API_KEY` plus optional `GENE_FAST_MODEL` to Vercel Environment Variables. Do not commit `.env.local`.
+
+## Optional web publishing
+
+The Publish action creates a static Vercel deployment only when these server-side variables are configured: `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, and `GENE_PUBLISH_PASSWORD` (optional `VERCEL_TEAM_ID` and `VERCEL_PROJECT_NAME`). The publish password gates deployment creation; use a strong secret and rotate it if exposed. Vercel API/deployment quotas still apply.
 
 ## Honest limitations of this milestone
 

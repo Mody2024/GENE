@@ -33,3 +33,43 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 @media(max-width:480px){.topbar{gap:6px}.top-actions{gap:5px;width:100%;justify-content:flex-start}.top-play-button,.mobile-preview-button{font-size:9px;padding:6px 8px}.thinking-select{max-width:80px}.sync-button{font-size:8px;padding:5px 6px}.build-check-head{flex-direction:column}.build-check-head .primary-button{width:100%}.build-check-item{grid-template-columns:22px minmax(88px,1fr)}.check-detail{grid-column:2}.build-check-summary{align-items:flex-start;flex-direction:column}.rename-project{padding:4px}}
 
 .project-kind-chip{display:inline-flex;align-items:center;border:1px solid var(--border);padding:5px 8px;border-radius:999px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.12em;white-space:nowrap}
+
+
+/* GENE v1.2: calmer preview collapse and project chat controls */
+.workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}
+.preview-reopen-tab{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:40;display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--text);box-shadow:0 12px 36px rgba(0,0,0,.28);backdrop-filter:blur(18px);font-size:11px;font-weight:700;cursor:pointer}
+.preview-reopen-tab:hover{border-color:var(--green);transform:translateY(-50%) translateX(-2px)}
+.preview-reopen-tab>span:last-child{color:var(--green);font-size:14px}
+.project-card{padding-right:36px}
+.project-delete,.recent-delete{border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:grid;place-items:center}
+.project-delete{position:absolute;right:6px;top:7px;width:25px;height:25px;font-size:18px}
+.project-delete:hover,.recent-delete:hover{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
+.recent-project-row{display:flex;align-items:center;gap:2px;min-width:0;border-radius:8px;padding-right:3px}
+.recent-project-row .file-row{flex:1;min-width:0;margin:0}
+.recent-delete{flex:0 0 26px;height:28px;font-size:17px;opacity:.65}
+.recent-project-row:hover .recent-delete{opacity:1}
+@media(max-width:800px){.preview-reopen-tab{top:auto;bottom:84px;right:10px;transform:none;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.3)}.preview-reopen-tab:hover{transform:translateY(-2px)}}
+
+.gene-logo-svg{width:25px;height:25px;display:block;flex:0 0 auto;color:currentColor}
+.brand-orbit .gene-logo-svg{width:26px;height:26px;color:#123425}
+.avatar .gene-logo-svg{width:20px;height:20px;color:#123425}
+.welcome-orbit>.gene-logo-svg{width:43px;height:43px;color:var(--green)}
+.gene-mark>.gene-logo-svg{width:44px;height:44px;color:var(--green)}
+.project-delete:focus-visible,.recent-delete:focus-visible,.preview-reopen-tab:focus-visible,.gene-logo-svg:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+
+.expanded-live-editor{position:absolute;z-index:12;left:24px;bottom:56px;width:min(560px,calc(100% - 48px));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:12px;border:1px solid var(--border-strong);border-radius:15px;background:color-mix(in srgb,var(--surface) 91%,transparent);box-shadow:0 14px 44px rgba(0,0,0,.36);backdrop-filter:blur(22px)}
+.expanded-live-editor-label{grid-column:1/-1;display:flex;align-items:center;gap:8px;font:700 9px "DM Mono",monospace;letter-spacing:.09em;color:var(--green)}
+.expanded-live-editor-label span:last-child{font:500 10px "DM Sans",sans-serif;letter-spacing:0;color:var(--muted);margin-left:4px}
+.expanded-live-editor textarea{resize:vertical;min-height:44px;max-height:130px;width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text);font:11px/1.55 "DM Sans",sans-serif;outline:none}
+.expanded-live-editor textarea:focus{border-color:var(--green)}
+.expanded-live-editor button{align-self:stretch;padding:0 15px;border:0;border-radius:10px;background:var(--green);color:#102318;font-size:10px;font-weight:800;white-space:nowrap}
+.expanded-live-editor button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:800px){.expanded-live-editor{left:10px;bottom:54px;width:calc(100% - 20px);grid-template-columns:minmax(0,1fr) auto;padding:9px;gap:7px}.expanded-live-editor textarea{font-size:12px}.expanded-live-editor button{padding:0 11px}}
+
+.publish-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid color-mix(in srgb,var(--green) 34%,var(--border));border-radius:9px;background:color-mix(in srgb,var(--green) 10%,var(--surface-2));color:var(--text);padding:7px 10px;font-size:10px;font-weight:750;white-space:nowrap}
+.publish-button:hover:not(:disabled){border-color:var(--green);background:color-mix(in srgb,var(--green) 16%,var(--surface-2))}
+.publish-button:disabled{opacity:.5;cursor:not-allowed}
+.notice a{color:var(--green);font-weight:750;margin-left:8px}
+.copy-publish-link{border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);padding:4px 7px;margin-left:8px;font-size:10px}
+.package-progress-label{font:9px "DM Mono",monospace;color:var(--green);white-space:nowrap}
+@media(max-width:480px){.publish-button{padding:6px 7px;font-size:9px}}
