@@ -264,7 +264,7 @@ export default function Home() {
     if (!operationOverride) {
       if (searchMode) operation = "research";
       else if (isConversationOnly(prompt)) operation = "chat";
-      else if (project.mode === "plan") operation = project.initialPrompt ? "plan" : "interview";
+      else if (project.mode === "plan") operation = project.question ? "interview" : project.initialPrompt ? "plan" : "interview";
       else if (!Object.keys(project.files).length) operation = "build";
       else operation = "edit";
     }
