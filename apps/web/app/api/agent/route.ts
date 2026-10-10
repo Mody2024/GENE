@@ -155,12 +155,12 @@ function ensureProjectSpecTitle(
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) return files;
   if (typeof spec.title === "string" && spec.title.trim()) return files;
 
-  const fallback = candidates
+  const strings = candidates
     .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
-    .map(value => value.trim())
-    .find(value => !/^untitled\\s+(game|app)$/i.test(value));
-  const title = (fallback || candidates.find((value): value is string => typeof value === "string" && Boolean(value.trim())) || "Untitled Project")
-    .split(/[.!?\\n]/)[0].trim().slice(0, 100) || "Untitled Project";
+    .map(value => value.trim());
+  const fallback = strings.find(value => !/^untitled\s+(game|app)$/i.test(value));
+  const title = (fallback || strings[0] || "Untitled Project")
+    .split(/[.!?\n]/)[0].trim().slice(0, 100) || "Untitled Project";
   spec.title = title;
   return files.map(file => file.path === "game-spec.json" ? { ...file, content: JSON.stringify(spec, null, 2) } : file);
 }
