@@ -116,6 +116,9 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
+  const [publishConfigured, setPublishConfigured] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState("");
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
   const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "versions">("chat");
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -168,6 +171,7 @@ export default function Home() {
     }
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
+      setPublishConfigured(Boolean(d.publishConfigured));
       if (d.model) setAiModel(d.model);
     }).catch(() => setApiReady(false));
   }, []);
@@ -1107,6 +1111,65 @@ export default function Home() {
     }
   }
 
+  async function publishProject() {
+    if (!project || !hasGame || publishBusy) return;
+    if (!publishConfigured) {
+      setNotice("To enable publishing, configure VERCEL_TOKEN, VERCEL_PROJECT_ID, and GENE_PUBLISH_PASSWORD in the GENE Vercel project, then redeploy.");
+      return;
+    }
+    const password = window.prompt("Enter the publish password stored in GENE's GENE_PUBLISH_PASSWORD environment variable.");
+    if (!password) return;
+    setPublishBusy(true);
+    setPublishedUrl("");
+    setNotice("Preparing a standalone web build for publishing…");
+    try {
+      const projectKind = project.kind || "game";
+      const cssName = projectKind === "app" ? "styles.css" : "game.css";
+      const jsName = projectKind === "app" ? "app.js" : "game.js";
+      const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
+      const title = project.plan?.title || project.name || "GENE project";
+      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+      const manifest = {
+        name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
+        start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
+        icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }]
+      };
+      const registerSource = "'use strict'; if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function () {}); }); }";
+      const cacheName = "gene-published-" + project.id.replace(/[^a-z0-9-]/gi, "").slice(0, 36);
+      const workerSource = "'use strict'; const CACHE='" + cacheName + "'; const FILES=['./','./index.html','./" + cssName + "','./" + jsName + "','./" + specName + "','./manifest.webmanifest','./icon.svg','./pwa-register.js']; self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))); self.addEventListener('activate',e=>e.waitUntil(self.clients.claim())); self.addEventListener('fetch',e=>{if(e.request.method==='GET'&&new URL(e.request.url).origin===location.origin)e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('./index.html'))));});";
+      const icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#101411"/><path d="M91 32A43 43 0 1 0 99 83H70V67h48v10A56 56 0 1 1 105 23z" fill="#77e0a2"/><circle cx="64" cy="64" r="11" fill="#f1f7f3"/></svg>';
+      const files: Array<{ path: string; content: string }> = [
+        { path: "index.html", content: html },
+        { path: cssName, content: project.files["game.css"] || "" },
+        { path: jsName, content: project.files["game.js"] || "" },
+        { path: specName, content: project.files["game-spec.json"] || "{}" },
+        { path: "manifest.webmanifest", content: JSON.stringify(manifest, null, 2) },
+        { path: "pwa-register.js", content: registerSource },
+        { path: "service-worker.js", content: workerSource },
+        { path: "icon.svg", content: icon }
+      ];
+      for (const [path, content] of Object.entries(project.files)) {
+        if (path === "game.html" || ["game.css", "game.js", "game-spec.json"].includes(path)) continue;
+        files.push({ path: exportProjectPath(path, projectKind), content });
+      }
+      setNotice("Uploading " + files.length + " files to Vercel and waiting for deployment status…");
+      const response = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-gene-publish-password": password },
+        body: JSON.stringify({ name: title, files })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error?.message || "Vercel rejected this publish request.");
+      setPublishedUrl(payload.url);
+      setNotice(payload.ready ? "Your web project is published and ready." : "Vercel accepted the deployment. It may take a moment to finish becoming available.");
+      addActivity("Published web project: " + payload.url + " (" + payload.state + ")");
+    } catch (error) {
+      setNotice("Publish failed: " + (error instanceof Error ? error.message : "Unknown publishing error"));
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   async function downloadProject() {
     if (!project || packageProgress !== null) return;
     setPackageProgress(0);
@@ -1303,7 +1366,7 @@ export default function Home() {
           </div>
         </header>
 
-        {notice && <div className="notice"><span>{notice}</span><button onClick={() => setNotice("")}>Dismiss</button></div>}
+        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { void navigator.clipboard?.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
 
         <div className="workspace">
           <section className="conversation-panel">
