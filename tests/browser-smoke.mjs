@@ -178,7 +178,7 @@ try {
   const beforeGamepad = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   await sampleFrame.locator("body").evaluate(() => {
     const buttons = Array.from({ length: 16 }, (_, index) => ({ pressed: index === 0 }));
-    Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }] });
+    window.__geneTestGamepads = [{ id: "GENE smoke controller", mapping: "standard", axes: [1, 0], buttons, connected: true }];
   });
   await samplePage.waitForTimeout(320);
   const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
