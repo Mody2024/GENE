@@ -328,9 +328,12 @@ export async function POST(request: NextRequest) {
 
   let text = "";
   let successfulModel = model;
+  let successfulProvider = "gemini";
   let lastDetail = "No configured model returned a complete asset recipe.";
   let sawTruncation = false;
   const startedAt = Date.now();
+  const hasAlternateProvider = Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim());
+  const geminiBudgetMs = hasAlternateProvider ? 31_000 : 49_000;
   const attempts: Array<{ key: string; model: string }> = [];
   for (let keyIndex = 0; keyIndex < Math.min(apiKeys.length, 3); keyIndex++) {
     for (const candidateModel of fallbackModels) {
@@ -340,7 +343,7 @@ export async function POST(request: NextRequest) {
     if (attempts.length >= 6) break;
   }
   for (let index = 0; index < attempts.length; index++) {
-    if (Date.now() - startedAt > 49_000) break;
+    if (Date.now() - startedAt > geminiBudgetMs) break;
     const attempt = attempts[index];
     const compact = index > 0
       ? "\n\nRECOVERY RETRY: Previous output was truncated or invalid. Return a smaller complete asset recipe from scratch, never continue partial JSON. Use fewer parts (18 maximum), concise names/notes, preserve the signature silhouette and correct proportions, and output one complete JSON object only."
@@ -354,7 +357,7 @@ export async function POST(request: NextRequest) {
           contents: [{ role: "user", parts: [{ text: user + compact }, ...parts.slice(1)] }],
           generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: index > 0 ? 3_800 : 6_500, thinkingConfig: { thinkingLevel: index > 0 || quality === "performance" ? "low" : quality === "high" ? "high" : "medium" } }
         }),
-        signal: AbortSignal.timeout(Math.min(index === 0 ? 13_000 : 9_000, Math.max(1_000, 49_000 - (Date.now() - startedAt))))
+        signal: AbortSignal.timeout(Math.min(index === 0 ? 13_000 : 9_000, Math.max(1_000, geminiBudgetMs - (Date.now() - startedAt))))
       });
       const payload: any = await response.json().catch(() => null);
       const candidateText = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\n") || "";
@@ -384,6 +387,60 @@ export async function POST(request: NextRequest) {
       lastDetail = error instanceof Error ? error.message : "Network timeout.";
     }
   }
+  if (!text && hasAlternateProvider && Date.now() - startedAt < 56_000) {
+    const providers: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
+    if (process.env.GROQ_API_KEY?.trim()) providers.push({
+      name: "groq",
+      key: process.env.GROQ_API_KEY.trim(),
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
+    });
+    if (process.env.OPENROUTER_API_KEY?.trim()) providers.push({
+      name: "openrouter",
+      key: process.env.OPENROUTER_API_KEY.trim(),
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
+      headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Forge" }
+    });
+    for (const provider of providers) {
+      if (Date.now() - startedAt > 57_000) break;
+      try {
+        const remaining = Math.max(1_000, 58_000 - (Date.now() - startedAt));
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + provider.key, ...(provider.headers || {}) },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [
+              { role: "system", content: system + "\n\nYou are an alternate provider in GENE Forge. Return one valid JSON object only. Do not use provider branding." },
+              { role: "user", content: user + "\n\nALTERNATE PROVIDER RECOVERY: Generate a compact, complete recipe from scratch using no more than 18 parts. Use only the declared shapes and surfaces. Preserve the main silhouette and functional details. No markdown, no commentary, valid JSON only." }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.2,
+            max_tokens: 3_600
+          }),
+          signal: AbortSignal.timeout(Math.min(9_000, remaining))
+        });
+        const data: any = await response.json().catch(() => null);
+        const content = data?.choices?.[0]?.message?.content;
+        if (!response.ok || typeof content !== "string" || !content.trim()) {
+          lastDetail = provider.name + " fallback: " + String(data?.error?.message || "empty response");
+          continue;
+        }
+        try { extractJson(content); } catch {
+          lastDetail = provider.name + " returned incomplete or invalid JSON.";
+          continue;
+        }
+        text = content;
+        successfulModel = provider.model;
+        successfulProvider = provider.name;
+        break;
+      } catch (error) {
+        lastDetail = provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network timeout");
+      }
+    }
+  }
+
   if (!text) {
     return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
       (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
@@ -400,7 +457,7 @@ export async function POST(request: NextRequest) {
     if (files["model.obj"].length > 1_500_000) return fail(413, "MESH_TOO_LARGE", "Generated mesh exceeded the 1.5 MB mesh budget.");
     return json(200, {
       ok: true,
-      aiMode: "gemini",
+      aiMode: successfulProvider,
       model: successfulModel,
       asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
     });
