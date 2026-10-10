@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         name: deploymentName,
         project: projectId,
-        target: "production",
+        target: "preview",
         files,
         projectSettings: { framework: null, buildCommand: null, installCommand: null, outputDirectory: ".", devCommand: null }
       }),
