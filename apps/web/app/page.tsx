@@ -53,7 +53,31 @@ function newProject(kind: ProjectKind = "game"): GeneProject {
     updatedAt: now()
   };
 }
-function fileName(path: string) { return path.split("/").pop() || path; }
+function fileName(path: string, kind: ProjectKind = "game") {
+  const leaf = path.split("/").pop() || path;
+  if (kind === "app") return ({ "game.html": "index.html", "game.css": "styles.css", "game.js": "app.js", "game-spec.json": "app-spec.json" } as Record<string, string>)[leaf] || leaf;
+  return leaf;
+}
+function exportProjectPath(path: string, kind: ProjectKind) {
+  if (kind !== "app") return path;
+  const aliases: Record<string, string> = { "game.html": "index.html", "game.css": "styles.css", "game.js": "app.js", "game-spec.json": "app-spec.json" };
+  const parts = path.split("/");
+  const leaf = parts[parts.length - 1];
+  if (aliases[leaf]) parts[parts.length - 1] = aliases[leaf];
+  return parts.join("/");
+}
+function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
+  if (kind !== "app") return files;
+  const aliases: Record<string, string> = { "index.html": "game.html", "styles.css": "game.css", "app.js": "game.js", "app-spec.json": "game-spec.json" };
+  const mapped: Record<string, string> = {};
+  for (const [path, content] of Object.entries(files)) {
+    const parts = path.split("/");
+    const leaf = parts[parts.length - 1];
+    if (aliases[leaf]) parts[parts.length - 1] = aliases[leaf];
+    mapped[parts.join("/")] = content;
+  }
+  return mapped;
+}
 
 type BuildCheckStatus = "pass" | "warn" | "fail";
 type BuildCheck = { label: string; status: BuildCheckStatus; detail: string };
@@ -924,7 +948,7 @@ export default function Home() {
   async function downloadProject() {
     if (!project) return;
     const zip = new JSZip();
-    Object.entries(project.files).forEach(([path, source]) => zip.file(path, source));
+    Object.entries(project.files).forEach(([path, source]) => zip.file(exportProjectPath(path, project.kind || "game"), source));
     (project.references || []).forEach(ref => {
       const safeName = ref.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120) || "reference";
       if (ref.kind === "image" && ref.dataBase64) zip.file("references/" + safeName, ref.dataBase64, { base64: true });
@@ -932,7 +956,7 @@ export default function Home() {
     });
     project.versions.forEach(version => {
       const prefix = "versions/" + String(version.number).padStart(3, "0") + "/";
-      Object.entries(version.files).forEach(([path, source]) => zip.file(prefix + path, source));
+      Object.entries(version.files).forEach(([path, source]) => zip.file(prefix + exportProjectPath(path, project.kind || "game"), source));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
@@ -1009,7 +1033,7 @@ export default function Home() {
           {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
         </>}
         <div className="sidebar-section-label">PROJECT FILES</div>
-        {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path)}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
+        {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
         <div className="sidebar-bottom">
           <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "Gemini connected" : "Gemini key missing"}</div>
           <small>{apiReady ? aiModel : "AI builds require a server-side key"}</small>
