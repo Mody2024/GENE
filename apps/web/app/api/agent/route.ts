@@ -606,6 +606,7 @@ export async function POST(request: NextRequest) {
   if (!text.trim()) return jsonError("Gemini returned an empty response. No files were changed.", 502, "GEMINI_EMPTY_RESPONSE");
 
   let result: AgentResponse;
+  let reviewedBy = "";
   try {
     if (body.operation === "research" && !text.trim().startsWith("{") && !text.trim().startsWith("```")) {
       result = { reply: text.trim(), files: [], question: null, plan: null, complete: true, needsUserDecision: false };
@@ -613,6 +614,63 @@ export async function POST(request: NextRequest) {
       result = parseModelJson(text);
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    if (process.env.GENE_AI_REVIEW?.trim().toLowerCase() === "true" &&
+        ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
+        Array.isArray(result.files) && result.files.length > 0) {
+      const reviewer = successfulProvider === "groq"
+        ? (process.env.OPENROUTER_API_KEY?.trim() ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } } : null)
+        : successfulProvider === "openrouter"
+          ? (process.env.GROQ_API_KEY?.trim() ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} } : null)
+          : process.env.GROQ_API_KEY?.trim()
+            ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} }
+            : process.env.OPENROUTER_API_KEY?.trim()
+              ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } }
+              : null;
+      if (reviewer) {
+        try {
+          const candidatePaths = new Set(result.files.map(file => file.path));
+          const reviewInput = {
+            operation: body.operation,
+            stagePath: body.stagePath || null,
+            projectKind,
+            plan: body.project?.plan || result.plan || null,
+            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => candidatePaths.has(path)).map(([path, content]) => [path, String(content).slice(0, 20_000)])),
+            candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
+          };
+          const reviewResponse = await fetch(reviewer.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + reviewer.key, ...reviewer.headers },
+            body: JSON.stringify({
+              model: reviewer.model,
+              messages: [
+                { role: "system", content: "You are GENE's independent code reviewer. Find concrete runtime, syntax, control, and contract bugs; do not redesign working code just for style. Return one JSON object: {reply:string,files:[{path:string,content:string}]}. If the candidate is sound or you cannot confidently fix it, return files:[] and summarize risks briefly. If you change code, return complete replacements only for paths already present in candidateFiles. Preserve the user's request, existing behavior, and no-watermark rule. No markdown." },
+                { role: "user", content: "Review this candidate before GENE validates/saves it. Return full replacement files only for high-confidence fixes.\n" + JSON.stringify(reviewInput) }
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.1,
+              max_tokens: body.operation === "buildPart" ? 3_000 : 4_000
+            }),
+            signal: AbortSignal.timeout(7_000)
+          });
+          const reviewData = await reviewResponse.json().catch(() => null);
+          const reviewContent = reviewData?.choices?.[0]?.message?.content;
+          if (reviewResponse.ok && typeof reviewContent === "string") {
+            const reviewResult = JSON.parse(reviewContent);
+            if (Array.isArray(reviewResult.files) && reviewResult.files.length > 0 &&
+                reviewResult.files.every((file: any) => file && candidatePaths.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
+              const replacements = new Map(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content]));
+              result.files = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
+              result.reply = result.reply + "\n\nA second AI reviewer checked the code and suggested targeted corrections before validation.";
+              reviewedBy = reviewer.name + "/" + reviewer.model;
+            } else if (typeof reviewResult.reply === "string" && reviewResult.reply.trim()) {
+              reviewedBy = reviewer.name + "/" + reviewer.model;
+            }
+          }
+        } catch {
+          // Independent review is best-effort; it must never block an otherwise valid build.
+        }
+      }
+    }
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
     result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
@@ -679,5 +737,5 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
-  return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, result });
+  return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }
