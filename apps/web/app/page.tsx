@@ -729,12 +729,14 @@ export default function Home() {
       let manifest: any = {};
       let currentFiles: Record<string, string> = {};
       let versionsByNumber = new Map<number, BuildVersion>();
+      let importedKind: ProjectKind = "game";
       let references: NonNullable<GeneProject["references"]> = [];
       if (file.name.toLowerCase().endsWith(".zip")) {
         const zip = await JSZip.loadAsync(file);
         const manifestEntry = zip.file("gene.project.json");
         if (!manifestEntry) throw new Error("This ZIP has no gene.project.json manifest.");
         manifest = JSON.parse(await manifestEntry.async("string"));
+        importedKind = manifest.kind === "app" || manifest.plan?.engine === "webapp" ? "app" : "game";
         let totalChars = 0;
         for (const [path, entry] of Object.entries(zip.files)) {
           if ((entry as JSZip.JSZipObject).dir) continue;
@@ -774,18 +776,21 @@ export default function Home() {
       } else if (file.name.toLowerCase().endsWith(".gene.json")) {
         const legacy = JSON.parse(await file.text());
         manifest = legacy.manifest || legacy;
+        importedKind = manifest.kind === "app" || manifest.plan?.engine === "webapp" ? "app" : "game";
         currentFiles = legacy.files || {};
         if (legacy.plan) manifest.plan = legacy.plan;
         if (Array.isArray(legacy.versions)) versionsByNumber = new Map<number, BuildVersion>(legacy.versions.map((v: BuildVersion) => [v.number, v] as [number, BuildVersion]));
       } else {
         throw new Error("Choose a GENE project ZIP or legacy .gene.json export.");
       }
-      if (!Object.keys(currentFiles).length) throw new Error("This project archive contains no game source files.");
-      if (!currentFiles["game.html"] || !currentFiles["game.js"]) throw new Error("This archive does not contain both game.html and game.js.");
+      currentFiles = importProjectPaths(currentFiles, importedKind);
+      for (const version of versionsByNumber.values()) version.files = importProjectPaths(version.files, importedKind);
+      if (!Object.keys(currentFiles).length) throw new Error("This project archive contains no source files.");
+      if (!currentFiles["game.html"] || !currentFiles["game.js"]) throw new Error(importedKind === "app" ? "This app archive does not contain index.html and app.js." : "This archive does not contain both game.html and game.js.");
       const p: GeneProject = {
         id: uid(),
         name: String(manifest.name || file.name.replace(/\.(zip|gene\.json)$/i, "")),
-        kind: manifest.kind === "app" || manifest.plan?.engine === "webapp" ? "app" : "game",
+        kind: importedKind,
         initialPrompt: String(manifest.initialPrompt || "Imported GENE project"),
         mode: "build",
         thinking: "balanced",
