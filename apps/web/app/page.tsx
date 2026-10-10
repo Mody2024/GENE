@@ -384,14 +384,14 @@ export default function Home() {
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
           let stageSucceeded = false;
           let stageError = "";
-          for (let stageAttempt = 1; stageAttempt <= 2 && !stageSucceeded; stageAttempt++) {
+          for (let stageAttempt = 1; stageAttempt <= 3 && !stageSucceeded; stageAttempt++) {
             const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
                 : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
-              (stageAttempt === 2 ? " RETRY: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." : "");
+              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
               const stageResponse = await fetch("/api/agent", {
                 method: "POST",
@@ -428,7 +428,7 @@ export default function Home() {
             }
           }
           if (!stageSucceeded) {
-            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after two compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
+            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
             responseOk = false;
             break;
           }
@@ -1514,7 +1514,7 @@ export default function Home() {
           </div>
           <small>Windows output is an Electron installer. Android output is a debug-signed APK for testing and direct installation, not a Play Store release.</small>
         </div>}
-        <div className="workspace">
+        <div className={"workspace" + (!previewOpen ? " preview-minimized" : "")}>
           <section className="conversation-panel">
             {section === "chat" && <>
               <div className="conversation-scroll">
