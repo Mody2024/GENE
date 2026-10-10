@@ -56,6 +56,8 @@ assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract tea
 assert.ok(prompts.includes("local couch multiplayer"), "game builder contract distinguishes local and online multiplayer");
 assert.ok(prompts.includes("dedicated Local Multiplayer 2D guide"), "local multiplayer has a dedicated build contract");
 assert.ok(gameGuides.includes("localMultiplayer2d"), "genre guide has a dedicated local multiplayer implementation guide");
+assert.ok(gameGuides.includes("localMultiplayer3d"), "3D local multiplayer has a dedicated guide");
+assert.ok(gameGuides.includes("return is3d(text) ? GUIDES.localMultiplayer3d : GUIDES.localMultiplayer2d"), "local multiplayer guide selection respects the requested engine");
 assert.ok(gameGuides.includes("Pressing a Player 1 key changes only Player 1 state"), "local multiplayer guide requires isolated per-player input");
 assert.ok(gameGuides.includes("Both players can move during the same frame"), "local multiplayer guide requires simultaneous gameplay");
 assert.ok(gameGuides.includes("couch co.?op") && gameGuides.includes("GUIDES.localMultiplayer2d"), "local co-op prompts select the dedicated multiplayer guide");
