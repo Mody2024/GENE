@@ -110,6 +110,7 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
         triangulate(ids, point => signA * point[axisA] - signB * point[axisB], point => point[axisC]);
       }
     }
+    for (const ids of cornerIndices.values()) faces.push(ids);
   } else if (shape === "box") {
     const [x, y, z] = scale.map(n => n / 2) as Vec3;
     vertices.push([-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]);
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels and spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration.",
     "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Use all six shape types where appropriate. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
