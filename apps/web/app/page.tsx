@@ -1074,7 +1074,7 @@ export default function Home() {
 
         {notice && <div className="notice"><span>{notice}</span><button onClick={() => setNotice("")}>Dismiss</button></div>}
 
-        <div className="workspace">
+        <div className={"workspace" + (!previewOpen ? " preview-minimized" : "")}>
           <section className="conversation-panel">
             {section === "chat" && <>
               <div className="conversation-scroll">
