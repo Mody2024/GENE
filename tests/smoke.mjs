@@ -24,6 +24,10 @@ assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned N
 assert.equal(webPackage.dependencies.jszip, "3.10.1", "project ZIP packaging is installed");
 assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
 assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit");
+assert.ok(api.includes("GEMINI_API_KEY_2") && api.includes("GEMINI_API_KEY_3"), "Gemini failover supports multiple independently configured keys");
+assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lite"), "Gemini failover includes supported stable fallback models");
+assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
+assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 const health = read("apps/web/app/api/health/route.ts");
 assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
