@@ -1,11 +1,13 @@
-# GENE — AI Game Studio
+# GENE — AI App & Game Builder
 
-GENE is an AI-assisted game-development workspace. This repository is the source of truth for the app. Build/test status must describe work the app actually performed; failed generation is rejected rather than presented as a successful game.
+GENE is an AI-assisted workspace for building and editing self-contained web apps and browser games through natural-language chat. This repository is the source of truth for the app. Build/test status must describe work the app actually performed; failed generation is rejected rather than presented as a successful game.
 
 ## Current milestone: GENE 1.2 Flash foundation
 
 Implemented in this branch:
 - Chat-first workspace inspired by professional AI coding tools, with working navigation and dark/light themes.
+- Two project types: browser games (Canvas 2D/raw WebGL) and frontend web apps (semantic HTML/CSS/JavaScript), each with separate planning/validation contracts and in-app source editing.
+- App-specific welcome prompts, plans, live DOM preview, scrollable fullscreen preview, editable source tabs and standard ZIP exports (`index.html`, `styles.css`, `app.js`, `app-spec.json`) that can be imported back into GENE.
 - A built-in, no-API-key-needed playable starter game (**Outpost: Last Light**) with keyboard/mobile controls, an energy-core objective, pursuing drones, dash, shield, win/loss states, restart, and editable/exportable HTML/CSS/JavaScript source.
 - Plan/Build modes and a sequential one-question-at-a-time interview prompt contract.
 - Gemini server API endpoint with server-only API key handling, thinking levels, response validation, rate limiting, and explicit errors when no key is configured.
@@ -19,6 +21,8 @@ Implemented in this branch:
 - GENE Forge: prompt-driven low-poly recipes converted into actual OBJ geometry, MTL materials and JSON asset manifests, plus an interactive WebGL mesh viewport, AI edits and individual file export. This is primitive-based mesh generation, not high-fidelity texturing or image-to-3D.
 - Server-side checks for generated file names/sizes, JavaScript syntax, required canvas, game-spec fields, objective/win/loss declarations, render loop, input hooks, draw operations, external runtime dependencies and conservative object budgets.
 - GitHub Actions contract tests including an HTTP end-to-end test of real local file sync and play serving, a production build, and Playwright browser tests for visible Canvas 2D pixels, keyboard movement, UI controls, a no-key playable starter, and real WebGL shader/buffer/draw calls.
+
+App previews allow client-side form handlers while keeping the iframe sandboxed; a restrictive Content Security Policy blocks network connections and native form destinations. Current generated apps are self-contained frontends, not deployed backends.
 
 The generation path asks Gemini for the actual source files used by the preview. Source validation and a visible canvas signal are useful diagnostics, but they are not equivalent to full gameplay automation. GENE must not claim that every game mechanic was verified unless it has evidence for that specific test.
 
