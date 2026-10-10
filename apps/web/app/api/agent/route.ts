@@ -617,7 +617,7 @@ export async function POST(request: NextRequest) {
     if (process.env.GENE_AI_REVIEW?.trim().toLowerCase() === "true" &&
         ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
         Array.isArray(result.files) && result.files.length > 0) {
-      const reviewer = successfulProvider === "groq"
+      const reviewer: { name: string; key: string; endpoint: string; model: string; headers: Record<string, string> } | null = successfulProvider === "groq"
         ? (process.env.OPENROUTER_API_KEY?.trim() ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } } : null)
         : successfulProvider === "openrouter"
           ? (process.env.GROQ_API_KEY?.trim() ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} } : null)
