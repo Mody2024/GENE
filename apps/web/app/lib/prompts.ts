@@ -69,7 +69,7 @@ export function makeAgentInput(input: {
       name: ref.name,
       mimeType: ref.mimeType,
       kind: ref.kind,
-      textContent: ref.kind === "text" ? (ref.textContent || "").slice(0, 16000) : undefined,
+      textContent: ref.kind === "text" ? (ref.textContent || "").slice(0, isStage ? 2500 : 16000) : undefined,
       imageAttached: ref.kind === "image"
     }))),
     "RECENT CHAT: " + JSON.stringify((input.history || p?.messages?.map(m => ({role:m.role,content:m.content})) || []).slice(isStage ? -3 : -12).map(m => ({ role: m.role, content: String(m.content).slice(0, isStage ? 450 : 800) })))
