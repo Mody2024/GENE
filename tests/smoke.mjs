@@ -54,6 +54,11 @@ assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly reje
 assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
 assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract teaches the model how to consume real Forge assets");
 assert.ok(prompts.includes("local couch multiplayer"), "game builder contract distinguishes local and online multiplayer");
+assert.ok(prompts.includes("dedicated Local Multiplayer 2D guide"), "local multiplayer has a dedicated build contract");
+assert.ok(gameGuides.includes("localMultiplayer2d"), "genre guide has a dedicated local multiplayer implementation guide");
+assert.ok(gameGuides.includes("Pressing a Player 1 key changes only Player 1 state"), "local multiplayer guide requires isolated per-player input");
+assert.ok(gameGuides.includes("Both players can move during the same frame"), "local multiplayer guide requires simultaneous gameplay");
+assert.ok(gameGuides.includes("couch co.?op") && gameGuides.includes("GUIDES.localMultiplayer2d"), "local co-op prompts select the dedicated multiplayer guide");
 assert.ok(gameGuides.includes("localMultiplayer2d"), "game guide registry contains a dedicated local multiplayer implementation guide");
 assert.ok(gameGuides.includes("Player 1 key changes only Player 1 state"), "local multiplayer guide requires independent player input ownership");
 assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer guide covers shared pause and complete reset behavior");
