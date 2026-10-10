@@ -340,41 +340,56 @@ export default function Home() {
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
-          const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
-          const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
-            "Use the original project idea in the project context as the source of truth. " +
-            (index === 0
-              ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
-              : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.");
-          const stageResponse = await fetch("/api/agent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...baseRequest,
-              operation: "buildPart",
-              stagePath,
-              message: stageMessage,
-              project: stageProject
-            })
-          });
-          const stagePayload = await stageResponse.json().catch(() => null);
-          if (!stageResponse.ok || !stagePayload?.ok) {
-            payload = stagePayload || { ok: false, error: { message: "Build stage " + (index + 1) + " failed before returning a valid response." } };
+          let stageSucceeded = false;
+          let stageError = "";
+          for (let stageAttempt = 1; stageAttempt <= 2 && !stageSucceeded; stageAttempt++) {
+            const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
+            const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
+              "Use the original project idea in the project context as the source of truth. " +
+              (index === 0
+                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
+                : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
+              (stageAttempt === 2 ? " RETRY: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." : "");
+            try {
+              const stageResponse = await fetch("/api/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...baseRequest,
+                  operation: "buildPart",
+                  stagePath,
+                  message: stageMessage,
+                  project: stageProject
+                })
+              });
+              const stagePayload = await stageResponse.json().catch(() => null);
+              if (!stageResponse.ok || !stagePayload?.ok) {
+                stageError = stagePayload?.error?.message || ("HTTP " + stageResponse.status + " from staged generation");
+                addActivity("Stage " + stagePath + " attempt " + stageAttempt + " failed: " + stageError.slice(0, 180));
+                continue;
+              }
+              const stageResult = stagePayload.result as AgentResponse;
+              const file = (stageResult.files || []).find(item => item.path === stagePath);
+              if (!file) {
+                stageError = "The model did not return the requested file " + stagePath + ".";
+                addActivity("Stage " + stagePath + " attempt " + stageAttempt + " returned no matching file");
+                continue;
+              }
+              stagedFiles[stagePath] = file.content;
+              if (stageResult.plan) stagedPlan = stageResult.plan;
+              modelUsed = stagePayload.model || modelUsed;
+              stageSucceeded = true;
+              addActivity("Validated stage file " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+            } catch (stageException) {
+              stageError = stageException instanceof Error ? stageException.message : "Network error during stage.";
+              addActivity("Stage " + stagePath + " attempt " + stageAttempt + " network failure");
+            }
+          }
+          if (!stageSucceeded) {
+            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after two compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
             responseOk = false;
-            addActivity("Build stage failed: " + stagePath);
             break;
           }
-          const stageResult = stagePayload.result as AgentResponse;
-          const file = (stageResult.files || []).find(item => item.path === stagePath);
-          if (!file) {
-            payload = { ok: false, error: { message: "Build stage " + (index + 1) + " did not return " + stagePath + ". No generated files were saved." } };
-            responseOk = false;
-            break;
-          }
-          stagedFiles[stagePath] = file.content;
-          if (stageResult.plan) stagedPlan = stageResult.plan;
-          modelUsed = stagePayload.model || modelUsed;
-          addActivity("Validated stage file " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
         }
         if (responseOk) {
           addActivity("Checking assembled project contract and source files");
