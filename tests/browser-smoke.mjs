@@ -137,7 +137,7 @@ try {
   assert.equal(runtimeAssets["assets/crate/model.mtl"], "newmtl crate\nKd 0.7 0.3 0.1", "live preview exposes matching MTL materials");
   const parsedAssets = await webglFrame.locator("body").evaluate(() => ({ mesh: window.GENE3D.parseOBJ("assets/crate/model.obj"), materials: window.GENE3D.parseMTL("assets/crate/model.mtl") }));
   assert.equal(parsedAssets.mesh.length, 1, "OBJ parser returns one material group");
-  assert.equal(parsedAssets.mesh[0].vertexCount, 1, "OBJ parser triangulates faces into actual geometry");
+  assert.equal(parsedAssets.mesh[0].vertexCount, 3, "OBJ parser triangulates faces into three real vertices");
   assert.equal(parsedAssets.mesh[0].positions.length, 18, "OBJ parser returns positions and computed normals for each triangle vertex");
   assert.deepEqual(parsedAssets.materials.crate.kd, [0.7, 0.3, 0.1], "MTL parser preserves diffuse material colors");
   await webglPage.waitForTimeout(2_500);
