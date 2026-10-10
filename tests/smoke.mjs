@@ -19,6 +19,7 @@ const buildHelper = read("scripts/cloud-build.mjs");
 const buildUpload = read("scripts/upload-cloud-output.mjs");
 const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
+const forge = read("apps/web/app/api/forge/route.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
@@ -54,10 +55,16 @@ assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API s
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(page.includes('const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"]'), "initial builds are generated in four compact stages");
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
-assert.ok(page.includes("stageAttempt <= 2") && page.includes("RETRY: the previous attempt"), "failed file stages retry once with a compact repair prompt");
+assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.includes("LAST-RESORT SAFE SLICE"), "failed file stages retry twice plus a compact last-resort playable slice");
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
+assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
+assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
+assert.ok(api.includes('body.operation === "buildPart" ? 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget and detects alternate-provider truncation");
+assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 3') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file three times and explicitly expand chat when preview is hidden");
+assert.ok(css.includes(".workspace.preview-minimized .conversation-scroll") && css.includes(".workspace.preview-minimized .composer"), "minimized preview widens both chat content and composer");
+assert.ok(forge.includes('"wedge" | "torus"') && forge.includes("senior hard-surface/prop artist"), "Forge produces additional wedge/torus geometry with stronger professional modelling guidance");
 assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
 assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
 assert.ok(api.includes("JSON.parse(cleaned)"), "candidate JSON is validated before it can reach file validation");
@@ -292,4 +299,16 @@ assert.ok(buildUpload.includes("from \"@vercel/blob\"") && buildUpload.includes(
 assert.ok(page.includes('fetch("/api/builds"') && page.includes('fetch("/api/builds/" + id') && page.includes("binaryBuildLinks"), "workspace submits cloud builds, polls progress, and displays direct binary links");
 assert.ok(css.includes(".binary-build-button") && css.includes(".binary-build-result"), "cloud build UI is styled for desktop and mobile");
 
+
+assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
+assert.ok(prompts.includes("stagePath?: string") && prompts.includes("fileBudget") && prompts.includes("isStageRepair"), "staged generation budgets context and repair stages can inspect their failing source");
+assert.ok(api.indexOf('finishReason === "MAX_TOKENS"') < api.indexOf("if (candidate.ok && candidateText.trim())"), "MAX_TOKENS is handled before JSON parsing even when Gemini returns no text");
+assert.ok(api.includes('body.operation === "buildPart" ? 6_144'), "single-file generation uses a larger output budget to reduce truncation");
+assert.ok(forge.includes("beveledBox") && forge.includes("cornerIndices.values()") && forge.includes('"wedge"') && forge.includes('"torus"'), "Forge builds actual chamfered hard-surface, sloped and ring meshes");
+assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includes("up to four local player slots"), "game guides require professional 3D forms and scalable local multiplayer");
+assert.ok(page.includes("GENE 1.3 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.3 exposes build progress and adapts retries after cutoff");
+assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
+
+assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
+assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("successfulProvider = provider.name"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");

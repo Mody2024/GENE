@@ -373,6 +373,7 @@ export async function POST(request: NextRequest) {
   const thinkingLevel = body.thinking === "fast" ? "low" : body.thinking === "deep" ? "high" : "medium";
   const userInput = makeAgentInput({
     operation: body.operation,
+    stagePath: typeof body.stagePath === "string" ? body.stagePath : undefined,
     mode: body.mode,
     message: body.message,
     project: body.project || null,
@@ -439,8 +440,8 @@ export async function POST(request: NextRequest) {
             responseMimeType: "application/json",
             temperature: body.operation === "interview" ? 0.35 : 0.2,
             maxOutputTokens: attempt.fallback
-              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : body.operation === "buildPart" ? 4_096 : 1_536)
-              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : body.operation === "buildPart" ? 4_096 : 3_072),
+              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : body.operation === "buildPart" ? 5_120 : 1_536)
+              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : body.operation === "buildPart" ? 6_144 : 3_072),
             thinkingConfig: { thinkingLevel: attempt.fallback || body.thinking === "fast" ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
@@ -451,6 +452,14 @@ export async function POST(request: NextRequest) {
       const candidateText = candidatePayload?.candidates?.[0]?.content?.parts
         ?.map((p: { text?: string }) => p.text || "").join("\n") || "";
       const finishReason = String(candidatePayload?.candidates?.[0]?.finishReason || "");
+
+      if (candidate.ok && finishReason === "MAX_TOKENS") {
+        outputFailure = "truncated";
+        lastFailure = { status: 422, detail: "Gemini finished with MAX_TOKENS; the JSON response was truncated." };
+        for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
+        for (const key of apiKeys.slice(1, 3)) enqueue(key, fallbackModels[fallbackModels.length - 1], true);
+        continue;
+      }
 
       if (candidate.ok && candidateText.trim()) {
         const expectsJson = body.operation !== "research" || candidateText.trim().startsWith("{") || candidateText.trim().startsWith("```");
@@ -466,18 +475,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // HTTP 200 does not imply a complete generation. Gemini tells us explicitly
-        // when its output budget cut a response off; parsing that fragment only gives
-        // users misleading "unterminated string" errors.
-        if (finishReason === "MAX_TOKENS") {
-          outputFailure = "truncated";
-          lastFailure = { status: 422, detail: "Gemini finished with MAX_TOKENS; the JSON response was truncated." };
-          for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
-          // A second key may have a different output configuration/quota, but avoid
-          // wasting time retrying the same model when the text itself was truncated.
-          for (const key of apiKeys.slice(1, 3)) enqueue(key, fallbackModels[fallbackModels.length - 1], true);
-          continue;
-        }
         if (!validJson) {
           outputFailure = "malformed";
           lastFailure = { status: 422, detail: "Gemini returned incomplete or invalid JSON even though the request completed." };
@@ -553,7 +550,7 @@ export async function POST(request: NextRequest) {
             messages: [{ role: "system", content: system }, { role: "user", content: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete." }],
             response_format: { type: "json_object" },
             temperature: body.operation === "interview" ? 0.35 : 0.2,
-            max_tokens: body.operation === "buildPart" ? 5_000 : isBuild ? 7_000 : 2_000
+            max_tokens: body.operation === "buildPart" ? 5_500 : isBuild ? 7_000 : 2_000
           }),
           signal: AbortSignal.timeout(Math.min(14_000, remainingMs))
         });
@@ -563,11 +560,19 @@ export async function POST(request: NextRequest) {
           lastFailure = { status: response.status || 502, detail: provider.name + " fallback: " + String(data?.error?.message || "empty response") };
           continue;
         }
+        const alternateFinish = String(data?.choices?.[0]?.finish_reason || "");
+        if (alternateFinish === "length") {
+          outputFailure = "truncated";
+          lastFailure = { status: 422, detail: provider.name + " hit its output token limit before completing JSON." };
+          continue;
+        }
         let parsed: unknown;
         try { parsed = JSON.parse(content); } catch {
+          outputFailure = "malformed";
           lastFailure = { status: 422, detail: provider.name + " returned incomplete or invalid JSON." };
           continue;
         }
+        outputFailure = null;
         payload = { candidates: [{ content: { parts: [{ text: JSON.stringify(parsed) }] }, finishReason: "STOP" }] };
         successfulModel = provider.model;
         successfulProvider = provider.name;
@@ -584,9 +589,9 @@ export async function POST(request: NextRequest) {
       const truncated = outputFailure === "truncated";
       return jsonError(
         (truncated
-          ? "Gemini cut off its response at the output limit. GENE retried with compact output and fallback models, but none returned complete JSON. "
-          : "Gemini returned malformed JSON. GENE retried with compact output and fallback models, but none returned valid JSON. ") +
-        "No files were changed. Retry Build; if this repeats, build the smallest core version first and add features with chat edits.",
+          ? "The AI response reached an output limit before completing its JSON. GENE tried compact retries and alternate configured models, but none returned a complete file. "
+          : "The AI returned malformed JSON after retrying with compact output and alternate configured models. ") +
+        "No project files were changed. GENE can safely retry this individual stage with a smaller implementation; keep optional features for later chat edits.",
         502,
         truncated ? "GEMINI_OUTPUT_TRUNCATED" : "GEMINI_OUTPUT_INVALID"
       );

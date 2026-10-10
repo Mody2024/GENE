@@ -356,6 +356,7 @@ export default function Home() {
     setNotice("");
     setRuntimeState("idle");
     setActivity([]);
+    if (operation === "build" || operation === "surprise") setShowActivity(true);
     addActivity("Request accepted: " + operation);
     setSection("chat");
     try {
@@ -384,14 +385,14 @@ export default function Home() {
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
           let stageSucceeded = false;
           let stageError = "";
-          for (let stageAttempt = 1; stageAttempt <= 2 && !stageSucceeded; stageAttempt++) {
+          for (let stageAttempt = 1; stageAttempt <= 3 && !stageSucceeded; stageAttempt++) {
             const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
                 : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
-              (stageAttempt === 2 ? " RETRY: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." : "");
+              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
               const stageResponse = await fetch("/api/agent", {
                 method: "POST",
@@ -428,7 +429,7 @@ export default function Home() {
             }
           }
           if (!stageSucceeded) {
-            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after two compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
+            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
             responseOk = false;
             break;
           }
@@ -1514,13 +1515,13 @@ export default function Home() {
           </div>
           <small>Windows output is an Electron installer. Android output is a debug-signed APK for testing and direct installation, not a Play Store release.</small>
         </div>}
-        <div className="workspace">
+        <div className={"workspace" + (!previewOpen ? " preview-minimized" : "")}>
           <section className="conversation-panel">
             {section === "chat" && <>
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow">GENE 1.2 FLASH</div>
+                  <div className="eyebrow">GENE 1.3 FLASH</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
                   <div className="starter-grid">

@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "sphere" | "cylinder" | "cone";
+type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
+type Surface = "matte" | "metal" | "rubber" | "glass" | "emissive";
 type Vec3 = [number, number, number];
 type Part = {
   name: string;
@@ -12,11 +13,13 @@ type Part = {
   scale: Vec3;
   rotation: Vec3;
   color: string;
+  surface: Surface;
 };
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "sphere", "cylinder", "cone"]);
+const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"]);
+const SURFACES = new Set<Surface>(["matte", "metal", "rubber", "glass", "emissive"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
 function json(status: number, body: unknown) {
@@ -54,7 +57,8 @@ function normalizeRecipe(raw: any, kind: string, quality: string): Recipe {
       position,
       scale,
       rotation,
-      color: safeColor(part.color)
+      color: safeColor(part.color),
+      surface: SURFACES.has(part.surface) ? part.surface as Surface : "matte"
     };
   });
   return {
@@ -71,11 +75,88 @@ function rgb(color: string): [number, number, number] {
 function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[][] } {
   const vertices: Vec3[] = [];
   const faces: number[][] = [];
-  if (shape === "box") {
+  if (shape === "beveledBox") {
+    const half = scale.map(n => n / 2) as Vec3;
+    const bevel = Math.min(...half) * 0.14;
+    const cornerIndices = new Map<string, number[]>();
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const key = [sx, sy, sz].join(",");
+      const points: Vec3[] = [
+        [sx * (half[0] - bevel), sy * half[1], sz * half[2]],
+        [sx * half[0], sy * (half[1] - bevel), sz * half[2]],
+        [sx * half[0], sy * half[1], sz * (half[2] - bevel)]
+      ];
+      const ids: number[] = [];
+      for (const point of points) { vertices.push(point); ids.push(vertices.length); }
+      cornerIndices.set(key, ids);
+      faces.push(ids);
+    }
+    const eps = 1e-5;
+    const triangulate = (ids: number[], u: (p: Vec3) => number, v: (p: Vec3) => number) => {
+      if (ids.length < 3) return;
+      const centerU = ids.reduce((sum, id) => sum + u(vertices[id - 1]), 0) / ids.length;
+      const centerV = ids.reduce((sum, id) => sum + v(vertices[id - 1]), 0) / ids.length;
+      ids.sort((a, b) => Math.atan2(v(vertices[a - 1]) - centerV, u(vertices[a - 1]) - centerU) - Math.atan2(v(vertices[b - 1]) - centerV, u(vertices[b - 1]) - centerU));
+      for (let i = 1; i < ids.length - 1; i++) faces.push([ids[0], ids[i], ids[i + 1]]);
+    };
+    faces.length = 0;
+    for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+      const ids = vertices.map((point, index) => Math.abs(point[axis] - sign * half[axis]) < eps ? index + 1 : 0).filter(Boolean);
+      triangulate(ids, point => point[(axis + 1) % 3], point => point[(axis + 2) % 3]);
+    }
+    for (let axisA = 0; axisA < 3; axisA++) for (let axisB = axisA + 1; axisB < 3; axisB++) {
+      const axisC = 3 - axisA - axisB;
+      for (const signA of [-1, 1]) for (const signB of [-1, 1]) {
+        const ids = vertices.map((point, index) => {
+          const matches = Math.sign(point[axisA]) === signA && Math.sign(point[axisB]) === signB && Math.abs(Math.abs(point[axisC]) - half[axisC]) < eps;
+          return matches && (Math.abs(point[axisA]) < half[axisA] - eps || Math.abs(point[axisB]) < half[axisB] - eps) ? index + 1 : 0;
+        }).filter(Boolean);
+        triangulate(ids, point => signA * point[axisA] - signB * point[axisB], point => point[axisC]);
+      }
+    }
+    for (const ids of cornerIndices.values()) faces.push(ids);
+  } else if (shape === "box") {
     const [x, y, z] = scale.map(n => n / 2) as Vec3;
     vertices.push([-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]);
     const quads = [[1,4,3,2],[5,6,7,8],[1,2,6,5],[2,3,7,6],[3,4,8,7],[4,1,5,8]];
     for (const q of quads) { faces.push([q[0],q[1],q[2]],[q[0],q[2],q[3]]); }
+  } else if (shape === "wedge") {
+    const [x, y, z] = scale.map(n => n / 2) as Vec3;
+    vertices.push(
+      [-x,-y,-z],[x,-y,-z],[-x,y,-z],[x,y,-z],
+      [-x,-y,z],[x,-y,z]
+    );
+    faces.push(
+      [1,3,2],[2,3,4],
+      [1,2,6],[1,6,5],
+      [1,5,3],[3,5,6],[3,6,4],
+      [2,4,6]
+    );
+  } else if (shape === "torus") {
+    const majorSegments = 16, tubeSegments = 8;
+    const rx = scale[0] * 0.34, rz = scale[2] * 0.34;
+    const tubeXZ = Math.min(scale[0], scale[2]) * 0.16;
+    const tubeY = Math.min(scale[1] * 0.42, tubeXZ);
+    for (let i = 0; i < majorSegments; i++) {
+      const u = i / majorSegments * Math.PI * 2;
+      for (let j = 0; j < tubeSegments; j++) {
+        const v = j / tubeSegments * Math.PI * 2;
+        const radial = Math.cos(v);
+        vertices.push([
+          Math.cos(u) * (rx + tubeXZ * radial),
+          Math.sin(v) * tubeY,
+          Math.sin(u) * (rz + tubeXZ * radial)
+        ]);
+      }
+    }
+    for (let i = 0; i < majorSegments; i++) for (let j = 0; j < tubeSegments; j++) {
+      const nextI = (i + 1) % majorSegments, nextJ = (j + 1) % tubeSegments;
+      const a = i * tubeSegments + j + 1;
+      const b = i * tubeSegments + nextJ + 1;
+      const c = nextI * tubeSegments + nextJ + 1;
+      const d = nextI * tubeSegments + j + 1;
+      faces.push([a,b,d],[b,c,d]);
+    }
   } else if (shape === "sphere") {
     const rings = 5;
     const segments = 10;
@@ -156,7 +237,10 @@ function buildMesh(recipe: Recipe) {
     const mesh = geometry(part.shape, part.scale);
     const material = "mat_" + String(index + 1).padStart(3, "0");
     const [r, g, b] = rgb(part.color);
-    mtl.push("newmtl " + material, "Kd " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "Ka 0.05 0.05 0.05", "Ks 0.08 0.08 0.08", "Ns 12", "");
+    const surface = part.surface || "matte";
+    const specular = surface === "metal" ? [0.72, 0.72, 0.72] : surface === "glass" ? [0.9, 0.9, 0.9] : surface === "emissive" ? [0.38, 0.38, 0.38] : surface === "rubber" ? [0.025, 0.025, 0.025] : [0.12, 0.12, 0.12];
+    const shininess = surface === "metal" ? 96 : surface === "glass" ? 120 : surface === "emissive" ? 48 : surface === "rubber" ? 4 : 18;
+    mtl.push("newmtl " + material, "Kd " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "Ka 0.05 0.05 0.05", "Ks " + specular.map(value => value.toFixed(3)).join(" "), "Ns " + shininess, ...(surface === "glass" ? ["d 0.42", "illum 4"] : surface === "emissive" ? ["Ke " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "illum 2"] : ["illum 2"]), "");
     obj.push("", "o " + part.name, "usemtl " + material);
     for (const vertex of mesh.vertices) {
       const p = transformPoint(vertex, part);
@@ -196,16 +280,24 @@ export async function POST(request: NextRequest) {
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
   if (!prompt || prompt.length > 4000) return fail(400, "PROMPT_REQUIRED", "Write a concrete asset request (maximum 4,000 characters).");
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires Gemini to create a structured asset recipe. No model or mesh was generated.");
+  const apiKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    ...(process.env.GEMINI_API_KEYS || "").split(/[,;\\n]+/)
+  ].map(value => value?.trim()).filter((value): value is string => Boolean(value)).filter((value, index, all) => all.indexOf(value) === index);
+  if (!apiKeys.length) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires a Gemini API key to create a structured mesh recipe. No model or mesh was generated.");
 
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
+  const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
-    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes.",
-    "Use a coherent art direction, clear primary/secondary forms, deliberate color blocking, aligned components, and grounded proportions. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Only these shapes are allowed. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use beveledBox for light-catching chamfered panels, torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels, rubber for tires/grips, glass for windows, metal for exposed hardware and emissive for small lights. Use spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
+    "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration. Vary material response intentionally: metal should have higher specular and shininess, rubber should be dark and matte, glass should be translucent in MTL, and emissive should identify small lights rather than large surfaces.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
@@ -234,25 +326,126 @@ export async function POST(request: NextRequest) {
     imageCount++;
   }
 
-  let response: Response;
-  try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.25, maxOutputTokens: 6500, thinkingConfig: { thinkingLevel: quality === "high" ? "high" : "medium" } }
-      }),
-      signal: AbortSignal.timeout(50_000)
-    });
-  } catch (e) {
-    return fail(502, "GEMINI_NETWORK_ERROR", "Could not reach Gemini: " + (e instanceof Error ? e.message : String(e)));
+  let text = "";
+  let successfulModel = model;
+  let successfulProvider = "gemini";
+  let lastDetail = "No configured model returned a complete asset recipe.";
+  let sawTruncation = false;
+  const startedAt = Date.now();
+  const hasAlternateProvider = Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim());
+  const geminiBudgetMs = hasAlternateProvider ? 31_000 : 49_000;
+  const attempts: Array<{ key: string; model: string }> = [];
+  for (let keyIndex = 0; keyIndex < Math.min(apiKeys.length, 3); keyIndex++) {
+    for (const candidateModel of fallbackModels) {
+      attempts.push({ key: apiKeys[keyIndex], model: candidateModel });
+      if (attempts.length >= 6) break;
+    }
+    if (attempts.length >= 6) break;
   }
-  const payload: any = await response.json().catch(() => null);
-  if (!response.ok) return fail(response.status === 429 ? 429 : 502, "GEMINI_API_ERROR", payload?.error?.message || "Gemini could not generate an asset recipe.");
-  const text = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\n") || "";
-  if (!text.trim()) return fail(502, "GEMINI_EMPTY_RESPONSE", "Gemini returned no asset recipe.");
+  for (let index = 0; index < attempts.length; index++) {
+    if (Date.now() - startedAt > geminiBudgetMs) break;
+    const attempt = attempts[index];
+    const compact = index > 0
+      ? "\n\nRECOVERY RETRY: Previous output was truncated or invalid. Return a smaller complete asset recipe from scratch, never continue partial JSON. Use fewer parts (18 maximum), concise names/notes, preserve the signature silhouette and correct proportions, and output one complete JSON object only."
+      : "";
+    try {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user + compact }, ...parts.slice(1)] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: index > 0 ? 3_800 : 6_500, thinkingConfig: { thinkingLevel: index > 0 || quality === "performance" ? "low" : quality === "high" ? "high" : "medium" } }
+        }),
+        signal: AbortSignal.timeout(Math.min(index === 0 ? 13_000 : 9_000, Math.max(1_000, geminiBudgetMs - (Date.now() - startedAt))))
+      });
+      const payload: any = await response.json().catch(() => null);
+      const candidateText = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\n") || "";
+      const finishReason = String(payload?.candidates?.[0]?.finishReason || "");
+      if (!response.ok) {
+        lastDetail = payload?.error?.message || "HTTP " + response.status;
+        if (response.status !== 429 && response.status < 500 && response.status !== 401 && response.status !== 403) break;
+        continue;
+      }
+      if (finishReason === "MAX_TOKENS") {
+        sawTruncation = true;
+        lastDetail = "The model reached its output token limit.";
+        continue;
+      }
+      if (!candidateText.trim()) {
+        lastDetail = "The model returned an empty recipe.";
+        continue;
+      }
+      try { extractJson(candidateText); } catch {
+        lastDetail = "The model returned malformed or incomplete JSON.";
+        continue;
+      }
+      text = candidateText;
+      successfulModel = attempt.model;
+      break;
+    } catch (error) {
+      lastDetail = error instanceof Error ? error.message : "Network timeout.";
+    }
+  }
+  if (!text && hasAlternateProvider && Date.now() - startedAt < 56_000) {
+    const providers: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
+    if (process.env.GROQ_API_KEY?.trim()) providers.push({
+      name: "groq",
+      key: process.env.GROQ_API_KEY.trim(),
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
+    });
+    if (process.env.OPENROUTER_API_KEY?.trim()) providers.push({
+      name: "openrouter",
+      key: process.env.OPENROUTER_API_KEY.trim(),
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
+      headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Forge" }
+    });
+    for (const provider of providers) {
+      if (Date.now() - startedAt > 57_000) break;
+      try {
+        const remaining = Math.max(1_000, 58_000 - (Date.now() - startedAt));
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + provider.key, ...(provider.headers || {}) },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [
+              { role: "system", content: system + "\n\nYou are an alternate provider in GENE Forge. Return one valid JSON object only. Do not use provider branding." },
+              { role: "user", content: user + "\n\nALTERNATE PROVIDER RECOVERY: Generate a compact, complete recipe from scratch using no more than 18 parts. Use only the declared shapes and surfaces. Preserve the main silhouette and functional details. No markdown, no commentary, valid JSON only." }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.2,
+            max_tokens: 3_600
+          }),
+          signal: AbortSignal.timeout(Math.min(9_000, remaining))
+        });
+        const data: any = await response.json().catch(() => null);
+        const content = data?.choices?.[0]?.message?.content;
+        if (!response.ok || typeof content !== "string" || !content.trim()) {
+          lastDetail = provider.name + " fallback: " + String(data?.error?.message || "empty response");
+          continue;
+        }
+        try { extractJson(content); } catch {
+          lastDetail = provider.name + " returned incomplete or invalid JSON.";
+          continue;
+        }
+        text = content;
+        successfulModel = provider.model;
+        successfulProvider = provider.name;
+        break;
+      } catch (error) {
+        lastDetail = provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network timeout");
+      }
+    }
+  }
+
+  if (!text) {
+    return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
+      (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
+      "No mesh files were saved. Try Performance quality or simplify the requested asset. Detail: " + lastDetail);
+  }
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
@@ -264,8 +457,8 @@ export async function POST(request: NextRequest) {
     if (files["model.obj"].length > 1_500_000) return fail(413, "MESH_TOO_LARGE", "Generated mesh exceeded the 1.5 MB mesh budget.");
     return json(200, {
       ok: true,
-      aiMode: "gemini",
-      model,
+      aiMode: successfulProvider,
+      model: successfulModel,
       asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
     });
   } catch (e) {

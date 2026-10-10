@@ -14,6 +14,7 @@ const GUIDES: Record<string, GameGuide> = {
     engine: "canvas2d",
     implementation: [
       "Use a world coordinate system and camera follow, not a single static screen.",
+      "ART DIRECTION: choose a specific visual identity and limited palette before drawing. Build layered parallax backgrounds, authored silhouettes, grounded contact shadows, highlights, readable character poses, animated feedback and environmental storytelling; avoid default flat rectangles and repeated placeholder shapes.",
       "Implement horizontal acceleration/friction, gravity, ground/platform collision, coyote time and jump buffering.",
       "Allow variable jump height by cutting upward velocity when the jump button is released.",
       "Include at least one distinct level layout, platforms at multiple heights, solid terrain, collectibles, a hazard/enemy, and a visible finish/checkpoint.",
@@ -108,6 +109,7 @@ const GUIDES: Record<string, GameGuide> = {
     engine: "webgl3d",
     implementation: [
       "Use an actual WebGL renderer: compile vertex/fragment shaders, link a program, upload vertex/index buffers, set projection/view/model transforms, and call drawArrays or drawElements every frame.",
+      "PROFESSIONAL MODELING PASS: establish a clear silhouette, primary/secondary/tertiary forms, deliberate proportions, bevel/chamfer highlights, trim, layered materials, consistent face normals and distinct surface colors. Build recognizable authored models from reusable mesh helpers; avoid a world made only of generic cubes, spheres and flat-colored primitives. Use atmospheric depth, purposeful key/fill lighting and ground contact cues while respecting the object budget.",
       "Render real perspective geometry with a ground plane, three lanes, a chase camera, environment structures, a visible runner, obstacles and coins. Do not draw the whole scene as a 2D HUD.",
       "Implement left/right lane switching, jump, slide, forward world movement, collision, coins, score, increasing difficulty and game-over/restart.",
       "Use chunk recycling/object pooling for the endless track and environment; keep meshes/objects within the budget.",
@@ -130,6 +132,7 @@ const GUIDES: Record<string, GameGuide> = {
     engine: "webgl3d",
     implementation: [
       "Use actual WebGL shader compilation, GPU buffers, projection/view/model transforms, and repeated geometry draw calls; no flat 2D-only fallback for the requested 3D scene.",
+      "PROFESSIONAL MODELING PASS: build a recognizable silhouette with primary, secondary and tertiary forms, coherent scale, bevel highlights, trim, layered materials, clean normals and varied roughness-like shading. Compose the level like an art-directed scene with foreground framing, a readable focal point, midground landmarks, atmospheric background depth, ground contact cues and intentional lighting; never substitute a random cube field for a designed environment.",
       "Render a ground plane and a camera perspective with a visible player mesh, multiple environment structures, pickups and enemies.",
       "Implement movement, world-space enemy approach, melee/projectile attack, health, pickup/objective, win/loss/restart.",
       "Keep shadow/effect costs low; prioritize clear silhouettes, materials and camera framing over excessive geometry."
@@ -149,19 +152,19 @@ const GUIDES: Record<string, GameGuide> = {
     engine: "canvas2d",
     implementation: [
       "Build a genuinely simultaneous local couch-multiplayer game on one machine. Both players must be visible and independently controllable during the same update loop.",
-      "Create separate player objects with independent positions, velocities, health/lives, cooldowns, score and input ownership. Never route the same keyboard event to both players.",
+      "Create separate player objects with independent positions, velocities, health/lives, cooldowns, score and input ownership. Never route the same keyboard event to both players. Use a player-slot/input-router abstraction so the design can scale from 2 to 4 local players without copy-pasting the simulation.",
       "Default keyboard layout: Player 1 uses WASD with F for action; Player 2 uses arrow keys with Enter or Right Shift for action. Display these bindings in the game UI and avoid browser scrolling while playing.",
-      "Poll navigator.getGamepads() once per frame and assign connected controllers by stable gamepad index to a distinct player slot; a controller must not silently take over both players. If no controller is connected, keyboard controls must work fully.",
-      "Make the core mechanic support two participants: shared co-op objectives or clear versus scoring. Show distinct player colors/silhouettes, labels, scores and health/lives so the state is readable at a glance.",
+      "Poll navigator.getGamepads() once per animation frame and assign connected controllers by stable gamepad index to a distinct player slot. Support up to four local player slots when the requested game fits, hot-plug/disconnect/reconnect, button edge detection, analog dead zones, and a clear join/rejoin flow. One controller must never control multiple players. Keyboard-only and mixed keyboard/controller play must work.",
+      "Make the core mechanic support two participants by default and a scalable player-slot model for up to four local participants when suitable: shared co-op objectives or clear versus scoring. Show distinct player colors/silhouettes, labels, scores and health/lives so the state is readable at a glance.",
       "Choose a camera that keeps both players visible: a shared fixed/zoomed-out arena is preferred for compact games; for larger worlds use a bounded camera that frames both players or a clear split-screen layout.",
       "Handle simultaneous opposing inputs, collision between players where appropriate, player knockouts, round end, pause/resume, rematch and full state reset. Pause must freeze the whole simulation, not just one player.",
-      "Provide an accessible start screen that explains the two control sets and lets users choose co-op or versus if both modes fit the requested concept. Keep it playable without a controller or network.",
+      "Provide an accessible start screen that explains the control sets and lets users choose co-op or versus if both modes fit the requested concept. For 3–4 players show per-slot join/ready state and distinct controls. Keep it playable without a controller or network.",
       "Use delta time, normalized diagonal movement, bounded world/entity counts and deterministic test hooks for player positions, scores, frame count and round state. Do not claim hardware controller testing unless performed."
     ],
     acceptance: [
       "Pressing a Player 1 key changes only Player 1 state; pressing a Player 2 key changes only Player 2 state.",
       "Both players can move during the same frame without one overwriting the other's input or position.",
-      "Keyboard controls remain playable when navigator.getGamepads() is empty.",
+      "Keyboard controls remain playable when navigator.getGamepads() is empty; controller indices map to unique player slots and disconnects do not freeze other players.",
       "A collectible, attack, goal or round mechanic changes the correct player's score/health and does not award the same event twice.",
       "The screen keeps both players visible, clearly distinguishes them and displays their individual scores/status.",
       "Pause freezes both players and all gameplay timers; resume continues without a jump in delta time.",
@@ -267,6 +270,9 @@ export function formatGameGuide(guide: GameGuide): string {
     "Acceptance checks to satisfy:",
     ...guide.acceptance.map((item, index) => "- " + item),
     "Performance defaults: " + JSON.stringify(guide.performance),
-    "Make the specific requested game's own objects, setting, mechanics and UI. Do not reuse a generic HUD-only game or claim that acceptance checks passed unless the runtime/test system actually measured them."
+    "ART-DIRECTOR PASS: Choose an intentional palette and shape language; build a focal point, layered depth, believable scale, clear silhouettes, restrained effects, lighting/material variation, and a cohesive HUD. Use reusable geometry with bevels, trim and secondary details instead of a field of identical cubes. Make environments tell a visual story and ensure landmarks are readable at gameplay distance.",
+    "GAME DESIGN PASS: Make the first 10 seconds understandable. Give the player a clear immediate goal, responsive controls, readable feedback, a difficulty/encounter curve, useful pause/restart flow, and meaningful win/loss states. All visible controls must work. Use delta time, edge-triggered actions, bounded objects, cleanup and collision-safe state transitions.",
+    "STAGED DELIVERY PASS: If the requested scope is large, build one complete playable vertical slice first, preserve the existing files and expand in small tested milestones. Keep the boot path working after every stage; cut optional scope before core gameplay. Do not return a huge monolithic implementation simply to claim every feature.",
+    "Universal visual bar: commit to a coherent art bible (palette, materials, silhouette language, camera, lighting and UI typography). Make a designed scene with a strong focal point, primary/secondary/tertiary forms, believable scale, contact cues and authored composition. For 3D, use reusable mesh builders, bevel highlights, clean normals, layered materials and readable silhouettes; primitive geometry is a building block, not the final art direction. For local multiplayer, use independent player slots and input ownership, gamepad index mapping, hot-plug handling, keyboard fallback, join/ready flow and camera framing that keeps all players visible. Make the specific requested game's own objects, setting, mechanics and UI. Do not reuse a generic HUD-only game or claim that acceptance checks passed unless the runtime/test system actually measured them."
   ].join("\n");
 }
