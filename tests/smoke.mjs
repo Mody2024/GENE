@@ -38,6 +38,9 @@ assert.ok(api.includes("project spec needs a title"), "builder requires meaningf
 assert.ok(api.includes('projectKind === "app"'), "agent validation distinguishes apps from games");
 assert.ok(api.includes("app spec needs a concise summary"), "app builds require structured app metadata");
 assert.ok(page.includes('createNewProject("app")'), "workspace can create a dedicated web app project");
+assert.ok(page.includes('"game.html": "index.html"') && page.includes('"game.js": "app.js"'), "app exports use standard HTML/CSS/JavaScript file names");
+assert.ok(page.includes("importProjectPaths(currentFiles, importedKind)"), "app-friendly exported source names import back into editable files");
+assert.ok(playPage.includes('isApp ? "min-height:100%;height:auto;overflow:auto;"'), "full-screen app previews remain scrollable");
 assert.ok(page.includes('project.kind === "app"'), "preview and workspace logic respect project kind");
 assert.ok(prompts.includes("WEB APP ACCEPTANCE CHECKLIST"), "AI prompt defines app-specific acceptance rules");
 assert.ok(api.includes("external runtime dependency"), "builder blocks external runtime dependencies");
