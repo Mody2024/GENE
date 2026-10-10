@@ -31,6 +31,9 @@ assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback 
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
 assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(25_000"), "Gemini requests allow realistic generation time without exceeding route budget");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
+assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
+assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
+assert.ok(api.includes("attempts < 8"), "fallback attempts remain bounded");
 const health = read("apps/web/app/api/health/route.ts");
 assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
