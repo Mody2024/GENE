@@ -996,7 +996,7 @@ export default function Home() {
       </aside>
 
       <aside className="project-sidebar">
-        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
+        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={() => createNewProject("game")}>＋</button></div>
         <button className="new-project" onClick={() => createNewProject("game")}><span>＋</span> New game project</button>
         <button className="new-project" onClick={() => createNewProject("app")}><span>＋</span> New web app project</button>
         <button className="import-project-button" onClick={loadPlayableDemo}>▶ Try playable demo</button>
