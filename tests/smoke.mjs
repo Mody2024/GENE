@@ -54,6 +54,10 @@ assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly reje
 assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
 assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract teaches the model how to consume real Forge assets");
 assert.ok(prompts.includes("local couch multiplayer"), "game builder contract distinguishes local and online multiplayer");
+assert.ok(gameGuides.includes("localMultiplayer2d"), "game guide catalog has a dedicated local multiplayer 2D implementation guide");
+assert.ok(gameGuides.includes("Pressing a Player 1 key changes only Player 1 state"), "local multiplayer guide requires independent input ownership");
+assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer guide checks shared pause and reset behavior");
+assert.ok(prompts.includes("WASD+F for P1"), "multiplayer prompt defines distinct default keyboard layouts");
 assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
