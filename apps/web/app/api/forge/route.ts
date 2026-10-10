@@ -12,6 +12,7 @@ type Part = {
   scale: Vec3;
   rotation: Vec3;
   color: string;
+  surface: Surface;
 };
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
@@ -54,7 +55,8 @@ function normalizeRecipe(raw: any, kind: string, quality: string): Recipe {
       position,
       scale,
       rotation,
-      color: safeColor(part.color)
+      color: safeColor(part.color),
+      surface: SURFACES.has(part.surface) ? part.surface as Surface : "matte"
     };
   });
   return {
@@ -233,7 +235,10 @@ function buildMesh(recipe: Recipe) {
     const mesh = geometry(part.shape, part.scale);
     const material = "mat_" + String(index + 1).padStart(3, "0");
     const [r, g, b] = rgb(part.color);
-    mtl.push("newmtl " + material, "Kd " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "Ka 0.05 0.05 0.05", "Ks 0.08 0.08 0.08", "Ns 12", "");
+    const surface = part.surface || "matte";
+    const specular = surface === "metal" ? [0.72, 0.72, 0.72] : surface === "glass" ? [0.9, 0.9, 0.9] : surface === "emissive" ? [0.38, 0.38, 0.38] : surface === "rubber" ? [0.025, 0.025, 0.025] : [0.12, 0.12, 0.12];
+    const shininess = surface === "metal" ? 96 : surface === "glass" ? 120 : surface === "emissive" ? 48 : surface === "rubber" ? 4 : 18;
+    mtl.push("newmtl " + material, "Kd " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "Ka 0.05 0.05 0.05", "Ks " + specular.map(value => value.toFixed(3)).join(" "), "Ns " + shininess, ...(surface === "glass" ? ["d 0.42", "illum 4"] : surface === "emissive" ? ["Ke " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "illum 2"] : ["illum 2"]), "");
     obj.push("", "o " + part.name, "usemtl " + material);
     for (const vertex of mesh.vertices) {
       const p = transformPoint(vertex, part);
@@ -287,10 +292,10 @@ export async function POST(request: NextRequest) {
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
-    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels and spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
-    "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Use all six shape types where appropriate. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use beveledBox for light-catching chamfered panels, torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels, rubber for tires/grips, glass for windows, metal for exposed hardware and emissive for small lights. Use spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
+    "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration. Vary material response intentionally: metal should have higher specular and shininess, rubber should be dark and matte, glass should be translucent in MTL, and emissive should identify small lights rather than large surfaces.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
