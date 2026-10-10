@@ -39,6 +39,11 @@ assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini hea
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
 assert.ok(api.includes("validateFiles"), "server validates model output");
 assert.ok(api.includes("normalizeAgentResult"), "API validates structured response shapes before updating the UI");
+assert.ok(api.includes("GEMINI_OUTPUT_TRUNCATED"), "truncated Gemini JSON gets a specific recoverable error");
+assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
+assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
+assert.ok(api.includes("JSON.parse(cleaned)"), "candidate JSON is validated before it can reach file validation");
+
 assert.ok(api.includes("at least three concrete implementation tasks"), "plans with no implementation tasks are rejected");
 assert.ok(api.includes("exactly one next question or a completed plan"), "interview responses must be sequential and complete");
 assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
