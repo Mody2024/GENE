@@ -267,6 +267,9 @@ export function formatGameGuide(guide: GameGuide): string {
     "Acceptance checks to satisfy:",
     ...guide.acceptance.map((item, index) => "- " + item),
     "Performance defaults: " + JSON.stringify(guide.performance),
+    "ART-DIRECTOR PASS: Choose an intentional palette and shape language; build a focal point, layered depth, believable scale, clear silhouettes, restrained effects, lighting/material variation, and a cohesive HUD. Use reusable geometry with bevels, trim and secondary details instead of a field of identical cubes. Make environments tell a visual story and ensure landmarks are readable at gameplay distance.",
+    "GAME DESIGN PASS: Make the first 10 seconds understandable. Give the player a clear immediate goal, responsive controls, readable feedback, a difficulty/encounter curve, useful pause/restart flow, and meaningful win/loss states. All visible controls must work. Use delta time, edge-triggered actions, bounded objects, cleanup and collision-safe state transitions.",
+    "STAGED DELIVERY PASS: If the requested scope is large, build one complete playable vertical slice first, preserve the existing files and expand in small tested milestones. Keep the boot path working after every stage; cut optional scope before core gameplay. Do not return a huge monolithic implementation simply to claim every feature.",
     "Make the specific requested game's own objects, setting, mechanics and UI. Do not reuse a generic HUD-only game or claim that acceptance checks passed unless the runtime/test system actually measured them."
   ].join("\n");
 }
