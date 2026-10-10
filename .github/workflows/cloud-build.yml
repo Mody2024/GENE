@@ -1,0 +1,123 @@
+name: GENE Cloud Binary Build
+run-name: GENE Cloud Build \${{ inputs.build_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: Unique GENE build identifier
+        required: true
+        type: string
+      source_ref:
+        description: Encrypted source branch
+        required: true
+        type: string
+      targets:
+        description: Binary targets to build
+        required: true
+        type: choice
+        options: [both, windows, android]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: gene-cloud-build-\${{ inputs.build_id }}
+  cancel-in-progress: false
+jobs:
+  windows-exe:
+    if: \${{ inputs.targets == 'both' || inputs.targets == 'windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout GENE build tools
+        uses: actions/checkout@v4
+      - name: Checkout encrypted project payload
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.source_ref }}
+          path: source-input
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Decrypt and prepare source
+        shell: pwsh
+        env:
+          GENE_BUILD_ENCRYPTION_KEY: \${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
+        run: |
+          node scripts/cloud-build.mjs unpack "source-input/.gene-builds/\${{ inputs.build_id }}.enc" web
+          $meta = Get-Content web/gene-build.json -Raw | ConvertFrom-Json
+          node scripts/cloud-build.mjs prepare-electron web desktop $meta.title
+      - name: Compile Windows installer
+        shell: pwsh
+        env:
+          GENE_BUILD_ENCRYPTION_KEY: \${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
+        run: |
+          Push-Location desktop
+          npm install --no-audit --no-fund
+          npm run dist:win
+          Pop-Location
+          New-Item -ItemType Directory -Force encrypted-artifacts | Out-Null
+          $exe = Get-ChildItem desktop/dist -File -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw "electron-builder finished without an EXE installer." }
+          node scripts/cloud-build.mjs encrypt "$($exe.FullName)" "encrypted-artifacts/windows-installer.exe.enc"
+      - name: Upload encrypted Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: gene-\${{ inputs.build_id }}-windows
+          path: encrypted-artifacts/windows-installer.exe.enc
+          if-no-files-found: error
+          retention-days: 7
+  android-apk:
+    if: \${{ inputs.targets == 'both' || inputs.targets == 'android' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout GENE build tools
+        uses: actions/checkout@v4
+      - name: Checkout encrypted project payload
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.source_ref }}
+          path: source-input
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Decrypt and prepare source
+        env:
+          GENE_BUILD_ENCRYPTION_KEY: \${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
+        run: |
+          node scripts/cloud-build.mjs unpack "source-input/.gene-builds/\${{ inputs.build_id }}.enc" web
+          META_TITLE="$(node -p "require('./web/gene-build.json').title")"
+          META_ID="$(node -p "require('./web/gene-build.json').projectId")"
+          node scripts/cloud-build.mjs prepare-android web android-wrapper "$META_TITLE" "$META_ID"
+      - name: Compile installable Android APK
+        env:
+          GENE_BUILD_ENCRYPTION_KEY: \${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
+        run: |
+          cd android-wrapper
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          cd ../..
+          mkdir -p encrypted-artifacts
+          node scripts/cloud-build.mjs encrypt android-wrapper/android/app/build/outputs/apk/debug/app-debug.apk encrypted-artifacts/android-debug.apk.enc
+      - name: Upload encrypted Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: gene-\${{ inputs.build_id }}-android
+          path: encrypted-artifacts/android-debug.apk.enc
+          if-no-files-found: error
+          retention-days: 7
