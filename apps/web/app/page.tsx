@@ -954,6 +954,26 @@ export default function Home() {
     setActivity([]);
   }
 
+  function deleteProject(projectId: string) {
+    const target = projects.find(item => item.id === projectId) || (project?.id === projectId ? project : null);
+    if (!target) return;
+    if (!window.confirm("Delete the chat and local project \"" + target.name + "\"? This removes its saved browser history and cannot be undone.")) return;
+    const remaining = projects.filter(item => item.id !== projectId);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+      if (localStorage.getItem(ACTIVE_KEY) === projectId) localStorage.removeItem(ACTIVE_KEY);
+    } catch {}
+    setProjects(remaining);
+    if (project?.id === projectId) {
+      const next = remaining[0] || newProject(target.kind || "game");
+      setProject(next);
+      setSection("chat");
+      setNotice("Deleted \"" + target.name + "\".");
+    } else {
+      setNotice("Deleted \"" + target.name + "\".");
+    }
+  }
+
   function loadPlayableDemo() {
     const files = playableDemoFiles();
     const stamp = now();
@@ -1144,10 +1164,10 @@ export default function Home() {
         <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
         <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
-        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small></div>
+        <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small><button className="project-delete" title="Delete this chat and project" onClick={() => deleteProject(project.id)}>×</button></div>
         {projects.filter(p => p.id !== project.id).length > 0 && <>
-          <div className="sidebar-section-label">RECENT PROJECTS</div>
-          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <button key={p.id} className="file-row recent-project-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button>)}
+          <div className="sidebar-section-label">RECENT CHATS</div>
+          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
         </>}
         <div className="sidebar-section-label">PROJECT FILES</div>
         {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
@@ -1291,11 +1311,12 @@ export default function Home() {
 </div>}{section === "versions" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">RECOVERY</div><h2>Versions</h2><p>Every successful source-changing response creates a local snapshot. Restoring creates another snapshot, so history stays intact.</p></div>{project.versions.length ? <div className="version-list">{project.versions.map(version => <div key={version.number} className="version-item"><div className="version-number">v{String(version.number).padStart(3, "0")}</div><div className="version-meta"><strong>{version.label}</strong><small>{new Date(version.createdAt).toLocaleString()} · {Object.keys(version.files).length} files</small><p>{version.testSummary}</p></div><button className="secondary-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}</div> : <div className="empty-state">No versions yet. A version is created when GENE returns files or you save a manual edit.</div>}</div>}
           </section>
 
-          <aside className={"preview-panel " + (!previewOpen ? "collapsed" : "") + (expandedPreview ? " expanded" : "")}>
-            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title={previewOpen ? "Minimize preview" : "Open preview"} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? "–" : "□"}</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
-            {previewOpen && <><div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div><div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : (project.kind === "app" ? "No app loaded" : "No game loaded")}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div></>}
+          {previewOpen ? <aside className={"preview-panel" + (expandedPreview ? " expanded" : "")}>
+            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); }}>–</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
+            <div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div>
+            <div className="preview-footer"><span className={"status-dot " + (runtimeState === "rendered" ? "online" : runtimeState === "error" ? "offline" : "")} />{hasGame ? runtimeLabel(runtimeState) : (project.kind === "app" ? "No app loaded" : "No game loaded")}{isSyncedToLocal && <button onClick={openLocalAgentGame}>Open disk game ↗</button>}<button onClick={downloadProject}>Export project ↓</button></div>
             {expandedPreview && hasGame && <button className="close-expanded" title="Close expanded preview" onClick={() => setExpandedPreview(false)}>Close expanded preview ×</button>}
-          </aside>
+          </aside> : <button className="preview-reopen-tab" title="Reopen live preview" onClick={() => setPreviewOpen(true)}><span className="live-dot" /> Preview <span>↗</span></button>}
         </div>
         <footer className="statusbar"><div><span className="status-dot online" /> Workspace local state</div><div>{Object.keys(project.files).length} source files <span className="status-divider">·</span> {project.versions.length} versions <span className="status-divider">·</span> {project.thinking} mode</div><button onClick={() => setShowActivity(!showActivity)}>Activity {showActivity ? "▾" : "▴"}</button></footer>
       </section>
