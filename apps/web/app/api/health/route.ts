@@ -17,6 +17,7 @@ export async function GET() {
       openrouter: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
     },
     model: process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEYS?.trim() ? (process.env.GENE_FAST_MODEL || "gemini-3.8-flash") : process.env.GROQ_API_KEY?.trim() ? (process.env.GENE_GROQ_MODEL || "llama-3.3-70b-versatile") : process.env.OPENROUTER_API_KEY?.trim() ? (process.env.GENE_OPENROUTER_MODEL || "qwen/qwen3-coder:free") : "No provider configured",
+    publishConfigured: Boolean(process.env.VERCEL_TOKEN?.trim() && process.env.VERCEL_PROJECT_ID?.trim() && process.env.GENE_PUBLISH_PASSWORD?.trim()),
     timestamp: new Date().toISOString(),
   }, {
     headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
