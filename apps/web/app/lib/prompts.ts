@@ -44,9 +44,10 @@ export function makeAgentInput(input: {
   const projectKind = p?.kind === "app" ? "app" : "game";
   const isStage = input.operation === "buildPart";
   const stagePath = input.stagePath || "";
+  const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
   const fileBudget: Record<string, number> = { "game-spec.json": 7000, "game.html": 5000, "game.css": 7000, "game.js": 9000 };
   const stageFiles = Object.fromEntries(Object.entries(p?.files || {})
-    .filter(([path]) => !isStage || (path !== stagePath && (path === "game-spec.json" || ((stagePath === "game.js" || stagePath === "game.css") && path === "game.html") || (stagePath === "game.js" && path === "game.css"))))
+    .filter(([path]) => !isStage || ((path !== stagePath || isStageRepair) && (path === "game-spec.json" || (isStageRepair && path === stagePath) || ((stagePath === "game.js" || stagePath === "game.css") && path === "game.html") || (stagePath === "game.js" && path === "game.css"))))
     .map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 2500)]));
   const guide = projectKind === "game" ? selectGameGuide({
     message: input.message,
