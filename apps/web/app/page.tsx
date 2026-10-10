@@ -327,7 +327,7 @@ export default function Home() {
         mode: operation === "build" || operation === "edit" || operation === "surprise" || operation === "buildPart" ? "build" : nextProject.mode,
         model: aiModel,
         thinking: nextProject.thinking,
-        history: nextProject.messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
+        history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
         answers: nextAnswers
       };
       if (operation === "build" || operation === "surprise") {
@@ -342,7 +342,7 @@ export default function Home() {
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
           const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
           const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
-            "Original request: " + prompt + ". " +
+            "Use the original project idea in the project context as the source of truth. " +
             (index === 0
               ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
               : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.");
