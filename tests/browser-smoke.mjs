@@ -133,7 +133,7 @@ try {
   await webglPage.close();
 
   // Check the first complete starter game with no Gemini API key configured.
-  const samplePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const samplePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   samplePage.on("pageerror", error => fatalErrors.push("starter: " + error.message));
   const emptyProject = { ...fixture, id: "playwright-empty-start", name: "Empty starter", initialPrompt: "", mode: "plan", plan: null, files: {}, versions: [], activeFile: "game.js", messages: [{ id: "hello", role: "assistant", content: "Test", createdAt: new Date().toISOString() }] };
   await samplePage.addInitScript(({ project, storageKey, activeKey }) => { localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
@@ -142,6 +142,8 @@ try {
   const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
   await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
   await samplePage.getByText("Visible render signal").first().waitFor({ timeout: 10_000 });
+  await samplePage.setViewportSize({ width: 390, height: 844 });
+  await samplePage.waitForTimeout(250);
   await samplePage.getByTitle("Open live preview").click();
   await samplePage.locator(".preview-panel.expanded").waitFor({ state: "visible", timeout: 5_000 });
   await sampleFrame.locator("#start-button").click();
@@ -171,6 +173,7 @@ try {
   const starterInfo = await sampleFrame.locator("body").evaluate(() => ({ cores: document.getElementById("core-count")?.textContent, canvas: Boolean(document.getElementById("game-canvas")) }));
   assert.ok(starterInfo.canvas && starterInfo.cores?.includes("7"), "starter loads its real game HUD and seven-core objective");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
+  await samplePage.close();
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mobilePage.addInitScript(({ project, storageKey, activeKey }) => {
