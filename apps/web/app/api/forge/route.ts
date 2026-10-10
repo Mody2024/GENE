@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
+type Surface = "matte" | "metal" | "rubber" | "glass" | "emissive";
 type Vec3 = [number, number, number];
 type Part = {
   name: string;
@@ -18,6 +19,7 @@ type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
 const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"]);
+const SURFACES = new Set<Surface>(["matte", "metal", "rubber", "glass", "emissive"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
 function json(status: number, body: unknown) {
