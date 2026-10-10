@@ -80,6 +80,23 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
   return mapped;
 }
 
+function standaloneDocument(source: string, title: string, cssName: string, jsName: string) {
+  const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
+  const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
+  let body = bodyMatch ? bodyMatch[1] : source
+    .replace(/<!doctype[^>]*>/gi, "")
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "")
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, "");
+  body = body.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+  return "<!doctype html>\n<html lang=\\"en\\">\n<head>\n" +
+    "<meta charset=\\"utf-8\\">\n<meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1,viewport-fit=cover\\">\n" +
+    "<meta name=\\"theme-color\\" content=\\"#101411\\">\n<meta name=\\"description\\" content=\\"" + safeTitle + "\\">\n" +
+    "<title>" + safeTitle + "</title>\n<link rel=\\"manifest\\" href=\\"manifest.webmanifest\\">\n" +
+    "<link rel=\\"icon\\" href=\\"icon.svg\\" type=\\"image/svg+xml\\">\n<link rel=\\"stylesheet\\" href=\\"" + cssName + "\\">\n" +
+    "</head>\n<body>\n" + body + "\n<script src=\\"" + jsName + "\\" defer></script>\n<script src=\\"pwa-register.js\\" defer></script>\n</body>\n</html>";
+}
+
+
 type BuildCheckStatus = "pass" | "warn" | "fail";
 type BuildCheck = { label: string; status: BuildCheckStatus; detail: string };
 type BuildReport = { checkedAt: string; projectUpdatedAt: string; checkedDirty: boolean; checkedFile: string; checkedEditorContent: string; checks: BuildCheck[] };
