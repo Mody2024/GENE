@@ -1221,6 +1221,12 @@ export default function Home() {
 
   async function buildBinary(targets: "both" | "windows" | "android") {
     if (!project || !hasGame || binaryBuildBusy || busy) return;
+    if (!binaryBuildConfigured) {
+      setNotice("To enable real EXE/APK builds, configure GENE_BUILD_GITHUB_TOKEN, GENE_BUILD_ENCRYPTION_KEY, and GENE_BUILD_PASSWORD in Vercel, plus GENE_BUILD_ENCRYPTION_KEY and BLOB_READ_WRITE_TOKEN in GitHub Actions secrets. See the cloud builder setup instructions in the GENE repository README.");
+      return;
+    }
+    const buildPassword = window.prompt("Enter the cloud build password configured as GENE_BUILD_PASSWORD in Vercel.");
+    if (!buildPassword) return;
     setBinaryBuildBusy(true);
     setBinaryBuildLinks(null);
     setBinaryBuildId("");
@@ -1253,7 +1259,7 @@ export default function Home() {
       setNotice("Submitting encrypted source. GitHub Actions will compile a real Windows installer and/or Android APK…");
       const response = await fetch("/api/builds", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-gene-build-password": buildPassword },
         body: JSON.stringify({ title, projectId: project.id, targets, files })
       });
       const payload = await response.json().catch(() => null);
