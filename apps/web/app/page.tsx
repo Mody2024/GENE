@@ -187,7 +187,7 @@ export default function Home() {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
-        setRuntimeState(state);
+        setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
           setProject(current => current && current.versions.length ? {
             ...current,
@@ -209,17 +209,22 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!project || !project.files["game.html"] || !project.files["game.js"] || runtimeState === "rendered" || runtimeState === "error") return;
+    // A hidden/collapsed preview has no mounted iframe, so it cannot send render
+    // telemetry. Never mark a build broken just because the user closed Preview.
+    if (!project || !project.files["game.html"] || !project.files["game.js"] || !previewOpen || !iframeRef.current || runtimeState === "rendered" || runtimeState === "error") return;
     const timer = window.setTimeout(() => {
-      setRuntimeState("error");
-      setNotice("GENE could not confirm a visible game frame. The source exists, but this build is not verified as playable.");
+      // The monitor can miss a frame during slow startup. Confirm the iframe still
+      // exists and give its render loop a second window before flagging a failure.
+      if (!previewOpen || !iframeRef.current) return;
+      setRuntimeState(current => current === "rendered" ? current : "error");
+      setNotice(current => current || "GENE could not confirm a visible game frame after waiting for the preview. The source is preserved; reopen or refresh Preview to retry verification.");
       setProject(projectNow => projectNow && projectNow.versions.length ? {
         ...projectNow,
-        versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: no visible render signal received within five seconds." } : v)
+        versions: projectNow.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Unverified: the visible-render monitor did not confirm a frame. Source is preserved." } : v)
       } : projectNow);
-    }, 5000);
+    }, 9000);
     return () => window.clearTimeout(timer);
-  }, [project?.id, project?.files, previewKey, runtimeState]);
+  }, [project?.id, project?.files, previewKey, previewOpen, runtimeState]);
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
@@ -229,7 +234,7 @@ export default function Home() {
       const js = (project.files["game.js"] || "").replace(/<\/script/gi, "<\\/script");
       const monitor = [
         "(function(){",
-        "function report(){try{var b=document.body;var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||b.querySelector('button,input,main,section,nav,form,canvas')));parent.postMessage({type:'gene-runtime',state:visible?'rendered':'loaded',renderer:'webapp'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webapp',message:String(e)},'*');}}",
+        "function report(){if(window.__geneFrameConfirmed)return;try{var b=document.body;var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||b.querySelector('button,input,main,section,nav,form,canvas')));if(visible)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:visible?'rendered':'loaded',renderer:'webapp'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webapp',message:String(e)},'*');}}",
         "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webapp',message:e.message||'app script error'},'*');});",
         "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',report);else report();[250,600,1100,1900,3000,4200].forEach(function(ms){setTimeout(report,ms);});",
         "})();"
@@ -243,7 +248,7 @@ export default function Home() {
     const engine = (() => { try { return JSON.parse(spec).engine === "webgl3d" ? "webgl3d" : "canvas2d"; } catch { return "canvas2d"; } })();
     const monitor = [
       "(function(){",
-      "function report(){try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0&&(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0&&(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36))n++;}parent.postMessage({type:'gene-runtime',state:n>12?'rendered':'loaded',visiblePixels:n,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
+      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0){alpha++;if(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0){alpha++;if(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:e.message||'script error'},'*');});",
       "[250,650,1200,2000,3200,4300].forEach(function(ms){setTimeout(report,ms);});",
       "})();"
