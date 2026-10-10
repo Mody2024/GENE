@@ -49,3 +49,10 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .recent-delete{flex:0 0 26px;height:28px;font-size:17px;opacity:.65}
 .recent-project-row:hover .recent-delete{opacity:1}
 @media(max-width:800px){.preview-reopen-tab{top:auto;bottom:84px;right:10px;transform:none;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.3)}.preview-reopen-tab:hover{transform:translateY(-2px)}}
+
+.gene-logo-svg{width:25px;height:25px;display:block;flex:0 0 auto;color:currentColor}
+.brand-orbit .gene-logo-svg{width:26px;height:26px;color:#123425}
+.avatar .gene-logo-svg{width:20px;height:20px;color:#123425}
+.welcome-orbit>.gene-logo-svg{width:43px;height:43px;color:var(--green)}
+.gene-mark>.gene-logo-svg{width:44px;height:44px;color:var(--green)}
+.project-delete:focus-visible,.recent-delete:focus-visible,.preview-reopen-tab:focus-visible,.gene-logo-svg:focus-visible{outline:2px solid var(--green);outline-offset:3px}
