@@ -428,19 +428,61 @@ export default function Home() {
         }
         if (responseOk) {
           addActivity("Checking assembled project contract and source files");
-          const validateResponse = await fetch("/api/agent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...baseRequest,
-              operation: "validateBuild",
-              message: "Validate assembled staged project",
-              project: { ...nextProject, files: stagedFiles, plan: stagedPlan }
-            })
-          });
-          const validationPayload = await validateResponse.json().catch(() => null);
-          if (!validateResponse.ok || !validationPayload?.ok) {
-            payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation." } };
+          let validationPayload: any = null;
+          let validationOk = false;
+          for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
+            const validateResponse = await fetch("/api/agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...baseRequest,
+                operation: "validateBuild",
+                message: "Validate assembled staged project",
+                project: { ...nextProject, files: stagedFiles, plan: stagedPlan }
+              })
+            });
+            validationPayload = await validateResponse.json().catch(() => null);
+            if (validateResponse.ok && validationPayload?.ok) {
+              validationOk = true;
+              break;
+            }
+            const validationError = String(validationPayload?.error?.message || "The assembled project failed validation.");
+            addActivity("Final validation failed: " + validationError.slice(0, 180));
+            if (validationAttempt >= 2) break;
+
+            const repairPath = stagePaths.find(path => validationError.includes(path)) ||
+              (/spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
+               /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
+               /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
+            addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
+            let repaired = false;
+            for (let repairAttempt = 1; repairAttempt <= 2 && !repaired; repairAttempt++) {
+              const repairResponse = await fetch("/api/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...baseRequest,
+                  operation: "buildPart",
+                  stagePath: repairPath,
+                  message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + repairPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + ". Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + repairPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
+                  project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+                })
+              });
+              const repairPayload = await repairResponse.json().catch(() => null);
+              const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === repairPath);
+              if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
+                stagedFiles[repairPath] = repairFile.content;
+                modelUsed = repairPayload.model || modelUsed;
+                repaired = true;
+                addActivity("Repaired " + repairPath + "; rerunning full-project validation");
+              } else {
+                addActivity("Repair attempt for " + repairPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+              }
+            }
+            if (!repaired) break;
+          }
+          if (!validationOk) {
+            payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation after targeted repair attempts." } };
             responseOk = false;
           } else {
             const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
@@ -452,7 +494,7 @@ export default function Home() {
               aiMode: "multi-provider",
               model: modelUsed,
               result: {
-                reply: "Built the first playable version in four small stages, normalized the source files, and passed GENE's structural validation. Play it and request focused improvements.",
+                reply: "Built the first playable version in compact stages, repaired any structural validation issues found, and validated the assembled source. Play it and request focused improvements.",
                 plan: stagedPlan,
                 files: normalizedFiles,
                 complete: true,
@@ -460,8 +502,7 @@ export default function Home() {
               }
             };
           }
-        }
-      } else {
+        }      } else {
         const response = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
