@@ -94,3 +94,5 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .binary-build-result-item a:hover{text-decoration:underline}
 .binary-build-muted,.binary-build-result small{font-size:10px;color:var(--muted)}
 @media(max-width:480px){.binary-target-select{max-width:90px;min-width:76px;font-size:9px;padding:6px 5px}.binary-build-button{font-size:9px;padding:6px 7px}.binary-build-result{margin:0 9px 10px;padding:10px}.binary-build-result-links{grid-template-columns:1fr}.binary-build-result-item{padding:8px}}
+
+.binary-build-log-link{font-size:10px;font-weight:750;color:var(--green);text-decoration:none;width:max-content}.binary-build-log-link:hover{text-decoration:underline}
