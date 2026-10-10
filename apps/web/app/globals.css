@@ -37,8 +37,8 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 
 /* GENE v1.2: calmer preview collapse and project chat controls */
 .workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}
-.preview-reopen-tab{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:40;display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--text);box-shadow:0 12px 36px rgba(0,0,0,.28);backdrop-filter:blur(18px);font-size:11px;font-weight:700;cursor:pointer}
-.preview-reopen-tab:hover{border-color:var(--green);transform:translateY(-50%) translateX(-2px)}
+.preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px;transform:none;z-index:40;display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--text);box-shadow:0 12px 36px rgba(0,0,0,.28);backdrop-filter:blur(18px);font-size:11px;font-weight:700;cursor:pointer}
+.preview-reopen-tab:hover{border-color:var(--green);transform:translateY(-2px)}
 .preview-reopen-tab>span:last-child{color:var(--green);font-size:14px}
 .project-card{padding-right:36px}
 .project-delete,.recent-delete{border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:grid;place-items:center}
@@ -48,7 +48,7 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .recent-project-row .file-row{flex:1;min-width:0;margin:0}
 .recent-delete{flex:0 0 26px;height:28px;font-size:17px;opacity:.65}
 .recent-project-row:hover .recent-delete{opacity:1}
-@media(max-width:800px){.preview-reopen-tab{top:auto;bottom:84px;right:10px;transform:none;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.3)}.preview-reopen-tab:hover{transform:translateY(-2px)}}
+@media(max-width:800px){.preview-reopen-tab{top:auto;bottom:78px;right:10px;transform:none;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.3)}.preview-reopen-tab:hover{transform:translateY(-2px)}}
 
 .gene-logo-svg{width:25px;height:25px;display:block;flex:0 0 auto;color:currentColor}
 .brand-orbit .gene-logo-svg{width:26px;height:26px;color:#123425}
