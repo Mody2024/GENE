@@ -273,10 +273,18 @@ export async function POST(request: NextRequest) {
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
   if (!prompt || prompt.length > 4000) return fail(400, "PROMPT_REQUIRED", "Write a concrete asset request (maximum 4,000 characters).");
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires Gemini to create a structured asset recipe. No model or mesh was generated.");
+  const apiKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    ...(process.env.GEMINI_API_KEYS || "").split(/[,;\\n]+/)
+  ].map(value => value?.trim()).filter((value): value is string => Boolean(value)).filter((value, index, all) => all.indexOf(value) === index);
+  if (!apiKeys.length) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires a Gemini API key to create a structured mesh recipe. No model or mesh was generated.");
 
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
+  const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
     "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
@@ -311,25 +319,69 @@ export async function POST(request: NextRequest) {
     imageCount++;
   }
 
-  let response: Response;
-  try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.25, maxOutputTokens: 6500, thinkingConfig: { thinkingLevel: quality === "high" ? "high" : "medium" } }
-      }),
-      signal: AbortSignal.timeout(50_000)
-    });
-  } catch (e) {
-    return fail(502, "GEMINI_NETWORK_ERROR", "Could not reach Gemini: " + (e instanceof Error ? e.message : String(e)));
+  let text = "";
+  let successfulModel = model;
+  let lastDetail = "No configured model returned a complete asset recipe.";
+  let sawTruncation = false;
+  const startedAt = Date.now();
+  const attempts: Array<{ key: string; model: string }> = [];
+  for (let keyIndex = 0; keyIndex < Math.min(apiKeys.length, 3); keyIndex++) {
+    for (const candidateModel of fallbackModels) {
+      attempts.push({ key: apiKeys[keyIndex], model: candidateModel });
+      if (attempts.length >= 6) break;
+    }
+    if (attempts.length >= 6) break;
   }
-  const payload: any = await response.json().catch(() => null);
-  if (!response.ok) return fail(response.status === 429 ? 429 : 502, "GEMINI_API_ERROR", payload?.error?.message || "Gemini could not generate an asset recipe.");
-  const text = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\n") || "";
-  if (!text.trim()) return fail(502, "GEMINI_EMPTY_RESPONSE", "Gemini returned no asset recipe.");
+  for (let index = 0; index < attempts.length; index++) {
+    if (Date.now() - startedAt > 49_000) break;
+    const attempt = attempts[index];
+    const compact = index > 0
+      ? "\\n\\nRECOVERY RETRY: Previous output was truncated or invalid. Return a smaller complete asset recipe from scratch, never continue partial JSON. Use fewer parts (18 maximum), concise names/notes, preserve the signature silhouette and correct proportions, and output one complete JSON object only."
+      : "";
+    try {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user + compact }, ...parts.slice(1)] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: index > 0 ? 3_800 : 6_500, thinkingConfig: { thinkingLevel: index > 0 || quality === "performance" ? "low" : quality === "high" ? "high" : "medium" } }
+        }),
+        signal: AbortSignal.timeout(Math.min(index === 0 ? 13_000 : 9_000, Math.max(1_000, 49_000 - (Date.now() - startedAt))))
+      });
+      const payload: any = await response.json().catch(() => null);
+      const candidateText = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("\\n") || "";
+      const finishReason = String(payload?.candidates?.[0]?.finishReason || "");
+      if (!response.ok) {
+        lastDetail = payload?.error?.message || "HTTP " + response.status;
+        if (response.status !== 429 && response.status < 500 && response.status !== 401 && response.status !== 403) break;
+        continue;
+      }
+      if (finishReason === "MAX_TOKENS") {
+        sawTruncation = true;
+        lastDetail = "The model reached its output token limit.";
+        continue;
+      }
+      if (!candidateText.trim()) {
+        lastDetail = "The model returned an empty recipe.";
+        continue;
+      }
+      try { extractJson(candidateText); } catch {
+        lastDetail = "The model returned malformed or incomplete JSON.";
+        continue;
+      }
+      text = candidateText;
+      successfulModel = attempt.model;
+      break;
+    } catch (error) {
+      lastDetail = error instanceof Error ? error.message : "Network timeout.";
+    }
+  }
+  if (!text) {
+    return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
+      (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
+      "No mesh files were saved. Try Performance quality or simplify the requested asset. Detail: " + lastDetail);
+  }
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
@@ -342,7 +394,7 @@ export async function POST(request: NextRequest) {
     return json(200, {
       ok: true,
       aiMode: "gemini",
-      model,
+      model: successfulModel,
       asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
     });
   } catch (e) {
