@@ -5,7 +5,16 @@ import type { AgentResponse } from "../../lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ALLOWED_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
+const CORE_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
+const MAX_PROJECT_FILES = 100;
+function isSafeProjectPath(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim() || value.length > 240) return false;
+  const path = value.replace(/\\\\/g, "/");
+  if (path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
+      path.split("/").some(part => !part || part === "." || part === "..") ||
+      /[<>:"|?*\\u0000-\\u001f]/.test(path)) return false;
+  return /\\.(html|css|js|mjs|cjs|json|svg|png|jpe?g|webp|gif|obj|mtl|glsl|txt|md|gd|ts|wav|mp3|ogg|woff2?)$/i.test(path);
+}
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 18;
 const RATE_WINDOW_MS = 60_000;
@@ -135,12 +144,11 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
   if ((operation === "build" || operation === "surprise") && !result.plan && existingPlan) result.plan = existingPlan;
   if (operation === "build" || operation === "surprise") {
     if (!result.plan) throw new Error("Build response is missing its implementation plan.");
-    if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required game source files.");
+    if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required core project files.");
   }
   const fileCount = Array.isArray(result.files) ? result.files.length : 0;
-  if ((operation === "edit" || operation === "chat") && fileCount > 4) {
-    throw new Error("Edit response changed too many files for the current browser-game scope.");
-  }
+  if (fileCount > MAX_PROJECT_FILES) throw new Error("This operation returned more than " + MAX_PROJECT_FILES + " files. Split the change into dependency-aware batches.");
+
   return result;
 }
 
@@ -196,7 +204,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
   const seen = new Set<string>();
   for (const file of files) {
     if (!file || typeof file.path !== "string" || typeof file.content !== "string") throw new Error("A generated file was malformed.");
-    if (!ALLOWED_FILES.has(file.path)) throw new Error("Blocked unexpected generated path: " + file.path);
+    if (!isSafeProjectPath(file.path)) throw new Error("Blocked unsafe or unsupported generated path: " + file.path);
     if (seen.has(file.path)) throw new Error("The model returned duplicate source path: " + file.path);
     seen.add(file.path);
     if (file.content.length > 500_000) throw new Error("Generated file exceeds the 500 KB safety limit.");
@@ -639,7 +647,7 @@ export async function POST(request: NextRequest) {
             stagePath: body.stagePath || null,
             projectKind,
             plan: body.project?.plan || result.plan || null,
-            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => ALLOWED_FILES.has(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
+            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => isSafeProjectPath(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
             candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
           };
           const reviewResponse = await fetch(reviewer.endpoint, {
@@ -681,13 +689,13 @@ export async function POST(request: NextRequest) {
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
-      if (typeof requestedPath !== "string" || !ALLOWED_FILES.has(requestedPath)) {
+      if (!isSafeProjectPath(requestedPath)) {
         throw new Error("Staged build is missing a valid requested file path.");
       }
       if (files.length !== 1 || files[0]?.path !== requestedPath) {
         throw new Error("Staged build must return exactly the requested file: " + requestedPath + ". No files were changed.");
       }
-      if (files[0].content.length > 120_000) {
+      if (files[0].content.length > 500_000) {
         throw new Error("Staged file exceeded the compact 120 KB per-file budget. No files were changed.");
       }
     }
