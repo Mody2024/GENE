@@ -739,7 +739,24 @@ export default function Home() {
         messages: [...nextProject.messages, assistantMessage],
         updatedAt: now()
       };
-      setProject(updated);
+      setProject(current => {
+        if (!buildInProgress || !current || current.id !== updated.id) return updated;
+        const knownIds = new Set(current.messages.map(item => item.id));
+        const appendedMessages = updated.messages.filter(item => !knownIds.has(item.id));
+        const isReadOnlyReply = operation === "chat" || operation === "research";
+        return {
+          ...current,
+          ...updated,
+          files: isReadOnlyReply ? current.files : { ...current.files, ...updated.files },
+          versions: isReadOnlyReply ? current.versions : updated.versions,
+          plan: isReadOnlyReply ? current.plan : updated.plan,
+          buildRun: activeBuildRun || current.buildRun || updated.buildRun,
+          livingPreview: isReadOnlyReply ? current.livingPreview : (changedPaths.length ? updated.livingPreview : current.livingPreview),
+          activeFile: isReadOnlyReply ? current.activeFile : updated.activeFile,
+          messages: [...current.messages, ...appendedMessages],
+          updatedAt: now()
+        };
+      });
       if (changedPaths.length) {
         addActivity("Files updated: " + changedPaths.join(", "));
         setSection("chat");
@@ -761,7 +778,16 @@ export default function Home() {
     } catch (error) {
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [text], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
-      setProject(failed);
+      setProject(current => {
+        if (!buildInProgress || !current || current.id !== failed.id) return failed;
+        const knownIds = new Set(current.messages.map(item => item.id));
+        return {
+          ...current,
+          buildRun: activeBuildRun || current.buildRun,
+          messages: [...current.messages, ...failed.messages.filter(item => !knownIds.has(item.id))],
+          updatedAt: now()
+        };
+      });
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
