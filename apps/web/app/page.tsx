@@ -588,8 +588,8 @@ export default function Home() {
                     return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
                   const isRuntimeLoadablePath = (path: string) =>
-                    /\\.js$/i.test(path) ||
-                    /^assets\\/[a-zA-Z0-9_-]+\\/(?:model\\.obj|model\\.mtl|asset\\.json)$/i.test(path);
+                    /\.js$/i.test(path) ||
+                    /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
                   const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
                     safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
                   ))].slice(0, 96);
