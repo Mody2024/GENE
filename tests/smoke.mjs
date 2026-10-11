@@ -319,7 +319,7 @@ console.log("GENE contract tests passed, including true WebGL contract checks, a
 const types14 = read("apps/web/app/lib/types.ts");
 const orchestrator14 = read("apps/web/app/lib/build-orchestrator.ts");
 assert.ok(types14.includes("export type BuildCheckpoint") && types14.includes("lastKnownGoodFiles"), "GENE 1.4 defines recoverable build checkpoints");
-assert.ok(types14.includes("prototype?: { targetMinutes: number") && types14.includes("fullGame?: { targetMinutes: number"), "prototype and full-game targets are stored separately");
+assert.ok(types14.includes("prototype?: { targetMinutes?: number") && types14.includes("fullGame?: { targetMinutes?: number"), "prototype and full-game targets are stored separately");
 assert.ok(types14.includes("export type PatchOperation"), "GENE 1.4 declares explicit, scoped source patch operations");
 assert.ok(orchestrator14.includes("assertAcyclic"), "build planning rejects cyclic task dependencies");
 assert.ok(orchestrator14.includes("getReadyTasks"), "the coordinator gates work on passed dependencies");
@@ -327,7 +327,7 @@ assert.ok(orchestrator14.includes("checkpointBuild") && orchestrator14.includes(
 assert.ok(orchestrator14.includes("queueUserChange") && orchestrator14.includes("planRevision"), "user interruptions queue changes and revise the plan");
 assert.ok(orchestrator14.includes("recoverFromCheckpoint"), "failed builds can restore a checkpoint rather than restart from scratch");
 
-assert.ok(prompts.includes("PROTOTYPE VS FULL GAME CONTRACT") && prompts.includes("Do not meet the full-game target by adding a timer"), "prototype and full-game content budgets must be meaningfully distinct");
+assert.ok(prompts.includes("PROTOTYPE VS FULL GAME CONTRACT") && prompts.includes("20 minutes and 2 hours are examples only"), "prototype and full-game content budgets must be meaningfully distinct");
 assert.ok(page.includes("Build checkpoints") && page.includes("Full-game target:"), "workspace exposes GENE 1.4 checkpoint and duration targets");
 assert.ok(page.includes("browser runtime still needs to render") && page.includes("Gameplay objectives still require manual verification"), "source validation is not mislabeled as proof of gameplay");
 
@@ -414,9 +414,15 @@ const recovered = coordinator.recoverFromCheckpoint(checkpointRun, checkpointRun
 assert.equal(recovered.files["game.js"], "known-good", "recovery restores the checkpoint source snapshot");
 assert.equal(recovered.run.tasks.find(task => task.id === "design").status, "passed", "recovery preserves completed tasks");
 assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queued", "recovery requeues unfinished tasks");
-assert.equal(baseRun.prototype.targetMinutes, 20, "prototype target is distinct and explicit");
-assert.equal(baseRun.fullGame.targetMinutes, 120, "full-game target is distinct and explicit");
+assert.equal(baseRun.prototype.targetMinutes, undefined, "prototype duration stays project-specific when no estimate is supplied");
+assert.equal(baseRun.fullGame.targetMinutes, undefined, "full-game duration stays project-specific when no estimate is supplied");
 console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");
 
 assert.ok(api.includes('import { applyPatchBatch } from "../../lib/patch-engine"'), "agent edit validation uses the patch engine");
 assert.ok(api.includes("const patchOperations = files.map") && api.includes("const patched = applyPatchBatch(body.project.files, patchOperations)"), "AI edits are applied as an atomic patch batch before project validation");
+
+assert.ok(prompts.includes("Plan an update") || prompts.includes("UPDATE PLAN"), "planning prompts support updates to existing projects");
+assert.ok(prompts.includes("Plan only") && prompts.includes("PLANNING INTENT"), "plan mode distinguishes new-project planning from update planning");
+assert.ok(page14.includes('aria-label="Planning intent"') && page14.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
+assert.ok(!page14.includes("prototypeMinutes: 20") && !page14.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
+assert.ok(page14.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
