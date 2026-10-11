@@ -532,13 +532,17 @@ export default function Home() {
                   ].join(" ").toLowerCase();
                   const plannedModules: string[] = [];
                   if (nextProject.kind === "app") {
-                    if (scopeText.length > 180 || (stagedPlan?.tasks || []).length >= 4) {
-                      plannedModules.push("src/app/state.js", "src/app/validation.js");
-                    }
+                    // Every non-trivial app gets a real modular base; complexity adds systems,
+                    // it must not be a prerequisite for having more than four files.
+                    plannedModules.push("src/app/state.js", "src/app/validation.js");
                     if (/save|persist|offline|cart|inventory|account|profile|settings|dashboard|history/.test(scopeText)) plannedModules.push("src/app/persistence.js");
                     if (/search|filter|sort|catalog|marketplace|products|library/.test(scopeText)) plannedModules.push("src/app/search.js");
+                    if (/form|signup|sign in|login|register|checkout|booking|contact/.test(scopeText)) plannedModules.push("src/app/forms.js");
+                    if (/chart|analytics|metrics|report|statistics/.test(scopeText)) plannedModules.push("src/app/analytics.js");
                   } else {
-                    plannedModules.push("src/systems/input.js", "src/systems/progression.js");
+                    // A game always receives modular input, progression, and content systems.
+                    // Add genre systems from the project brief and approved plan.
+                    plannedModules.push("src/systems/input.js", "src/systems/progression.js", "src/systems/content.js");
                     if (/story|dialogue|quest|mission|chapter|level|campaign|narrative|cutscene/.test(scopeText)) plannedModules.push("src/systems/narrative.js");
                     if (/combat|enemy|enemies|boss|weapon|shoot|attack|damage|survival/.test(scopeText)) plannedModules.push("src/systems/combat.js");
                     if (/3d|third.person|first.person|open.world|driving|vehicle|world.exploration/.test(scopeText)) plannedModules.push("src/systems/world.js", "src/systems/camera.js");
@@ -573,7 +577,8 @@ export default function Home() {
                       tasks: [
                         ...activeBuildRun.tasks.filter(task => task.id !== "validate-assembled"),
                         ...newTasks,
-                        ...activeBuildRun.tasks.filter(task => task.id === "validate-assembled").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)], files: [...stagePaths] }))
+                        ...activeBuildRun.tasks.filter(task => task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] })),
+                        ...activeBuildRun.tasks.filter(task => task.id === "validate-assembled").map(task => ({ ...task, dependsOn: ["final-content-pass"], files: [...stagePaths] }))
                       ]
                     };
                     addActivity("Expanded the build plan with " + extras.length + " additional dependency-aware project files from game-spec.json.");
