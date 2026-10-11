@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AGENT_SYSTEM, makeAgentInput } from "../../lib/prompts";
 import type { AgentResponse } from "../../lib/types";
+import { applyPatchBatch } from "../../lib/patch-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -717,9 +718,17 @@ export async function POST(request: NextRequest) {
     }
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
-      const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
+      const patchOperations = files.map(file => {
+        const previous = body.project.files[file.path];
+        return typeof previous === "string"
+          ? (previous.length
+            ? { op: "replace_exact" as const, path: file.path, expected: previous, replacement: file.content }
+            : { op: "replace_range" as const, path: file.path, startLine: 1, endLine: 1, replacement: file.content })
+          : { op: "add_file" as const, path: file.path, content: file.content };
+      });
+      const patched = applyPatchBatch(body.project.files, patchOperations);
       const mergedFiles = ensureProjectSpecTitle(
-        Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
+        Object.entries(patched.files).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
         titleCandidates
       );
       validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
