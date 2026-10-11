@@ -466,3 +466,5 @@ assert.ok(page.includes('"src/systems/input.js", "src/systems/progression.js", "
 assert.ok(page.includes('task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] }))'), "dynamic file expansion moves the final content pass behind every generated module");
 assert.ok(api.includes("const gameQuestions = [") && api.includes("const appQuestions = [") && api.includes("bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id))"), "fallback interview asks multiple adaptive questions one at a time");
 assert.ok(api.includes("const original = String(body.message || body.project?.initialPrompt"), "update planning uses the requested update instead of only the original project prompt");
+
+assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
