@@ -36,3 +36,8 @@ GENE must model the playable prototype and the full game as separate content pla
 ## Honest completion gates
 
 A build is not complete just because source generation succeeded. The intended gates are source/schema checks, dependency validation, runtime startup, visible first frame, controls and primary loop, objective completion, fail/restart path, full-game completion path, and performance diagnostics. Where automated play is unavailable, the UI must identify which checks are static, which were executed, and which remain unverified.
+
+
+## Context-aware patch engine
+
+`apps/web/app/lib/patch-engine.ts` applies a batch to a copied source manifest and returns a result only if every operation succeeds. It supports add/delete/rename, exact-context replacements, line-range replacements, and standard unified diff hunks. Stale or ambiguous context, unsafe paths, missing files, rename collisions, invalid ranges, and oversized files reject the whole batch. The caller still needs to connect this utility to model-generated patch plans and run project-level validation before saving.
