@@ -216,7 +216,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     normalized.push(file);
   }
   for (const file of normalized) {
-    if (file.path === "game.js") new Function(file.content);
+    if (/\\.js$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
   if (operation === "build" || operation === "surprise") {
@@ -237,6 +237,9 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           throw new Error("Build rejected: additionalFiles contains an unsafe, duplicate, or core path.");
         }
         seenAdditional.add(path);
+        if (typeof byPath[path] !== "string" || byPath[path].trim().length < 8) {
+          throw new Error("Build rejected: declared project module/asset " + path + " is missing from the assembled project.");
+        }
       }
     }
     if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: project spec needs a title.");
