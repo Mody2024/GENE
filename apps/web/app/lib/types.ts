@@ -23,6 +23,66 @@ export type GeneProject = {
   references: ReferenceFile[];
   updatedAt: string;
 };
+/** Durable execution records used by the GENE 1.4 Flash build coordinator. */
+export type BuildTaskStatus = "queued" | "running" | "passed" | "failed" | "blocked" | "skipped";
+export type BuildTaskKind = "research" | "design" | "scaffold" | "implement" | "integrate" | "test" | "repair" | "package";
+export type BuildTask = {
+  id: string;
+  title: string;
+  kind: BuildTaskKind;
+  status: BuildTaskStatus;
+  dependsOn: string[];
+  attempts: number;
+  files: string[];
+  acceptance: string[];
+  lastError?: string;
+};
+export type CheckpointReason = "task-complete" | "prototype-ready" | "user-interruption" | "repair-failed" | "phase-complete" | "manual";
+export type BuildCheckpoint = {
+  id: string;
+  createdAt: string;
+  reason: CheckpointReason;
+  planRevision: number;
+  completedTaskIds: string[];
+  activeTaskId?: string;
+  fileManifest: Record<string, string>;
+  lastKnownGoodFiles: Record<string, string>;
+  validation: { passed: string[]; failed: string[] };
+  recoveryNote: string;
+};
+export type BuildRunStatus = "planning" | "running" | "paused" | "needs-input" | "recovering" | "completed" | "failed";
+export type BuildRun = {
+  id: string;
+  status: BuildRunStatus;
+  planRevision: number;
+  tasks: BuildTask[];
+  checkpoints: BuildCheckpoint[];
+  activeTaskId?: string;
+  startedAt: string;
+  updatedAt: string;
+  userChangeQueue: string[];
+  prototype?: { targetMinutes: number; estimatedMinutes: number; ready: boolean; completedObjectives: string[] };
+  fullGame?: { targetMinutes: number; estimatedMinutes: number; contentTargets: string[]; acceptance: string[] };
+  lastError?: string;
+};
+export type LivingPreviewStatus = "not-started" | "booting" | "playable" | "stale" | "error";
+export type LivingBuildPreview = {
+  status: LivingPreviewStatus;
+  lastKnownGoodVersion?: number;
+  startedAt?: string;
+  updatedAt: string;
+  runtimeErrors: string[];
+  currentObjectives: string[];
+  canContinuePlaying: boolean;
+};
+export type PatchOperation =
+  | { op: "replace_exact"; path: string; expected: string; replacement: string }
+  | { op: "replace_range"; path: string; startLine: number; endLine: number; replacement: string }
+  | { op: "add_file"; path: string; content: string }
+  | { op: "delete_file"; path: string }
+  | { op: "rename_file"; path: string; newPath: string }
+  | { op: "apply_diff"; path: string; patch: string };
+
 export type AgentResponse = {
   reply: string;
   question?: Question | null;
