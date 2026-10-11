@@ -442,3 +442,7 @@ assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
 assert.ok(page.includes("FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS") && page.includes("Final content pass completed") === false, "build pipeline requests a distinct full-game expansion pass rather than treating the prototype as the finished game");
 assert.ok(page.includes("final-content-pass") && page.includes("Expand the prototype into the full game"), "build task ledger includes a separate full-game expansion stage");
+
+assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\""), "concurrent read-only chat merges into the live project without replacing build files");
+assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => item.id))"), "concurrent build/chat responses deduplicate and preserve conversation messages");
+assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
