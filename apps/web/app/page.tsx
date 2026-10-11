@@ -682,7 +682,7 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
-  }, [project, busy, aiModel, searchMode, localAgentStatus, localAgentToken, localAgentUrl]);
+  }, [project, busy, aiModel, searchMode, planIntent, localAgentStatus, localAgentToken, localAgentUrl]);
 
   useEffect(() => {
     if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
