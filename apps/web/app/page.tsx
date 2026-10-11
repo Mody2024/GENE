@@ -603,21 +603,13 @@ export default function Home() {
                     completedObjectives: ["Core files generated", "Initial source contract passed", "Ready for live preview; remaining build tasks continue"]
                   }
                 };
-                const prototypeVersion: BuildVersion = {
-                  number: (nextProject.versions[0]?.number || 0) + 1,
-                  label: "Playable prototype checkpoint",
-                  files: { ...stagedFiles },
-                  createdAt: now(),
-                  testSummary: "Core files generated; full-game expansion and browser runtime checks are still in progress."
-                };
                 setProject(current => current && current.id === nextProject.id ? {
                   ...current,
                   files: { ...current.files, ...stagedFiles },
-                  versions: [prototypeVersion, ...current.versions],
                   buildRun: activeBuildRun,
                   livingPreview: {
                     status: "playable",
-                    lastKnownGoodVersion: prototypeVersion.number,
+                    lastKnownGoodVersion: current.versions[0]?.number,
                     updatedAt: now(),
                     runtimeErrors: [],
                     currentObjectives: activeBuildRun?.prototype?.completedObjectives || [],
