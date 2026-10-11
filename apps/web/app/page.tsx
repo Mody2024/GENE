@@ -419,7 +419,8 @@ export default function Home() {
             files: [path],
             acceptance: ["Return the requested complete file", "Pass server-side source validation"]
           })),
-          { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
+          { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: ["game.js", "game.css"], acceptance: [nextProject.kind === "app" ? "Primary user flows have working interactions and failure states" : "Full-game content extends beyond the prototype with progression and a complete ending", "Existing working controls and mechanics are preserved"] },
+          { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["final-content-pass"], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
         ];
         activeBuildRun = createBuildRun({
           projectId: nextProject.id,
@@ -556,6 +557,43 @@ export default function Home() {
           }
         }
         if (responseOk) {
+          activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "running");
+          persistRun(activeBuildRun, "booting", stagedFiles, [], [], "task-complete");
+          const finalPassMessage = nextProject.kind === "app"
+            ? "FINAL APP QUALITY PASS. Improve the existing complete web app without redesigning it from scratch. Inspect game.html, game.css, game.js and game-spec.json. Implement the highest-value unfinished user flows, make every existing visible control work, add field validation and visible success/error/empty/loading states where relevant, prevent duplicate form submission, preserve user input on failure, and ensure keyboard-accessible interactions. Preserve the app's existing design, data model, routes and working behavior. Update only game.js and keep compatibility with the existing HTML/CSS. Return one complete replacement game.js, not a summary. Do not claim backend persistence or authentication unless actually implemented."
+            : "FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS. Inspect the existing game-spec.json, game.html, game.css, game.js and all generated modules. Preserve the playable core and its controls, then implement a meaningful amount of the planned full-game content beyond the prototype: progression, distinct missions/levels or encounters, challenge variation, rewards/unlocks, and a satisfying full-game conclusion appropriate to this genre. Use the duration estimate from this specific project's specification if present; never insert universal 20-minute/2-hour targets and never pad playtime. Keep existing modules compatible, use them when they exist, and update only game.js. Return one complete replacement game.js with the full-game behavior implemented, not a plan or summary.";
+          try {
+            const finalPassResponse = await fetch("/api/agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...baseRequest,
+                operation: "buildPart",
+                stagePath: "game.js",
+                message: finalPassMessage,
+                project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+              })
+            });
+            const finalPassPayload = await finalPassResponse.json().catch(() => null);
+            const finalGameFile = (finalPassPayload?.result?.files || []).find((file: { path?: string }) => file.path === "game.js");
+            if (finalPassResponse.ok && finalPassPayload?.ok && finalGameFile && typeof finalGameFile.content === "string") {
+              stagedFiles["game.js"] = finalGameFile.content;
+              modelUsed = finalPassPayload.model || modelUsed;
+              activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "passed");
+              persistRun(activeBuildRun, "booting", stagedFiles, ["Final content pass returned a complete game.js replacement"], [], "task-complete");
+              addActivity(nextProject.kind === "app" ? "App interaction and error-state polish pass completed." : "Full-game expansion pass completed after the playable core was available.");
+            } else {
+              const finalPassError = String(finalPassPayload?.error?.message || "The model did not return a complete game.js replacement.");
+              activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "failed", undefined, finalPassError);
+              persistRun(activeBuildRun, "stale", stagedFiles, [], ["Final content pass: " + finalPassError], "repair-failed");
+              addActivity("Final content pass failed; preserving the last known-good staged source and continuing with validation.");
+            }
+          } catch (finalPassException) {
+            const finalPassError = finalPassException instanceof Error ? finalPassException.message : "Unknown final content pass error";
+            activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "failed", undefined, finalPassError);
+            persistRun(activeBuildRun, "stale", stagedFiles, [], ["Final content pass: " + finalPassError], "repair-failed");
+            addActivity("Final content pass failed; preserving the last known-good staged source and continuing with validation.");
+          }
           addActivity("Checking assembled project contract and source files");
           let validationPayload: any = null;
           let validationOk = false;
