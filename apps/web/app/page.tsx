@@ -842,7 +842,7 @@ export default function Home() {
       const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : result.plan ? "plan" : result.question ? "question" : undefined);
       const updated: GeneProject = {
         ...nextProject,
-        name: result.plan?.title || ((nextProject.name === "Untitled game" || nextProject.name === "Untitled app") && isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name),
+        name: (nextProject.name === "Untitled game" || nextProject.name === "Untitled app") ? (result.plan?.title || (isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name)) : nextProject.name,
         mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
         answers: nextAnswers,
         question: operation === "research" || operation === "chat" ? nextProject.question : (result.question || null),
