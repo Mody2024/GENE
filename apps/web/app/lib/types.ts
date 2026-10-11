@@ -63,8 +63,8 @@ export type BuildRun = {
   startedAt: string;
   updatedAt: string;
   userChangeQueue: string[];
-  prototype?: { targetMinutes: number; estimatedMinutes: number; ready: boolean; completedObjectives: string[] };
-  fullGame?: { targetMinutes: number; estimatedMinutes: number; contentTargets: string[]; acceptance: string[] };
+  prototype?: { targetMinutes?: number; estimatedMinutes: number; ready: boolean; completedObjectives: string[] };
+  fullGame?: { targetMinutes?: number; estimatedMinutes: number; contentTargets: string[]; acceptance: string[] };
   lastError?: string;
 };
 export type LivingPreviewStatus = "not-started" | "booting" | "playable" | "stale" | "error";
