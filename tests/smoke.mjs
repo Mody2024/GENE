@@ -363,10 +363,10 @@ const { applyPatchBatch } = patchModule;
 const originalTree = { "src/main.js": "const speed = 2;\nstart();", "README.md": "GENE test" };
 const changedTree = applyPatchBatch(originalTree, [
   { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 4;" },
-  { op: "add_file", path: "data/levels.json", content: "{\\"levels\\":[1,2]}" }
+  { op: "add_file", path: "data/levels.json", content: JSON.stringify({ levels: [1, 2] }) }
 ]);
 assert.equal(changedTree.files["src/main.js"], "const speed = 4;\nstart();", "exact-context edits update only the requested source span");
-assert.equal(changedTree.files["data/levels.json"], "{\\"levels\\":[1,2]}", "atomic batches can add project data files");
+assert.equal(changedTree.files["data/levels.json"], JSON.stringify({ levels: [1, 2] }), "atomic batches can add project data files");
 assert.equal(originalTree["src/main.js"], "const speed = 2;\nstart();", "patching never mutates the caller's known-good tree");
 assert.throws(() => applyPatchBatch(originalTree, [
   { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 5;" },
