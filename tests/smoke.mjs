@@ -347,3 +347,6 @@ assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("Never a
 
 assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
 assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
+
+assert.ok(api.includes("value.includes(String.fromCharCode(92))") && api.includes("value.split(\"\").some(char => char.charCodeAt(0) < 32"), "project path validation rejects backslashes and control characters");
+assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includes("additionalFiles"), "dynamic stage path validation uses the same safe relative-path policy");
