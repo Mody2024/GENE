@@ -29,7 +29,7 @@ export const AGENT_SYSTEM = [
   "3D QUALITY BAR: for webgl3d, create an actual perspective 3D world with depth testing, camera/view/projection transforms, coherent world scale, a floor/environment, lighting/shading, distinct model silhouettes, player/enemy/object geometry, and world-space collision/gameplay. Build geometry with reusable mesh helpers and GPU buffers rather than drawing a flat 2D scene while labeling it 3D. Add a stable camera that follows or frames the player, visible ground reference, and input-driven movement. Keep WebGL calls and shaders self-contained; handle WebGL context failure with a visible, useful error instead of a blank screen. Raw WebGL only; do not pretend Three.js or a physics engine is installed.",
   "3D ASSET INTEGRATION: if current project files contain assets/<id>/model.obj, model.mtl, or asset.json, inspect them and use their real geometry/material data in the game when relevant. The isolated game runtime exposes eligible text assets in window.__GENE_ASSETS__ keyed by full project path and provides window.GENE3D.parseOBJ(path) plus window.GENE3D.parseMTL(path). parseOBJ returns groups shaped {material, positions, vertexCount}, where positions is interleaved XYZ and normal XYZ for each triangle vertex; parseMTL returns a material map with kd:[r,g,b]. Use these helpers to render actual Forge meshes/materials, rather than replacing them with cubes or merely mentioning them. The runtime asset bridge has a size cap, so check for missing paths and provide a visible fallback. When describing Forge output, distinguish generated OBJ geometry from rigged/animated characters, UVs, texture maps, or production-ready imported assets.",
   "ITERATIVE EDITING: treat current source as the working project, not a disposable template. Preserve existing mechanics, art direction, controls, progress, and working systems unless the user explicitly asks to replace them. Make the smallest coherent change that solves the request, then ensure the entire returned source set remains compatible. For bug reports, reason from the actual code and error, fix root causes, and avoid random rewrites.",
-  "Allowed returned file paths are game.html, game.css, game.js, and game-spec.json. Return complete file contents for each changed path, with no hidden dependencies. Return only changed files during edits.",
+  "CORE RUNTIME CONTRACT: game.html, game.css, game.js, and game-spec.json are the boot files, not a file-count limit. During buildPart, return exactly the requested safe relative stagePath, including a path declared in game-spec.json.additionalFiles. Extra JavaScript modules must be classic browser scripts without import/export and must expose the API the core runtime calls. Return complete file contents, never partial snippets; during edits, return only changed files.",
   "Plan mode never returns files and never claims it edited anything.",
   "Ask at most ONE high-impact question at a time; do not repeat known answers. If enough information is available, return question=null and a concrete plan.",
   "JSON response shape: {reply:string, question:null|{id:string,text:string,why?:string,choices?:string[]}, plan:null|{title:string,summary:string,kind:'game'|'app',engine:'canvas2d'|'webgl3d'|'webapp',tasks:string[],mechanics:string[],performanceBudget:{targetFps:number,maxEnemies:number,maxObjects:number,maxParticles:number}}, files:[{path:string,content:string}], complete:boolean, needsUserDecision:boolean}. Use kind=app with engine=webapp for app plans, and kind=game with a graphics engine for game plans."
@@ -51,9 +51,19 @@ export function makeAgentInput(input: {
   const stagePath = input.stagePath || "";
   const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
   const fileBudget: Record<string, number> = { "game-spec.json": 7000, "game.html": 5000, "game.css": 7000, "game.js": 9000 };
-  const stageFiles = Object.fromEntries(Object.entries(p?.files || {})
-    .filter(([path]) => !isStage || ((path !== stagePath || isStageRepair) && (path === "game-spec.json" || (isStageRepair && path === stagePath) || ((stagePath === "game.js" || stagePath === "game.css") && path === "game.html") || (stagePath === "game.js" && path === "game.css"))))
-    .map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 2500)]));
+  const stageEntries = Object.entries(p?.files || {}).filter(([path]) => {
+    if (!isStage) return true;
+    if (isStageRepair && path === stagePath) return true;
+    if (path === stagePath) return false;
+    if (path === "game-spec.json") return true;
+    if ((stagePath === "game.js" || stagePath === "game.css") && path === "game.html") return true;
+    if (stagePath === "game.js" && path === "game.css") return true;
+    // Give staged modules enough neighboring source to integrate against, without
+    // dumping every large asset into the model context.
+    if (/\\.js$/i.test(path) && (stagePath === "game.js" || /\\.js$/i.test(stagePath))) return true;
+    return false;
+  }).slice(0, 18);
+  const stageFiles = Object.fromEntries(stageEntries.map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 3000)]));
   const guide = projectKind === "game" ? selectGameGuide({
     message: input.message,
     initialPrompt: p?.initialPrompt,
