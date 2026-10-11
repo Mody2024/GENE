@@ -607,7 +607,7 @@ export default function Home() {
         files,
         versions,
         buildRun: activeBuildRun || nextProject.buildRun || null,
-        livingPreview: changedPaths.length ? { status: "playable", lastKnownGoodVersion: versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Play the game and verify its objectives"], canContinuePlaying: true } : nextProject.livingPreview || null,
+        livingPreview: changedPaths.length ? { status: "booting", lastKnownGoodVersion: versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Waiting for browser render confirmation"], canContinuePlaying: false } : nextProject.livingPreview || null,
         activeFile: changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : (changedPaths[0] || nextProject.activeFile),
         messages: [...nextProject.messages, assistantMessage],
         updatedAt: now()
