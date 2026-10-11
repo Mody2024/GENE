@@ -431,3 +431,10 @@ assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "ap
 const appErrorBoundary = read("apps/web/app/error.tsx");
 assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
 assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
+
+assert.ok(page.includes("(!isConversationOnly(text.trim()) || busy)"), "conversation-only chat can run during a playable build preview while edits queue");
+assert.ok(page.includes("pendingBuildRequests.current.push(text.trim())") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
+assert.ok(page.includes("Playable core slice ready; full project work continues"), "the live preview can become available before the complete project build ends");
+assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("chat stays responsive and code changes queue safely"), "the workspace advertises responsive chat and safe queued edits during builds");
+assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
+assert.ok(page.includes("Plan an update</button>\\n                </div>}\\n                <div className=\\"composer-toolbar\\""), "plan intent controls close their JSX conditional correctly");
