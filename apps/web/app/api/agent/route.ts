@@ -216,7 +216,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     normalized.push(file);
   }
   for (const file of normalized) {
-    if (/\\.js$/i.test(file.path)) new Function(file.content);
+    if (/\.js$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
   if (operation === "build" || operation === "surprise") {
