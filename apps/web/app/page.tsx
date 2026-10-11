@@ -227,16 +227,19 @@ export default function Home() {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
-          setProject(current => current && current.versions.length ? {
+          setProject(current => current ? {
             ...current,
-            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Server source checks passed. Browser runtime reported a visible render surface." } : v)
+            buildRun: current.buildRun ? { ...current.buildRun, prototype: current.buildRun.prototype ? { ...current.buildRun.prototype, ready: true } : current.buildRun.prototype, updatedAt: now() } : current.buildRun,
+            livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Play and verify the core gameplay loop"], canContinuePlaying: true },
+            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Source checks passed; browser runtime reported a visible render surface. Gameplay objectives still require manual verification." } : v)
           } : current);
         }
         if (state === "error") {
           const errorText = event.data.message || "unknown runtime error";
           setNotice("The game runtime reported an error: " + errorText);
-          setProject(current => current && current.versions.length ? {
+          setProject(current => current ? {
             ...current,
+            livingPreview: { status: "error", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [errorText], currentObjectives: [], canContinuePlaying: false },
             versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Runtime check failed: " + errorText } : v)
           } : current);
         }
@@ -530,8 +533,8 @@ export default function Home() {
           } else {
             activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
             activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
-            activeBuildRun = { ...activeBuildRun, status: "completed", prototype: { ...activeBuildRun.prototype!, ready: true } };
-            persistRun(activeBuildRun, "playable", stagedFiles, ["Assembled source validation passed"], [], "prototype-ready");
+            activeBuildRun = { ...activeBuildRun, status: "completed", prototype: { ...activeBuildRun.prototype!, ready: false } };
+            persistRun(activeBuildRun, "booting", stagedFiles, ["Assembled source validation passed; browser runtime still needs to render"], [], "prototype-ready");
             const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
               ? validationPayload.result.files as Array<{ path: string; content: string }>
               : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
@@ -1621,6 +1624,11 @@ export default function Home() {
 
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
+              {project.buildRun && <div className="build-check-panel">
+                <div className="build-check-head"><div><div className="eyebrow">GENE 1.4 FLASH</div><h3>Build checkpoints</h3><p>Prototype target: ~{project.buildRun.prototype?.targetMinutes ?? 20} min · Full-game target: ~{project.buildRun.fullGame?.targetMinutes ?? 120} min</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
+                <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
+              </div>}
               <div className="build-check-panel">
                 <div className="build-check-head"><div><div className="eyebrow">QUALITY GATE</div><h3>Build checks</h3><p>{project.kind === "app" ? "Inspect project structure, syntax, interactive handlers and preview evidence." : "Inspect project structure, syntax, renderer, controls and preview evidence."}</p></div><button className="primary-button" onClick={runBuildChecks} disabled={!hasGame}>Run build checks</button></div>
                 {!hasGame && <p className="build-check-empty">{project.kind === "app" ? "Build an app first to run checks on its actual source files." : "Build a game first to run checks on its actual source files."}</p>}
