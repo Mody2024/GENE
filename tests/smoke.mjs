@@ -432,7 +432,7 @@ const appErrorBoundary = read("apps/web/app/error.tsx");
 assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
 assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
 
-assert.ok(page.includes("(!isConversationOnly(text.trim()) || busy)"), "conversation-only chat can run during a playable build preview while edits queue");
+assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(text.trim())") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
 assert.ok(page.includes("Playable core slice ready; full project work continues"), "the live preview can become available before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("chat stays responsive and code changes queue safely"), "the workspace advertises responsive chat and safe queued edits during builds");
@@ -474,3 +474,7 @@ assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec 
 
 assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
 assert.ok(api.includes(String.raw`if (/\.js$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
+
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
+assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
+assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
