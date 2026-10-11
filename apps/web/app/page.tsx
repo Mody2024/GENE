@@ -342,7 +342,8 @@ export default function Home() {
 
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
-    if (buildInProgress && canQueueBuildRequests && !operationOverride) {
+    if (buildInProgress && canQueueBuildRequests && !operationOverride &&
+        (!isConversationOnly(text.trim()) || busy)) {
       pendingBuildRequests.current.push(text.trim());
       setQueuedRequestCount(pendingBuildRequests.current.length);
       setNotice("Queued " + pendingBuildRequests.current.length + " request(s). GENE will process them in order after the current build phase, preserving the active build checkpoint.");
