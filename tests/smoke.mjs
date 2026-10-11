@@ -53,7 +53,7 @@ assert.ok(api.includes("normalizeAgentResult"), "API validates structured respon
 assert.ok(api.includes("GEMINI_OUTPUT_TRUNCATED"), "truncated Gemini JSON gets a specific recoverable error");
 assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API supports single-file build stages and offline final assembly validation");
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
-assert.ok(page.includes('const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"]'), "initial builds are generated in four compact stages");
+assert.ok(page.includes("let stagePaths = recovery") && page.includes(': ["game-spec.json", "game.html", "game.css", "game.js"]'), "builds begin with four boot stages and can expand into dependency-aware project-specific files");
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
 assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.includes("LAST-RESORT SAFE SLICE"), "failed file stages retry twice plus a compact last-resort playable slice");
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
@@ -312,3 +312,180 @@ assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-column
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
 assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("successfulProvider = provider.name"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
+
+
+// GENE 1.4 Flash orchestration contracts: durable checkpoints, dependency ordering,
+// interruption handling, prototype/full-game separation, and patch vocabulary.
+const types14 = read("apps/web/app/lib/types.ts");
+const orchestrator14 = read("apps/web/app/lib/build-orchestrator.ts");
+assert.ok(types14.includes("export type BuildCheckpoint") && types14.includes("lastKnownGoodFiles"), "GENE 1.4 defines recoverable build checkpoints");
+assert.ok(types14.includes("prototype?: { targetMinutes?: number") && types14.includes("fullGame?: { targetMinutes?: number"), "prototype and full-game targets are stored separately");
+assert.ok(types14.includes("export type PatchOperation"), "GENE 1.4 declares explicit, scoped source patch operations");
+assert.ok(orchestrator14.includes("assertAcyclic"), "build planning rejects cyclic task dependencies");
+assert.ok(orchestrator14.includes("getReadyTasks"), "the coordinator gates work on passed dependencies");
+assert.ok(orchestrator14.includes("checkpointBuild") && orchestrator14.includes("lastKnownGoodFiles"), "checkpointing stores known-good source snapshots");
+assert.ok(orchestrator14.includes("queueUserChange") && orchestrator14.includes("planRevision"), "user interruptions queue changes and revise the plan");
+assert.ok(orchestrator14.includes("recoverFromCheckpoint"), "failed builds can restore a checkpoint rather than restart from scratch");
+
+assert.ok(prompts.includes("PROTOTYPE VS FULL GAME CONTRACT") && prompts.includes("20 minutes and 2 hours are examples only"), "prototype and full-game content budgets must be meaningfully distinct");
+assert.ok(page.includes("Build checkpoints") && page.includes("Full-game target:"), "workspace exposes GENE 1.4 checkpoint and duration targets");
+assert.ok(page.includes("browser runtime still needs to render") && page.includes("Gameplay objectives still require manual verification"), "source validation is not mislabeled as proof of gameplay");
+
+const patchEngine = read("apps/web/app/lib/patch-engine.ts");
+assert.ok(patchEngine.includes("export function applyPatchBatch"), "GENE 1.4 provides an atomic multi-file patch engine");
+assert.ok(patchEngine.includes("Patch context is stale or missing") && patchEngine.includes("Patch context is ambiguous"), "patches reject stale and ambiguous contexts instead of overwriting unrelated source");
+assert.ok(patchEngine.includes("applyUnifiedDiff") && patchEngine.includes("rename_file") && patchEngine.includes("replace_range"), "patch engine supports unified diffs, renames, and focused range edits");
+assert.ok(patchEngine.includes("A patch batch must contain at least one operation"), "empty patch batches are rejected");
+
+assert.ok(api.includes("const MAX_PROJECT_FILES = 100") && api.includes("isSafeProjectPath"), "agent supports dependency-aware projects with up to 100 safe relative paths");
+assert.ok(!api.includes("fileCount > 4") && !api.includes("changed too many files for the current browser-game scope"), "edit operations are no longer capped at four files");
+assert.ok(prompts.includes("NOT a four-file project limit") && prompts.includes("preserve directories and filenames"), "model is instructed to plan multi-file projects and preserve paths");
+
+assert.ok(page.includes("stagePaths = [...stagePaths, ...extras]"), "staged builds expand from the model-generated file manifest");
+assert.ok(page.includes("additionalFiles") && page.includes("dependency-aware project files"), "additional project files become tracked build tasks");
+assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("must not use import/export syntax") && prompts.includes("CORE RUNTIME CONTRACT:"), "dynamic modules follow the actual preview loading contract");
+
+assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
+assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
+
+assert.ok(api.includes("value.includes(String.fromCharCode(92))") && api.includes("value.split(\"\").some(char => char.charCodeAt(0) < 32"), "project path validation rejects backslashes and control characters");
+assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includes("additionalFiles"), "dynamic stage path validation uses the same safe relative-path policy");
+
+
+// GENE 1.4 executable utility tests (not only source-string assertions).
+const tsCompiler = await import("typescript");
+const patchSource = read("apps/web/app/lib/patch-engine.ts");
+const patchJs = tsCompiler.transpileModule(patchSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const patchModule = await import("data:text/javascript;base64," + Buffer.from(patchJs).toString("base64"));
+const { applyPatchBatch } = patchModule;
+const originalTree = { "src/main.js": "const speed = 2;\nstart();", "README.md": "GENE test" };
+const changedTree = applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 4;" },
+  { op: "add_file", path: "data/levels.json", content: JSON.stringify({ levels: [1, 2] }) }
+]);
+assert.equal(changedTree.files["src/main.js"], "const speed = 4;\nstart();", "exact-context edits update only the requested source span");
+assert.equal(changedTree.files["data/levels.json"], JSON.stringify({ levels: [1, 2] }), "atomic batches can add project data files");
+assert.equal(originalTree["src/main.js"], "const speed = 2;\nstart();", "patching never mutates the caller's known-good tree");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 5;" },
+  { op: "delete_file", path: "missing.js" }
+]), /Cannot delete a missing file/, "one invalid operation rejects the whole patch batch");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 9;", replacement: "broken" }
+]), /stale or missing/, "stale edit context is rejected");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "add_file", path: "../outside.js", content: "unsafe" }
+]), /Unsafe project path/, "path traversal is rejected");
+const renamedTree = applyPatchBatch(originalTree, [{ op: "rename_file", path: "README.md", newPath: "docs/README.md" }]);
+assert.equal(renamedTree.files["docs/README.md"], "GENE test", "rename preserves file content");
+assert.equal(renamedTree.files["README.md"], undefined, "rename removes the old manifest path");
+const diffTree = applyPatchBatch(originalTree, [{
+  op: "apply_diff", path: "src/main.js",
+  patch: "@@ -1,2 +1,2 @@\n-const speed = 2;\n+const speed = 3;\n start();"
+}]);
+assert.equal(diffTree.files["src/main.js"], "const speed = 3;\nstart();", "unified diffs apply only when their source context matches");
+
+const coordinatorSource = read("apps/web/app/lib/build-orchestrator.ts");
+const coordinatorJs = tsCompiler.transpileModule(coordinatorSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const coordinator = await import("data:text/javascript;base64," + Buffer.from(coordinatorJs).toString("base64"));
+const baseRun = coordinator.createBuildRun({
+  projectId: "test", now: "2026-01-01T00:00:00.000Z",
+  tasks: [
+    { id: "design", title: "Design", kind: "design", acceptance: ["Spec is valid"] },
+    { id: "core", title: "Core", kind: "implement", dependsOn: ["design"], files: ["game.js"], acceptance: ["Core loop works"] }
+  ],
+  prototypeMinutes: 20, fullGameMinutes: 120,
+  fullGameContent: ["Extra missions", "Distinct ending"]
+});
+assert.deepEqual(coordinator.getReadyTasks(baseRun).map(task => task.id), ["design"], "only dependency-ready tasks may start");
+assert.throws(() => coordinator.createBuildRun({ projectId: "cycle", tasks: [
+  { id: "a", title: "A", kind: "design", dependsOn: ["b"], acceptance: [] },
+  { id: "b", title: "B", kind: "implement", dependsOn: ["a"], acceptance: [] }
+] }), /cycle detected/, "dependency cycles are rejected");
+let checkpointRun = coordinator.setTaskStatus(baseRun, "design", "running");
+checkpointRun = coordinator.setTaskStatus(checkpointRun, "design", "passed");
+checkpointRun = coordinator.setTaskStatus(checkpointRun, "core", "running");
+checkpointRun = coordinator.checkpointBuild(checkpointRun, { "game.js": "known-good" }, { passed: ["design"], failed: [] }, "task-complete", "Resume at core");
+const recovered = coordinator.recoverFromCheckpoint(checkpointRun, checkpointRun.checkpoints[0].id);
+assert.equal(recovered.files["game.js"], "known-good", "recovery restores the checkpoint source snapshot");
+assert.equal(recovered.run.tasks.find(task => task.id === "design").status, "passed", "recovery preserves completed tasks");
+assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queued", "recovery requeues unfinished tasks");
+assert.equal(baseRun.prototype.targetMinutes, undefined, "prototype duration stays project-specific when no estimate is supplied");
+assert.equal(baseRun.fullGame.targetMinutes, undefined, "full-game duration stays project-specific when no estimate is supplied");
+console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");
+
+assert.ok(api.includes('import { applyPatchBatch } from "../../lib/patch-engine"'), "agent edit validation uses the patch engine");
+assert.ok(api.includes("const patchOperations = files.map") && api.includes("const patched = applyPatchBatch(body.project.files, patchOperations)"), "AI edits are applied as an atomic patch batch before project validation");
+
+assert.ok(prompts.includes("Plan an update") || prompts.includes("UPDATE PLAN"), "planning prompts support updates to existing projects");
+assert.ok(prompts.includes("Plan only") && prompts.includes("PLANNING INTENT"), "plan mode distinguishes new-project planning from update planning");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
+assert.ok(!page.includes("prototypeMinutes: 20") && !page.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
+assert.ok(page.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
+
+assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "app-level error boundary exists");
+const appErrorBoundary = read("apps/web/app/error.tsx");
+assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
+assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
+
+assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
+assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
+assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
+assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
+
+assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
+assert.ok(page.includes("FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS") && page.includes("Final content pass completed") === false, "build pipeline requests a distinct full-game expansion pass rather than treating the prototype as the finished game");
+assert.ok(page.includes("final-content-pass") && page.includes("Expand the prototype into the full game"), "build task ledger includes a separate full-game expansion stage");
+
+assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\""), "concurrent read-only chat merges into the live project without replacing build files");
+assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => item.id))"), "concurrent build/chat responses deduplicate and preserve conversation messages");
+assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
+
+assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(prompts.includes("must not use import/export syntax") && prompts.includes("window.GeneModules"), "generated modules follow the live preview's script-loading contract");
+assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/script>" : "")'), "generated modules are injected before the core runtime in both app and game previews");
+
+
+// GENE 1.4 regressions: the builder must grow beyond the four boot files,
+// run a real one-question-at-a-time interview, and recover rather than restart.
+assert.ok(page.includes('project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"'), "new Plan Mode projects begin with the interview instead of jumping straight to a shallow plan");
+assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
+assert.ok(page.includes('new Set(["json","js","svg"') && page.includes("test(stagePath)"), "JavaScript modules are accepted and scheduled as real generation stages");
+assert.ok(page.includes("recoverFromCheckpoint(nextProject.buildRun)") && page.includes("Checkpoint recovery: kept completed stage"), "failed builds restore the latest checkpoint and skip already-passed stages");
+assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt <= 3'), "users can resume a failed build and final expansion retries length/provider failures");
+assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
+
+
+assert.ok(page.includes('"src/systems/input.js", "src/systems/progression.js", "src/systems/content.js"'), "all games receive baseline input, progression, and content modules");
+assert.ok(page.includes('task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] }))'), "dynamic file expansion moves the final content pass behind every generated module");
+assert.ok(api.includes("const gameQuestions = [") && api.includes("const appQuestions = [") && api.includes("bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id))"), "fallback interview asks multiple adaptive questions one at a time");
+assert.ok(api.includes("const original = String(body.message || body.project?.initialPrompt"), "update planning uses the requested update instead of only the original project prompt");
+
+assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
+
+assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
+assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec promises touch/pointer controls") && api.includes("spec promises controller support"), "validation checks declared keyboard, touch, and gamepad controls instead of only checking for any event handler");
+
+assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
+assert.ok(api.includes(String.raw`if (/\.js$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
+
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
+assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
+assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
+
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
+assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "read-only AI chat can run concurrently with the playable prototype build");
+assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
+assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
+
+assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("only browser modules and the supported Forge OBJ/MTL asset paths"), "the staged build does not fabricate unsupported binary assets");
+assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline") && prompts.includes("assets/<asset-id>/model.obj"), "asset prompts match the runtime's actual Forge asset paths");
+
+assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
+assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
