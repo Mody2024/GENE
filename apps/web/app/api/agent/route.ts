@@ -275,7 +275,20 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     } else {
       if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game spec needs a genre.");
       if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: gameplay mechanics are missing.");
-      if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: game controls are missing.");
+      if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) {
+        // Recover the exact recurring failure at the contract boundary as well as in validateBuild.
+        // Prefer controls proven by source handlers; never claim a keyboard/gamepad API exists when it does not.
+        const allRuntimeSource = Object.entries(byPath)
+          .filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string")
+          .map(([, content]) => content).join("\n");
+        const recoveredControls: string[] = [];
+        if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(allRuntimeSource)) recoveredControls.push("Keyboard controls: use the movement/action keys shown in the game.");
+        if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(allRuntimeSource)) recoveredControls.push("Touch and pointer controls: use the visible on-screen controls.");
+        if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(allRuntimeSource)) recoveredControls.push("Gamepad/controller controls: use the mapped buttons and sticks.");
+        if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, or controller handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
+        spec.controls = recoveredControls;
+        byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+      }
       if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
       if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) throw new Error("Build rejected: the win condition is missing.");
       if (typeof spec.lossCondition !== "string" || !spec.lossCondition.trim()) throw new Error("Build rejected: the loss condition is missing.");
