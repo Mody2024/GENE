@@ -398,7 +398,6 @@ const baseRun = coordinator.createBuildRun({
     { id: "design", title: "Design", kind: "design", acceptance: ["Spec is valid"] },
     { id: "core", title: "Core", kind: "implement", dependsOn: ["design"], files: ["game.js"], acceptance: ["Core loop works"] }
   ],
-  prototypeMinutes: 20, fullGameMinutes: 120,
   fullGameContent: ["Extra missions", "Distinct ending"]
 });
 assert.deepEqual(coordinator.getReadyTasks(baseRun).map(task => task.id), ["design"], "only dependency-ready tasks may start");
