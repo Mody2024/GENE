@@ -340,3 +340,7 @@ assert.ok(patchEngine.includes("A patch batch must contain at least one operatio
 assert.ok(api.includes("const MAX_PROJECT_FILES = 100") && api.includes("isSafeProjectPath"), "agent supports dependency-aware projects with up to 100 safe relative paths");
 assert.ok(!api.includes("fileCount > 4") && !api.includes("changed too many files for the current browser-game scope"), "edit operations are no longer capped at four files");
 assert.ok(prompts.includes("NOT a four-file project limit") && prompts.includes("preserve directories and filenames"), "model is instructed to plan multi-file projects and preserve paths");
+
+assert.ok(page.includes("stagePaths = [...stagePaths, ...extras]"), "staged builds expand from the model-generated file manifest");
+assert.ok(page.includes("additionalFiles") && page.includes("dependency-aware project files"), "additional project files become tracked build tasks");
+assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("Never assume a standalone .js module is automatically executed"), "dynamic assets are planned without claiming unintegrated modules run");
