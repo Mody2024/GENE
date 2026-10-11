@@ -783,13 +783,13 @@ export default function Home() {
       }
     } catch (error) {
       const text = explainAgentError(error);
-      const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [text], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
+      const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(current => {
         if (!buildInProgress || !current || current.id !== failed.id) return failed;
         const knownIds = new Set(current.messages.map(item => item.id));
         return {
           ...current,
-          buildRun: activeBuildRun || current.buildRun,
+          buildRun: current.buildRun,
           messages: [...current.messages, ...failed.messages.filter(item => !knownIds.has(item.id))],
           updatedAt: now()
         };
