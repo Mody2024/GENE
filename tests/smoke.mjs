@@ -417,3 +417,6 @@ assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queue
 assert.equal(baseRun.prototype.targetMinutes, 20, "prototype target is distinct and explicit");
 assert.equal(baseRun.fullGame.targetMinutes, 120, "full-game target is distinct and explicit");
 console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");
+
+assert.ok(api.includes('import { applyPatchBatch } from "../../lib/patch-engine"'), "agent edit validation uses the patch engine");
+assert.ok(api.includes("const patchOperations = files.map") && api.includes("const patched = applyPatchBatch(body.project.files, patchOperations)"), "AI edits are applied as an atomic patch batch before project validation");
