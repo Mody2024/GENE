@@ -22,6 +22,8 @@ export type GeneProject = {
   activeFile: string;
   references: ReferenceFile[];
   updatedAt: string;
+  buildRun?: BuildRun | null;
+  livingPreview?: LivingBuildPreview | null;
 };
 /** Durable execution records used by the GENE 1.4 Flash build coordinator. */
 export type BuildTaskStatus = "queued" | "running" | "passed" | "failed" | "blocked" | "skipped";
