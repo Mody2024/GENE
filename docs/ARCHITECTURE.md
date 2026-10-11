@@ -51,3 +51,13 @@ The browser build coordinator begins with the four required runtime files, then 
 ## GENE 1.4 scope and verification boundary
 
 The implementation branch now has the first manifest-driven build expansion and safe relative-path checks, as well as the checkpoint ledger and atomic patch utility. The four core browser files remain the only files directly assembled into the iframe; additional files can be represented in the project and exported, but need a real loader/reference before they are considered runtime-integrated. The current coordinator still runs as a client-side staged sequence and uses browser project state; it is not yet a server-side autonomous worker and does not yet continue the project's full-game scope after the prototype as a background task. Playtime targets must be estimated per project from its genre, content and progression; example durations are not universal defaults. Concurrent chat during a long build is therefore a release requirement still open, not a capability to claim as complete. Run the full CI workflow before merging.
+
+
+## GENE 1.4 live runtime and build completion rules
+
+- A playable core may be shown while the remaining build stages continue. Conversational questions can be answered during that phase; source-changing requests are queued and applied in order after the build reaches a stable result.
+- Build and chat responses that overlap must merge messages and preserve the newest source/checkpoint state instead of replacing it with a stale project snapshot.
+- After staged files are generated, a separate final content pass must expand the game beyond its prototype, or polish the web app's interactions and error states. If that pass fails, keep the playable checkpoint and report a partial/failed build instead of claiming full completion.
+- Additional JavaScript files are loaded as classic scripts in the sandboxed live preview before the core runtime. They must not use ESM import/export syntax; expose shared APIs through a documented global namespace and ensure the core runtime calls those APIs. A file existing in the manifest alone is not proof it is integrated.
+- Web app validation rejects a declared interactive interface when it has no detectable event handlers, and checks that its main script is not effectively empty. These are structural checks, not proof every user flow works.
+- Playtime is a project-specific estimate from the game's scope and structure. No fixed duration is assigned when the specification does not provide one.
