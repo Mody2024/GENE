@@ -56,13 +56,13 @@ export function createBuildRun(intent: BuildIntent): BuildRun {
     updatedAt: now,
     userChangeQueue: [],
     prototype: {
-      targetMinutes: Math.max(1, intent.prototypeMinutes ?? 20),
+      targetMinutes: typeof intent.prototypeMinutes === "number" && intent.prototypeMinutes > 0 ? intent.prototypeMinutes : undefined,
       estimatedMinutes: 0,
       ready: false,
       completedObjectives: intent.prototypeObjectives ?? [],
     },
     fullGame: {
-      targetMinutes: Math.max(1, intent.fullGameMinutes ?? 120),
+      targetMinutes: typeof intent.fullGameMinutes === "number" && intent.fullGameMinutes > 0 ? intent.fullGameMinutes : undefined,
       estimatedMinutes: 0,
       contentTargets: intent.fullGameContent ?? [],
       acceptance: [
