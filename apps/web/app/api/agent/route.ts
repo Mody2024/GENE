@@ -355,13 +355,42 @@ export async function POST(request: NextRequest) {
   if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
     const answers = body.answers || {};
     const known = Object.keys(answers);
-    if (body.operation === "interview" && known.length === 0) {
+    if (body.operation === "interview") {
+      const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+      const appQuestions = [
+        { id: "audience", text: "Who is this app mainly for?", why: "The primary audience determines the main workflow and interface.", choices: ["Just me / personal use", "Customers or the public", "A team or business", "Use smart defaults"] },
+        { id: "platform", text: "Where should the app work first?", why: "This determines responsive layout and the most important input patterns.", choices: ["Desktop web", "Mobile web", "Desktop and mobile", "Use smart defaults"] },
+        { id: "look", text: "What visual direction fits it?", why: "A concrete art direction makes the app feel designed rather than generic.", choices: ["Minimal and professional", "Bold and playful", "Premium glass / editorial", "Use smart defaults"] },
+        { id: "data", text: "Does it need to save user data?", why: "Persistence changes the architecture and validation requirements.", choices: ["No, local temporary state", "Save on this device", "Accounts and cloud data", "Recommend the simplest reliable option"] }
+      ];
+      const gameQuestions = [
+        { id: "genre", text: "What should the core gameplay feel like?", why: "This defines the main loop, challenge, and win/loss rules.", choices: ["Action / combat", "Adventure / story", "Platformer / precision", "Racing / endless runner", "Survival / crafting", "Puzzle / strategy", "Use a creative surprise"] },
+        { id: "camera", text: "What perspective should players use?", why: "Camera and perspective affect controls, level design, and performance.", choices: ["2D side view", "2D top-down", "3D first-person", "3D third-person", "Choose what best fits the idea"] },
+        { id: "content", text: "What should make the full game worth finishing?", why: "The prototype proves the loop; the full game needs distinct content and progression.", choices: ["Story, missions, and an ending", "Levels with new mechanics", "Runs, unlocks, and replayability", "Co-op or competitive play", "A mix chosen for the idea"] },
+        { id: "controls", text: "Which controls must work?", why: "Controls are planned and tested as part of the game, not added as an afterthought.", choices: ["Keyboard and mouse", "Touch controls", "Controller / gamepad", "Keyboard, touch, and controller", "Use the best supported defaults"] }
+      ];
+      const bank = projectKind === "app" ? appQuestions : gameQuestions;
+      const nextQuestion = bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id));
+      if (nextQuestion) {
+        return NextResponse.json({
+          ok: true,
+          aiMode: "fallback",
+          result: {
+            reply: "GENE is using its built-in interview because no AI provider key is available. This is a rule-based question, not an AI-generated answer.",
+            question: nextQuestion,
+            plan: null,
+            files: [],
+            complete: false,
+            needsUserDecision: true
+          }
+        });
+      }
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "Local preview mode is active. This is one local prompt to demonstrate the interview UI, not Gemini reasoning. Add GEMINI_API_KEY to enable the real adaptive interview.",
-          question: { id: "controls", text: "How should the main character be controlled?", why: "Controls shape the player controller and core game feel.", choices: ["Keyboard", "Mouse / touch", "Keyboard + touch", "Use smart defaults"] },
+          reply: "Interview complete. I can prepare a starter outline from your answers, but real AI planning and code generation require a configured provider key.",
+          question: null,
           plan: null,
           files: [],
           complete: false,
@@ -369,22 +398,22 @@ export async function POST(request: NextRequest) {
         }
       });
     }
-    if (body.operation === "interview" || body.operation === "plan") {
-      const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+    if (body.operation === "plan") {
+      const original = String(body.message || body.project?.initialPrompt || (projectKind === "app" ? "Untitled app" : "Untitled game"));
       const is3d = projectKind === "game" && /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "I prepared a rule-based outline only. This is not a Gemini-generated plan, and no source files were created. Add GEMINI_API_KEY to enable GENE's real game-design reasoning.",
+          reply: "I prepared a rule-based outline only. This is not an AI-generated plan, and no source files were created. Configure a provider key to enable GENE's full planning and code generation.",
           question: null,
           plan: {
             title: original.split(/[.!?]/)[0].slice(0, 64) || (projectKind === "app" ? "Untitled app" : "Untitled game"),
             kind: projectKind,
-            summary: "Local outline based on your request. Review and refine it after connecting Gemini.",
+            summary: "Local outline based on your request. Review and refine it after connecting an AI provider.",
             engine: projectKind === "app" ? "webapp" : is3d ? "webgl3d" : "canvas2d",
-            tasks: ["Create project shell", "Implement player controls", "Build the core mechanic", "Add level-specific obstacles and feedback", "Implement objective and restart", "Validate runtime and performance"],
-            mechanics: ["Player input", "Collision/interaction", "Scoring or objective", "Win/loss and restart"],
+            tasks: ["Define the core loop and acceptance criteria", "Implement the project shell and responsive layout", "Implement the main mechanic and input handling", "Add distinct progression and content", "Implement success, failure, and restart flows", "Run source, interaction, and runtime validation"],
+            mechanics: ["Primary user/game loop", "Input and state management", "Visible feedback and recovery", "Completion and restart"],
             performanceBudget: { targetFps: 60, maxEnemies: projectKind === "app" ? 0 : 8, maxObjects: 160, maxParticles: projectKind === "app" ? 0 : 60 }
           },
           files: [],
