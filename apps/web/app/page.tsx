@@ -1,7 +1,8 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentResponse, BuildVersion, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
+import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
+import { checkpointBuild, createBuildRun, recoverFromCheckpoint, resumeBuild, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
@@ -39,6 +40,15 @@ function GeneMark({ className = "" }: { className?: string }) {
   </svg>;
 }
 function now() { return new Date().toISOString(); }
+function explainAgentError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error || "Unknown error");
+  if (/resource_exhausted|quota exceeded|rate.?limit|429/i.test(raw)) return "The AI provider rate limit or quota was reached. Your project files were preserved; wait for quota reset or configure another API key/model, then retry.";
+  if (/GEMINI_KEY_REJECTED|invalid api key|unauthorized|401/i.test(raw)) return "The AI provider rejected the API key. Check the key in your deployment environment, redeploy, and retry. Your existing project was preserved.";
+  if (/timeout|timed out|aborted|ETIMEDOUT/i.test(raw)) return "The request timed out before GENE could finish. Completed checkpoints were preserved; retry to continue with a smaller task.";
+  if (/failed to fetch|networkerror|network request failed|offline/i.test(raw)) return "GENE could not reach the server. Check your connection and deployment status, then retry. Your last saved project version was preserved.";
+  if (/GENE_VALIDATION_FAILED|422|stale or missing|unsafe project path|Build rejected/i.test(raw)) return "GENE rejected the generated change during validation to protect your project. Try a smaller, more specific change. Details: " + raw.slice(0, 500);
+  return raw.slice(0, 900) || "GENE encountered an unexpected error. Your last saved project version was preserved; inspect the activity log and retry.";
+}
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
 }
@@ -113,7 +123,13 @@ export default function Home() {
   const [project, setProject] = useState<GeneProject | null>(null);
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
+  const [planIntent, setPlanIntent] = useState<"create" | "update">("create");
   const [busy, setBusy] = useState(false);
+  const [buildInProgress, setBuildInProgress] = useState(false);
+  const [canQueueBuildRequests, setCanQueueBuildRequests] = useState(false);
+  const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
+  const [queuedRequestCount, setQueuedRequestCount] = useState(0);
+  const pendingBuildRequests = useRef<string[]>([]);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -226,16 +242,19 @@ export default function Home() {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
-          setProject(current => current && current.versions.length ? {
+          setProject(current => current ? {
             ...current,
-            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Server source checks passed. Browser runtime reported a visible render surface." } : v)
+            buildRun: current.buildRun ? { ...current.buildRun, prototype: current.buildRun.prototype ? { ...current.buildRun.prototype, ready: true } : current.buildRun.prototype, updatedAt: now() } : current.buildRun,
+            livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Play and verify the core gameplay loop"], canContinuePlaying: true },
+            versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Source checks passed; browser runtime reported a visible render surface. Gameplay objectives still require manual verification." } : v)
           } : current);
         }
         if (state === "error") {
           const errorText = event.data.message || "unknown runtime error";
           setNotice("The game runtime reported an error: " + errorText);
-          setProject(current => current && current.versions.length ? {
+          setProject(current => current ? {
             ...current,
+            livingPreview: { status: "error", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [errorText], currentObjectives: [], canContinuePlaying: false },
             versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Runtime check failed: " + errorText } : v)
           } : current);
         }
@@ -265,6 +284,12 @@ export default function Home() {
 
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
+    // Load generated modules into the same sandboxed runtime as the core game/app.
+    const moduleScripts = Object.entries(project.files)
+      .filter(([path]) => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([path, source]) => "/* GENE module: " + path + " */\n" + source.replace(/<\/script/gi, "<\\/script"))
+      .join("\n;\n");
     if (project.kind === "app") {
       const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
       const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
@@ -276,7 +301,7 @@ export default function Home() {
         "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',report);else report();[250,600,1100,1900,3000,4200].forEach(function(ms){setTimeout(report,ms);});",
         "})();"
       ].join("\n");
-      return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;min-height:100%;width:100%;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-project-kind='app'>" + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+      return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;min-height:100%;width:100%;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-project-kind='app'>" + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
     }
     const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
     const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
@@ -292,7 +317,7 @@ export default function Home() {
     ].join("\n");
     const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
     const assetBootstrap = buildRuntimeAssetBootstrap(project.files);
-    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
   const savedAssets = useMemo(() => {
@@ -323,16 +348,36 @@ export default function Home() {
   const addActivity = (entry: string) => setActivity(prev => [new Date().toLocaleTimeString() + "  " + entry, ...prev].slice(0, 80));
 
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
-    if (!project || busy || !text.trim()) return;
+    if (!project || !text.trim()) return;
     const prompt = text.trim();
+    const isReadOnlyConversation = !operationOverride && isConversationOnly(prompt);
+    const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation;
+    const queueRequest = () => {
+      pendingBuildRequests.current.push(prompt);
+      setQueuedRequestCount(pendingBuildRequests.current.length);
+      setNotice("Queued " + pendingBuildRequests.current.length + " request(s). GENE will process them in order after the current build phase, preserving the active build checkpoint.");
+      addActivity("Queued user request for after the current build phase.");
+      setDraft("");
+    };
+    if (buildInProgress && canQueueBuildRequests && !operationOverride && !isReadOnlyConversation) {
+      queueRequest();
+      return;
+    }
+    if (canChatDuringBuild && parallelChatInProgress) {
+      queueRequest();
+      return;
+    }
+    if (busy && !canChatDuringBuild) return;
+    if (parallelChatInProgress && !canChatDuringBuild) return;
+    const parallelReadOnlyRequest = canChatDuringBuild;
     const isFirstIdea = !project.initialPrompt;
-    const answerKey = operationOverride ? undefined : project.question?.id;
+    const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
     if (!operationOverride) {
       if (searchMode) operation = "research";
       else if (isConversationOnly(prompt)) operation = "chat";
-      else if (project.mode === "plan") operation = project.question ? "interview" : project.initialPrompt ? "plan" : "interview";
+      else if (project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
       else if (!Object.keys(project.files).length) operation = "build";
       else operation = "edit";
     }
@@ -350,12 +395,25 @@ export default function Home() {
         : [...project.messages, message("user", prompt)],
       updatedAt: now()
     };
-    setProject(nextProject);
+    setProject(current => {
+      if (parallelReadOnlyRequest && current && current.id === nextProject.id) {
+        const latestUserMessage = nextProject.messages[nextProject.messages.length - 1];
+        return { ...current, messages: latestUserMessage ? [...current.messages, latestUserMessage] : current.messages, updatedAt: now() };
+      }
+      return nextProject;
+    });
     setDraft("");
-    setBusy(true);
+    if (operation === "build" || operation === "surprise") {
+      setBuildInProgress(true);
+      setCanQueueBuildRequests(["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(nextProject.files[path])));
+    }
+    if (parallelReadOnlyRequest) setParallelChatInProgress(true);
+    else setBusy(true);
     setNotice("");
-    setRuntimeState("idle");
-    setActivity([]);
+    if (!parallelReadOnlyRequest) {
+      setRuntimeState("idle");
+      setActivity([]);
+    }
     if (operation === "build" || operation === "surprise") setShowActivity(true);
     addActivity("Request accepted: " + operation);
     setSection("chat");
@@ -373,15 +431,68 @@ export default function Home() {
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
         answers: nextAnswers
       };
+      let activeBuildRun: BuildRun | null = nextProject.buildRun || null;
       if (operation === "build" || operation === "surprise") {
         // Generate small, independently validated files rather than asking Gemini
         // to fit an entire project into one large JSON response.
-        const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
-        const stagedFiles: Record<string, string> = { ...nextProject.files };
+        const recovery = nextProject.buildRun?.checkpoints?.length
+          ? recoverFromCheckpoint(nextProject.buildRun)
+          : null;
+        let stagePaths = recovery
+          ? recovery.run.tasks
+              .filter(task => task.id.startsWith("stage-") && task.files.length > 0)
+              .sort((a, b) => Number(a.id.slice(6)) - Number(b.id.slice(6)))
+              .map(task => task.files[0])
+          : ["game-spec.json", "game.html", "game.css", "game.js"];
+        if (!stagePaths.length) stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
+        const stagedFiles: Record<string, string> = { ...(recovery?.files || nextProject.files) };
         let stagedPlan = nextProject.plan || null;
         let modelUsed = aiModel;
+        const buildTasks = [
+          ...stagePaths.map((path, index) => ({
+            id: "stage-" + index,
+            title: "Generate " + path,
+            kind: (index === 0 ? "design" : index === 1 ? "scaffold" : "implement") as "design" | "scaffold" | "implement",
+            dependsOn: index ? ["stage-" + (index - 1)] : [],
+            files: [path],
+            acceptance: ["Return the requested complete file", "Pass server-side source validation"]
+          })),
+          { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: ["game.js", "game.css"], acceptance: [nextProject.kind === "app" ? "Primary user flows have working interactions and failure states" : "Full-game content extends beyond the prototype with progression and a complete ending", "Existing working controls and mechanics are preserved"] },
+          { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["final-content-pass"], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
+        ];
+        activeBuildRun = recovery
+          ? {
+              ...resumeBuild(recovery.run),
+              tasks: resumeBuild(recovery.run).tasks.map(task =>
+                task.id === "final-content-pass" || task.id === "validate-assembled"
+                  ? { ...task, status: "queued" as const, lastError: undefined }
+                  : task
+              ),
+              status: "running"
+            }
+          : createBuildRun({
+              projectId: nextProject.id,
+              tasks: buildTasks,
+              prototypeObjectives: ["Boot and render", "Core controls and gameplay loop", "Reach a meaningful prototype conclusion"],
+              fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct content beyond the playable prototype", "Meaningful progression and challenge variation", "Complete full-game ending"])
+            });
+        activeBuildRun = { ...activeBuildRun, status: "running" };
+        if (recovery) addActivity("Resuming from checkpoint " + (recovery.run.checkpoints[recovery.run.checkpoints.length - 1]?.id || "latest") + "; previously passed file stages will be preserved.");
+        setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
+        addActivity("GENE 1.4 coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
+        const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
+          activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
+          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
+        };
+        let finalContentPassSucceeded = false;
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
+          if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") {
+            addActivity("Checkpoint recovery: kept completed stage " + stagePath + " unchanged.");
+            continue;
+          }
+          activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
+          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
           let stageSucceeded = false;
           let stageError = "";
@@ -390,8 +501,10 @@ export default function Home() {
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
-                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
-                : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
+                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
+                : /\.js$/i.test(stagePath) && stagePath !== "game.js"
+                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.js$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
+                  : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
               const stageResponse = await fetch("/api/agent", {
@@ -422,19 +535,177 @@ export default function Home() {
               if (stageResult.plan) stagedPlan = stageResult.plan;
               modelUsed = stagePayload.model || modelUsed;
               stageSucceeded = true;
-              addActivity("Validated stage file " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+              activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "passed");
+              if (stagePath === "game-spec.json") {
+                try {
+                  const spec = JSON.parse(file.content);
+                  const prototypeTarget = Number(spec.prototype?.targetMinutes);
+                  const fullGameTarget = Number(spec.fullGame?.targetMinutes);
+                  activeBuildRun = activeBuildRun ? { ...activeBuildRun,
+                    prototype: { ...activeBuildRun.prototype!, targetMinutes: Number.isFinite(prototypeTarget) && prototypeTarget > 0 ? prototypeTarget : undefined },
+                    fullGame: { ...activeBuildRun.fullGame!, targetMinutes: Number.isFinite(fullGameTarget) && fullGameTarget > 0 ? fullGameTarget : undefined }
+                  } : activeBuildRun;
+                  // The model's manifest is advisory, not the only source of architecture.
+                  // Derive a project-specific module plan from the actual scope so substantial builds
+                  // don't silently collapse into the four-file boot contract.
+                  const scopeText = [
+                    nextProject.initialPrompt,
+                    ...(stagedPlan?.tasks || []),
+                    ...(stagedPlan?.mechanics || [])
+                  ].join(" ").toLowerCase();
+                  const plannedModules: string[] = [];
+                  if (nextProject.kind === "app") {
+                    // Every non-trivial app gets a real modular base; complexity adds systems,
+                    // it must not be a prerequisite for having more than four files.
+                    plannedModules.push("src/app/state.js", "src/app/validation.js");
+                    if (/save|persist|offline|cart|inventory|account|profile|settings|dashboard|history/.test(scopeText)) plannedModules.push("src/app/persistence.js");
+                    if (/search|filter|sort|catalog|marketplace|products|library/.test(scopeText)) plannedModules.push("src/app/search.js");
+                    if (/form|signup|sign in|login|register|checkout|booking|contact/.test(scopeText)) plannedModules.push("src/app/forms.js");
+                    if (/chart|analytics|metrics|report|statistics/.test(scopeText)) plannedModules.push("src/app/analytics.js");
+                  } else {
+                    // A game always receives modular input, progression, and content systems.
+                    // Add genre systems from the project brief and approved plan.
+                    plannedModules.push("src/systems/input.js", "src/systems/progression.js", "src/systems/content.js");
+                    if (/story|dialogue|quest|mission|chapter|level|campaign|narrative|cutscene/.test(scopeText)) plannedModules.push("src/systems/narrative.js");
+                    if (/combat|enemy|enemies|boss|weapon|shoot|attack|damage|survival/.test(scopeText)) plannedModules.push("src/systems/combat.js");
+                    if (/3d|third.person|first.person|open.world|driving|vehicle|world.exploration/.test(scopeText)) plannedModules.push("src/systems/world.js", "src/systems/camera.js");
+                    if (/co.op|local.multiplayer|two.player|split.screen|controller|gamepad/.test(scopeText)) plannedModules.push("src/systems/multiplayer.js");
+                    if (/puzzle|craft|build|upgrade|skill.tree|resource|economy/.test(scopeText)) plannedModules.push("src/systems/economy.js");
+                  }
+                  const modelCandidates = [
+                    ...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []),
+                    ...(Array.isArray(spec.projectFiles) ? spec.projectFiles.map((entry: any) => typeof entry === "string" ? entry : entry?.path) : [])
+                  ];
+                  spec.additionalFiles = [...new Set([...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []), ...plannedModules])];
+                  stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
+                  const candidates = [...modelCandidates, ...plannedModules];
+                  const core = new Set(["game-spec.json", "game.html", "game.css", "game.js"]);
+                  const safe = (path: unknown): path is string => {
+                    if (typeof path !== "string" || path.length > 240 || path.includes(String.fromCharCode(92)) || path.startsWith("/") ||
+                      /^[a-zA-Z]:/.test(path) || path.split("/").some(part => !part || part === "." || part === "..") ||
+                      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
+                    const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+                    return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
+                  };
+                  const isRuntimeLoadablePath = (path: string) =>
+                    /\.js$/i.test(path) ||
+                    /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
+                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
+                    safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
+                  ))].slice(0, 96);
+                  const omittedUnsupportedAssets = candidates.filter((path: unknown) =>
+                    typeof path === "string" && safe(path) && !core.has(path) && !isRuntimeLoadablePath(path)
+                  );
+                  if (omittedUnsupportedAssets.length) addActivity("Skipped " + omittedUnsupportedAssets.length + " unsupported asset placeholder path(s); only browser modules and the supported Forge OBJ/MTL asset paths are staged here.");
+                  spec.additionalFiles = safeManifest;
+                  stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
+                  const extras = safeManifest.filter(path => !stagedFiles[path]);
+                  if (extras.length) {
+                    const oldLastStage = stagePaths.length - 1;
+                    stagePaths = [...stagePaths, ...extras];
+                    const newTasks = extras.map((path, extraIndex) => {
+                      const taskIndex = 4 + extraIndex;
+                      return { id: "stage-" + taskIndex, title: "Generate " + path, kind: "implement" as const, dependsOn: [extraIndex === 0 ? "stage-" + oldLastStage : "stage-" + (taskIndex - 1)], attempts: 0, status: "queued" as const, files: [path], acceptance: ["Asset/module content is complete", "Path is safe and content stays within file budget"] };
+                    });
+                    activeBuildRun = {
+                      ...activeBuildRun,
+                      tasks: [
+                        ...activeBuildRun.tasks.filter(task => task.id !== "validate-assembled"),
+                        ...newTasks,
+                        ...activeBuildRun.tasks.filter(task => task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] })),
+                        ...activeBuildRun.tasks.filter(task => task.id === "validate-assembled").map(task => ({ ...task, dependsOn: ["final-content-pass"], files: [...stagePaths] }))
+                      ]
+                    };
+                    addActivity("Expanded the build plan with " + extras.length + " additional dependency-aware project files from game-spec.json.");
+                  }
+                } catch {
+                  addActivity("The spec did not define additional files; continuing with the four core runtime files.");
+                }
+              }
+              persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
+              addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+              if (stagePath === "game.js" && ["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(stagedFiles[path]))) {
+                activeBuildRun = {
+                  ...activeBuildRun,
+                  prototype: {
+                    ...activeBuildRun.prototype!,
+                    ready: true,
+                    completedObjectives: ["Core files generated", "Initial source contract passed", "Ready for live preview; remaining build tasks continue"]
+                  }
+                };
+                setProject(current => current && current.id === nextProject.id ? {
+                  ...current,
+                  files: { ...current.files, ...stagedFiles },
+                  plan: stagedPlan,
+                  buildRun: activeBuildRun,
+                  livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: true },
+                  updatedAt: now()
+                } : current);
+                setPreviewOpen(true);
+                setPreviewKey(value => value + 1);
+                setRuntimeState("loaded");
+                setSection("chat");
+                setCanQueueBuildRequests(true);
+                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
+                addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
+              }
             } catch (stageException) {
               stageError = stageException instanceof Error ? stageException.message : "Network error during stage.";
               addActivity("Stage " + stagePath + " attempt " + stageAttempt + " network failure");
             }
           }
           if (!stageSucceeded) {
-            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
+            activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "failed", undefined, stageError);
+            persistRun(activeBuildRun, "error", stagedFiles, [], [stagePath + ": " + stageError], "repair-failed");
+            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " The project keeps a recovery checkpoint for the next attempt." } };
             responseOk = false;
             break;
           }
         }
         if (responseOk) {
+          activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "running");
+          persistRun(activeBuildRun, "booting", stagedFiles, [], [], "task-complete");
+          const finalPassMessage = nextProject.kind === "app"
+            ? "FINAL APP QUALITY PASS. Improve the existing complete web app without redesigning it from scratch. Inspect game.html, game.css, game.js and game-spec.json. Implement the highest-value unfinished user flows, make every existing visible control work, add field validation and visible success/error/empty/loading states where relevant, prevent duplicate form submission, preserve user input on failure, and ensure keyboard-accessible interactions. Preserve the app's existing design, data model, routes and working behavior. Update only game.js and keep compatibility with the existing HTML/CSS. Return one complete replacement game.js, not a summary. Do not claim backend persistence or authentication unless actually implemented."
+            : "FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS. Inspect the existing game-spec.json, game.html, game.css, game.js and all generated modules. Preserve the playable core and its controls, then implement a meaningful amount of the planned full-game content beyond the prototype: progression, distinct missions/levels or encounters, challenge variation, rewards/unlocks, and a satisfying full-game conclusion appropriate to this genre. Use the duration estimate from this specific project's specification if present; never insert universal 20-minute/2-hour targets and never pad playtime. Keep existing modules compatible, use them when they exist, and update only game.js. Return one complete replacement game.js with the full-game behavior implemented, not a plan or summary.";
+          let finalPassError = "";
+          for (let finalAttempt = 1; finalAttempt <= 3 && !finalContentPassSucceeded; finalAttempt++) {
+            try {
+              const retryNote = finalAttempt === 1 ? "" : " RETRY " + finalAttempt + "/3. The previous final pass failed: " + finalPassError.slice(0, 700) + ". Return a smaller complete file. Do not repeat the whole design description; preserve current controls, remove verbose data/tables, and ensure the entire response is valid and closed.";
+              const finalPassResponse = await fetch("/api/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...baseRequest,
+                  operation: "buildPart",
+                  stagePath: "game.js",
+                  message: finalPassMessage + " You MUST integrate the already generated modules by calling their documented window.GeneModules APIs where relevant. Preserve existing working input handling. Keep the response concise enough to fit a single complete file. " + retryNote,
+                  project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+                })
+              });
+              const finalPassPayload = await finalPassResponse.json().catch(() => null);
+              const finalGameFile = (finalPassPayload?.result?.files || []).find((file: { path?: string }) => file.path === "game.js");
+              if (finalPassResponse.ok && finalPassPayload?.ok && finalGameFile && typeof finalGameFile.content === "string" && finalGameFile.content.trim().length > 80) {
+                stagedFiles["game.js"] = finalGameFile.content;
+                finalContentPassSucceeded = true;
+                modelUsed = finalPassPayload.model || modelUsed;
+                activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "passed");
+                persistRun(activeBuildRun, "booting", stagedFiles, ["Final content pass returned a complete game.js replacement"], [], "task-complete");
+                addActivity(nextProject.kind === "app" ? "App interaction and error-state polish pass completed." : "Full-game expansion pass completed after the playable core was available.");
+              } else {
+                finalPassError = String(finalPassPayload?.error?.message || "The model did not return a complete, non-empty game.js replacement.");
+                addActivity("Final content pass attempt " + finalAttempt + "/3 failed: " + finalPassError.slice(0, 180));
+              }
+            } catch (finalPassException) {
+              finalPassError = finalPassException instanceof Error ? finalPassException.message : "Unknown final content pass error";
+              addActivity("Final content pass attempt " + finalAttempt + "/3 failed: " + finalPassError.slice(0, 180));
+            }
+          }
+          if (!finalContentPassSucceeded) {
+            activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "failed", undefined, finalPassError || "Full-game expansion failed after three attempts.");
+            persistRun(activeBuildRun, "stale", stagedFiles, [], ["Final content pass: " + (finalPassError || "failed after three attempts")], "repair-failed");
+            addActivity("Final content pass failed after three attempts; preserving the last known-good checkpoint.");
+          }
           addActivity("Checking assembled project contract and source files");
           let validationPayload: any = null;
           let validationOk = false;
@@ -490,9 +761,24 @@ export default function Home() {
             if (!repaired) break;
           }
           if (!validationOk) {
+            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "failed", undefined, String(validationPayload?.error?.message || "Assembled source validation failed"));
+            persistRun(activeBuildRun, "error", stagedFiles, [], [String(validationPayload?.error?.message || "Assembled source validation failed")], "repair-failed");
             payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation after targeted repair attempts." } };
             responseOk = false;
           } else {
+            if (finalContentPassSucceeded) {
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
+            } else {
+              // Release validation depends on successful full-game expansion. Keep the
+              // partial core, but don't mark a failed expansion as a completed release.
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "skipped", undefined, "Skipped release completion because the final-content task failed.");
+            }
+            activeBuildRun = { ...activeBuildRun, status: finalContentPassSucceeded ? "completed" : "failed", prototype: { ...activeBuildRun.prototype!, ready: false } };
+            persistRun(activeBuildRun, finalContentPassSucceeded ? "booting" : "stale", stagedFiles,
+              ["Assembled source validation passed; browser runtime still needs to render"],
+              finalContentPassSucceeded ? [] : ["Final content pass failed; this is a partial build, not a complete full game/app."],
+              finalContentPassSucceeded ? "prototype-ready" : "repair-failed");
             const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
               ? validationPayload.result.files as Array<{ path: string; content: string }>
               : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
@@ -502,11 +788,11 @@ export default function Home() {
               aiMode: "multi-provider",
               model: modelUsed,
               result: {
-                reply: "Built the first playable version in compact stages, repaired any structural validation issues found, and validated the assembled source. Play it and request focused improvements.",
+                reply: finalContentPassSucceeded ? "Generated the playable core, expanded the full-game content, and validated the assembled source. The browser preview still needs runtime verification." : "The playable core was generated and its source validated, but the final full-game/app quality pass failed. This is a partial build, not the completed project. The last source checkpoint is preserved; retry the final build pass after resolving the reported provider or generation error.",
                 plan: stagedPlan,
                 files: normalizedFiles,
-                complete: true,
-                needsUserDecision: false
+                complete: finalContentPassSucceeded,
+                needsUserDecision: !finalContentPassSucceeded
               }
             };
           }
@@ -528,7 +814,7 @@ export default function Home() {
       if (!responseOk || !payload?.ok) {
         const error = payload?.error?.message || "GENE could not complete the request.";
         addActivity("Request failed: " + error);
-        const failed = { ...nextProject, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
+        const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
         setProject(failed);
         setNotice(error);
         return;
@@ -563,11 +849,34 @@ export default function Home() {
         plan: result.plan || nextProject.plan,
         files,
         versions,
-        activeFile: changedPaths.includes(nextProject.activeFile) ? nextProject.activeFile : (changedPaths[0] || nextProject.activeFile),
+        buildRun: activeBuildRun || nextProject.buildRun || null,
+        livingPreview: changedPaths.length ? { status: "booting", lastKnownGoodVersion: versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Waiting for browser render confirmation"], canContinuePlaying: false } : nextProject.livingPreview || null,
+        activeFile: changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : (changedPaths[0] || nextProject.activeFile),
         messages: [...nextProject.messages, assistantMessage],
         updatedAt: now()
       };
-      setProject(updated);
+      setProject(current => {
+        if (!current || current.id !== updated.id) return updated;
+        const knownIds = new Set(current.messages.map(item => item.id));
+        const appendedMessages = updated.messages.filter(item => !knownIds.has(item.id));
+        const isReadOnlyReply = operation === "chat" || operation === "research";
+        if (isReadOnlyReply) {
+          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };
+        }
+        if (!buildInProgress) return updated;
+        return {
+          ...current,
+          ...updated,
+          files: { ...current.files, ...updated.files },
+          versions: updated.versions,
+          plan: updated.plan,
+          buildRun: activeBuildRun || current.buildRun || updated.buildRun,
+          livingPreview: changedPaths.length ? updated.livingPreview : current.livingPreview,
+          activeFile: updated.activeFile,
+          messages: [...current.messages, ...appendedMessages],
+          updatedAt: now()
+        };
+      });
       if (changedPaths.length) {
         addActivity("Files updated: " + changedPaths.join(", "));
         setSection("chat");
@@ -587,15 +896,42 @@ export default function Home() {
         }
       }
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Network error";
-      const failed = { ...nextProject, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
-      setProject(failed);
+      const text = explainAgentError(error);
+      const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
+      setProject(current => {
+        if (!current || current.id !== failed.id) return failed;
+        const knownIds = new Set(current.messages.map(item => item.id));
+        return {
+          ...current,
+          buildRun: current.buildRun,
+          files: current.files,
+          versions: current.versions,
+          plan: current.plan,
+          livingPreview: current.livingPreview,
+          messages: [...current.messages, ...failed.messages.filter(item => !knownIds.has(item.id))],
+          updatedAt: now()
+        };
+      });
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      setBusy(false);
+      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+      else setBusy(false);
+      if (operation === "build" || operation === "surprise") {
+        setBuildInProgress(false);
+        setCanQueueBuildRequests(false);
+      }
     }
-  }, [project, busy, aiModel, searchMode, localAgentStatus, localAgentToken, localAgentUrl]);
+  }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, localAgentStatus, localAgentToken, localAgentUrl]);
+
+  useEffect(() => {
+    if (busy || buildInProgress || !project || pendingBuildRequests.current.length === 0) return;
+    const next = pendingBuildRequests.current.shift();
+    setQueuedRequestCount(pendingBuildRequests.current.length);
+    if (!next) return;
+    setNotice("Processing queued request (" + (pendingBuildRequests.current.length + 1) + " remaining after this one).");
+    void runAgent(next);
+  }, [busy, buildInProgress, project?.id, queuedRequestCount, runAgent]);
 
   useEffect(() => {
     if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
@@ -1493,10 +1829,10 @@ export default function Home() {
             </select>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
-            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
-             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
+            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || buildInProgress || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
+             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || buildInProgress || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
             <select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select>
-            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
+            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || buildInProgress || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
             <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
@@ -1558,18 +1894,22 @@ export default function Home() {
                   <p>{project.plan.summary}</p>
                   <div className="plan-metrics"><span>{project.plan.tasks.length} tasks</span><span>{project.plan.mechanics.length} mechanics</span><span>{project.plan.engine === "canvas2d" ? "Canvas 2D" : "WebGL 3D"}</span><span>{project.plan.performanceBudget.targetFps} FPS target</span></div>
                   <ol>{project.plan.tasks.slice(0, 7).map((task, i) => <li key={task}><span>{String(i + 1).padStart(2, "0")}</span>{task}</li>)}</ol>
-                  <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy}>{busy ? "Working…" : "Build this plan"} <span>→</span></button>
+                  <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy || buildInProgress}>{buildInProgress ? "Build in progress…" : busy ? "Working…" : "Build this plan"} <span>→</span></button>
                 </div>}
-                {busy && <div className="working-row"><span className="spinner" /><div><strong>GENE is working</strong><small>{operationText(project.mode, hasGame)}</small></div><button onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide activity" : "View activity"}</button></div>}
+                {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "GENE is building" : queuedRequestCount ? "Requests queued" : "GENE is working"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " The preview is available; new chat requests queue safely." : ""}</small></div><button onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide activity" : "View activity"}</button></div>}
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
               <form className="composer" onSubmit={onSubmit}>
+                {project.mode === "plan" && <div className="composer-tools plan-intent-switch" role="group" aria-label="Planning intent">
+                  <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} onClick={() => setPlanIntent("create")}>Plan a new project</button>
+                  <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}>Plan an update</button>
+                </div>}
                 <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
-                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach reference images, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach reference images, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue request" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
@@ -1580,6 +1920,12 @@ export default function Home() {
 
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
+              {project.buildRun && <div className="build-check-panel">
+                <div className="build-check-head"><div><div className="eyebrow">GENE 1.4 FLASH</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
+                <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
+                {(project.buildRun.status === "failed" || project.buildRun.status === "recovering" || project.buildRun.tasks.some(task => task.status === "failed" || task.status === "blocked")) && <button className="primary-button" disabled={busy || buildInProgress} onClick={() => void runAgent("Resume this existing GENE build from its latest saved checkpoint. Restore checkpoint files, keep every passed task unchanged, retry only unfinished or failed tasks, then rerun final validation and repair. Do not restart from zero or claim completion unless all required tasks pass.", "build")}>Resume from checkpoint</button>}
+              </div>}
               <div className="build-check-panel">
                 <div className="build-check-head"><div><div className="eyebrow">QUALITY GATE</div><h3>Build checks</h3><p>{project.kind === "app" ? "Inspect project structure, syntax, interactive handlers and preview evidence." : "Inspect project structure, syntax, renderer, controls and preview evidence."}</p></div><button className="primary-button" onClick={runBuildChecks} disabled={!hasGame}>Run build checks</button></div>
                 {!hasGame && <p className="build-check-empty">{project.kind === "app" ? "Build an app first to run checks on its actual source files." : "Build a game first to run checks on its actual source files."}</p>}
