@@ -127,6 +127,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [buildInProgress, setBuildInProgress] = useState(false);
   const [canQueueBuildRequests, setCanQueueBuildRequests] = useState(false);
+  const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
   const [queuedRequestCount, setQueuedRequestCount] = useState(0);
   const pendingBuildRequests = useRef<string[]>([]);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
@@ -348,17 +349,26 @@ export default function Home() {
 
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
-    if (buildInProgress && canQueueBuildRequests && !operationOverride &&
-        (!isConversationOnly(text.trim()) || busy)) {
-      pendingBuildRequests.current.push(text.trim());
+    const prompt = text.trim();
+    const isReadOnlyConversation = !operationOverride && isConversationOnly(prompt);
+    const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation;
+    const queueRequest = () => {
+      pendingBuildRequests.current.push(prompt);
       setQueuedRequestCount(pendingBuildRequests.current.length);
       setNotice("Queued " + pendingBuildRequests.current.length + " request(s). GENE will process them in order after the current build phase, preserving the active build checkpoint.");
       addActivity("Queued user request for after the current build phase.");
       setDraft("");
+    };
+    if (buildInProgress && canQueueBuildRequests && !operationOverride && !isReadOnlyConversation) {
+      queueRequest();
       return;
     }
-    if (busy) return;
-    const prompt = text.trim();
+    if (canChatDuringBuild && parallelChatInProgress) {
+      queueRequest();
+      return;
+    }
+    if (busy && !canChatDuringBuild) return;
+    const parallelReadOnlyRequest = canChatDuringBuild;
     const isFirstIdea = !project.initialPrompt;
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
@@ -387,7 +397,8 @@ export default function Home() {
     setProject(nextProject);
     setDraft("");
     if (operation === "build" || operation === "surprise") { setBuildInProgress(true); setCanQueueBuildRequests(false); }
-    setBusy(true);
+    if (parallelReadOnlyRequest) setParallelChatInProgress(true);
+    else setBusy(true);
     setNotice("");
     setRuntimeState("idle");
     setActivity([]);
@@ -895,7 +906,8 @@ export default function Home() {
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      setBusy(false);
+      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+      else setBusy(false);
       if (operation === "build" || operation === "surprise") {
         setBuildInProgress(false);
         setCanQueueBuildRequests(false);
