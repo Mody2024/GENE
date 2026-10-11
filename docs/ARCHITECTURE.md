@@ -41,3 +41,8 @@ A build is not complete just because source generation succeeded. The intended g
 ## Context-aware patch engine
 
 `apps/web/app/lib/patch-engine.ts` applies a batch to a copied source manifest and returns a result only if every operation succeeds. It supports add/delete/rename, exact-context replacements, line-range replacements, and standard unified diff hunks. Stale or ambiguous context, unsafe paths, missing files, rename collisions, invalid ranges, and oversized files reject the whole batch. The caller still needs to connect this utility to model-generated patch plans and run project-level validation before saving.
+
+
+## Dynamic file manifests and bounded build stages
+
+The browser build coordinator begins with the four required runtime files, then reads optional `game-spec.json.additionalFiles` and adds each safe, non-core path as its own dependency-aware stage. The assembly validator depends on the final planned stage. The agent API accepts safe relative paths for additional files and edits, validates manifest uniqueness, limits a project to 100 files, limits individual files to 500 KB, and caps combined generated text at 8 MB. The preview runtime still directly executes only the core HTML/CSS/JavaScript contract; a listed asset is not considered integrated until the generated runtime references or loads it correctly.
