@@ -727,8 +727,14 @@ export default function Home() {
             payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation after targeted repair attempts." } };
             responseOk = false;
           } else {
-            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
-            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
+            if (finalContentPassSucceeded) {
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
+            } else {
+              // Release validation depends on successful full-game expansion. Keep the
+              // partial core, but don't mark a failed expansion as a completed release.
+              activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "skipped", undefined, "Skipped release completion because the final-content task failed.");
+            }
             activeBuildRun = { ...activeBuildRun, status: finalContentPassSucceeded ? "completed" : "failed", prototype: { ...activeBuildRun.prototype!, ready: false } };
             persistRun(activeBuildRun, finalContentPassSucceeded ? "booting" : "stale", stagedFiles,
               ["Assembled source validation passed; browser runtime still needs to render"],
