@@ -435,6 +435,7 @@ export default function Home() {
           activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
         };
+        let finalContentPassSucceeded = false;
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
@@ -578,6 +579,7 @@ export default function Home() {
             const finalGameFile = (finalPassPayload?.result?.files || []).find((file: { path?: string }) => file.path === "game.js");
             if (finalPassResponse.ok && finalPassPayload?.ok && finalGameFile && typeof finalGameFile.content === "string") {
               stagedFiles["game.js"] = finalGameFile.content;
+              finalContentPassSucceeded = true;
               modelUsed = finalPassPayload.model || modelUsed;
               activeBuildRun = setTaskStatus(activeBuildRun, "final-content-pass", "passed");
               persistRun(activeBuildRun, "booting", stagedFiles, ["Final content pass returned a complete game.js replacement"], [], "task-complete");
@@ -656,8 +658,11 @@ export default function Home() {
           } else {
             activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
             activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
-            activeBuildRun = { ...activeBuildRun, status: "completed", prototype: { ...activeBuildRun.prototype!, ready: false } };
-            persistRun(activeBuildRun, "booting", stagedFiles, ["Assembled source validation passed; browser runtime still needs to render"], [], "prototype-ready");
+            activeBuildRun = { ...activeBuildRun, status: finalContentPassSucceeded ? "completed" : "failed", prototype: { ...activeBuildRun.prototype!, ready: false } };
+            persistRun(activeBuildRun, finalContentPassSucceeded ? "booting" : "stale", stagedFiles,
+              ["Assembled source validation passed; browser runtime still needs to render"],
+              finalContentPassSucceeded ? [] : ["Final content pass failed; this is a partial build, not a complete full game/app."],
+              finalContentPassSucceeded ? "prototype-ready" : "repair-failed");
             const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
               ? validationPayload.result.files as Array<{ path: string; content: string }>
               : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
@@ -667,11 +672,11 @@ export default function Home() {
               aiMode: "multi-provider",
               model: modelUsed,
               result: {
-                reply: "Built the first playable version in compact stages, repaired any structural validation issues found, and validated the assembled source. Play it and request focused improvements.",
+                reply: finalContentPassSucceeded ? "Generated the playable core, expanded the full-game content, and validated the assembled source. The browser preview still needs runtime verification." : "The playable core was generated and its source validated, but the final full-game/app quality pass failed. This is a partial build, not the completed project. The last source checkpoint is preserved; retry the final build pass after resolving the reported provider or generation error.",
                 plan: stagedPlan,
                 files: normalizedFiles,
-                complete: true,
-                needsUserDecision: false
+                complete: finalContentPassSucceeded,
+                needsUserDecision: !finalContentPassSucceeded
               }
             };
           }
