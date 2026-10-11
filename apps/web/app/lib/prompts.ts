@@ -60,7 +60,7 @@ export function makeAgentInput(input: {
     if (stagePath === "game.js" && path === "game.css") return true;
     // Give staged modules enough neighboring source to integrate against, without
     // dumping every large asset into the model context.
-    if (/\\.js$/i.test(path) && (stagePath === "game.js" || /\\.js$/i.test(stagePath))) return true;
+    if (/\.js$/i.test(path) && (stagePath === "game.js" || /\.js$/i.test(stagePath))) return true;
     return false;
   }).slice(0, 18);
   const stageFiles = Object.fromEntries(stageEntries.map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 3000)]));
