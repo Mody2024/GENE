@@ -326,3 +326,7 @@ assert.ok(orchestrator14.includes("getReadyTasks"), "the coordinator gates work 
 assert.ok(orchestrator14.includes("checkpointBuild") && orchestrator14.includes("lastKnownGoodFiles"), "checkpointing stores known-good source snapshots");
 assert.ok(orchestrator14.includes("queueUserChange") && orchestrator14.includes("planRevision"), "user interruptions queue changes and revise the plan");
 assert.ok(orchestrator14.includes("recoverFromCheckpoint"), "failed builds can restore a checkpoint rather than restart from scratch");
+
+assert.ok(prompts.includes("PROTOTYPE VS FULL GAME CONTRACT") && prompts.includes("Do not meet the full-game target by adding a timer"), "prototype and full-game content budgets must be meaningfully distinct");
+assert.ok(page.includes("Build checkpoints") && page.includes("Full-game target:"), "workspace exposes GENE 1.4 checkpoint and duration targets");
+assert.ok(page.includes("browser runtime still needs to render") && page.includes("Gameplay objectives still require manual verification"), "source validation is not mislabeled as proof of gameplay");
