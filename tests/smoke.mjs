@@ -426,3 +426,8 @@ assert.ok(prompts.includes("Plan only") && prompts.includes("PLANNING INTENT"), 
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
 assert.ok(!page.includes("prototypeMinutes: 20") && !page.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
 assert.ok(page.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
+
+assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "app-level error boundary exists");
+const appErrorBoundary = read("apps/web/app/error.tsx");
+assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
+assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
