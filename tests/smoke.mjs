@@ -330,3 +330,9 @@ assert.ok(orchestrator14.includes("recoverFromCheckpoint"), "failed builds can r
 assert.ok(prompts.includes("PROTOTYPE VS FULL GAME CONTRACT") && prompts.includes("Do not meet the full-game target by adding a timer"), "prototype and full-game content budgets must be meaningfully distinct");
 assert.ok(page.includes("Build checkpoints") && page.includes("Full-game target:"), "workspace exposes GENE 1.4 checkpoint and duration targets");
 assert.ok(page.includes("browser runtime still needs to render") && page.includes("Gameplay objectives still require manual verification"), "source validation is not mislabeled as proof of gameplay");
+
+const patchEngine = read("apps/web/app/lib/patch-engine.ts");
+assert.ok(patchEngine.includes("export function applyPatchBatch"), "GENE 1.4 provides an atomic multi-file patch engine");
+assert.ok(patchEngine.includes("Patch context is stale or missing") && patchEngine.includes("Patch context is ambiguous"), "patches reject stale and ambiguous contexts instead of overwriting unrelated source");
+assert.ok(patchEngine.includes("applyUnifiedDiff") && patchEngine.includes("rename_file") && patchEngine.includes("replace_range"), "patch engine supports unified diffs, renames, and focused range edits");
+assert.ok(patchEngine.includes("A patch batch must contain at least one operation"), "empty patch batches are rejected");
