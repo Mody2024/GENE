@@ -438,6 +438,8 @@ export default function Home() {
         const recovery = nextProject.buildRun?.checkpoints?.length
           ? recoverFromCheckpoint(nextProject.buildRun)
           : null;
+        // Start with the four mandatory runtime files. The project spec and scope decide whether extras are warranted.
+        // On resume, reuse the checkpoint's actual task manifest rather than assuming a fixed file count.
         let stagePaths = recovery
           ? recovery.run.tasks
               .filter(task => task.id.startsWith("stage-") && task.files.length > 0)
@@ -555,17 +557,17 @@ export default function Home() {
                   ].join(" ").toLowerCase();
                   const plannedModules: string[] = [];
                   if (nextProject.kind === "app") {
-                    // Every non-trivial app gets a real modular base; complexity adds systems,
-                    // it must not be a prerequisite for having more than four files.
-                    plannedModules.push("src/app/state.js", "src/app/validation.js");
+                    // Add app modules only when the actual requested feature scope needs them.
+                    if (/complex state|shared state|multi-step|multi-page|undo|redo|workflow/.test(scopeText)) plannedModules.push("src/app/state.js");
+                    if (/validation|form|signup|sign in|login|register|checkout|booking|contact/.test(scopeText)) plannedModules.push("src/app/validation.js", "src/app/forms.js");
                     if (/save|persist|offline|cart|inventory|account|profile|settings|dashboard|history/.test(scopeText)) plannedModules.push("src/app/persistence.js");
                     if (/search|filter|sort|catalog|marketplace|products|library/.test(scopeText)) plannedModules.push("src/app/search.js");
-                    if (/form|signup|sign in|login|register|checkout|booking|contact/.test(scopeText)) plannedModules.push("src/app/forms.js");
                     if (/chart|analytics|metrics|report|statistics/.test(scopeText)) plannedModules.push("src/app/analytics.js");
                   } else {
-                    // A game always receives modular input, progression, and content systems.
-                    // Add genre systems from the project brief and approved plan.
-                    plannedModules.push("src/systems/input.js", "src/systems/progression.js", "src/systems/content.js");
+                    // A module is justified by a feature, not by a fixed template.
+                    if (/touch|mobile|keyboard|wasd|arrow keys|controller|gamepad|input/.test(scopeText)) plannedModules.push("src/systems/input.js");
+                    if (/progression|upgrade|unlock|level up|score chase|campaign|wave|difficulty/.test(scopeText)) plannedModules.push("src/systems/progression.js");
+                    if (/multiple levels|level design|spawn table|procedural|enemy waves|collectibles|content system/.test(scopeText)) plannedModules.push("src/systems/content.js");
                     if (/story|dialogue|quest|mission|chapter|level|campaign|narrative|cutscene/.test(scopeText)) plannedModules.push("src/systems/narrative.js");
                     if (/combat|enemy|enemies|boss|weapon|shoot|attack|damage|survival/.test(scopeText)) plannedModules.push("src/systems/combat.js");
                     if (/3d|third.person|first.person|open.world|driving|vehicle|world.exploration/.test(scopeText)) plannedModules.push("src/systems/world.js", "src/systems/camera.js");
