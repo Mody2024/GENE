@@ -312,3 +312,17 @@ assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-column
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
 assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("successfulProvider = provider.name"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
+
+
+// GENE 1.4 Flash orchestration contracts: durable checkpoints, dependency ordering,
+// interruption handling, prototype/full-game separation, and patch vocabulary.
+const types14 = read("apps/web/app/lib/types.ts");
+const orchestrator14 = read("apps/web/app/lib/build-orchestrator.ts");
+assert.ok(types14.includes("export type BuildCheckpoint") && types14.includes("lastKnownGoodFiles"), "GENE 1.4 defines recoverable build checkpoints");
+assert.ok(types14.includes("prototype?: { targetMinutes: number") && types14.includes("fullGame?: { targetMinutes: number"), "prototype and full-game targets are stored separately");
+assert.ok(types14.includes("export type PatchOperation"), "GENE 1.4 declares explicit, scoped source patch operations");
+assert.ok(orchestrator14.includes("assertAcyclic"), "build planning rejects cyclic task dependencies");
+assert.ok(orchestrator14.includes("getReadyTasks"), "the coordinator gates work on passed dependencies");
+assert.ok(orchestrator14.includes("checkpointBuild") && orchestrator14.includes("lastKnownGoodFiles"), "checkpointing stores known-good source snapshots");
+assert.ok(orchestrator14.includes("queueUserChange") && orchestrator14.includes("planRevision"), "user interruptions queue changes and revise the plan");
+assert.ok(orchestrator14.includes("recoverFromCheckpoint"), "failed builds can restore a checkpoint rather than restart from scratch");
