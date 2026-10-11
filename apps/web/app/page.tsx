@@ -125,6 +125,10 @@ export default function Home() {
   const [draft, setDraft] = useState("");
   const [planIntent, setPlanIntent] = useState<"create" | "update">("create");
   const [busy, setBusy] = useState(false);
+  const [buildInProgress, setBuildInProgress] = useState(false);
+  const [canQueueBuildRequests, setCanQueueBuildRequests] = useState(false);
+  const [queuedRequestCount, setQueuedRequestCount] = useState(0);
+  const pendingBuildRequests = useRef<string[]>([]);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -337,7 +341,16 @@ export default function Home() {
   const addActivity = (entry: string) => setActivity(prev => [new Date().toLocaleTimeString() + "  " + entry, ...prev].slice(0, 80));
 
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
-    if (!project || busy || !text.trim()) return;
+    if (!project || !text.trim()) return;
+    if (buildInProgress && canQueueBuildRequests && !operationOverride) {
+      pendingBuildRequests.current.push(text.trim());
+      setQueuedRequestCount(pendingBuildRequests.current.length);
+      setNotice("Queued " + pendingBuildRequests.current.length + " request(s). GENE will process them in order after the current build phase, preserving the active build checkpoint.");
+      addActivity("Queued user request for after the current build phase.");
+      setDraft("");
+      return;
+    }
+    if (busy) return;
     const prompt = text.trim();
     const isFirstIdea = !project.initialPrompt;
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -366,6 +379,7 @@ export default function Home() {
     };
     setProject(nextProject);
     setDraft("");
+    if (operation === "build" || operation === "surprise") { setBuildInProgress(true); setCanQueueBuildRequests(false); }
     setBusy(true);
     setNotice("");
     setRuntimeState("idle");
@@ -509,6 +523,24 @@ export default function Home() {
               }
               persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
               addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+              if (stagePath === "game.js" && ["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(stagedFiles[path])) &&
+                  !nextProject.versions.length && !nextProject.files["game.js"]) {
+                setProject(current => current && current.id === nextProject.id ? {
+                  ...current,
+                  files: { ...stagedFiles },
+                  plan: stagedPlan,
+                  buildRun: activeBuildRun,
+                  livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Playable core slice ready; full project work continues"], canContinuePlaying: false },
+                  updatedAt: now()
+                } : current);
+                setPreviewOpen(true);
+                setPreviewKey(value => value + 1);
+                setRuntimeState("loaded");
+                setSection("chat");
+                setCanQueueBuildRequests(true);
+                setBusy(false);
+                addActivity("Core prototype source is now in the live preview. Continuing the remaining planned project stages; new requests can be queued safely.");
+              }
             } catch (stageException) {
               stageError = stageException instanceof Error ? stageException.message : "Network error during stage.";
               addActivity("Stage " + stagePath + " attempt " + stageAttempt + " network failure");
@@ -690,8 +722,21 @@ export default function Home() {
       addActivity("Network/response error: " + text);
     } finally {
       setBusy(false);
+      if (operation === "build" || operation === "surprise") {
+        setBuildInProgress(false);
+        setCanQueueBuildRequests(false);
+      }
     }
-  }, [project, busy, aiModel, searchMode, planIntent, localAgentStatus, localAgentToken, localAgentUrl]);
+  }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, localAgentStatus, localAgentToken, localAgentUrl]);
+
+  useEffect(() => {
+    if (busy || buildInProgress || !project || pendingBuildRequests.current.length === 0) return;
+    const next = pendingBuildRequests.current.shift();
+    setQueuedRequestCount(pendingBuildRequests.current.length);
+    if (!next) return;
+    setNotice("Processing queued request (" + (pendingBuildRequests.current.length + 1) + " remaining after this one).");
+    void runAgent(next);
+  }, [busy, buildInProgress, project?.id, queuedRequestCount, runAgent]);
 
   useEffect(() => {
     if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
@@ -1589,10 +1634,10 @@ export default function Home() {
             </select>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
-            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
-             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
+            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || buildInProgress || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
+             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || buildInProgress || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
             <select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select>
-            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
+            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || buildInProgress || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
             <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
           </div>
         </header>
@@ -1654,9 +1699,9 @@ export default function Home() {
                   <p>{project.plan.summary}</p>
                   <div className="plan-metrics"><span>{project.plan.tasks.length} tasks</span><span>{project.plan.mechanics.length} mechanics</span><span>{project.plan.engine === "canvas2d" ? "Canvas 2D" : "WebGL 3D"}</span><span>{project.plan.performanceBudget.targetFps} FPS target</span></div>
                   <ol>{project.plan.tasks.slice(0, 7).map((task, i) => <li key={task}><span>{String(i + 1).padStart(2, "0")}</span>{task}</li>)}</ol>
-                  <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy}>{busy ? "Working…" : "Build this plan"} <span>→</span></button>
+                  <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy || buildInProgress}>{buildInProgress ? "Build in progress…" : busy ? "Working…" : "Build this plan"} <span>→</span></button>
                 </div>}
-                {busy && <div className="working-row"><span className="spinner" /><div><strong>GENE is working</strong><small>{operationText(project.mode, hasGame)}</small></div><button onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide activity" : "View activity"}</button></div>}
+                {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "GENE is building" : queuedRequestCount ? "Requests queued" : "GENE is working"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " The preview is available; new chat requests queue safely." : ""}</small></div><button onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide activity" : "View activity"}</button></div>}
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
@@ -1667,9 +1712,9 @@ export default function Home() {
                 </div>
                 <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
-                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach reference images, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={busy || !draft.trim()}>{busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach reference images, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue request" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
