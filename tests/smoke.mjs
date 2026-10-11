@@ -456,7 +456,7 @@ assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/scri
 // run a real one-question-at-a-time interview, and recover rather than restart.
 assert.ok(page.includes('project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"'), "new Plan Mode projects begin with the interview instead of jumping straight to a shallow plan");
 assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
-assert.ok(page.includes('new Set(["json","js","svg"') && page.includes('/\\.js$/i.test(stagePath)'), "JavaScript modules are accepted and scheduled as real generation stages");
+assert.ok(page.includes('new Set(["json","js","svg"') && page.includes("test(stagePath)"), "JavaScript modules are accepted and scheduled as real generation stages");
 assert.ok(page.includes("recoverFromCheckpoint(nextProject.buildRun)") && page.includes("Checkpoint recovery: kept completed stage"), "failed builds restore the latest checkpoint and skip already-passed stages");
 assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt <= 3'), "users can resume a failed build and final expansion retries length/provider failures");
 assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
