@@ -486,3 +486,6 @@ assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "sk
 
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("only browser modules and the supported Forge OBJ/MTL asset paths"), "the staged build does not fabricate unsupported binary assets");
 assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline") && prompts.includes("assets/<asset-id>/model.obj"), "asset prompts match the runtime's actual Forge asset paths");
+
+assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
+assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("assets\\/") === false, "asset staging is gated by an explicit runtime-loadable path contract");
