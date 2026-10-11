@@ -287,7 +287,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
       if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
       const controlsContract = spec.controls.join(" ").toLowerCase();
-      if (/keyboard|wasd|arrow keys|key bindings/.test(controlsContract) && !/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(js)) {
+      if (/keyboard|wasd|arrow keys|key bindings/.test(controlsContract) && !/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(runtimeSource)) {
         throw new Error("Build rejected: the spec promises keyboard controls but game.js has no detectable keyboard input mapping.");
       }
       if (/touch|mobile|pointer controls/.test(controlsContract) && !/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(runtimeSource)) {
