@@ -252,7 +252,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const js = byPath["game.js"];
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
     // Validate the complete assembled JavaScript project so valid modular controls are not rejected.
-    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\\n");
+    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
     if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
     if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
     if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
