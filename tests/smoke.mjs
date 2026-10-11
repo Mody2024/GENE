@@ -483,3 +483,6 @@ assert.ok(page.includes("Playable prototype published.") && page.includes('statu
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "read-only AI chat can run concurrently with the playable prototype build");
 assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
 assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
+
+assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("only browser modules and the supported Forge OBJ/MTL asset paths"), "the staged build does not fabricate unsupported binary assets");
+assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline") && prompts.includes("assets/<asset-id>/model.obj"), "asset prompts match the runtime's actual Forge asset paths");
