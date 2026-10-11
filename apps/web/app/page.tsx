@@ -368,6 +368,7 @@ export default function Home() {
       return;
     }
     if (busy && !canChatDuringBuild) return;
+    if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
     const isFirstIdea = !project.initialPrompt;
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -394,7 +395,13 @@ export default function Home() {
         : [...project.messages, message("user", prompt)],
       updatedAt: now()
     };
-    setProject(nextProject);
+    setProject(current => {
+      if (parallelReadOnlyRequest && current && current.id === nextProject.id) {
+        const latestUserMessage = nextProject.messages[nextProject.messages.length - 1];
+        return { ...current, messages: latestUserMessage ? [...current.messages, latestUserMessage] : current.messages, updatedAt: now() };
+      }
+      return nextProject;
+    });
     setDraft("");
     if (operation === "build" || operation === "surprise") { setBuildInProgress(true); setCanQueueBuildRequests(false); }
     if (parallelReadOnlyRequest) setParallelChatInProgress(true);
@@ -855,19 +862,23 @@ export default function Home() {
         updatedAt: now()
       };
       setProject(current => {
-        if (!buildInProgress || !current || current.id !== updated.id) return updated;
+        if (!current || current.id !== updated.id) return updated;
         const knownIds = new Set(current.messages.map(item => item.id));
         const appendedMessages = updated.messages.filter(item => !knownIds.has(item.id));
         const isReadOnlyReply = operation === "chat" || operation === "research";
+        if (isReadOnlyReply) {
+          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };
+        }
+        if (!buildInProgress) return updated;
         return {
           ...current,
           ...updated,
-          files: isReadOnlyReply ? current.files : { ...current.files, ...updated.files },
-          versions: isReadOnlyReply ? current.versions : updated.versions,
-          plan: isReadOnlyReply ? current.plan : updated.plan,
+          files: { ...current.files, ...updated.files },
+          versions: updated.versions,
+          plan: updated.plan,
           buildRun: activeBuildRun || current.buildRun || updated.buildRun,
-          livingPreview: isReadOnlyReply ? current.livingPreview : (changedPaths.length ? updated.livingPreview : current.livingPreview),
-          activeFile: isReadOnlyReply ? current.activeFile : updated.activeFile,
+          livingPreview: changedPaths.length ? updated.livingPreview : current.livingPreview,
+          activeFile: updated.activeFile,
           messages: [...current.messages, ...appendedMessages],
           updatedAt: now()
         };
@@ -894,11 +905,15 @@ export default function Home() {
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(current => {
-        if (!buildInProgress || !current || current.id !== failed.id) return failed;
+        if (!current || current.id !== failed.id) return failed;
         const knownIds = new Set(current.messages.map(item => item.id));
         return {
           ...current,
           buildRun: current.buildRun,
+          files: current.files,
+          versions: current.versions,
+          plan: current.plan,
+          livingPreview: current.livingPreview,
           messages: [...current.messages, ...failed.messages.filter(item => !knownIds.has(item.id))],
           updatedAt: now()
         };
