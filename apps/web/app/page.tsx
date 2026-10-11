@@ -1,7 +1,8 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentResponse, BuildVersion, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
+import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
+import { checkpointBuild, createBuildRun, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
@@ -380,8 +381,36 @@ export default function Home() {
         const stagedFiles: Record<string, string> = { ...nextProject.files };
         let stagedPlan = nextProject.plan || null;
         let modelUsed = aiModel;
+        const buildTasks = [
+          ...stagePaths.map((path, index) => ({
+            id: "stage-" + index,
+            title: "Generate " + path,
+            kind: (index === 0 ? "design" : index === 1 ? "scaffold" : "implement") as "design" | "scaffold" | "implement",
+            dependsOn: index ? ["stage-" + (index - 1)] : [],
+            files: [path],
+            acceptance: ["Return the requested complete file", "Pass server-side source validation"]
+          })),
+          { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
+        ];
+        let activeBuildRun: BuildRun = createBuildRun({
+          projectId: nextProject.id,
+          tasks: buildTasks,
+          prototypeMinutes: 20,
+          fullGameMinutes: 120,
+          prototypeObjectives: ["Boot and render", "Core controls and gameplay loop", "Reach a meaningful prototype conclusion"],
+          fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct missions/levels beyond the prototype", "Progression and challenge variation", "Complete full-game ending"])
+        });
+        activeBuildRun = { ...activeBuildRun, status: "running" };
+        setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
+        addActivity("GENE 1.4 coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
+        const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
+          activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
+          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
+        };
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
+          activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
+          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
           let stageSucceeded = false;
           let stageError = "";
@@ -422,14 +451,18 @@ export default function Home() {
               if (stageResult.plan) stagedPlan = stageResult.plan;
               modelUsed = stagePayload.model || modelUsed;
               stageSucceeded = true;
-              addActivity("Validated stage file " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+              activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "passed");
+              persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
+              addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
             } catch (stageException) {
               stageError = stageException instanceof Error ? stageException.message : "Network error during stage.";
               addActivity("Stage " + stagePath + " attempt " + stageAttempt + " network failure");
             }
           }
           if (!stageSucceeded) {
-            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " No project files were saved. Retry the build; completed stages remain temporary until the full project passes validation." } };
+            activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "failed", undefined, stageError);
+            persistRun(activeBuildRun, "error", stagedFiles, [], [stagePath + ": " + stageError], "repair-failed");
+            payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " The project keeps a recovery checkpoint for the next attempt." } };
             responseOk = false;
             break;
           }
@@ -490,9 +523,15 @@ export default function Home() {
             if (!repaired) break;
           }
           if (!validationOk) {
+            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "failed", undefined, String(validationPayload?.error?.message || "Assembled source validation failed"));
+            persistRun(activeBuildRun, "error", stagedFiles, [], [String(validationPayload?.error?.message || "Assembled source validation failed")], "repair-failed");
             payload = validationPayload || { ok: false, error: { message: "The assembled project failed validation after targeted repair attempts." } };
             responseOk = false;
           } else {
+            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "running");
+            activeBuildRun = setTaskStatus(activeBuildRun, "validate-assembled", "passed");
+            activeBuildRun = { ...activeBuildRun, status: "completed", prototype: { ...activeBuildRun.prototype!, ready: true } };
+            persistRun(activeBuildRun, "playable", stagedFiles, ["Assembled source validation passed"], [], "prototype-ready");
             const normalizedFiles = Array.isArray(validationPayload?.result?.files) && validationPayload.result.files.length
               ? validationPayload.result.files as Array<{ path: string; content: string }>
               : stagePaths.map(path => ({ path, content: stagedFiles[path] }));
@@ -563,7 +602,9 @@ export default function Home() {
         plan: result.plan || nextProject.plan,
         files,
         versions,
-        activeFile: changedPaths.includes(nextProject.activeFile) ? nextProject.activeFile : (changedPaths[0] || nextProject.activeFile),
+        buildRun: activeBuildRun || nextProject.buildRun || null,
+        livingPreview: changedPaths.length ? { status: "playable", lastKnownGoodVersion: versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Play the game and verify its objectives"], canContinuePlaying: true } : nextProject.livingPreview || null,
+        activeFile: changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : (changedPaths[0] || nextProject.activeFile),
         messages: [...nextProject.messages, assistantMessage],
         updatedAt: now()
       };
