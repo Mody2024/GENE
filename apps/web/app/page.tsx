@@ -564,7 +564,10 @@ export default function Home() {
                     const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
                     return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
-                  const extras = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path) && !stagedFiles[path]))].slice(0, 96);
+                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path)))].slice(0, 96);
+                  spec.additionalFiles = safeManifest;
+                  stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
+                  const extras = safeManifest.filter(path => !stagedFiles[path]);
                   if (extras.length) {
                     const oldLastStage = stagePaths.length - 1;
                     stagePaths = [...stagePaths, ...extras];
