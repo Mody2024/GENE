@@ -403,7 +403,10 @@ export default function Home() {
       return nextProject;
     });
     setDraft("");
-    if (operation === "build" || operation === "surprise") { setBuildInProgress(true); setCanQueueBuildRequests(false); }
+    if (operation === "build" || operation === "surprise") {
+      setBuildInProgress(true);
+      setCanQueueBuildRequests(["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(nextProject.files[path])));
+    }
     if (parallelReadOnlyRequest) setParallelChatInProgress(true);
     else setBusy(true);
     setNotice("");
