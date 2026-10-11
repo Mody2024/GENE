@@ -724,6 +724,13 @@ export default function Home() {
             });
             validationPayload = await validateResponse.json().catch(() => null);
             if (validateResponse.ok && validationPayload?.ok) {
+              // Validation may deterministically normalize a missing spec contract.
+              // Persist those normalized files into the staged snapshot before commit.
+              for (const normalizedFile of (validationPayload?.result?.files || [])) {
+                if (normalizedFile && typeof normalizedFile.path === "string" && typeof normalizedFile.content === "string") {
+                  stagedFiles[normalizedFile.path] = normalizedFile.content;
+                }
+              }
               validationOk = true;
               break;
             }
