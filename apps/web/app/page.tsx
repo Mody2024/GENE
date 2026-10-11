@@ -587,7 +587,15 @@ export default function Home() {
                     const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
                     return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
-                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path)))].slice(0, 96);
+                  const textStageExtensions = new Set(["json", "js", "svg", "obj", "mtl", "glsl", "txt", "md", "gd", "ts", "html", "css"]);
+                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
+                    safe(path) && !core.has(path) && textStageExtensions.has(path.slice(path.lastIndexOf(".") + 1).toLowerCase())
+                  ))].slice(0, 96);
+                  const omittedBinaryAssets = candidates.filter((path: unknown) =>
+                    typeof path === "string" && safe(path) && !core.has(path) &&
+                    !textStageExtensions.has(path.slice(path.lastIndexOf(".") + 1).toLowerCase())
+                  );
+                  if (omittedBinaryAssets.length) addActivity("Skipped " + omittedBinaryAssets.length + " binary asset placeholder path(s); actual binary assets must come from the asset/Forge pipeline, not text generation.");
                   spec.additionalFiles = safeManifest;
                   stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
                   const extras = safeManifest.filter(path => !stagedFiles[path]);
