@@ -40,6 +40,15 @@ function GeneMark({ className = "" }: { className?: string }) {
   </svg>;
 }
 function now() { return new Date().toISOString(); }
+function explainAgentError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error || "Unknown error");
+  if (/resource_exhausted|quota exceeded|rate.?limit|429/i.test(raw)) return "The AI provider rate limit or quota was reached. Your project files were preserved; wait for quota reset or configure another API key/model, then retry.";
+  if (/GEMINI_KEY_REJECTED|invalid api key|unauthorized|401/i.test(raw)) return "The AI provider rejected the API key. Check the key in your deployment environment, redeploy, and retry. Your existing project was preserved.";
+  if (/timeout|timed out|aborted|ETIMEDOUT/i.test(raw)) return "The request timed out before GENE could finish. Completed checkpoints were preserved; retry to continue with a smaller task.";
+  if (/failed to fetch|networkerror|network request failed|offline/i.test(raw)) return "GENE could not reach the server. Check your connection and deployment status, then retry. Your last saved project version was preserved.";
+  if (/GENE_VALIDATION_FAILED|422|stale or missing|unsafe project path|Build rejected/i.test(raw)) return "GENE rejected the generated change during validation to protect your project. Try a smaller, more specific change. Details: " + raw.slice(0, 500);
+  return raw.slice(0, 900) || "GENE encountered an unexpected error. Your last saved project version was preserved; inspect the activity log and retry.";
+}
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
 }
@@ -331,7 +340,7 @@ export default function Home() {
     if (!project || busy || !text.trim()) return;
     const prompt = text.trim();
     const isFirstIdea = !project.initialPrompt;
-    const answerKey = operationOverride ? undefined : project.question?.id;
+    const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
     if (!operationOverride) {
@@ -674,7 +683,7 @@ export default function Home() {
         }
       }
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Network error";
+      const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [text], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(failed);
       setNotice(text);
