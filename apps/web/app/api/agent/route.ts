@@ -280,6 +280,16 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
       if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
       if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
+      const controlsContract = spec.controls.join(" ").toLowerCase();
+      if (/keyboard|wasd|arrow keys|key bindings/.test(controlsContract) && !/(keydown|keyup|event\\.key|event\\.code|keyCode)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises keyboard controls but game.js has no detectable keyboard input mapping.");
+      }
+      if (/touch|mobile|pointer controls/.test(controlsContract) && !/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises touch/pointer controls but game.js has no detectable touch or pointer handlers.");
+      }
+      if (/gamepad|controller/.test(controlsContract) && !/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises controller support but game.js does not read the Gamepad API.");
+      }
       if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
       if (spec.engine === "webgl3d") {
         if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
