@@ -259,6 +259,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         }
       }
       if (!/<(?:main|header|nav|section|form|button|h1|h2|article|div|input|label)\b/i.test(html)) throw new Error("Build rejected: app HTML must contain a real semantic UI, not an empty body.");
+      if (/<(?:button|input|select|textarea|form)\b/i.test(html) && !/(addEventListener|onclick|onsubmit|onchange|oninput)/i.test(js)) {
+        throw new Error("Build rejected: the app declares interactive controls but game.js contains no detectable event handlers. Wire the controls to real state changes and visible validation/results.");
+      }
+      if (js.trim().length < 80) throw new Error("Build rejected: app JavaScript is too small to implement the declared user flows.");
       if (!spec.performanceBudget || !Number.isFinite(spec.performanceBudget.targetFps) || spec.performanceBudget.targetFps < 30 || spec.performanceBudget.targetFps > 120) {
         throw new Error("Build rejected: app spec needs a valid performanceBudget.targetFps (30–120).");
       }
