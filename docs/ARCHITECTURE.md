@@ -46,3 +46,8 @@ A build is not complete just because source generation succeeded. The intended g
 ## Dynamic file manifests and bounded build stages
 
 The browser build coordinator begins with the four required runtime files, then reads optional `game-spec.json.additionalFiles` and adds each safe, non-core path as its own dependency-aware stage. The assembly validator depends on the final planned stage. The agent API accepts safe relative paths for additional files and edits, validates manifest uniqueness, limits a project to 100 files, limits individual files to 500 KB, and caps combined generated text at 8 MB. The preview runtime still directly executes only the core HTML/CSS/JavaScript contract; a listed asset is not considered integrated until the generated runtime references or loads it correctly.
+
+
+## GENE 1.4 scope and verification boundary
+
+The implementation branch now has the first manifest-driven build expansion and safe relative-path checks, as well as the checkpoint ledger and atomic patch utility. The four core browser files remain the only files directly assembled into the iframe; additional files can be represented in the project and exported, but need a real loader/reference before they are considered runtime-integrated. The current coordinator still runs as a client-side staged sequence and uses browser project state; it is not yet a server-side autonomous worker and does not yet continue the two-hour full game after the prototype as a background task. Concurrent chat during a long build is therefore a release requirement still open, not a capability to claim as complete. Run the full CI workflow before merging.
