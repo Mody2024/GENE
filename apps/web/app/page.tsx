@@ -381,7 +381,7 @@ export default function Home() {
       if (operation === "build" || operation === "surprise") {
         // Generate small, independently validated files rather than asking Gemini
         // to fit an entire project into one large JSON response.
-        const stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
+        let stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
         const stagedFiles: Record<string, string> = { ...nextProject.files };
         let stagedPlan = nextProject.plan || null;
         let modelUsed = aiModel;
@@ -423,7 +423,7 @@ export default function Home() {
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
-                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
+                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
                 : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
@@ -456,6 +456,41 @@ export default function Home() {
               modelUsed = stagePayload.model || modelUsed;
               stageSucceeded = true;
               activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "passed");
+              if (stagePath === "game-spec.json") {
+                try {
+                  const spec = JSON.parse(file.content);
+                  const candidates = [
+                    ...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []),
+                    ...(Array.isArray(spec.projectFiles) ? spec.projectFiles.map((entry: any) => typeof entry === "string" ? entry : entry?.path) : [])
+                  ];
+                  const core = new Set(["game-spec.json", "game.html", "game.css", "game.js"]);
+                  const safe = (path: unknown): path is string => typeof path === "string" && path.length <= 240 &&
+                    !path.startsWith("/") && !/^[a-zA-Z]:/.test(path) &&
+                    !path.replace(/\\\\/g, "/").split("/").some(part => !part || part === "." || part === "..") &&
+                    !/[<>:"|?*\\u0000-\\u001f]/.test(path) &&
+                    /\\.(json|svg|png|jpe?g|webp|gif|obj|mtl|glsl|txt|md|gd|ts|wav|mp3|ogg|woff2?)$/i.test(path);
+                  const extras = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path) && !stagedFiles[path]))].slice(0, 96);
+                  if (extras.length) {
+                    const oldLastStage = stagePaths.length - 1;
+                    stagePaths = [...stagePaths, ...extras];
+                    const newTasks = extras.map((path, extraIndex) => {
+                      const taskIndex = 4 + extraIndex;
+                      return { id: "stage-" + taskIndex, title: "Generate " + path, kind: "implement" as const, dependsOn: [extraIndex === 0 ? "stage-" + oldLastStage : "stage-" + (taskIndex - 1)], attempts: 0, status: "queued" as const, files: [path], acceptance: ["Asset/module content is complete", "Path is safe and content stays within file budget"] };
+                    });
+                    activeBuildRun = {
+                      ...activeBuildRun,
+                      tasks: [
+                        ...activeBuildRun.tasks.filter(task => task.id !== "validate-assembled"),
+                        ...newTasks,
+                        ...activeBuildRun.tasks.filter(task => task.id === "validate-assembled").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)], files: [...stagePaths] }))
+                      ]
+                    };
+                    addActivity("Expanded the build plan with " + extras.length + " additional dependency-aware project files from game-spec.json.");
+                  }
+                } catch {
+                  addActivity("The spec did not define additional files; continuing with the four core runtime files.");
+                }
+              }
               persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
               addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
             } catch (stageException) {
