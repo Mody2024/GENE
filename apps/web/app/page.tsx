@@ -114,6 +114,7 @@ export default function Home() {
   const [project, setProject] = useState<GeneProject | null>(null);
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
+  const [planIntent, setPlanIntent] = useState<"create" | "update">("create");
   const [busy, setBusy] = useState(false);
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
@@ -336,7 +337,7 @@ export default function Home() {
     if (!operationOverride) {
       if (searchMode) operation = "research";
       else if (isConversationOnly(prompt)) operation = "chat";
-      else if (project.mode === "plan") operation = project.question ? "interview" : project.initialPrompt ? "plan" : "interview";
+      else if (project.mode === "plan") operation = project.question && planIntent === "create" ? "interview" : project.initialPrompt || planIntent === "update" ? "plan" : "interview";
       else if (!Object.keys(project.files).length) operation = "build";
       else operation = "edit";
     }
@@ -399,10 +400,8 @@ export default function Home() {
         activeBuildRun = createBuildRun({
           projectId: nextProject.id,
           tasks: buildTasks,
-          prototypeMinutes: 20,
-          fullGameMinutes: 120,
           prototypeObjectives: ["Boot and render", "Core controls and gameplay loop", "Reach a meaningful prototype conclusion"],
-          fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct missions/levels beyond the prototype", "Progression and challenge variation", "Complete full-game ending"])
+          fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct content beyond the playable prototype", "Meaningful progression and challenge variation", "Complete full-game ending"])
         });
         activeBuildRun = { ...activeBuildRun, status: "running" };
         setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
@@ -459,6 +458,12 @@ export default function Home() {
               if (stagePath === "game-spec.json") {
                 try {
                   const spec = JSON.parse(file.content);
+                  const prototypeTarget = Number(spec.prototype?.targetMinutes);
+                  const fullGameTarget = Number(spec.fullGame?.targetMinutes);
+                  activeBuildRun = activeBuildRun ? { ...activeBuildRun,
+                    prototype: { ...activeBuildRun.prototype!, targetMinutes: Number.isFinite(prototypeTarget) && prototypeTarget > 0 ? prototypeTarget : undefined },
+                    fullGame: { ...activeBuildRun.fullGame!, targetMinutes: Number.isFinite(fullGameTarget) && fullGameTarget > 0 ? fullGameTarget : undefined }
+                  } : activeBuildRun;
                   const candidates = [
                     ...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []),
                     ...(Array.isArray(spec.projectFiles) ? spec.projectFiles.map((entry: any) => typeof entry === "string" ? entry : entry?.path) : [])
@@ -1647,6 +1652,10 @@ export default function Home() {
                 <div ref={chatEnd} />
               </div>
               <form className="composer" onSubmit={onSubmit}>
+                {project.mode === "plan" && <div className="composer-tools plan-intent-switch" role="group" aria-label="Planning intent">
+                  <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} onClick={() => setPlanIntent("create")}>Plan a new project</button>
+                  <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}>Plan an update</button>
+                </div>
                 <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? "Describe your game or answer GENE's question…" : hasGame ? "Ask GENE to change a mechanic, art, level, or performance…" : "Describe the game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); } }} />
@@ -1663,7 +1672,7 @@ export default function Home() {
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
               {project.buildRun && <div className="build-check-panel">
-                <div className="build-check-head"><div><div className="eyebrow">GENE 1.4 FLASH</div><h3>Build checkpoints</h3><p>Prototype target: ~{project.buildRun.prototype?.targetMinutes ?? 20} min · Full-game target: ~{project.buildRun.fullGame?.targetMinutes ?? 120} min</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="build-check-head"><div><div className="eyebrow">GENE 1.4 FLASH</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
                 <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
                 <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
               </div>}
