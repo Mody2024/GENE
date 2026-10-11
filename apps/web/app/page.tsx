@@ -455,7 +455,9 @@ export default function Home() {
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
-                : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
+                : /\\.js$/i.test(stagePath) && stagePath !== "game.js"
+                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose a meaningful API under a unique key such as window.GeneModules.input or window.GeneModules.progression. Keep it self-contained and safe if initialized before game.js. Match the game's actual controls/mechanics; do not add fake placeholder APIs."
+                  : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
               const stageResponse = await fetch("/api/agent", {
@@ -496,17 +498,43 @@ export default function Home() {
                     prototype: { ...activeBuildRun.prototype!, targetMinutes: Number.isFinite(prototypeTarget) && prototypeTarget > 0 ? prototypeTarget : undefined },
                     fullGame: { ...activeBuildRun.fullGame!, targetMinutes: Number.isFinite(fullGameTarget) && fullGameTarget > 0 ? fullGameTarget : undefined }
                   } : activeBuildRun;
-                  const candidates = [
+                  // The model's manifest is advisory, not the only source of architecture.
+                  // Derive a project-specific module plan from the actual scope so substantial builds
+                  // don't silently collapse into the four-file boot contract.
+                  const scopeText = [
+                    nextProject.initialPrompt,
+                    ...(stagedPlan?.tasks || []),
+                    ...(stagedPlan?.mechanics || [])
+                  ].join(" ").toLowerCase();
+                  const plannedModules: string[] = [];
+                  if (nextProject.kind === "app") {
+                    if (scopeText.length > 180 || (stagedPlan?.tasks || []).length >= 4) {
+                      plannedModules.push("src/app/state.js", "src/app/validation.js");
+                    }
+                    if (/save|persist|offline|cart|inventory|account|profile|settings|dashboard|history/.test(scopeText)) plannedModules.push("src/app/persistence.js");
+                    if (/search|filter|sort|catalog|marketplace|products|library/.test(scopeText)) plannedModules.push("src/app/search.js");
+                  } else {
+                    plannedModules.push("src/systems/input.js", "src/systems/progression.js");
+                    if (/story|dialogue|quest|mission|chapter|level|campaign|narrative|cutscene/.test(scopeText)) plannedModules.push("src/systems/narrative.js");
+                    if (/combat|enemy|enemies|boss|weapon|shoot|attack|damage|survival/.test(scopeText)) plannedModules.push("src/systems/combat.js");
+                    if (/3d|third.person|first.person|open.world|driving|vehicle|world.exploration/.test(scopeText)) plannedModules.push("src/systems/world.js", "src/systems/camera.js");
+                    if (/co.op|local.multiplayer|two.player|split.screen|controller|gamepad/.test(scopeText)) plannedModules.push("src/systems/multiplayer.js");
+                    if (/puzzle|craft|build|upgrade|skill.tree|resource|economy/.test(scopeText)) plannedModules.push("src/systems/economy.js");
+                  }
+                  const modelCandidates = [
                     ...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []),
                     ...(Array.isArray(spec.projectFiles) ? spec.projectFiles.map((entry: any) => typeof entry === "string" ? entry : entry?.path) : [])
                   ];
+                  spec.additionalFiles = [...new Set([...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []), ...plannedModules])];
+                  stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
+                  const candidates = [...modelCandidates, ...plannedModules];
                   const core = new Set(["game-spec.json", "game.html", "game.css", "game.js"]);
                   const safe = (path: unknown): path is string => {
                     if (typeof path !== "string" || path.length > 240 || path.includes(String.fromCharCode(92)) || path.startsWith("/") ||
                       /^[a-zA-Z]:/.test(path) || path.split("/").some(part => !part || part === "." || part === "..") ||
                       path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
                     const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
-                    return new Set(["json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
+                    return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
                   const extras = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path) && !stagedFiles[path]))].slice(0, 96);
                   if (extras.length) {
