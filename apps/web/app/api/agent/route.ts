@@ -8,12 +8,12 @@ export const maxDuration = 60;
 const CORE_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
 const MAX_PROJECT_FILES = 100;
 function isSafeProjectPath(value: unknown): value is string {
-  if (typeof value !== "string" || !value.trim() || value.length > 240) return false;
-  const path = value.replace(/\\\\/g, "/");
-  if (path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
-      path.split("/").some(part => !part || part === "." || part === "..") ||
-      /[<>:"|?*\\u0000-\\u001f]/.test(path)) return false;
-  return /\\.(html|css|js|mjs|cjs|json|svg|png|jpe?g|webp|gif|obj|mtl|glsl|txt|md|gd|ts|wav|mp3|ogg|woff2?)$/i.test(path);
+  if (typeof value !== "string" || !value.trim() || value.length > 240 || value.includes(String.fromCharCode(92))) return false;
+  if (value.startsWith("/") || /^[a-zA-Z]:/.test(value) ||
+      value.split("/").some(part => !part || part === "." || part === "..") ||
+      value.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
+  const extension = value.slice(value.lastIndexOf(".") + 1).toLowerCase();
+  return new Set(["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
 }
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 18;
