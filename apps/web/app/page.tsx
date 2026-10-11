@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
-import { checkpointBuild, createBuildRun, setTaskStatus } from "./lib/build-orchestrator";
+import { checkpointBuild, createBuildRun, recoverFromCheckpoint, resumeBuild, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
@@ -412,8 +412,17 @@ export default function Home() {
       if (operation === "build" || operation === "surprise") {
         // Generate small, independently validated files rather than asking Gemini
         // to fit an entire project into one large JSON response.
-        let stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
-        const stagedFiles: Record<string, string> = { ...nextProject.files };
+        const recovery = nextProject.buildRun?.checkpoints?.length
+          ? recoverFromCheckpoint(nextProject.buildRun)
+          : null;
+        let stagePaths = recovery
+          ? recovery.run.tasks
+              .filter(task => task.id.startsWith("stage-") && task.files.length > 0)
+              .sort((a, b) => Number(a.id.slice(6)) - Number(b.id.slice(6)))
+              .map(task => task.files[0])
+          : ["game-spec.json", "game.html", "game.css", "game.js"];
+        if (!stagePaths.length) stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
+        const stagedFiles: Record<string, string> = { ...(recovery?.files || nextProject.files) };
         let stagedPlan = nextProject.plan || null;
         let modelUsed = aiModel;
         const buildTasks = [
@@ -428,13 +437,24 @@ export default function Home() {
           { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: ["game.js", "game.css"], acceptance: [nextProject.kind === "app" ? "Primary user flows have working interactions and failure states" : "Full-game content extends beyond the prototype with progression and a complete ending", "Existing working controls and mechanics are preserved"] },
           { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["final-content-pass"], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
         ];
-        activeBuildRun = createBuildRun({
-          projectId: nextProject.id,
-          tasks: buildTasks,
-          prototypeObjectives: ["Boot and render", "Core controls and gameplay loop", "Reach a meaningful prototype conclusion"],
-          fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct content beyond the playable prototype", "Meaningful progression and challenge variation", "Complete full-game ending"])
-        });
+        activeBuildRun = recovery
+          ? {
+              ...resumeBuild(recovery.run),
+              tasks: resumeBuild(recovery.run).tasks.map(task =>
+                task.id === "final-content-pass" || task.id === "validate-assembled"
+                  ? { ...task, status: "queued" as const, lastError: undefined }
+                  : task
+              ),
+              status: "running"
+            }
+          : createBuildRun({
+              projectId: nextProject.id,
+              tasks: buildTasks,
+              prototypeObjectives: ["Boot and render", "Core controls and gameplay loop", "Reach a meaningful prototype conclusion"],
+              fullGameContent: (nextProject.plan?.tasks || []).concat(["Distinct content beyond the playable prototype", "Meaningful progression and challenge variation", "Complete full-game ending"])
+            });
         activeBuildRun = { ...activeBuildRun, status: "running" };
+        if (recovery) addActivity("Resuming from checkpoint " + (recovery.run.checkpoints[recovery.run.checkpoints.length - 1]?.id || "latest") + "; previously passed file stages will be preserved.");
         setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
         addActivity("GENE 1.4 coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
         const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
@@ -444,6 +464,10 @@ export default function Home() {
         let finalContentPassSucceeded = false;
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
+          if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") {
+            addActivity("Checkpoint recovery: kept completed stage " + stagePath + " unchanged.");
+            continue;
+          }
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
