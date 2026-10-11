@@ -344,3 +344,6 @@ assert.ok(prompts.includes("NOT a four-file project limit") && prompts.includes(
 assert.ok(page.includes("stagePaths = [...stagePaths, ...extras]"), "staged builds expand from the model-generated file manifest");
 assert.ok(page.includes("additionalFiles") && page.includes("dependency-aware project files"), "additional project files become tracked build tasks");
 assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("Never assume a standalone .js module is automatically executed"), "dynamic assets are planned without claiming unintegrated modules run");
+
+assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
+assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
