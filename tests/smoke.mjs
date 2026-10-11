@@ -350,3 +350,70 @@ assert.ok(api.includes("additionalFiles must be a bounded array") && api.include
 
 assert.ok(api.includes("value.includes(String.fromCharCode(92))") && api.includes("value.split(\"\").some(char => char.charCodeAt(0) < 32"), "project path validation rejects backslashes and control characters");
 assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includes("additionalFiles"), "dynamic stage path validation uses the same safe relative-path policy");
+
+
+// GENE 1.4 executable utility tests (not only source-string assertions).
+const tsCompiler = await import("typescript");
+const patchSource = read("apps/web/app/lib/patch-engine.ts");
+const patchJs = tsCompiler.transpileModule(patchSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const patchModule = await import("data:text/javascript;base64," + Buffer.from(patchJs).toString("base64"));
+const { applyPatchBatch } = patchModule;
+const originalTree = { "src/main.js": "const speed = 2;\nstart();", "README.md": "GENE test" };
+const changedTree = applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 4;" },
+  { op: "add_file", path: "data/levels.json", content: "{\\"levels\\":[1,2]}" }
+]);
+assert.equal(changedTree.files["src/main.js"], "const speed = 4;\nstart();", "exact-context edits update only the requested source span");
+assert.equal(changedTree.files["data/levels.json"], "{\\"levels\\":[1,2]}", "atomic batches can add project data files");
+assert.equal(originalTree["src/main.js"], "const speed = 2;\nstart();", "patching never mutates the caller's known-good tree");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 2;", replacement: "const speed = 5;" },
+  { op: "delete_file", path: "missing.js" }
+]), /Cannot delete a missing file/, "one invalid operation rejects the whole patch batch");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "src/main.js", expected: "const speed = 9;", replacement: "broken" }
+]), /stale or missing/, "stale edit context is rejected");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "add_file", path: "../outside.js", content: "unsafe" }
+]), /Unsafe project path/, "path traversal is rejected");
+const renamedTree = applyPatchBatch(originalTree, [{ op: "rename_file", path: "README.md", newPath: "docs/README.md" }]);
+assert.equal(renamedTree.files["docs/README.md"], "GENE test", "rename preserves file content");
+assert.equal(renamedTree.files["README.md"], undefined, "rename removes the old manifest path");
+const diffTree = applyPatchBatch(originalTree, [{
+  op: "apply_diff", path: "src/main.js",
+  patch: "@@ -1,2 +1,2 @@\n-const speed = 2;\n+const speed = 3;\n start();"
+}]);
+assert.equal(diffTree.files["src/main.js"], "const speed = 3;\nstart();", "unified diffs apply only when their source context matches");
+
+const coordinatorSource = read("apps/web/app/lib/build-orchestrator.ts");
+const coordinatorJs = tsCompiler.transpileModule(coordinatorSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const coordinator = await import("data:text/javascript;base64," + Buffer.from(coordinatorJs).toString("base64"));
+const baseRun = coordinator.createBuildRun({
+  projectId: "test", now: "2026-01-01T00:00:00.000Z",
+  tasks: [
+    { id: "design", title: "Design", kind: "design", acceptance: ["Spec is valid"] },
+    { id: "core", title: "Core", kind: "implement", dependsOn: ["design"], files: ["game.js"], acceptance: ["Core loop works"] }
+  ],
+  prototypeMinutes: 20, fullGameMinutes: 120,
+  fullGameContent: ["Extra missions", "Distinct ending"]
+});
+assert.deepEqual(coordinator.getReadyTasks(baseRun).map(task => task.id), ["design"], "only dependency-ready tasks may start");
+assert.throws(() => coordinator.createBuildRun({ projectId: "cycle", tasks: [
+  { id: "a", title: "A", kind: "design", dependsOn: ["b"], acceptance: [] },
+  { id: "b", title: "B", kind: "implement", dependsOn: ["a"], acceptance: [] }
+] }), /cycle detected/, "dependency cycles are rejected");
+let checkpointRun = coordinator.setTaskStatus(baseRun, "design", "running");
+checkpointRun = coordinator.setTaskStatus(checkpointRun, "design", "passed");
+checkpointRun = coordinator.setTaskStatus(checkpointRun, "core", "running");
+checkpointRun = coordinator.checkpointBuild(checkpointRun, { "game.js": "known-good" }, { passed: ["design"], failed: [] }, "task-complete", "Resume at core");
+const recovered = coordinator.recoverFromCheckpoint(checkpointRun, checkpointRun.checkpoints[0].id);
+assert.equal(recovered.files["game.js"], "known-good", "recovery restores the checkpoint source snapshot");
+assert.equal(recovered.run.tasks.find(task => task.id === "design").status, "passed", "recovery preserves completed tasks");
+assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queued", "recovery requeues unfinished tasks");
+assert.equal(baseRun.prototype.targetMinutes, 20, "prototype target is distinct and explicit");
+assert.equal(baseRun.fullGame.targetMinutes, 120, "full-game target is distinct and explicit");
+console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");
