@@ -343,7 +343,7 @@ assert.ok(prompts.includes("NOT a four-file project limit") && prompts.includes(
 
 assert.ok(page.includes("stagePaths = [...stagePaths, ...extras]"), "staged builds expand from the model-generated file manifest");
 assert.ok(page.includes("additionalFiles") && page.includes("dependency-aware project files"), "additional project files become tracked build tasks");
-assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("Never assume a standalone .js module is automatically executed"), "dynamic assets are planned without claiming unintegrated modules run");
+assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("must not use import/export syntax") && prompts.includes("CORE RUNTIME CONTRACT:"), "dynamic modules follow the actual preview loading contract");
 
 assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
 assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
@@ -433,7 +433,7 @@ assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GEN
 assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
-assert.ok(page.includes("pendingBuildRequests.current.push(text.trim())") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
+assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
