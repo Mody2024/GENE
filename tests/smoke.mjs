@@ -450,3 +450,13 @@ assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""
 assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
 assert.ok(prompts.includes("must not use import/export syntax") && prompts.includes("window.GeneModules"), "generated modules follow the live preview's script-loading contract");
 assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/script>" : "")'), "generated modules are injected before the core runtime in both app and game previews");
+
+
+// GENE 1.4 regressions: the builder must grow beyond the four boot files,
+// run a real one-question-at-a-time interview, and recover rather than restart.
+assert.ok(page.includes('project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"'), "new Plan Mode projects begin with the interview instead of jumping straight to a shallow plan");
+assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
+assert.ok(page.includes('new Set(["json","js","svg"') && page.includes('/\\.js$/i.test(stagePath)'), "JavaScript modules are accepted and scheduled as real generation stages");
+assert.ok(page.includes("recoverFromCheckpoint(nextProject.buildRun)") && page.includes("Checkpoint recovery: kept completed stage"), "failed builds restore the latest checkpoint and skip already-passed stages");
+assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt <= 3'), "users can resume a failed build and final expansion retries length/provider failures");
+assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
