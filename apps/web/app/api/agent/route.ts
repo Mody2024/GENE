@@ -200,14 +200,18 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
     throw new Error("Plan/research mode is read-only. Source file output was rejected.");
   }
+  if (files.length > MAX_PROJECT_FILES) throw new Error("Project exceeds " + MAX_PROJECT_FILES + " files. Split the build into smaller dependency-aware batches.");
   const normalized: Array<{ path: string; content: string }> = [];
   const seen = new Set<string>();
+  let totalCharacters = 0;
   for (const file of files) {
     if (!file || typeof file.path !== "string" || typeof file.content !== "string") throw new Error("A generated file was malformed.");
     if (!isSafeProjectPath(file.path)) throw new Error("Blocked unsafe or unsupported generated path: " + file.path);
     if (seen.has(file.path)) throw new Error("The model returned duplicate source path: " + file.path);
     seen.add(file.path);
     if (file.content.length > 500_000) throw new Error("Generated file exceeds the 500 KB safety limit.");
+    totalCharacters += file.content.length;
+    if (totalCharacters > 8_000_000) throw new Error("Project text exceeds the 8 MB safety budget. Keep large assets as files rather than embedding them into source.");
     normalized.push(file);
   }
   for (const file of normalized) {
@@ -222,6 +226,18 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     new Function(byPath["game.js"]);
     const spec = JSON.parse(byPath["game-spec.json"]);
     if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: project spec must be a JSON object.");
+    if (spec.additionalFiles !== undefined) {
+      if (!Array.isArray(spec.additionalFiles) || spec.additionalFiles.length > MAX_PROJECT_FILES - CORE_FILES.size) {
+        throw new Error("Build rejected: additionalFiles must be a bounded array of relative project paths.");
+      }
+      const seenAdditional = new Set<string>();
+      for (const path of spec.additionalFiles) {
+        if (!isSafeProjectPath(path) || CORE_FILES.has(path) || seenAdditional.has(path)) {
+          throw new Error("Build rejected: additionalFiles contains an unsafe, duplicate, or core path.");
+        }
+        seenAdditional.add(path);
+      }
+    }
     if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: project spec needs a title.");
     if (spec.kind && spec.kind !== projectKind) throw new Error("Build rejected: project spec kind does not match the selected project type.");
     const allowedEngine = projectKind === "app" ? spec.engine === "webapp" : (spec.engine === "canvas2d" || spec.engine === "webgl3d");
