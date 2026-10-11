@@ -423,6 +423,6 @@ assert.ok(api.includes("const patchOperations = files.map") && api.includes("con
 
 assert.ok(prompts.includes("Plan an update") || prompts.includes("UPDATE PLAN"), "planning prompts support updates to existing projects");
 assert.ok(prompts.includes("Plan only") && prompts.includes("PLANNING INTENT"), "plan mode distinguishes new-project planning from update planning");
-assert.ok(page14.includes('aria-label="Planning intent"') && page14.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
-assert.ok(!page14.includes("prototypeMinutes: 20") && !page14.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
-assert.ok(page14.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
+assert.ok(!page.includes("prototypeMinutes: 20") && !page.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
+assert.ok(page.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
