@@ -488,4 +488,4 @@ assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("only browser 
 assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline") && prompts.includes("assets/<asset-id>/model.obj"), "asset prompts match the runtime's actual Forge asset paths");
 
 assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
-assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("assets\\/") === false, "asset staging is gated by an explicit runtime-loadable path contract");
+assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
