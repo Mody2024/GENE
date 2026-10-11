@@ -385,16 +385,34 @@ export async function POST(request: NextRequest) {
           }
         });
       }
+      const answersSummary = Object.entries(answers).map(([key, value]) => key + ": " + String(value)).join("; ");
+      const camera = String(answers.camera || "");
+      const originalText = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+      const is3d = projectKind === "game" && (/3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(originalText) || /3d|first-person|third-person/i.test(camera));
+      const isApp = projectKind === "app";
+      const starterPlan = {
+        title: originalText.split(/[.!?]/)[0].slice(0, 64) || (isApp ? "Untitled app" : "Untitled game"),
+        kind: projectKind,
+        summary: "Built-in starter plan from your interview answers (" + answersSummary.slice(0, 420) + "). This is a rule-based plan, not AI-generated.",
+        engine: isApp ? "webapp" : is3d ? "webgl3d" : "canvas2d",
+        tasks: isApp
+          ? ["Define primary user flow and responsive navigation", "Build the visual system and semantic screens", "Implement persistent state and form validation as required", "Wire every interactive control to visible state changes", "Add loading, empty, success, and recoverable error states", "Validate keyboard/touch behavior and all primary flows"]
+          : ["Build a playable core loop with the selected perspective and controls", "Implement input, collisions, state transitions, and feedback", "Create distinct stages, challenges, or missions beyond the prototype", "Add progression, unlocks, and project-specific content", "Implement pause, restart, win/loss, and a complete ending", "Validate gameplay, controls, runtime, and performance"],
+        mechanics: isApp
+          ? ["Responsive navigation", "State and validation", "Accessible interactive controls", "Recoverable user feedback"]
+          : [String(answers.genre || "Core genre loop"), String(answers.content || "Progression and distinct content"), String(answers.controls || "Responsive controls"), "Clear completion and restart rules"],
+        performanceBudget: { targetFps: 60, maxEnemies: isApp ? 0 : 8, maxObjects: 160, maxParticles: isApp ? 0 : 60 }
+      };
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "Interview complete. I can prepare a starter outline from your answers, but real AI planning and code generation require a configured provider key.",
+          reply: "Interview complete. This is a rule-based starter plan built from your answers. AI-powered planning and code generation still require a configured provider key.",
           question: null,
-          plan: null,
+          plan: starterPlan,
           files: [],
-          complete: false,
-          needsUserDecision: true
+          complete: true,
+          needsUserDecision: false
         }
       });
     }
