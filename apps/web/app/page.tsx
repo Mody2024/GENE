@@ -464,11 +464,13 @@ export default function Home() {
                     ...(Array.isArray(spec.projectFiles) ? spec.projectFiles.map((entry: any) => typeof entry === "string" ? entry : entry?.path) : [])
                   ];
                   const core = new Set(["game-spec.json", "game.html", "game.css", "game.js"]);
-                  const safe = (path: unknown): path is string => typeof path === "string" && path.length <= 240 &&
-                    !path.startsWith("/") && !/^[a-zA-Z]:/.test(path) &&
-                    !path.replace(/\\\\/g, "/").split("/").some(part => !part || part === "." || part === "..") &&
-                    !/[<>:"|?*\\u0000-\\u001f]/.test(path) &&
-                    /\\.(json|svg|png|jpe?g|webp|gif|obj|mtl|glsl|txt|md|gd|ts|wav|mp3|ogg|woff2?)$/i.test(path);
+                  const safe = (path: unknown): path is string => {
+                    if (typeof path !== "string" || path.length > 240 || path.includes(String.fromCharCode(92)) || path.startsWith("/") ||
+                      /^[a-zA-Z]:/.test(path) || path.split("/").some(part => !part || part === "." || part === "..") ||
+                      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
+                    const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+                    return new Set(["json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
+                  };
                   const extras = [...new Set(candidates.filter((path: unknown): path is string => safe(path) && !core.has(path) && !stagedFiles[path]))].slice(0, 96);
                   if (extras.length) {
                     const oldLastStage = stagePaths.length - 1;
