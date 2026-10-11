@@ -610,9 +610,7 @@ export default function Home() {
               }
               persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
               addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
-              if (stagePath === "game.js" && index === 3) {
-                // Publish the verified core files to the live workspace before optional modules
-                // and full-game expansion continue, so the user can play and chat during the build.
+              if (stagePath === "game.js" && ["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(stagedFiles[path]))) {
                 activeBuildRun = {
                   ...activeBuildRun,
                   prototype: {
@@ -624,27 +622,9 @@ export default function Home() {
                 setProject(current => current && current.id === nextProject.id ? {
                   ...current,
                   files: { ...current.files, ...stagedFiles },
-                  buildRun: activeBuildRun,
-                  livingPreview: {
-                    status: "playable",
-                    lastKnownGoodVersion: current.versions[0]?.number,
-                    updatedAt: now(),
-                    runtimeErrors: [],
-                    currentObjectives: activeBuildRun?.prototype?.completedObjectives || [],
-                    canContinuePlaying: true
-                  }
-                } : current);
-                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
-                addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
-              }
-              if (stagePath === "game.js" && ["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(stagedFiles[path])) &&
-                  !nextProject.versions.length && !nextProject.files["game.js"]) {
-                setProject(current => current && current.id === nextProject.id ? {
-                  ...current,
-                  files: { ...stagedFiles },
                   plan: stagedPlan,
                   buildRun: activeBuildRun,
-                  livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Playable core slice ready; full project work continues"], canContinuePlaying: false },
+                  livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: true },
                   updatedAt: now()
                 } : current);
                 setPreviewOpen(true);
@@ -652,8 +632,8 @@ export default function Home() {
                 setRuntimeState("loaded");
                 setSection("chat");
                 setCanQueueBuildRequests(true);
-                setBusy(false);
-                addActivity("Core prototype source is now in the live preview. Continuing the remaining planned project stages; new requests can be queued safely.");
+                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
+                addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
               }
             } catch (stageException) {
               stageError = stageException instanceof Error ? stageException.message : "Network error during stage.";
