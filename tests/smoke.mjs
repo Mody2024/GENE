@@ -438,3 +438,7 @@ assert.ok(page.includes("Playable core slice ready; full project work continues"
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("chat stays responsive and code changes queue safely"), "the workspace advertises responsive chat and safe queued edits during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
+
+assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
+assert.ok(page.includes("FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS") && page.includes("Final content pass completed") === false, "build pipeline requests a distinct full-game expansion pass rather than treating the prototype as the finished game");
+assert.ok(page.includes("final-content-pass") && page.includes("Expand the prototype into the full game"), "build task ledger includes a separate full-game expansion stage");
