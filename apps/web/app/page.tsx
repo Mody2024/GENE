@@ -410,8 +410,10 @@ export default function Home() {
     if (parallelReadOnlyRequest) setParallelChatInProgress(true);
     else setBusy(true);
     setNotice("");
-    setRuntimeState("idle");
-    setActivity([]);
+    if (!parallelReadOnlyRequest) {
+      setRuntimeState("idle");
+      setActivity([]);
+    }
     if (operation === "build" || operation === "surprise") setShowActivity(true);
     addActivity("Request accepted: " + operation);
     setSection("chat");
