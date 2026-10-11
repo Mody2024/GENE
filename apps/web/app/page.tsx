@@ -377,6 +377,7 @@ export default function Home() {
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
         answers: nextAnswers
       };
+      let activeBuildRun: BuildRun | null = nextProject.buildRun || null;
       if (operation === "build" || operation === "surprise") {
         // Generate small, independently validated files rather than asking Gemini
         // to fit an entire project into one large JSON response.
@@ -395,7 +396,7 @@ export default function Home() {
           })),
           { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
         ];
-        let activeBuildRun: BuildRun = createBuildRun({
+        activeBuildRun = createBuildRun({
           projectId: nextProject.id,
           tasks: buildTasks,
           prototypeMinutes: 20,
@@ -570,7 +571,7 @@ export default function Home() {
       if (!responseOk || !payload?.ok) {
         const error = payload?.error?.message || "GENE could not complete the request.";
         addActivity("Request failed: " + error);
-        const failed = { ...nextProject, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
+        const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
         setProject(failed);
         setNotice(error);
         return;
@@ -632,7 +633,7 @@ export default function Home() {
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : "Network error";
-      const failed = { ...nextProject, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
+      const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [text], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(failed);
       setNotice(text);
       addActivity("Network/response error: " + text);
