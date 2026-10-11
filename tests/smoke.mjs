@@ -437,4 +437,4 @@ assert.ok(page.includes("pendingBuildRequests.current.push(text.trim())") && pag
 assert.ok(page.includes("Playable core slice ready; full project work continues"), "the live preview can become available before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("chat stays responsive and code changes queue safely"), "the workspace advertises responsive chat and safe queued edits during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
-assert.ok(page.includes("Plan an update</button>\\n                </div>}\\n                <div className=\\"composer-toolbar\\""), "plan intent controls close their JSX conditional correctly");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
