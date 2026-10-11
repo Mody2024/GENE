@@ -592,6 +592,41 @@ export default function Home() {
               }
               persistRun(activeBuildRun, "booting", stagedFiles, ["Source response returned for " + stagePath], []);
               addActivity("Checkpoint saved after " + stagePath + " (" + file.content.length.toLocaleString() + " characters)");
+              if (stagePath === "game.js" && index === 3) {
+                // Publish the verified core files to the live workspace before optional modules
+                // and full-game expansion continue, so the user can play and chat during the build.
+                activeBuildRun = {
+                  ...activeBuildRun,
+                  prototype: {
+                    ...activeBuildRun.prototype!,
+                    ready: true,
+                    completedObjectives: ["Core files generated", "Initial source contract passed", "Ready for live preview; remaining build tasks continue"]
+                  }
+                };
+                const prototypeVersion: BuildVersion = {
+                  number: (nextProject.versions[0]?.number || 0) + 1,
+                  label: "Playable prototype checkpoint",
+                  files: { ...stagedFiles },
+                  createdAt: now(),
+                  testSummary: "Core files generated; full-game expansion and browser runtime checks are still in progress."
+                };
+                setProject(current => current && current.id === nextProject.id ? {
+                  ...current,
+                  files: { ...current.files, ...stagedFiles },
+                  versions: [prototypeVersion, ...current.versions],
+                  buildRun: activeBuildRun,
+                  livingPreview: {
+                    status: "playable",
+                    lastKnownGoodVersion: prototypeVersion.number,
+                    updatedAt: now(),
+                    runtimeErrors: [],
+                    currentObjectives: activeBuildRun?.prototype?.completedObjectives || [],
+                    canContinuePlaying: true
+                  }
+                } : current);
+                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
+                addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
+              }
               if (stagePath === "game.js" && ["game-spec.json", "game.html", "game.css", "game.js"].every(path => Boolean(stagedFiles[path])) &&
                   !nextProject.versions.length && !nextProject.files["game.js"]) {
                 setProject(current => current && current.id === nextProject.id ? {
