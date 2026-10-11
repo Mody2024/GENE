@@ -471,6 +471,8 @@ assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.
 assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
 assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec promises touch/pointer controls") && api.includes("spec promises controller support"), "validation checks declared keyboard, touch, and gamepad controls instead of only checking for any event handler");
 assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.js$/i.test(path)") && api.includes("test(runtimeSource)"), "control validation scans all assembled JavaScript modules, not only game.js");
+assert.ok(api.includes("spec.controls = inferred") && api.includes("normalizedSpecChanged") && api.includes("validationFiles"), "final validation deterministically repairs and returns a missing game controls contract");
+assert.ok(page.includes("Add app modules only when the actual requested feature scope needs them") && page.includes("A module is justified by a feature, not by a fixed template"), "additional modules are selected from project scope instead of a fixed file template");
 
 assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
 assert.ok(api.includes(String.raw`if (/\.js$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
