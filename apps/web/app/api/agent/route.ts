@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AGENT_SYSTEM, makeAgentInput } from "../../lib/prompts";
 import type { AgentResponse } from "../../lib/types";
+import { applyPatchBatch } from "../../lib/patch-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ALLOWED_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
+const CORE_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
+const MAX_PROJECT_FILES = 100;
+function isSafeProjectPath(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim() || value.length > 240 || value.includes(String.fromCharCode(92))) return false;
+  if (value.startsWith("/") || /^[a-zA-Z]:/.test(value) ||
+      value.split("/").some(part => !part || part === "." || part === "..") ||
+      value.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
+  const extension = value.slice(value.lastIndexOf(".") + 1).toLowerCase();
+  return new Set(["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
+}
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 18;
 const RATE_WINDOW_MS = 60_000;
@@ -135,12 +145,11 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
   if ((operation === "build" || operation === "surprise") && !result.plan && existingPlan) result.plan = existingPlan;
   if (operation === "build" || operation === "surprise") {
     if (!result.plan) throw new Error("Build response is missing its implementation plan.");
-    if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required game source files.");
+    if (!Array.isArray(result.files) || result.files.length < 4) throw new Error("Build response is missing required core project files.");
   }
   const fileCount = Array.isArray(result.files) ? result.files.length : 0;
-  if ((operation === "edit" || operation === "chat") && fileCount > 4) {
-    throw new Error("Edit response changed too many files for the current browser-game scope.");
-  }
+  if (fileCount > MAX_PROJECT_FILES) throw new Error("This operation returned more than " + MAX_PROJECT_FILES + " files. Split the change into dependency-aware batches.");
+
   return result;
 }
 
@@ -192,18 +201,22 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
     throw new Error("Plan/research mode is read-only. Source file output was rejected.");
   }
+  if (files.length > MAX_PROJECT_FILES) throw new Error("Project exceeds " + MAX_PROJECT_FILES + " files. Split the build into smaller dependency-aware batches.");
   const normalized: Array<{ path: string; content: string }> = [];
   const seen = new Set<string>();
+  let totalCharacters = 0;
   for (const file of files) {
     if (!file || typeof file.path !== "string" || typeof file.content !== "string") throw new Error("A generated file was malformed.");
-    if (!ALLOWED_FILES.has(file.path)) throw new Error("Blocked unexpected generated path: " + file.path);
+    if (!isSafeProjectPath(file.path)) throw new Error("Blocked unsafe or unsupported generated path: " + file.path);
     if (seen.has(file.path)) throw new Error("The model returned duplicate source path: " + file.path);
     seen.add(file.path);
     if (file.content.length > 500_000) throw new Error("Generated file exceeds the 500 KB safety limit.");
+    totalCharacters += file.content.length;
+    if (totalCharacters > 8_000_000) throw new Error("Project text exceeds the 8 MB safety budget. Keep large assets as files rather than embedding them into source.");
     normalized.push(file);
   }
   for (const file of normalized) {
-    if (file.path === "game.js") new Function(file.content);
+    if (/\.js$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
   if (operation === "build" || operation === "surprise") {
@@ -214,6 +227,21 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     new Function(byPath["game.js"]);
     const spec = JSON.parse(byPath["game-spec.json"]);
     if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: project spec must be a JSON object.");
+    if (spec.additionalFiles !== undefined) {
+      if (!Array.isArray(spec.additionalFiles) || spec.additionalFiles.length > MAX_PROJECT_FILES - CORE_FILES.size) {
+        throw new Error("Build rejected: additionalFiles must be a bounded array of relative project paths.");
+      }
+      const seenAdditional = new Set<string>();
+      for (const path of spec.additionalFiles) {
+        if (!isSafeProjectPath(path) || CORE_FILES.has(path) || seenAdditional.has(path)) {
+          throw new Error("Build rejected: additionalFiles contains an unsafe, duplicate, or core path.");
+        }
+        seenAdditional.add(path);
+        if (typeof byPath[path] !== "string" || byPath[path].trim().length < 8) {
+          throw new Error("Build rejected: declared project module/asset " + path + " is missing from the assembled project.");
+        }
+      }
+    }
     if (typeof spec.title !== "string" || !spec.title.trim()) throw new Error("Build rejected: project spec needs a title.");
     if (spec.kind && spec.kind !== projectKind) throw new Error("Build rejected: project spec kind does not match the selected project type.");
     const allowedEngine = projectKind === "app" ? spec.engine === "webapp" : (spec.engine === "canvas2d" || spec.engine === "webgl3d");
@@ -234,6 +262,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         }
       }
       if (!/<(?:main|header|nav|section|form|button|h1|h2|article|div|input|label)\b/i.test(html)) throw new Error("Build rejected: app HTML must contain a real semantic UI, not an empty body.");
+      if (/<(?:button|input|select|textarea|form)\b/i.test(html) && !/(addEventListener|onclick|onsubmit|onchange|oninput)/i.test(js)) {
+        throw new Error("Build rejected: the app declares interactive controls but game.js contains no detectable event handlers. Wire the controls to real state changes and visible validation/results.");
+      }
+      if (js.trim().length < 80) throw new Error("Build rejected: app JavaScript is too small to implement the declared user flows.");
       if (!spec.performanceBudget || !Number.isFinite(spec.performanceBudget.targetFps) || spec.performanceBudget.targetFps < 30 || spec.performanceBudget.targetFps > 120) {
         throw new Error("Build rejected: app spec needs a valid performanceBudget.targetFps (30–120).");
       }
@@ -251,6 +283,16 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
       if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
       if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");
+      const controlsContract = spec.controls.join(" ").toLowerCase();
+      if (/keyboard|wasd|arrow keys|key bindings/.test(controlsContract) && !/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises keyboard controls but game.js has no detectable keyboard input mapping.");
+      }
+      if (/touch|mobile|pointer controls/.test(controlsContract) && !/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises touch/pointer controls but game.js has no detectable touch or pointer handlers.");
+      }
+      if (/gamepad|controller/.test(controlsContract) && !/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(js)) {
+        throw new Error("Build rejected: the spec promises controller support but game.js does not read the Gamepad API.");
+      }
       if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
       if (spec.engine === "webgl3d") {
         if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
@@ -326,36 +368,83 @@ export async function POST(request: NextRequest) {
   if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
     const answers = body.answers || {};
     const known = Object.keys(answers);
-    if (body.operation === "interview" && known.length === 0) {
+    if (body.operation === "interview") {
+      const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+      const appQuestions = [
+        { id: "audience", text: "Who is this app mainly for?", why: "The primary audience determines the main workflow and interface.", choices: ["Just me / personal use", "Customers or the public", "A team or business", "Use smart defaults"] },
+        { id: "platform", text: "Where should the app work first?", why: "This determines responsive layout and the most important input patterns.", choices: ["Desktop web", "Mobile web", "Desktop and mobile", "Use smart defaults"] },
+        { id: "look", text: "What visual direction fits it?", why: "A concrete art direction makes the app feel designed rather than generic.", choices: ["Minimal and professional", "Bold and playful", "Premium glass / editorial", "Use smart defaults"] },
+        { id: "data", text: "Does it need to save user data?", why: "Persistence changes the architecture and validation requirements.", choices: ["No, local temporary state", "Save on this device", "Accounts and cloud data", "Recommend the simplest reliable option"] }
+      ];
+      const gameQuestions = [
+        { id: "genre", text: "What should the core gameplay feel like?", why: "This defines the main loop, challenge, and win/loss rules.", choices: ["Action / combat", "Adventure / story", "Platformer / precision", "Racing / endless runner", "Survival / crafting", "Puzzle / strategy", "Use a creative surprise"] },
+        { id: "camera", text: "What perspective should players use?", why: "Camera and perspective affect controls, level design, and performance.", choices: ["2D side view", "2D top-down", "3D first-person", "3D third-person", "Choose what best fits the idea"] },
+        { id: "content", text: "What should make the full game worth finishing?", why: "The prototype proves the loop; the full game needs distinct content and progression.", choices: ["Story, missions, and an ending", "Levels with new mechanics", "Runs, unlocks, and replayability", "Co-op or competitive play", "A mix chosen for the idea"] },
+        { id: "controls", text: "Which controls must work?", why: "Controls are planned and tested as part of the game, not added as an afterthought.", choices: ["Keyboard and mouse", "Touch controls", "Controller / gamepad", "Keyboard, touch, and controller", "Use the best supported defaults"] }
+      ];
+      const bank = projectKind === "app" ? appQuestions : gameQuestions;
+      const nextQuestion = bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id));
+      if (nextQuestion) {
+        return NextResponse.json({
+          ok: true,
+          aiMode: "fallback",
+          result: {
+            reply: "GENE is using its built-in interview because no AI provider key is available. This is a rule-based question, not an AI-generated answer.",
+            question: nextQuestion,
+            plan: null,
+            files: [],
+            complete: false,
+            needsUserDecision: true
+          }
+        });
+      }
+      const answersSummary = Object.entries(answers).map(([key, value]) => key + ": " + String(value)).join("; ");
+      const camera = String(answers.camera || "");
+      const originalText = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+      const is3d = projectKind === "game" && (/3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(originalText) || /3d|first-person|third-person/i.test(camera));
+      const isApp = projectKind === "app";
+      const starterPlan = {
+        title: originalText.split(/[.!?]/)[0].slice(0, 64) || (isApp ? "Untitled app" : "Untitled game"),
+        kind: projectKind,
+        summary: "Built-in starter plan from your interview answers (" + answersSummary.slice(0, 420) + "). This is a rule-based plan, not AI-generated.",
+        engine: isApp ? "webapp" : is3d ? "webgl3d" : "canvas2d",
+        tasks: isApp
+          ? ["Define primary user flow and responsive navigation", "Build the visual system and semantic screens", "Implement persistent state and form validation as required", "Wire every interactive control to visible state changes", "Add loading, empty, success, and recoverable error states", "Validate keyboard/touch behavior and all primary flows"]
+          : ["Build a playable core loop with the selected perspective and controls", "Implement input, collisions, state transitions, and feedback", "Create distinct stages, challenges, or missions beyond the prototype", "Add progression, unlocks, and project-specific content", "Implement pause, restart, win/loss, and a complete ending", "Validate gameplay, controls, runtime, and performance"],
+        mechanics: isApp
+          ? ["Responsive navigation", "State and validation", "Accessible interactive controls", "Recoverable user feedback"]
+          : [String(answers.genre || "Core genre loop"), String(answers.content || "Progression and distinct content"), String(answers.controls || "Responsive controls"), "Clear completion and restart rules"],
+        performanceBudget: { targetFps: 60, maxEnemies: isApp ? 0 : 8, maxObjects: 160, maxParticles: isApp ? 0 : 60 }
+      };
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "Local preview mode is active. This is one local prompt to demonstrate the interview UI, not Gemini reasoning. Add GEMINI_API_KEY to enable the real adaptive interview.",
-          question: { id: "controls", text: "How should the main character be controlled?", why: "Controls shape the player controller and core game feel.", choices: ["Keyboard", "Mouse / touch", "Keyboard + touch", "Use smart defaults"] },
-          plan: null,
+          reply: "Interview complete. This is a rule-based starter plan built from your answers. AI-powered planning and code generation still require a configured provider key.",
+          question: null,
+          plan: starterPlan,
           files: [],
-          complete: false,
-          needsUserDecision: true
+          complete: true,
+          needsUserDecision: false
         }
       });
     }
-    if (body.operation === "interview" || body.operation === "plan") {
-      const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
+    if (body.operation === "plan") {
+      const original = String(body.message || body.project?.initialPrompt || (projectKind === "app" ? "Untitled app" : "Untitled game"));
       const is3d = projectKind === "game" && /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
         result: {
-          reply: "I prepared a rule-based outline only. This is not a Gemini-generated plan, and no source files were created. Add GEMINI_API_KEY to enable GENE's real game-design reasoning.",
+          reply: "I prepared a rule-based outline only. This is not an AI-generated plan, and no source files were created. Configure a provider key to enable GENE's full planning and code generation.",
           question: null,
           plan: {
             title: original.split(/[.!?]/)[0].slice(0, 64) || (projectKind === "app" ? "Untitled app" : "Untitled game"),
             kind: projectKind,
-            summary: "Local outline based on your request. Review and refine it after connecting Gemini.",
+            summary: "Local outline based on your request. Review and refine it after connecting an AI provider.",
             engine: projectKind === "app" ? "webapp" : is3d ? "webgl3d" : "canvas2d",
-            tasks: ["Create project shell", "Implement player controls", "Build the core mechanic", "Add level-specific obstacles and feedback", "Implement objective and restart", "Validate runtime and performance"],
-            mechanics: ["Player input", "Collision/interaction", "Scoring or objective", "Win/loss and restart"],
+            tasks: ["Define the core loop and acceptance criteria", "Implement the project shell and responsive layout", "Implement the main mechanic and input handling", "Add distinct progression and content", "Implement success, failure, and restart flows", "Run source, interaction, and runtime validation"],
+            mechanics: ["Primary user/game loop", "Input and state management", "Visible feedback and recovery", "Completion and restart"],
             performanceBudget: { targetFps: 60, maxEnemies: projectKind === "app" ? 0 : 8, maxObjects: 160, maxParticles: projectKind === "app" ? 0 : 60 }
           },
           files: [],
@@ -639,7 +728,7 @@ export async function POST(request: NextRequest) {
             stagePath: body.stagePath || null,
             projectKind,
             plan: body.project?.plan || result.plan || null,
-            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => ALLOWED_FILES.has(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
+            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => isSafeProjectPath(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
             candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
           };
           const reviewResponse = await fetch(reviewer.endpoint, {
@@ -681,21 +770,29 @@ export async function POST(request: NextRequest) {
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
-      if (typeof requestedPath !== "string" || !ALLOWED_FILES.has(requestedPath)) {
+      if (!isSafeProjectPath(requestedPath)) {
         throw new Error("Staged build is missing a valid requested file path.");
       }
       if (files.length !== 1 || files[0]?.path !== requestedPath) {
         throw new Error("Staged build must return exactly the requested file: " + requestedPath + ". No files were changed.");
       }
-      if (files[0].content.length > 120_000) {
+      if (files[0].content.length > 500_000) {
         throw new Error("Staged file exceeded the compact 120 KB per-file budget. No files were changed.");
       }
     }
     result.files = files;
     if ((body.operation === "edit" || body.operation === "chat") && files.length > 0 && body.project?.files) {
-      const merged = { ...body.project.files, ...Object.fromEntries(files.map(file => [file.path, file.content])) };
+      const patchOperations = files.map(file => {
+        const previous = body.project.files[file.path];
+        return typeof previous === "string"
+          ? (previous.length
+            ? { op: "replace_exact" as const, path: file.path, expected: previous, replacement: file.content }
+            : { op: "replace_range" as const, path: file.path, startLine: 1, endLine: 1, replacement: file.content })
+          : { op: "add_file" as const, path: file.path, content: file.content };
+      });
+      const patched = applyPatchBatch(body.project.files, patchOperations);
       const mergedFiles = ensureProjectSpecTitle(
-        Object.entries(merged).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
+        Object.entries(patched.files).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
         titleCandidates
       );
       validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
