@@ -566,9 +566,15 @@ export async function POST(request: NextRequest) {
           generationConfig: {
             responseMimeType: "application/json",
             temperature: body.operation === "interview" ? 0.35 : 0.2,
-            maxOutputTokens: attempt.fallback
-              ? (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 6_144 : body.operation === "buildPart" ? 5_120 : 1_536)
-              : (body.operation === "build" || body.operation === "surprise" || body.operation === "edit" ? 10_240 : body.operation === "buildPart" ? 6_144 : 3_072),
+            maxOutputTokens: body.operation === "buildPart"
+              ? (attempt.fallback ? 5_120 : 6_144)
+              : body.operation === "build" || body.operation === "surprise" || body.operation === "edit"
+                ? (attempt.fallback ? 6_144 : 10_240)
+                : body.operation === "plan" && body.extendedPlanning
+                  ? (attempt.fallback ? 3_072 : 6_144)
+                  : body.operation === "enhancePrompt"
+                    ? 2_048
+                    : (attempt.fallback ? 1_536 : 3_072),
             thinkingConfig: { thinkingLevel: attempt.fallback || body.thinking === "fast" ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
