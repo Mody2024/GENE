@@ -71,7 +71,7 @@ assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType:
 
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
-assert.ok(api.includes('body.operation === "buildPart" ? 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget and detects alternate-provider truncation");
+assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget with bounded fallback and detects alternate-provider truncation");
 assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 3') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file three times and explicitly expand chat when preview is hidden");
 assert.ok(css.includes(".workspace.preview-minimized .conversation-scroll") && css.includes(".workspace.preview-minimized .composer"), "minimized preview widens both chat content and composer");
 assert.ok(forge.includes('"wedge" | "torus"') && forge.includes("senior hard-surface/prop artist"), "Forge produces additional wedge/torus geometry with stronger professional modelling guidance");
