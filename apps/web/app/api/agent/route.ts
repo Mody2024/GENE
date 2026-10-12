@@ -363,7 +363,9 @@ export async function POST(request: NextRequest) {
         if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(source)) inferred.push("Keyboard controls: use the displayed movement/action keys.");
         if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(source)) inferred.push("Touch/pointer controls: use the on-screen controls or tap/drag the play area.");
         if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(source)) inferred.push("Gamepad/controller controls: use the mapped controller buttons and sticks.");
-        if (!inferred.length) inferred.push("Keyboard controls: use the displayed movement/action keys.");
+        if (!inferred.length) {
+          throw new Error("Build rejected: game controls are missing because no keyboard, touch, or controller input handlers were found in the assembled JavaScript. Implement real input handlers in game.js or a runtime module, then declare the supported controls in game-spec.json.");
+        }
         spec.controls = inferred;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
         normalizedSpecChanged = true;
