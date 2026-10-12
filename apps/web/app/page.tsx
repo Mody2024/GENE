@@ -246,9 +246,9 @@ export default function Home() {
         const id = String(event.data.id || "");
         const classes = String(event.data.classes || "");
         const label = String(event.data.text || "").trim().slice(0, 90);
-        const target = "<" + tag + (id ? "#" + id : "") + (classes ? "." + classes.split(/\\s+/).slice(0, 3).join(".") : "") + ">" + (label ? " containing “" + label + "”" : "");
+        const target = "<" + tag + (id ? "#" + id : "") + (classes ? "." + classes.split(/\s+/).slice(0, 3).join(".") : "") + ">" + (label ? " containing “" + label + "”" : "");
         setCustomEditMode(false);
-        setDraft(current => (current.trim() ? current.trim() + "\\n\\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
+        setDraft(current => (current.trim() ? current.trim() + "\n\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
         setNotice("Element selected. Describe the exact change in the composer, then send it.");
       }
       if (event.data?.type === "gene-runtime") {
