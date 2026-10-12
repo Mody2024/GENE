@@ -124,6 +124,9 @@ export default function Home() {
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
   const [planIntent, setPlanIntent] = useState<"create" | "update">("create");
+  const [extendedPlanning, setExtendedPlanning] = useState(false);
+  const [enhancingPrompt, setEnhancingPrompt] = useState(false);
+  const [customEditMode, setCustomEditMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [buildInProgress, setBuildInProgress] = useState(false);
   const [canQueueBuildRequests, setCanQueueBuildRequests] = useState(false);
@@ -429,7 +432,8 @@ export default function Home() {
         model: aiModel,
         thinking: nextProject.thinking,
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
-        answers: nextAnswers
+        answers: nextAnswers,
+        extendedPlanning
       };
       let activeBuildRun: BuildRun | null = nextProject.buildRun || null;
       if (operation === "build" || operation === "surprise") {
@@ -1235,6 +1239,40 @@ export default function Home() {
     setProject({ ...project, references: (project.references || []).filter(ref => ref.id !== id), updatedAt: now() });
   }
 
+  async function enhanceDraftPrompt() {
+    if (!project || !draft.trim() || enhancingPrompt || busy) return;
+    setEnhancingPrompt(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "enhancePrompt",
+          mode: "plan",
+          model: aiModel,
+          thinking: project.thinking,
+          extendedPlanning,
+          message: draft.trim(),
+          project,
+          history: project.messages.slice(-8).map(m => ({ role: m.role, content: m.content.slice(0, 900) })),
+          answers: project.answers
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || typeof payload?.result?.reply !== "string") {
+        throw new Error(payload?.error?.message || "GENE couldn't enhance this prompt. Your original text is unchanged.");
+      }
+      setDraft(payload.result.reply.slice(0, 7000));
+      setNotice("Prompt enhanced. Review it before sending; nothing has been built or changed yet.");
+      addActivity("Prompt enhanced; original project files were not changed.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Prompt enhancement failed.");
+    } finally {
+      setEnhancingPrompt(false);
+    }
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void runAgent(draft);
@@ -1914,7 +1952,11 @@ export default function Home() {
                   <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} onClick={() => setPlanIntent("create")}>Plan a new project</button>
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}>Plan an update</button>
                 </div>}
-                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
+                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "WEB RESEARCH · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
+                <div className="composer-tools gene15-tools">
+                  <label className="extended-plan-toggle"><input type="checkbox" checked={extendedPlanning} onChange={e => setExtendedPlanning(e.target.checked)} /> <span><strong>Extended planning</strong><small>Deeper phases, architecture, dependencies and test gates</small></span></label>
+                  <button type="button" title="Improve the draft prompt without starting a build" onClick={enhanceDraftPrompt} disabled={!draft.trim() || enhancingPrompt || busy}>{enhancingPrompt ? "Enhancing…" : "✦ Enhance prompt"}</button>
+                </div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
