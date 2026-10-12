@@ -332,7 +332,7 @@ export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return jsonError("Request body must be valid JSON."); }
 
-  const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise"];
+  const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise", "enhancePrompt"];
   const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
@@ -340,7 +340,11 @@ export async function POST(request: NextRequest) {
     return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing project files.", 409, "GENE_PLAN_MODE_READ_ONLY");
   }
   if (typeof body.message !== "string" || !body.message.trim()) return jsonError("Please enter a message.");
-  if (body.message.length > 12_000) return jsonError("Message is too long (maximum 12,000 characters).");
+  if (body.message.length > (body.operation === "enhancePrompt" ? 24_000 : 12_000)) return jsonError("Message is too long (maximum " + (body.operation === "enhancePrompt" ? "24,000" : "12,000") + " characters).");
+
+  if (body.operation === "enhancePrompt" && body.mode === "build") {
+    return jsonError("Prompt enhancement is read-only. Use Plan mode or run it before starting a build.", 409, "GENE_PROMPT_ENHANCER_READ_ONLY");
+  }
 
   if (body.operation === "validateBuild") {
     try {
@@ -501,7 +505,8 @@ export async function POST(request: NextRequest) {
     project: body.project || null,
     history: Array.isArray(body.history) ? body.history : [],
     answers: body.answers || {},
-    thinking: thinkingLevel
+    thinking: thinkingLevel,
+    extendedPlanning: body.extendedPlanning === true
   });
 
   const parts: Array<Record<string, unknown>> = [{ text: userInput }];
