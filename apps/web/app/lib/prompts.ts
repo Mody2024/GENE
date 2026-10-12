@@ -2,7 +2,7 @@ import { formatGameGuide, selectGameGuide } from "./game-guides";
 import type { GamePlan, GeneProject, Mode } from "./types";
 
 export const AGENT_SYSTEM = [
-  "You are GENE 1.4 FLASH — Better Gene, a senior game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
+  "You are GENE 1.5 FLASH — the unified autonomous builder, a senior game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
   "Be specific, honest, and tool-oriented. Never claim a build, test, model, edit, or publish happened unless the application actually did it.",
   "Never add Gemini, OpenAI, Groq, OpenRouter, GENE, or AI-generated watermarks, badges, footer credits, provider names, or artificial signatures to the generated app/game UI unless the user explicitly asks for them. Make output look like a deliberate professional product designed by a human: consistent design system, considered spacing and typography, coherent iconography, meaningful hierarchy, realistic details, accessible states, responsive layouts, and no generic AI-template filler.",
   "For every project, treat game.html as markup only and game.js as the sole executable source. Never emit script tags or inline JavaScript in game.html. Do not use external CDN dependencies. A game/app should start with a stable core implementation before secondary features are added; edits should be small, targeted, and preserve working existing behavior.",
@@ -36,7 +36,7 @@ export const AGENT_SYSTEM = [
 ].join("\n");
 
 export function makeAgentInput(input: {
-  operation: "interview" | "plan" | "build" | "buildPart" | "edit" | "chat" | "surprise" | "research";
+  operation: "interview" | "plan" | "build" | "buildPart" | "edit" | "chat" | "surprise" | "research" | "enhancePrompt";
   stagePath?: string;
   mode: Mode;
   message: string;
@@ -44,6 +44,7 @@ export function makeAgentInput(input: {
   history?: Array<{ role: string; content: string }>;
   answers?: Record<string, string>;
   thinking?: string;
+  extendedPlanning?: boolean;
 }) {
   const p = input.project;
   const projectKind = p?.kind === "app" ? "app" : "game";
@@ -76,6 +77,7 @@ export function makeAgentInput(input: {
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
+    "EXTENDED PLANNING: " + (input.extendedPlanning ? "ENABLED — produce a deeper, phased, dependency-aware plan with architecture, file/module ownership, detailed gameplay or user flows, content scope, risks, test gates, milestones, and acceptance criteria. Keep the plan useful and structured rather than padded." : "STANDARD — make the plan clear and actionable without unnecessary expansion."),
     "USER MESSAGE: " + input.message,
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
@@ -93,7 +95,9 @@ export function makeAgentInput(input: {
   if (projectKind === "game" && /local multiplayer|couch co.?op|same.?screen multiplayer|split.?screen multiplayer|two.?player|2.?player|versus multiplayer|player.?vs.?player|co.?op game/i.test([input.message, p?.initialPrompt || "", p?.plan?.title || "", ...(p?.plan?.mechanics || [])].join("\\n"))) {
     parts.push("LOCAL MULTIPLAYER ACCEPTANCE CONTRACT: this is a core gameplay requirement, not a menu option. Create independent player objects with separate position/velocity/health/score/cooldowns and explicit input ownership. Default keyboard map: P1 WASD + F action; P2 arrow keys + Enter or Right Shift action. Poll Gamepad API once per frame and assign each connected gamepad to one player slot; do not mirror one controller to all players. Both players must update in the same simulation tick. Show both players at once, use distinct visual identities and player-specific HUD, and include start, pause/resume, win/loss, rematch and reset states. Test by pressing each player's controls independently, then both simultaneously, checking no state leaks between players. Preserve the requested engine, including 3D for 3D requests. Do not claim end-to-end validation until tests actually exercise it.");
   }
+  if (input.operation === "enhancePrompt") parts.push("PROMPT ENHANCER MODE: Do not build anything, do not return source files, and do not ask questions. Rewrite the user's draft into one excellent, specific, implementation-ready prompt for GENE. Preserve the user's intent, fill obvious gaps with sensible defaults, make success criteria testable, specify quality and polish expectations, ask the builder to choose an appropriate file architecture rather than a fixed file count, include working controls/interactions and error states, and avoid inventing external services or features that require credentials. Return the enhanced prompt only in the reply, with no commentary or quotation marks. Keep it within 7000 characters.");
   if (input.operation === "interview") parts.push("Interview: ask exactly one material question next, based on the latest answer and the full known context. Do not return a batch of questions. If no meaningful question remains, return a complete plan.");
+  if (input.operation === "plan" && input.extendedPlanning) parts.push("EXTENDED PLAN FORMAT: return a thorough but navigable blueprint. Include product vision and non-goals; user/player personas and core loop; detailed screens/levels and transitions; mechanics or user flows; visual/art direction; technical architecture and file/module manifest chosen by actual needs (not a fixed number); data/state model; controls/accessibility; performance budget; dependency order; milestone phases; test/acceptance matrix; likely failure modes and mitigations; save/checkpoint/rollback plan. For games, specify content progression, difficulty pacing, enemy/NPC behaviors, level variety, narrative beats, win/loss/replayability. For apps, specify every route/page, actions, validation, persistence boundaries, loading/empty/error states and responsive behavior. Keep unknowns explicit and ask only one question if a critical decision blocks the plan.");
   if (input.operation === "plan") parts.push("Plan only. Give an ordered implementation plan, concrete features/user flows, a project kind and engine (app=webapp, game=canvas2d or webgl3d), and conservative performance budget. Do not return source files. PLANNING INTENT: If the user asks to update, upgrade, improve, extend, fix, redesign, refactor, or add features to an existing project, produce an UPDATE PLAN against the current plan and source files, not a new-game plan. Explicitly list current behavior to preserve, proposed changes, affected files/modules, dependencies, migration/backward-compatibility risks, acceptance checks, rollback/checkpoint strategy, and build order. Do not plan only games: plans must cover web apps too, including routes, screens, forms, validation, persistence/backend needs, accessibility, responsive behavior, and error/empty/loading states. Do not claim changes were applied.");
   if (input.operation === "build") parts.push(projectKind === "app" ? "Generate all four files for a complete, polished and interactive web app, not a mockup. Implement the central user flow and all visible controls, and include project-spec metadata in game-spec.json with kind=app and engine=webapp. If no approved plan exists, include a structured plan alongside the files." : "Generate all four files for a complete playable game, not a mockup. Implement controls, objective, win/loss and restart loop. If no approved plan exists, include a structured plan alongside the files; use the same engine in the plan and spec.");
   if (input.operation === "buildPart") parts.push(
