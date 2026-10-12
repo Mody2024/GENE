@@ -109,3 +109,18 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .preview-reopen-tab:hover{transform:translateY(-1px)}
 @media(max-width:1050px){.workspace.preview-minimized .conversation-scroll{padding-left:clamp(18px,4vw,48px);padding-right:clamp(18px,4vw,48px)}.workspace.preview-minimized .composer{margin-left:clamp(12px,4vw,48px);margin-right:clamp(12px,4vw,48px)}}
 @media(max-width:800px){.workspace.preview-minimized .conversation-scroll{padding:16px 15px}.workspace.preview-minimized .composer{margin:0 10px 9px}.preview-reopen-tab{top:auto;bottom:84px;right:10px;transform:none;padding:10px 12px}.preview-reopen-tab:hover{transform:translateY(-2px)}}
+
+
+/* GENE 1.5 Flash: compact planning controls and clearer adaptive workspace affordances. */
+.gene15-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 10px;border:1px solid var(--border);border-radius:13px;background:color-mix(in srgb,var(--surface-2) 76%,transparent)}
+.extended-plan-toggle{display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;color:var(--text)}
+.extended-plan-toggle input{accent-color:var(--green);width:15px;height:15px;flex:0 0 auto}
+.extended-plan-toggle span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.extended-plan-toggle strong{font-size:11px;font-weight:750}
+.extended-plan-toggle small{font-size:10px;color:var(--muted);line-height:1.4}
+.gene15-tools>button,.preview-actions button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:9px;padding:8px 10px;font-size:10px;font-weight:750;cursor:pointer;transition:background .16s,border-color .16s,transform .16s}
+.gene15-tools>button:hover,.preview-actions button:hover:not(:disabled){border-color:var(--border-strong);background:var(--surface-2);transform:translateY(-1px)}
+.gene15-tools>button:disabled,.preview-actions button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.preview-actions button.tool-active{border-color:var(--green);color:var(--green);background:color-mix(in srgb,var(--green) 11%,var(--surface))}
+.preview-stage:has(iframe) iframe{background:var(--surface)}
+@media(max-width:620px){.gene15-tools{align-items:stretch}.extended-plan-toggle{flex:1 1 100%}.gene15-tools>button{width:100%}.preview-actions button[title^="Select"]{max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}

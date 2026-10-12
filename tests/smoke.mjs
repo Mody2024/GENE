@@ -59,9 +59,19 @@ assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
+assert.ok(prompts.includes("GENE 1.5 FLASH") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.5 supports detailed extended plans and a read-only prompt enhancement operation");
+assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("✦ Enhance prompt"), "workspace exposes extended planning and prompt enhancement controls");
+assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Select to edit"), "live preview supports selecting an element to prepare a targeted edit");
+assert.ok(page.includes("files in the current manifest") && page.includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
+assert.ok(api.includes("body.operation === \"enhancePrompt\"") && api.includes("extendedPlanning: body.extendedPlanning === true"), "API accepts the prompt enhancer operation and extended planning flag");
+assert.ok(api.includes("no keyboard, touch, or controller input handlers were found"), "final validation reports absent input handlers without inventing keyboard controls");
+assert.ok(css.includes(".gene15-tools") && css.includes(".extended-plan-toggle"), "GENE 1.5 planning controls have responsive styling");
+assert.ok(prompts.includes("UNIFIED BRAIN CONTRACT") && prompts.includes("AUTONOMOUS DESIGN PASS") && prompts.includes("CONTINUITY CONTRACT"), "all project types share one continuous autonomous design brain");
+assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType: "application/json" }'), "web research is not forced into JSON MIME mode that can interfere with grounding");
+
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
-assert.ok(api.includes('body.operation === "buildPart" ? 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget and detects alternate-provider truncation");
+assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget with bounded fallback and detects alternate-provider truncation");
 assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 3') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file three times and explicitly expand chat when preview is hidden");
 assert.ok(css.includes(".workspace.preview-minimized .conversation-scroll") && css.includes(".workspace.preview-minimized .composer"), "minimized preview widens both chat content and composer");
 assert.ok(forge.includes('"wedge" | "torus"') && forge.includes("senior hard-surface/prop artist"), "Forge produces additional wedge/torus geometry with stronger professional modelling guidance");
@@ -298,12 +308,17 @@ assert.ok(buildHelper.includes("aes-256-gcm") && buildHelper.includes("prepareEl
 assert.ok(buildUpload.includes("from \"@vercel/blob\"") && buildUpload.includes("access: \"public\""), "binary upload helper returns direct Vercel Blob download URLs");
 assert.ok(page.includes('fetch("/api/builds"') && page.includes('fetch("/api/builds/" + id') && page.includes("binaryBuildLinks"), "workspace submits cloud builds, polls progress, and displays direct binary links");
 assert.ok(css.includes(".binary-build-button") && css.includes(".binary-build-result"), "cloud build UI is styled for desktop and mobile");
+assert.ok(buildHelper.includes('artifactName:"${productName}-Setup-${version}.${ext}"') && !buildHelper.includes('artifactName:"\\${productName}'), "Electron Builder receives valid artifact-name placeholders without path-escaping backslashes");
+assert.ok(buildWorkflow.includes("valid Windows MZ executable header") && buildWorkflow.includes("APK failed ZIP integrity validation") && buildWorkflow.includes("sdkmanager --licenses"), "cloud workers validate EXE/APK outputs and prepare Android SDK licenses");
+assert.ok(buildUpload.includes("createHash(\"sha256\")") && buildUpload.includes("sha256=") && buildUpload.includes("bytes="), "binary upload reports artifact size and SHA-256 checksum");
+assert.ok(buildWorkflow.includes("WINDOWS_SHA256") && buildWorkflow.includes("ANDROID_SHA256") && buildWorkflow.includes("sizeBytes"), "cloud build result records binary integrity metadata per target");
+assert.ok(page.includes("item.sizeBytes") && page.includes("item.sha256"), "download results display verified artifact size and checksum");
 
 
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("stagePath?: string") && prompts.includes("fileBudget") && prompts.includes("isStageRepair"), "staged generation budgets context and repair stages can inspect their failing source");
 assert.ok(api.indexOf('finishReason === "MAX_TOKENS"') < api.indexOf("if (candidate.ok && candidateText.trim())"), "MAX_TOKENS is handled before JSON parsing even when Gemini returns no text");
-assert.ok(api.includes('body.operation === "buildPart" ? 6_144'), "single-file generation uses a larger output budget to reduce truncation");
+assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144'), "single-file generation uses an adaptive larger output budget to reduce truncation");
 assert.ok(forge.includes("beveledBox") && forge.includes("cornerIndices.values()") && forge.includes('"wedge"') && forge.includes('"torus"'), "Forge builds actual chamfered hard-surface, sloped and ring meshes");
 assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includes("up to four local player slots"), "game guides require professional 3D forms and scalable local multiplayer");
 assert.ok(page.includes("GENE 1.3 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.3 exposes build progress and adapts retries after cutoff");
@@ -461,7 +476,7 @@ assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt
 assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
 
 
-assert.ok(page.includes('"src/systems/input.js", "src/systems/progression.js", "src/systems/content.js"'), "all games receive baseline input, progression, and content modules");
+assert.ok(page.includes('plannedModules.push("src/systems/input.js")') && page.includes('plannedModules.push("src/systems/progression.js")') && page.includes('plannedModules.push("src/systems/content.js")'), "game modules are selected from actual scope instead of forcing unnecessary files into every game");
 assert.ok(page.includes('task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] }))'), "dynamic file expansion moves the final content pass behind every generated module");
 assert.ok(api.includes("const gameQuestions = [") && api.includes("const appQuestions = [") && api.includes("bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id))"), "fallback interview asks multiple adaptive questions one at a time");
 assert.ok(api.includes("const original = String(body.message || body.project?.initialPrompt"), "update planning uses the requested update instead of only the original project prompt");

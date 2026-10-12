@@ -29,6 +29,8 @@ jobs:
     timeout-minutes: 30
     outputs:
       download_url: ${{ steps.upload.outputs.url }}
+      size_bytes: ${{ steps.upload.outputs.bytes }}
+      sha256: ${{ steps.upload.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -54,10 +56,14 @@ jobs:
           npm install --no-audit --no-fund
           npm run dist:win
           Pop-Location
-          $exe = Get-ChildItem desktop/dist -File -Filter *.exe | Select-Object -First 1
-          if (-not $exe) { throw "electron-builder finished without an EXE installer." }
+          $exe = Get-ChildItem desktop/dist -File -Filter *.exe | Where-Object { $_.Length -gt 1MB } | Select-Object -First 1
+          if (-not $exe) { throw "electron-builder produced no EXE installer larger than 1 MB. Inspect the dist folder and electron-builder logs." }
+          $stream = [System.IO.File]::OpenRead($exe.FullName)
+          try { $header = New-Object byte[] 2; [void]$stream.Read($header, 0, 2) } finally { $stream.Dispose() }
+          if ($header[0] -ne 77 -or $header[1] -ne 90) { throw "The generated installer does not have a valid Windows MZ executable header." }
           New-Item -ItemType Directory -Force build-output | Out-Null
           Copy-Item $exe.FullName "build-output/GENE-${{ inputs.build_id }}-Setup.exe"
+          Get-Item "build-output/GENE-${{ inputs.build_id }}-Setup.exe" | Select-Object Name,Length | Format-Table -AutoSize
       - name: Upload real EXE to download storage
         id: upload
         shell: pwsh
@@ -72,6 +78,8 @@ jobs:
     timeout-minutes: 35
     outputs:
       download_url: ${{ steps.upload.outputs.url }}
+      size_bytes: ${{ steps.upload.outputs.bytes }}
+      sha256: ${{ steps.upload.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -87,8 +95,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - name: Install Android platform and build tools
-        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+      - name: Accept Android SDK licenses and install build tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
       - name: Decrypt and prepare project
         env:
           GENE_BUILD_ENCRYPTION_KEY: ${{ secrets.GENE_BUILD_ENCRYPTION_KEY }}
@@ -108,7 +118,13 @@ jobs:
           ./gradlew --no-daemon assembleDebug
           cd ../..
           mkdir -p build-output
-          cp android-wrapper/android/app/build/outputs/apk/debug/app-debug.apk "build-output/GENE-${{ inputs.build_id }}-debug.apk"
+          APK="android-wrapper/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK" || { echo "Gradle finished without producing an APK." >&2; exit 1; }
+          APK_BYTES="$(stat -c%s "$APK")"
+          test "$APK_BYTES" -gt 100000 || { echo "APK output is suspiciously small ($APK_BYTES bytes)." >&2; exit 1; }
+          unzip -tq "$APK" || { echo "Generated APK failed ZIP integrity validation." >&2; exit 1; }
+          cp "$APK" "build-output/GENE-${{ inputs.build_id }}-debug.apk"
+          sha256sum "build-output/GENE-${{ inputs.build_id }}-debug.apk"
       - name: Upload real APK to download storage
         id: upload
         env:
@@ -134,15 +150,19 @@ jobs:
           REQUESTED_TARGETS: ${{ inputs.targets }}
           WINDOWS_STATE: ${{ needs.windows.result }}
           WINDOWS_URL: ${{ needs.windows.outputs.download_url }}
+          WINDOWS_BYTES: ${{ needs.windows.outputs.size_bytes }}
+          WINDOWS_SHA256: ${{ needs.windows.outputs.sha256 }}
           ANDROID_STATE: ${{ needs.android.result }}
           ANDROID_URL: ${{ needs.android.outputs.download_url }}
+          ANDROID_BYTES: ${{ needs.android.outputs.size_bytes }}
+          ANDROID_SHA256: ${{ needs.android.outputs.sha256 }}
         with:
           script: |
             const fs = require('fs');
             const buildId = process.env.BUILD_ID;
             const targets = {
-              windows: { status: process.env.WINDOWS_STATE, url: process.env.WINDOWS_URL || null, filename: 'GENE-' + buildId + '-Setup.exe' },
-              android: { status: process.env.ANDROID_STATE, url: process.env.ANDROID_URL || null, filename: 'GENE-' + buildId + '-debug.apk', signing: 'debug' }
+              windows: { status: process.env.WINDOWS_STATE, url: process.env.WINDOWS_URL || null, filename: 'GENE-' + buildId + '-Setup.exe', sizeBytes: Number(process.env.WINDOWS_BYTES || 0) || null, sha256: process.env.WINDOWS_SHA256 || null },
+              android: { status: process.env.ANDROID_STATE, url: process.env.ANDROID_URL || null, filename: 'GENE-' + buildId + '-debug.apk', signing: 'debug', sizeBytes: Number(process.env.ANDROID_BYTES || 0) || null, sha256: process.env.ANDROID_SHA256 || null }
             };
             const requested = process.env.REQUESTED_TARGETS;
             if (requested === 'windows') delete targets.android;

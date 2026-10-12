@@ -64,6 +64,10 @@ The Publish action creates a static Vercel deployment only when these server-sid
 - 2D/3D game runtime targets self-contained Canvas 2D or raw WebGL. Three.js/Phaser adapters, Godot/Unity/Unreal exporters, multiplayer server generation and native EXE builds are not yet implemented.
 - Forge creates real low-poly primitive-composed OBJ assets; it does not yet perform image-to-3D generation, Blender retopology/UV/rigging, advanced textures or texture baking. Mesh creation alone does not claim that the asset has been integrated into a gameplay scene.
 
+## GENE 1.5 Flash Preview roadmap
+
+See [docs/GENE-1.5-PREVIEW-ROADMAP.md](docs/GENE-1.5-PREVIEW-ROADMAP.md) for the preview scope, cloud EXE/APK reliability gates, autonomous brain improvements, and production acceptance criteria.
+
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

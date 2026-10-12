@@ -124,6 +124,9 @@ export default function Home() {
   const [projects, setProjects] = useState<GeneProject[]>([]);
   const [draft, setDraft] = useState("");
   const [planIntent, setPlanIntent] = useState<"create" | "update">("create");
+  const [extendedPlanning, setExtendedPlanning] = useState(false);
+  const [enhancingPrompt, setEnhancingPrompt] = useState(false);
+  const [customEditMode, setCustomEditMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [buildInProgress, setBuildInProgress] = useState(false);
   const [canQueueBuildRequests, setCanQueueBuildRequests] = useState(false);
@@ -136,7 +139,7 @@ export default function Home() {
   const [binaryBuildConfigured, setBinaryBuildConfigured] = useState(false);
   const [binaryBuildId, setBinaryBuildId] = useState("");
   const [binaryBuildRunUrl, setBinaryBuildRunUrl] = useState("");
-  const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string }> | null>(null);
+  const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string; sizeBytes?: number | null; sha256?: string | null }> | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [publishConfigured, setPublishConfigured] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -238,6 +241,16 @@ export default function Home() {
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+      if (event.data?.type === "gene-custom-selection") {
+        const tag = String(event.data.tag || "element").toLowerCase();
+        const id = String(event.data.id || "");
+        const classes = String(event.data.classes || "");
+        const label = String(event.data.text || "").trim().slice(0, 90);
+        const target = "<" + tag + (id ? "#" + id : "") + (classes ? "." + classes.split(/\s+/).slice(0, 3).join(".") : "") + ">" + (label ? " containing “" + label + "”" : "");
+        setCustomEditMode(false);
+        setDraft(current => (current.trim() ? current.trim() + "\n\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
+        setNotice("Element selected. Describe the exact change in the composer, then send it.");
+      }
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
@@ -263,6 +276,11 @@ export default function Home() {
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
   }, []);
+
+  useEffect(() => {
+    if (!iframeRef.current?.contentWindow || !previewOpen) return;
+    iframeRef.current.contentWindow.postMessage({ type: "gene-custom-edit-mode", enabled: customEditMode }, "*");
+  }, [customEditMode, previewKey, previewOpen, project?.files]);
 
   useEffect(() => {
     // A hidden/collapsed preview has no mounted iframe, so it cannot send render
@@ -312,6 +330,8 @@ export default function Home() {
       "(function(){",
       "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0){alpha++;if(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0){alpha++;if(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:e.message||'script error'},'*');});",
+      "window.addEventListener('message',function(e){if(e.data&&e.data.type==='gene-custom-edit-mode'){window.__geneCustomEdit=!!e.data.enabled;document.documentElement.style.cursor=window.__geneCustomEdit?'crosshair':'';}});",
+      "document.addEventListener('click',function(e){if(!window.__geneCustomEdit)return;var el=e.target;if(!el||el===document.body||el===document.documentElement)return;e.preventDefault();e.stopPropagation();parent.postMessage({type:'gene-custom-selection',tag:el.tagName||'element',id:el.id||'',classes:typeof el.className==='string'?el.className:'',text:(el.innerText||el.getAttribute&&el.getAttribute('aria-label')||'').slice(0,90)},'*');},true);",
       "[250,650,1200,2000,3200,4300].forEach(function(ms){setTimeout(report,ms);});",
       "})();"
     ].join("\n");
@@ -429,7 +449,8 @@ export default function Home() {
         model: aiModel,
         thinking: nextProject.thinking,
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
-        answers: nextAnswers
+        answers: nextAnswers,
+        extendedPlanning
       };
       let activeBuildRun: BuildRun | null = nextProject.buildRun || null;
       if (operation === "build" || operation === "surprise") {
@@ -495,7 +516,7 @@ export default function Home() {
           }
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
-          addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
+          addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
           let stageSucceeded = false;
           let stageError = "";
           for (let stageAttempt = 1; stageAttempt <= 3 && !stageSucceeded; stageAttempt++) {
@@ -739,7 +760,8 @@ export default function Home() {
             if (validationAttempt >= 2) break;
 
             const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
+              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+               /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
                /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
                /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
             addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
@@ -1233,6 +1255,40 @@ export default function Home() {
   function removeReference(id: string) {
     if (!project) return;
     setProject({ ...project, references: (project.references || []).filter(ref => ref.id !== id), updatedAt: now() });
+  }
+
+  async function enhanceDraftPrompt() {
+    if (!project || !draft.trim() || enhancingPrompt || busy) return;
+    setEnhancingPrompt(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "enhancePrompt",
+          mode: "plan",
+          model: aiModel,
+          thinking: project.thinking,
+          extendedPlanning,
+          message: draft.trim(),
+          project,
+          history: project.messages.slice(-8).map(m => ({ role: m.role, content: m.content.slice(0, 900) })),
+          answers: project.answers
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || typeof payload?.result?.reply !== "string") {
+        throw new Error(payload?.error?.message || "GENE couldn't enhance this prompt. Your original text is unchanged.");
+      }
+      setDraft(payload.result.reply.slice(0, 7000));
+      setNotice("Prompt enhanced. Review it before sending; nothing has been built or changed yet.");
+      addActivity("Prompt enhanced; original project files were not changed.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Prompt enhancement failed.");
+    } finally {
+      setEnhancingPrompt(false);
+    }
   }
 
   const onSubmit = (event: FormEvent) => {
@@ -1856,6 +1912,7 @@ export default function Home() {
               <span className={"binary-build-state " + (item.status === "success" && item.url ? "ready" : "failed")}>{item.status === "success" && item.url ? "Ready" : item.status === "skipped" ? "Not requested" : "Failed"}</span>
               <span>{target === "windows" ? "Windows installer (.exe)" : "Android app (.apk)"}</span>
               {item.url && item.status === "success" ? <a href={item.url} target="_blank" rel="noreferrer" download={item.filename || undefined}>Download {target === "windows" ? "EXE" : "APK"} ↓</a> : <span className="binary-build-muted">No artifact</span>}
+              {item.status === "success" && item.sizeBytes ? <small>{(item.sizeBytes / 1048576).toFixed(2)} MB · SHA-256 <span title={item.sha256 || ""}>{String(item.sha256 || "not reported").slice(0, 12)}</span></small> : null}
             </div>)}
           </div>
           <small>Windows output is an Electron installer. Android output is a debug-signed APK for testing and direct installation, not a Play Store release.</small>
@@ -1914,7 +1971,11 @@ export default function Home() {
                   <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} onClick={() => setPlanIntent("create")}>Plan a new project</button>
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}>Plan an update</button>
                 </div>}
-                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "GOOGLE SEARCH GROUNDING · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
+                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "WEB RESEARCH · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
+                <div className="composer-tools gene15-tools">
+                  <label className="extended-plan-toggle"><input type="checkbox" checked={extendedPlanning} onChange={e => setExtendedPlanning(e.target.checked)} /> <span><strong>Extended planning</strong><small>Deeper phases, architecture, dependencies and test gates</small></span></label>
+                  <button type="button" title="Improve the draft prompt without starting a build" onClick={enhanceDraftPrompt} disabled={!draft.trim() || enhancingPrompt || busy}>{enhancingPrompt ? "Enhancing…" : "✦ Enhance prompt"}</button>
+                </div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
@@ -1977,7 +2038,7 @@ export default function Home() {
           </section>
 
           {previewOpen ? <aside className={"preview-panel" + (expandedPreview ? " expanded" : "")}>
-            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); }}>–</button><button title="Refresh preview" onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
+            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button type="button" className={customEditMode ? "tool-active" : ""} title="Select an element in the live preview to edit it with GENE" disabled={!hasGame} onClick={() => { setCustomEditMode(value => !value); setNotice(customEditMode ? "Custom edit selection cancelled." : "Click an element in the preview. GENE will identify it and prepare an edit prompt."); }}>✎ Select to edit</button><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); setCustomEditMode(false); }}>–</button><button title={runtimeState === "error" ? "Refresh preview after an error" : "Refresh preview"} onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); setCustomEditMode(false); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
             <div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div>
             {expandedPreview && hasGame && <form className="expanded-live-editor" onSubmit={event => { event.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); }}>
               <div className="expanded-live-editor-label"><span className="live-dot" /> EDIT LIVE <span>Chat edits update this preview</span></div>
