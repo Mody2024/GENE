@@ -1912,6 +1912,7 @@ export default function Home() {
               <span className={"binary-build-state " + (item.status === "success" && item.url ? "ready" : "failed")}>{item.status === "success" && item.url ? "Ready" : item.status === "skipped" ? "Not requested" : "Failed"}</span>
               <span>{target === "windows" ? "Windows installer (.exe)" : "Android app (.apk)"}</span>
               {item.url && item.status === "success" ? <a href={item.url} target="_blank" rel="noreferrer" download={item.filename || undefined}>Download {target === "windows" ? "EXE" : "APK"} ↓</a> : <span className="binary-build-muted">No artifact</span>}
+              {item.status === "success" && item.sizeBytes ? <small>{(item.sizeBytes / 1048576).toFixed(2)} MB · SHA-256 <span title={item.sha256 || ""}>{String(item.sha256 || "not reported").slice(0, 12)}</span></small> : null}
             </div>)}
           </div>
           <small>Windows output is an Electron installer. Android output is a debug-signed APK for testing and direct installation, not a Play Store release.</small>
