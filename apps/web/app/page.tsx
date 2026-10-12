@@ -139,7 +139,7 @@ export default function Home() {
   const [binaryBuildConfigured, setBinaryBuildConfigured] = useState(false);
   const [binaryBuildId, setBinaryBuildId] = useState("");
   const [binaryBuildRunUrl, setBinaryBuildRunUrl] = useState("");
-  const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string }> | null>(null);
+  const [binaryBuildLinks, setBinaryBuildLinks] = useState<Record<string, { status: string; url?: string | null; filename?: string; signing?: string; sizeBytes?: number | null; sha256?: string | null }> | null>(null);
   const [apiReady, setApiReady] = useState<boolean | null>(null);
   const [publishConfigured, setPublishConfigured] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
