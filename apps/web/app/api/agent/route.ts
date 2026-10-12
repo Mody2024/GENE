@@ -566,7 +566,7 @@ export async function POST(request: NextRequest) {
           systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
           contents: [{ role: "user", parts: attemptParts }],
           generationConfig: {
-            responseMimeType: "application/json",
+            ...(body.operation === "research" ? {} : { responseMimeType: "application/json" }),
             temperature: body.operation === "interview" ? 0.35 : 0.2,
             maxOutputTokens: body.operation === "buildPart"
               ? (attempt.fallback ? 5_120 : 6_144)
