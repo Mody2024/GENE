@@ -516,7 +516,7 @@ export default function Home() {
           }
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
-          addActivity("Build stage " + (index + 1) + "/" + stagePaths.length + ": generating " + stagePath);
+          addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
           let stageSucceeded = false;
           let stageError = "";
           for (let stageAttempt = 1; stageAttempt <= 3 && !stageSucceeded; stageAttempt++) {
@@ -760,7 +760,8 @@ export default function Home() {
             if (validationAttempt >= 2) break;
 
             const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
+              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+               /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
                /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
                /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
             addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
