@@ -66,6 +66,9 @@ assert.ok(page.includes("files in the current manifest") && page.includes("input
 assert.ok(api.includes("body.operation === \"enhancePrompt\"") && api.includes("extendedPlanning: body.extendedPlanning === true"), "API accepts the prompt enhancer operation and extended planning flag");
 assert.ok(api.includes("no keyboard, touch, or controller input handlers were found"), "final validation reports absent input handlers without inventing keyboard controls");
 assert.ok(css.includes(".gene15-tools") && css.includes(".extended-plan-toggle"), "GENE 1.5 planning controls have responsive styling");
+assert.ok(prompts.includes("UNIFIED BRAIN CONTRACT") && prompts.includes("AUTONOMOUS DESIGN PASS") && prompts.includes("CONTINUITY CONTRACT"), "all project types share one continuous autonomous design brain");
+assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType: "application/json" }'), "web research is not forced into JSON MIME mode that can interfere with grounding");
+
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
 assert.ok(api.includes('body.operation === "buildPart" ? 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget and detects alternate-provider truncation");
