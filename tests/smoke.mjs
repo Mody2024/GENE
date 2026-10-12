@@ -308,6 +308,11 @@ assert.ok(buildHelper.includes("aes-256-gcm") && buildHelper.includes("prepareEl
 assert.ok(buildUpload.includes("from \"@vercel/blob\"") && buildUpload.includes("access: \"public\""), "binary upload helper returns direct Vercel Blob download URLs");
 assert.ok(page.includes('fetch("/api/builds"') && page.includes('fetch("/api/builds/" + id') && page.includes("binaryBuildLinks"), "workspace submits cloud builds, polls progress, and displays direct binary links");
 assert.ok(css.includes(".binary-build-button") && css.includes(".binary-build-result"), "cloud build UI is styled for desktop and mobile");
+assert.ok(buildHelper.includes('artifactName:"${productName}-Setup-${version}.${ext}"') && !buildHelper.includes('artifactName:"\\${productName}'), "Electron Builder receives valid artifact-name placeholders without path-escaping backslashes");
+assert.ok(buildWorkflow.includes("valid Windows MZ executable header") && buildWorkflow.includes("APK failed ZIP integrity validation") && buildWorkflow.includes("sdkmanager --licenses"), "cloud workers validate EXE/APK outputs and prepare Android SDK licenses");
+assert.ok(buildUpload.includes("createHash(\"sha256\")") && buildUpload.includes("sha256=") && buildUpload.includes("bytes="), "binary upload reports artifact size and SHA-256 checksum");
+assert.ok(buildWorkflow.includes("WINDOWS_SHA256") && buildWorkflow.includes("ANDROID_SHA256") && buildWorkflow.includes("sizeBytes"), "cloud build result records binary integrity metadata per target");
+assert.ok(page.includes("item.sizeBytes") && page.includes("item.sha256"), "download results display verified artifact size and checksum");
 
 
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
