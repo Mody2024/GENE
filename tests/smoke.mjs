@@ -476,7 +476,7 @@ assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt
 assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
 
 
-assert.ok(page.includes('"src/systems/input.js", "src/systems/progression.js", "src/systems/content.js"'), "all games receive baseline input, progression, and content modules");
+assert.ok(page.includes('plannedModules.push("src/systems/input.js")') && page.includes('plannedModules.push("src/systems/progression.js")') && page.includes('plannedModules.push("src/systems/content.js")'), "game modules are selected from actual scope instead of forcing unnecessary files into every game");
 assert.ok(page.includes('task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] }))'), "dynamic file expansion moves the final content pass behind every generated module");
 assert.ok(api.includes("const gameQuestions = [") && api.includes("const appQuestions = [") && api.includes("bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id))"), "fallback interview asks multiple adaptive questions one at a time");
 assert.ok(api.includes("const original = String(body.message || body.project?.initialPrompt"), "update planning uses the requested update instead of only the original project prompt");
