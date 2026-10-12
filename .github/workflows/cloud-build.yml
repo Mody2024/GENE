@@ -78,6 +78,8 @@ jobs:
     timeout-minutes: 35
     outputs:
       download_url: ${{ steps.upload.outputs.url }}
+      size_bytes: ${{ steps.upload.outputs.bytes }}
+      sha256: ${{ steps.upload.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
