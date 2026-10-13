@@ -261,8 +261,11 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const soundCalls = runtimeSource.match(/\b(?:playSfx|playSound|triggerSound|playAudio)\s*\(/g) || [];
       const hasConnectedSoundEvents = soundCalls.length >= 2 && /\b(?:soundManager|audioManager|playSfx|playSound|triggerSound|playAudio)\b/i.test(runtimeSource);
       const hasSoundOutput = /\.(?:start|play)\s*\(/i.test(runtimeSource);
-      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic)\b/i.test(runtimeSource);
-      const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings)\b/i.test(runtimeSource + "\\n" + html);
+      // Accept equivalent real music paths (Web Audio nodes or media elements),
+      // not just one preferred helper name, while still requiring actual playback.
+      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic|startBgm|playBgm|startBackgroundMusic|playBackgroundMusic|musicSource|musicOscillator|musicNode|bgmPlayer|musicPlayer)\b/i.test(runtimeSource) ||
+        /(?:music|bgm|backgroundMusic)[A-Za-z0-9_$]*\.(?:start|play)\s*\(/i.test(runtimeSource);
+      const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings|masterVolume|muteAudio|toggleMute|volumeSlider|musicGain|sfxGain)\b/i.test(runtimeSource + "\\n" + html);
       if (audio?.enabled !== true ||
           !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
           !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
