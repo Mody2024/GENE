@@ -45,11 +45,15 @@ function GeneMark({ className = "" }: { className?: string }) {
 function now() { return new Date().toISOString(); }
 function explainAgentError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error || "Unknown error");
-  if (/resource_exhausted|quota exceeded|rate.?limit|429/i.test(raw)) return "The AI provider rate limit or quota was reached. Your project files were preserved; wait for quota reset or configure another API key/model, then retry.";
-  if (/GEMINI_KEY_REJECTED|invalid api key|unauthorized|401/i.test(raw)) return "The AI provider rejected the API key. Check the key in your deployment environment, redeploy, and retry. Your existing project was preserved.";
-  if (/timeout|timed out|aborted|ETIMEDOUT/i.test(raw)) return "The request timed out before GENE could finish. Completed checkpoints were preserved; retry to continue with a smaller task.";
-  if (/failed to fetch|networkerror|network request failed|offline/i.test(raw)) return "GENE could not reach the server. Check your connection and deployment status, then retry. Your last saved project version was preserved.";
+  if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "The backup AI route needs credits or selected a paid model. GENE tried its configured backup after Gemini failed, but no project changes were applied. Use a model marked :free and remove any paid-model override, or add credits to that provider.";
+  if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
+  if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
+  if (/OPENROUTER_FALLBACK_FAILED/i.test(raw)) return "GENE tried Gemini and its OpenRouter backup, but both failed. Check the selected model and API key, then retry. Your existing project files were preserved.";
+  if (/GEMINI_CAPACITY_BUSY|overloaded|high demand|temporarily unavailable/i.test(raw)) return "The AI service is temporarily busy. GENE tried its configured fallback path but did not get a successful response. Retry shortly; your existing project files were preserved.";
+  if (/timeout|timed out|aborted|ETIMEDOUT|GEMINI_TIMEOUT/i.test(raw)) return "The AI request timed out before it finished. Completed checkpoints and existing project files were preserved; retry with a smaller task.";
+  if (/failed to fetch|networkerror|network request failed|offline/i.test(raw)) return "GENE could not reach its server. Check your connection and deployment status, then retry. Your last saved project version was preserved.";
   if (/GENE_VALIDATION_FAILED|422|stale or missing|unsafe project path|Build rejected/i.test(raw)) return "GENE rejected the generated change during validation to protect your project. Try a smaller, more specific change. Details: " + raw.slice(0, 500);
+  if (/GEMINI_OUTPUT_TRUNCATED|GEMINI_OUTPUT_INVALID|output limit|malformed JSON/i.test(raw)) return "The AI response was incomplete or could not be validated. GENE preserved the current project and can retry this stage with a smaller implementation.";
   return raw.slice(0, 900) || "GENE encountered an unexpected error. Your last saved project version was preserved; inspect the activity log and retry.";
 }
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
