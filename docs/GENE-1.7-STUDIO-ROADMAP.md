@@ -1,6 +1,16 @@
 # GENE 1.7: Studio Forge — Studio-Scale Game Creation
 
-Status: proposal for after GENE 1.6 reliability gates. This document is a plan, not a claim that these capabilities already exist.
+Status: living implementation roadmap. This document is not a claim that every listed capability exists.
+
+## Implementation snapshot — 2026-10-13
+
+Implemented on the `feat/gene-monster-builder` branch (not yet merged or promoted to production):
+- Capability-aware studio contract and `/api/capabilities` endpoint, including explicit partial capability records for the audio mixer and scene asset integration.
+- Stronger game-generation acceptance guidance for event-driven sound, browser-safe audio startup, bus/mute controls, graceful missing-audio behavior, honest spatial-audio claims, coherent asset silhouettes/materials, and mesh/material budgets.
+- Saved Forge meshes now offer an **Integrate into game** action. It prepares a chat request tied to that asset's actual OBJ/MTL file paths and asks for scene loading, materials, collision/gameplay integration, and visible preview proof; the user reviews and sends the request rather than the UI pretending integration already happened.
+- Regression assertions cover the new contract and asset-integration workflow.
+
+Still roadmap work, not delivered by this snapshot: an actual shared audio runtime/mixer panel and event timeline; a source-linked scene hierarchy with direct transform/material editing and undo/redo; richer authored/imported model and animation pipelines; automated gameplay/audio-quality tests; and complete verified EXE/APK pipelines. Passing CI validates repository tests, not every possible generated game or native target.
 
 ## Product direction
 
