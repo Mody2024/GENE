@@ -37,12 +37,9 @@ function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 function GeneMark({ className = "" }: { className?: string }) {
-  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE">
-    <defs><linearGradient id="gene-core-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="currentColor" /><stop offset="1" stopColor="currentColor" stopOpacity=".55" /></linearGradient></defs>
-    <path d="M20 3.2 33.9 11.1 33.9 27.2 20 35.3 6.1 27.2 6.1 11.1Z" fill="none" stroke="currentColor" strokeWidth="1.15" strokeOpacity=".32" />
-    <circle cx="20" cy="20" r="12.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity=".8" />
-    <path d="M27.5 13.1A10.2 10.2 0 1 0 29.6 21H20.4" fill="none" stroke="url(#gene-core-gradient)" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="30.7" cy="10.8" r="2.2" fill="currentColor" /><circle cx="8.1" cy="28.1" r="1.65" fill="currentColor" />
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE mark">
+    <path d="M30.2 12.1A13.1 13.1 0 1 0 32.9 22H21.2" fill="none" stroke="currentColor" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20.5 20.5h9.8" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" opacity=".45" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }
@@ -2166,7 +2163,7 @@ export default function Home() {
                   </details>
                 </div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools"><button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button><button type="button" className={"icon-only-tool " + (searchMode ? "tool-active" : "")} aria-pressed={searchMode} title="Toggle web research grounded in current documentation" aria-label="Toggle web research" onClick={() => setSearchMode(!searchMode)}>⌕</button><button type="button" className="icon-only-tool" title="Let GENE choose an idea" aria-label="Surprise me" onClick={surpriseMe}>✧</button><span className="key-hint">Enter ↵</span></div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
