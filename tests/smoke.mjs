@@ -61,7 +61,7 @@ assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("va
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
 assert.ok(prompts.includes("GENE 1.6") && prompts.includes("GENE 1.6 MODE CONTRACT") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.6 supports mode-specific orchestration, detailed plans, and read-only prompt enhancement");
 assert.ok(page.includes("GENE 1.6 Flash") && page.includes("GENE 1.6 Balanced") && page.includes("GENE 1.6 Thinking"), "workspace exposes the three named GENE 1.6 modes");
-assert.ok(prompts.includes("input.operation === \"chat\" || input.operation === \"research\" || input.operation === \"enhancePrompt\""), "non-build operations receive a compact plan summary rather than repeatedly serializing every plan task");
+assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation)'), "planning and conversational operations use bounded project context");
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
 assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("GENE 1.6 BUILD SYSTEM"), "workspace branding identifies the current GENE 1.6 release line");
