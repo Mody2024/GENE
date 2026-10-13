@@ -38,11 +38,11 @@ function uid() {
 }
 function GeneMark({ className = "" }: { className?: string }) {
   return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE">
-    <defs><linearGradient id="gene-core-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".98" /><stop offset="1" stopColor="currentColor" stopOpacity=".56" /></linearGradient></defs>
-    <circle cx="20" cy="20" r="5.4" fill="url(#gene-core-gradient)" />
-    <ellipse cx="20" cy="20" rx="15.5" ry="7.2" fill="none" stroke="currentColor" strokeWidth="1.35" strokeOpacity=".78" transform="rotate(-36 20 20)" />
-    <ellipse cx="20" cy="20" rx="15.5" ry="7.2" fill="none" stroke="currentColor" strokeWidth="1.05" strokeOpacity=".38" transform="rotate(38 20 20)" />
-    <circle cx="32.2" cy="11.4" r="2.15" fill="currentColor" /><circle cx="8.2" cy="26.9" r="1.9" fill="currentColor" /><circle cx="26.4" cy="33.6" r="1.55" fill="currentColor" />
+    <defs><linearGradient id="gene-core-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="currentColor" /><stop offset="1" stopColor="currentColor" stopOpacity=".55" /></linearGradient></defs>
+    <path d="M20 3.2 33.9 11.1 33.9 27.2 20 35.3 6.1 27.2 6.1 11.1Z" fill="none" stroke="currentColor" strokeWidth="1.15" strokeOpacity=".32" />
+    <circle cx="20" cy="20" r="12.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity=".8" />
+    <path d="M27.5 13.1A10.2 10.2 0 1 0 29.6 21H20.4" fill="none" stroke="url(#gene-core-gradient)" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="30.7" cy="10.8" r="2.2" fill="currentColor" /><circle cx="8.1" cy="28.1" r="1.65" fill="currentColor" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }
@@ -186,6 +186,7 @@ export default function Home() {
   const [forgeNotice, setForgeNotice] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showAbout, setShowAbout] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
@@ -816,35 +817,50 @@ export default function Home() {
             if (validationAttempt >= 2) break;
 
             const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game-spec.json" :
-               /input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+               /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game.js" :
                /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
                /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
                /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
-            addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
-            let repaired = false;
-            for (let repairAttempt = 1; repairAttempt <= 2 && !repaired; repairAttempt++) {
-              const repairResponse = await fetch("/api/agent", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  ...baseRequest,
-                  operation: "buildPart",
-                  stagePath: repairPath,
-                  message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + repairPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + ". Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + repairPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
-                  project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
-                })
-              });
-              const repairPayload = await repairResponse.json().catch(() => null);
-              const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === repairPath);
-              if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
-                stagedFiles[repairPath] = repairFile.content;
-                modelUsed = repairPayload.model || modelUsed;
-                repaired = true;
-                addActivity("Repaired " + repairPath + "; rerunning full-project validation");
-              } else {
-                addActivity("Repair attempt for " + repairPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+            // Audio is a cross-file contract: real playback belongs in game.js and
+            // its honest implementation/bus/event contract belongs in game-spec.json.
+            // Repairing only the spec can never fix missing sound code, and repairing
+            // only code can never fix missing audio metadata.
+            const repairPaths = /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError)
+              ? ["game.js", "game-spec.json"] : [repairPath];
+            let repaired = true;
+            for (const targetPath of repairPaths) {
+              addActivity("Attempting targeted repair of " + targetPath + " (" + (validationAttempt + 1) + "/3)");
+              let fileRepaired = false;
+              for (let repairAttempt = 1; repairAttempt <= 2 && !fileRepaired; repairAttempt++) {
+                const focusedAudioInstruction = /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError)
+                  ? (targetPath === "game.js"
+                    ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
+                    : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
+                  : "";
+                const repairResponse = await fetch("/api/agent", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    ...baseRequest,
+                    operation: "buildPart",
+                    stagePath: targetPath,
+                    message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + targetPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + "." + focusedAudioInstruction + " Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + targetPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
+                    project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+                  })
+                });
+                const repairPayload = await repairResponse.json().catch(() => null);
+                const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === targetPath);
+                if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
+                  stagedFiles[targetPath] = repairFile.content;
+                  modelUsed = repairPayload.model || modelUsed;
+                  fileRepaired = true;
+                  addActivity("Repaired " + targetPath + "; rerunning full-project validation");
+                } else {
+                  addActivity("Repair attempt for " + targetPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+                }
               }
+              if (!fileRepaired) { repaired = false; break; }
             }
             if (!repaired) break;
           }
@@ -1065,18 +1081,20 @@ export default function Home() {
   }, [busy, buildInProgress, project?.id, queuedRequestCount, runAgent]);
 
   useEffect(() => {
-    if (runtimeState !== "error" || busy || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 2) return;
+    if (runtimeState !== "error" || busy || buildInProgress || !project?.files["game.js"] || !project.files["game.html"] || autoRepairAttempts.current >= 3) return;
     autoRepairAttempts.current += 1;
     const attempt = autoRepairAttempts.current;
     const timer = window.setTimeout(() => {
+      setNotice("GENE detected a preview failure and is automatically diagnosing and repairing the source (attempt " + attempt + "/3). Your last saved files and versions are preserved.");
+      addActivity("Automatic runtime repair started (attempt " + attempt + "/3); preserving the current checkpoint.");
       void runAgent(
-        "Automated runtime repair attempt " + attempt + " of 2. The game preview failed to render or emitted a runtime error. Read the complete current project files and make the smallest safe fix. Runtime status: " + (notice || "no visible frame confirmed") + ". Return only genuinely changed files.",
+        "AUTOMATIC RUNTIME RECOVERY — attempt " + attempt + " of 3. The game/app preview failed to render or emitted a runtime error. Inspect the current source, HTML, CSS, spec and recent runtime error details in context. Identify the actual cause; make the smallest safe source repair, preserve existing mechanics and visual design, then let GENE refresh and re-check the preview. Do not merely explain the issue. Return only genuinely changed files. Runtime status: " + (notice || "no visible frame confirmed") + ".",
         "edit",
         true
       );
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
+  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, notice, runAgent]);
 
   async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
     const normalizedUrl = url.trim().replace(/\/+$/, "");
@@ -2016,6 +2034,7 @@ export default function Home() {
             {hasGame && localAgentStatus === "connected" && <button className="agent-connect-button" onClick={syncToLocalAgent} disabled={busy}>{isSyncedToLocal ? "Resync project files" : "Write project to disk"}</button>}
             {isSyncedToLocal && <button className="agent-connect-button" onClick={openLocalAgentGame}>{project.kind === "app" ? "Open disk-backed app ↗" : "Open disk-backed game ↗"}</button>}
           </div>
+          <button className="about-link" onClick={() => setShowAbout(true)}><span>ⓘ</span> About GENE <span className="about-version">1.8</span></button>
         </div>
       </aside>
 
@@ -2231,6 +2250,7 @@ export default function Home() {
         </div>
         <footer className="statusbar"><div><span className="status-dot online" /> Workspace local state</div><div>{Object.keys(project.files).length} source files <span className="status-divider">·</span> {project.versions.length} versions <span className="status-divider">·</span> {project.thinking} mode</div><button onClick={() => setShowActivity(!showActivity)}>Activity {showActivity ? "▾" : "▴"}</button></footer>
       </section>
+      {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>1.8</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
     </main>
   );
 }
