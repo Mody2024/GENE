@@ -640,3 +640,30 @@ These are not 1.6 blockers. Build them only when there is evidence that the foun
 ## 1.7 release gate
 
 GENE 1.7 is ready only when the 1.6 golden-project suite still passes, project revisions are recoverable, context selection is traceable, imported/generated assets are validated, long jobs survive refreshes and transient failures, and release artifacts are tied to a tested commit.
+
+
+## Continuation log — 2026-10-13
+
+This log records implementation evidence separately from acceptance claims.
+
+### Added in the Studio Forge continuation branch
+- `apps/web/app/lib/runtime-scene.ts` validates and bounds scene object manifests and exposes object lookup, visibility filtering, transform access, material/light/camera values, and a Canvas 2D drawing helper.
+- Live preview, fullscreen playtest, standalone HTML, and ZIP export paths include the runtime scene bootstrap.
+- Scene Studio exposes material roughness/metalness/emissive, light intensity/color, and camera field-of-view fields, stored alongside scene objects in `game-spec.json`.
+- Generation prompts now explicitly require Canvas 2D renderers to draw authored scene objects and WebGL renderers to apply their transforms as actual geometry/materials.
+- Smoke tests now include executable checks for saved-transform round trips, hidden-object filtering, material preservation, Canvas drawing calls, and invalid-manifest fallback.
+
+### Verification still required
+- The scene viewport is still an isometric Canvas 2D authoring viewport, not the planned WebGL editor with orbit camera and true three-axis gizmos.
+- The Canvas helper draws simple primitive representations; it is not a substitute for integrating each authored object into a game's own renderer, physics, and gameplay. Renderer-level end-to-end tests remain required.
+- The newly added smoke tests have not been run in a green CI environment in this continuation.
+- Audio is already a required generation contract and the built-in starter declares procedural music/SFX and volume settings; the requested multi-genre browser/device test matrix remains unverified.
+- Windows EXE and Android APK builds still require successful cloud runs plus launch/install and artifact-integrity verification.
+- The latest observed Vercel status for the PR revision was a build-rate-limit failure. No production release is claimed.
+
+### Next acceptance sequence
+1. Get CI running on the latest head and fix any syntax, type, or smoke-test failures.
+2. Implement the real WebGL viewport, orbit controls, and axis transform gizmos.
+3. Prove editor-save → runtime-render → reload round trips for Canvas 2D and WebGL games.
+4. Run audio regression fixtures and native cloud builds.
+5. Merge/deploy only after the final revision and live URL are verified.
