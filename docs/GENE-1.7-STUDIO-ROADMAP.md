@@ -106,6 +106,97 @@ Acceptance: simulated provider failures result in a clear status and preserve pr
 
 Acceptance: every release can be traced to a commit and test run; each offered download has a verified checksum and accurate target/signing label.
 
+
+### 11. Full sound and music system (new priority)
+
+Treat sound as a first-class part of every generated game, app, and interactive experience—not a last-minute collection of random effects. Use a shared audio specification and engine adapters so capabilities are explicit for browser games, Godot, Unity, Unreal, and exported builds.
+
+#### 11.1 Audio planning and sound direction
+- Interview for sound style only when it matters: cinematic, cozy, arcade, horror, realistic, minimalist, music-led, or intentionally silent.
+- Include a versioned audio brief in the plan: mood, intensity curve, instrument palette, ambience, key sound events, music transitions, voice needs, accessibility needs, target platforms, and asset/licensing constraints.
+- Map gameplay events to named sound events and states (boot, menu, hover/select/confirm/back, gameplay, combat, damage, jump/land, pickup, objective, pause, win/lose, loading, save/load, multiplayer join/leave, error).
+- Keep a clear distinction between required, optional, placeholder, and intentionally silent cues. Never mark a placeholder as a finished sound asset.
+
+#### 11.2 Audio asset creation and sourcing
+- Support imported WAV, MP3, OGG, and supported platform formats with format/duration/size/sample-rate checks and clear transcoding guidance.
+- Allow users to upload their own audio and organize it into a searchable asset library with tags, preview, waveform/duration metadata, loop points, variants, and attribution.
+- Add procedural sound synthesis for suitable SFX (UI clicks, beeps, impacts, wind, drones, simple steps, sci-fi pulses) using oscillators/noise/envelopes/filters; provide seeded generation so builds are reproducible.
+- Add music composition assistance through structured prompts, tempo, meter, mood, instrumentation, loop length, stems, intensity layers, and transition points. If a music-generation provider is not configured, offer honest procedural/midi-like or user-imported alternatives rather than claiming a full produced song exists.
+- Support optional voice/dialogue generation only through a configured provider; expose pronunciation, language, emotion, subtitle, and regeneration controls.
+- Add batch generation and variation for footsteps, impacts, UI sounds, weapon families, creatures, and ambience, with loudness normalization and duplicate detection.
+- Keep every asset's origin, license, attribution, provider, prompt (if applicable), generation date, and allowed-use notes in a manifest. Never scrape copyrighted soundtracks or imitate a named living artist's voice without authorization.
+- Never bundle an asset unless it exists, decodes, passes licensing/source policy, and is included in the build manifest.
+
+#### 11.3 Runtime audio engine
+- Build a centralized audio service with one managed context/engine per runtime, pooled/reused decoded buffers, asset streaming for long music/dialogue, and cached short SFX.
+- Add named buses/groups: Master, Music, Ambience, SFX, UI, Dialogue/Voice, and Accessibility/Assistive cues, with per-bus volume, mute, and optional ducking.
+- Support event-based playback, priorities, concurrency caps, voice stealing, cooldowns, random/weighted variants, pitch/volume variation within safe bounds, fades, crossfades, loop regions, stop/replace, pause/resume, and scene teardown cleanup.
+- Handle browser autoplay restrictions correctly: initialize or resume audio only after a real user gesture, surface a clear “enable audio” affordance where needed, and recover from suspended/interrupted contexts.
+- Prevent sound leaks: stop or detach event listeners and dispose audio nodes on project reset, preview reload, scene change, or hot reload.
+- Add fallback behavior when audio is unavailable, blocked, unsupported, or fails to decode; gameplay must not crash or hang because a sound is missing.
+- Avoid starting duplicate music or stacking repeated loops when a user restarts a level or reconnects to a preview.
+- Offer a reduced-motion/reduced-stimulation option that can also reduce abrupt audio changes, flashing visualizers, and intense sound events.
+
+#### 11.4 Spatial and dynamic sound
+- For supported 3D runtimes, support listener position/orientation, distance attenuation, stereo/spatial panning, occlusion/reverb zones where feasible, and moving sources attached to entities.
+- Connect camera/player position to the audio listener and expose indoor/outdoor/underwater/room presets where the engine supports them.
+- Use priority and distance-based culling/virtualization so distant ambience and many simultaneous emitters do not overload weak devices.
+- Provide a 2D fallback and mark unsupported spatial features clearly; never claim full 3D positional audio for a runtime that only pans stereo.
+
+#### 11.5 Adaptive music and game-state transitions
+- Allow layered stems or intensity layers (calm/exploration/tension/combat/boss/victory) with synchronized transitions where assets support it.
+- Define state transitions and crossfade rules in data rather than hard-coded timers.
+- Support dynamic ambience based on time, weather, biome, underwater state, room, or gameplay threat when relevant.
+- Add mix ducking so dialogue or critical gameplay cues remain audible over music and ambience.
+- Prevent abrupt restart/cut at loop boundaries; validate loop points and transition compatibility.
+
+#### 11.6 Audio settings, accessibility, and UX
+- Generate a polished in-game audio settings screen when appropriate: master/music/SFX/ambience/voice sliders, mute toggles, output test, reset-to-default, and persistent preferences.
+- Add captions/subtitles for dialogue and optional descriptions for important non-speech audio cues; do not rely on sound alone to communicate critical information.
+- Respect keyboard/gamepad navigation, screen readers for settings, mobile touch targets, mute preferences, and platform accessibility controls.
+- Include safe default volume, no unexpected autoplay with sound on page load, no excessively loud peak transients, and an easy mute control.
+- Support mono compatibility and avoid requiring stereo-only cues for critical gameplay information.
+
+#### 11.7 Authoring, debugging, and editor tools
+- Add a Sound panel to the GENE workspace: asset list, audition controls, event map, bus mixer, missing-cue warnings, and per-scene/event assignment.
+- Let users ask in chat to add, replace, tune, or remove sound; show a source diff and update only relevant audio assets/config/scripts.
+- Add an audio event timeline/inspector with event, source asset, bus, volume, pitch range, loop, spatial setting, priority, and cooldown.
+- Add an audio test scene/preview with mute, test tones, event triggering, and meters; avoid expensive always-on visualizers.
+- Report missing files, decode failures, duplicate event bindings, clipping risk, unbounded concurrency, missing user gesture, and assets not included in exports.
+- Add exportable audio manifest and dependency report, and ensure source ZIPs preserve asset paths.
+
+#### 11.8 Performance and platform support
+- Set per-project budgets for total audio bytes, decoded memory, simultaneous voices, music streaming, and optional effects.
+- Compress/stream long tracks; keep short frequently played SFX decoded when appropriate; cache only within memory budgets.
+- Support low-end mode with fewer simultaneous voices, simpler effects, shorter ambience ranges, and no expensive visualizers.
+- Verify behavior separately in browser preview, deployed web, desktop wrapper, Android export, and native engine exports; don't assume one runtime's audio behavior proves another's.
+- Use Web Audio API for web-specific routing/spatial effects where supported, with simple media playback and silent/no-audio fallback paths as needed. AudioWorklet-based processing is optional and only for features that justify it.
+
+#### 11.9 Automated audio acceptance tests
+- Test asset existence, decoding, supported format, metadata, manifest references, loop points, and license/provenance fields.
+- Test that each critical event maps to a valid cue or an explicitly approved silent state.
+- Test user-gesture initialization, resume after suspension, mute/volume behavior, bus routing, music restart prevention, and cleanup after reload.
+- Test missing/corrupt audio assets and ensure the game remains playable with a visible warning.
+- Add deterministic browser audio mocks for CI; where real audio output cannot be validated headlessly, label the check as structural rather than audible-quality verification.
+- Add golden checks for clipping/peak level, silence gaps, loop seams, and basic loudness consistency where tooling supports them.
+- Acceptance: a sample game has a coherent audio brief, valid licensed/imported or generated assets, working event mapping, functioning mixer/settings, and passing audio tests; removing one sound file yields a clear warning without breaking gameplay.
+
+### 12. Additional 1.7 quality-of-life and reliability upgrades
+- Add global undo/redo for supported user edits, with clear boundaries for generated files, plan changes, and asset operations.
+- Add project snapshots and named checkpoints before risky migrations, large generation runs, or automated repairs.
+- Add a unified diagnostics panel for AI provider, preview, build, asset import, sound, and export errors with copyable redacted reports.
+- Add a project portability audit before ZIP/export: missing assets, unsupported features, environment variables, platform-specific APIs, and dependency/license notes.
+- Add a real “quality vs speed vs cost” budget profile that changes context limits, number of review passes, asset detail, and test depth; show the actual policy applied.
+- Add a recovery assistant that proposes a minimal repair from a saved failing state and shows a diff before applying.
+- Add generated project documentation: controls, architecture, asset list, build/run steps, limitations, and third-party notices.
+- Add optional localization workflow for UI strings, subtitles, text direction (including RTL Arabic), and per-language font coverage.
+- Add accessibility checks for keyboard navigation, contrast, reduced motion, caption availability, and critical information not conveyed by audio alone.
+- Add a threat-model and dependency audit for imported projects and generated integrations, including secrets scanning and unsafe archive rejection.
+- Add an opt-in telemetry-free local diagnostics mode and make any remote diagnostics explicit, minimal, and redacted.
+- Add project-level resource dashboards for build duration, token use where available, asset bytes, preview memory, and validation coverage.
+
+Acceptance: recovery snapshots restore a known-good revision, exports produce an actionable portability report, diagnostics are redacted, and quality/cost profiles measurably alter work rather than only changing labels.
+
 ## Ideas to keep in the backlog until 1.6 is stable
 
 - Visual node editor for scene and gameplay systems.
