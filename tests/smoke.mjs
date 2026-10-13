@@ -64,6 +64,7 @@ assert.ok(page.includes("GENE 1.6 Flash") && page.includes("GENE 1.6 Balanced") 
 assert.ok(prompts.includes("input.operation === \"chat\" || input.operation === \"research\" || input.operation === \"enhancePrompt\""), "non-build operations receive a compact plan summary rather than repeatedly serializing every plan task");
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
+assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("GENE 1.6 BUILD SYSTEM"), "workspace branding identifies the current GENE 1.6 release line");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("✦ Enhance prompt"), "workspace exposes extended planning and prompt enhancement controls");
 assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Select to edit"), "live preview supports selecting an element to prepare a targeted edit");
