@@ -617,6 +617,7 @@ assert.ok(sceneCommitHandler.includes("setObjects(next)") && !sceneCommitHandler
 assert.ok(page.includes("saveStudioFiles") && page.includes("Studio manifest saved") && page.includes("writeProjectToDisk(updatedProject"), "Scene and audio manifests save as recoverable project versions and can sync to the local agent");
 assert.ok(css.includes("GENE 1.7 Scene Studio") && css.includes(".scene-studio-layout") && css.includes("@media (max-width:720px)"), "Scene Studio has responsive hierarchy and transform inspector styles");
 assert.ok(browserSmoke.includes('button[title="Scene Studio"]') && browserSmoke.includes("Browser-tested scene prop") && browserSmoke.includes("savedSceneSpec.includes"), "Playwright browser test exercises actual Scene Studio object editing and game-spec persistence");
+assert.ok(browserSmoke.includes("Scene Studio undo removes the unsaved object entry") && browserSmoke.includes("Scene Studio redo restores the object entry"), "Playwright browser test exercises Scene Studio undo and redo controls");
 assert.ok(browserSmoke.includes('button[title="Audio Studio"]') && browserSmoke.includes("UI confirmation sound previewed.") && browserSmoke.includes("savedAudioSpec.includes"), "Playwright browser test exercises Audio Studio playback and audio manifest persistence");
 
 assert.ok(page.includes("mergeConcurrentSourceChanges") && page.includes("discarded this stale result") && page.includes("if (!current || current.id !== updated.id) return current;"), "workspace rejects stale overlapping AI results without switching active projects");
