@@ -381,6 +381,8 @@ assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includ
 
 // GENE 1.4 executable utility tests (not only source-string assertions).
 const tsCompiler = await import("typescript");
+const promptSyntax = tsCompiler.transpileModule(prompts, { compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }, reportDiagnostics: true });
+assert.equal((promptSyntax.diagnostics || []).filter(item => item.category === tsCompiler.DiagnosticCategory.Error).length, 0, "production prompt source must remain syntactically valid TypeScript");
 const starterGameJs = tsCompiler.transpileModule(starterGameSource, {
   compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
 }).outputText;
@@ -511,7 +513,7 @@ assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.
 
 assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
 assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
-assert.ok(prompts.includes("audio:{enabled:true,implementation:") && prompts.includes("procedural-web-audio") && prompts.includes("asset-backed") && prompts.includes("buses:[") && prompts.includes("master") && prompts.includes("music") && prompts.includes("sfx") && prompts.includes("events:{uiConfirm:") && prompts.includes("playerAction:"), "audio metadata example includes implementation, mixer buses and named events");
+assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("implementation=procedural-web-audio or asset-backed") && prompts.includes("buses master/music/sfx/ambience/ui") && prompts.includes("uiConfirm/playSfx") && prompts.includes("outcome/playSfx"), "audio metadata prompt describes the implementation, buses and named events without fragile quote escaping");
 assert.ok(prompts.includes("AudioContext") && prompts.includes("setMusicVolume") && prompts.includes("setSfxVolume") && prompts.includes("playSfx(eventName, options)"), "game prompts require an integrated audio manager with real music, SFX and volume controls");
 assert.ok(prompts.includes("read and honor its enabled flag, bus names, volume defaults, and event map") && prompts.includes("preserve user-edited audio settings across regeneration"), "generated games must consume and preserve settings authored in Audio Studio");
 assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("Audio is part of the definition of done"), "audio is an explicit deliverable with source-aligned project metadata");
