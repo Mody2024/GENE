@@ -1,5 +1,6 @@
 import { formatGameGuide, selectGameGuide } from "./game-guides";
 import type { GamePlan, GeneProject, Mode } from "./types";
+import { buildStudioContract } from "./studio-contract";
 
 export const AGENT_SYSTEM = [
   "You are GENE 1.6 — the unified autonomous builder, a senior product designer, game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
@@ -93,6 +94,7 @@ export function makeAgentInput(input: {
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
     ...(guide ? ["GENRE-SPECIFIC IMPLEMENTATION GUIDE AND ACCEPTANCE CHECKLIST:\\n" + formatGameGuide(guide)] : ["WEB APP ACCEPTANCE CHECKLIST: polished responsive layout; semantic HTML; keyboard-accessible controls; working navigation/actions/forms; useful visual hierarchy; proper loading/empty/success/error states; field-level validation and actionable error messages; guard duplicate submits; preserve user input on failure; handle offline/timeout/HTTP errors; no fake backend, no external CDN, no hard-coded credentials; avoid dead controls and placeholder-only screens. For every visible control, identify its action and state transition; never render inert buttons or fake success. If persistence or authentication is not wired, label the limitation honestly and do not simulate saved/server data."]),
+    buildStudioContract(projectKind, p?.plan?.engine || (projectKind === "app" ? "webapp" : "canvas2d"), input.operation),
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
