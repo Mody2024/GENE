@@ -24,11 +24,16 @@ function safePath(path: unknown): path is string {
 }
 
 export async function POST(request: NextRequest) {
-  const token = process.env.VERCEL_TOKEN?.trim();
-  const projectId = process.env.VERCEL_PROJECT_ID?.trim();
+  const token = (process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN || "").trim();
+  const projectId = (process.env.VERCEL_PROJECT_ID || process.env.VERCEL_PROJECT || "").trim();
   const password = process.env.GENE_PUBLISH_PASSWORD?.trim();
   if (!token || !projectId || !password) {
-    return fail("Web publishing is not configured yet. In Vercel, add VERCEL_TOKEN, VERCEL_PROJECT_ID, and GENE_PUBLISH_PASSWORD, then redeploy GENE.", 503, "GENE_PUBLISH_NOT_CONFIGURED");
+    const missing = [
+      ...(!token ? ["Vercel token (VERCEL_TOKEN or VERCEL_API_TOKEN)"] : []),
+      ...(!projectId ? ["Vercel project ID (VERCEL_PROJECT_ID or VERCEL_PROJECT)"] : []),
+      ...(!password ? ["GENE_PUBLISH_PASSWORD"] : [])
+    ];
+    return fail("Web publishing configuration check failed: " + missing.join("; ") + ". Values are not exposed. Ensure the variables are enabled for the Production environment and redeploy after changing them.", 503, "GENE_PUBLISH_NOT_CONFIGURED");
   }
   const supplied = request.headers.get("x-gene-publish-password") || "";
   if (!secureEquals(supplied, password)) return fail("Publish access was not authorized.", 401, "GENE_PUBLISH_UNAUTHORIZED");
