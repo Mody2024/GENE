@@ -111,12 +111,13 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     for (const o of visible) {
       const p = project(o.position), sx = Math.max(.2,Math.min(4,Math.abs(o.scale.x))), sy = Math.max(.2,Math.min(4,Math.abs(o.scale.y))), sz = Math.max(.2,Math.min(4,Math.abs(o.scale.z)));
       const rx = 14*sx, ry = 9*sz, h = 25*sy, active = o.id === selectedId, type = o.type.toLowerCase();
-      ctx.save(); ctx.translate(p.x,p.y);
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(((o.rotation.y || 0) + (o.rotation.z || 0)) * Math.PI / 180);
       ctx.fillStyle="#000"; ctx.globalAlpha=.28; ctx.beginPath(); ctx.ellipse(0,6,rx*1.3,ry,0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
       ctx.fillStyle=o.color; ctx.strokeStyle=active?"#ffffff":"#263747"; ctx.lineWidth=active?2.5:1;
       if(type.includes("light")) { ctx.strokeStyle=o.color; ctx.beginPath(); ctx.arc(0,-h,13,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-20,-h); ctx.lineTo(20,-h); ctx.moveTo(0,-h-20); ctx.lineTo(0,-h+20); ctx.stroke(); }
       else if(type.includes("camera")) { ctx.beginPath(); ctx.moveTo(-12,-h-6); ctx.lineTo(12,-h-6); ctx.lineTo(17,-h+6); ctx.lineTo(-17,-h+6); ctx.closePath(); ctx.fill(); ctx.stroke(); }
       else if(type.includes("sphere")) { ctx.beginPath(); ctx.ellipse(0,-h,rx,ry,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.strokeStyle="#ffffff55"; ctx.beginPath(); ctx.ellipse(0,-h,rx*.45,ry,0,0,Math.PI*2); ctx.stroke(); }
+      else if(type.includes("plane")) { ctx.beginPath(); ctx.moveTo(-rx,0); ctx.lineTo(0,-ry); ctx.lineTo(rx,0); ctx.lineTo(0,ry); ctx.closePath(); ctx.fill(); ctx.stroke(); }
       else { ctx.beginPath(); ctx.moveTo(-rx,-h); ctx.lineTo(0,-h-ry); ctx.lineTo(rx,-h); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.globalAlpha=.65; ctx.beginPath(); ctx.moveTo(-rx,-h); ctx.lineTo(-rx,0); ctx.lineTo(0,ry); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(rx,-h); ctx.lineTo(rx,0); ctx.lineTo(0,ry); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; ctx.stroke(); }
       if(active) { ctx.strokeStyle="#79eac6"; ctx.lineWidth=1.5; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.ellipse(0,3,rx*1.7,ry*1.7,0,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
       ctx.restore(); ctx.fillStyle=active?"#e8fff8":"#9bb1c6"; ctx.font=active?"bold 12px sans-serif":"11px sans-serif"; ctx.textAlign="center"; ctx.fillText(o.name.slice(0,24),p.x,p.y-h-19);
