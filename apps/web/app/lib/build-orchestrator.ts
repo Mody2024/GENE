@@ -152,7 +152,8 @@ export function checkpointBuild(
   };
   return {
     ...run,
-    checkpoints: [...run.checkpoints, checkpoint],
+    // Keep a bounded recovery history: every checkpoint may contain a full source snapshot.
+    checkpoints: [...run.checkpoints, checkpoint].slice(-8),
     updatedAt: isoNow(now),
     status: reason === "user-interruption" ? "paused" : run.status,
   };
