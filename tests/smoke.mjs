@@ -62,6 +62,7 @@ assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file
 assert.ok(prompts.includes("GENE 1.6") && prompts.includes("GENE 1.6 MODE CONTRACT") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.6 supports mode-specific orchestration, detailed plans, and read-only prompt enhancement");
 assert.ok(page.includes("GENE 1.6 Flash") && page.includes("GENE 1.6 Balanced") && page.includes("GENE 1.6 Thinking"), "workspace exposes the three named GENE 1.6 modes");
 assert.ok(prompts.includes("input.operation === \"chat\" || input.operation === \"research\" || input.operation === \"enhancePrompt\""), "non-build operations receive a compact plan summary rather than repeatedly serializing every plan task");
+assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("✦ Enhance prompt"), "workspace exposes extended planning and prompt enhancement controls");
