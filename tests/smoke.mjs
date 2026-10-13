@@ -525,3 +525,31 @@ assert.ok(studioContract.includes("pipeline-dependent") && studioContract.includ
 assert.ok(studioContract.includes("polished, coherent vertical slice") && studioContract.includes("art direction") && studioContract.includes("weak hardware"), "studio contract prioritizes coherent game quality and target performance over asset count");
 assert.ok(prompts.includes('import { buildStudioContract } from "./studio-contract";') && prompts.includes("buildStudioContract(projectKind"), "all AI operations receive the capability-aware production contract");
 assert.ok(capabilitiesApi.includes("getStudioCapabilities") && capabilitiesApi.includes("INVALID_PROJECT_KIND") && capabilitiesApi.includes("INVALID_ENGINE"), "capability API validates requested project kind and engine before returning support information");
+
+
+const projectMemorySource = read("apps/web/app/lib/project-memory.ts");
+assert.ok(prompts.includes('import { formatCanonicalProjectMemory } from "./project-memory";') && prompts.includes("CANONICAL PROJECT MEMORY"), "AI prompt context includes structured project memory separately from chat");
+assert.ok(projectMemorySource.includes("confirmedDecisions") && projectMemorySource.includes("latestCheckpoint") && projectMemorySource.includes("unfinishedTasks"), "project memory tracks decisions, checkpoint evidence, and unfinished work");
+const memoryJs = tsCompiler.transpileModule(projectMemorySource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const projectMemory = await import("data:text/javascript;base64," + Buffer.from(memoryJs).toString("base64"));
+const memorySnapshot = projectMemory.buildCanonicalProjectMemory({
+  id: "memory-test", name: "Test project", kind: "game", initialPrompt: "A small survival game",
+  mode: "build", thinking: "deep", messages: [], answers: { engine: "WebGL 3D", playerCount: "Single player" },
+  plan: { title: "Survival", summary: "Survive rounds", engine: "webgl3d", tasks: ["movement", "enemies"], mechanics: ["combat"], performanceBudget: { targetFps: 60, maxEnemies: 12, maxObjects: 800, maxParticles: 80 } },
+  files: { "game.js": "start();", "game-spec.json": "{}" }, versions: [{ number: 3, label: "Known good", files: {}, createdAt: "2026-01-01", testSummary: "pass" }],
+  activeFile: "game.js", references: [], updatedAt: "2026-01-01",
+  buildRun: { ...checkpointRun, status: "recovering", lastError: "Temporary generation error" }
+});
+assert.equal(memorySnapshot.confirmedDecisions.length, 2, "canonical project memory preserves user-confirmed answers");
+assert.equal(memorySnapshot.currentPlan.engine, "webgl3d", "canonical project memory preserves the selected engine");
+assert.equal(memorySnapshot.source.fileCount, 2, "canonical project memory tracks the current source manifest");
+assert.equal(memorySnapshot.build.lastError, "Temporary generation error", "canonical project memory retains the latest recoverable error");
+assert.ok(projectMemory.formatCanonicalProjectMemory({ id: "minimal", name: "Minimal", initialPrompt: "x", mode: "plan", thinking: "balanced", messages: [], answers: {}, files: {}, versions: [], activeFile: "", references: [], updatedAt: "2026-01-01" }).includes('"schemaVersion":1'), "canonical memory has an explicit schema version");
+let boundedHistoryRun = baseRun;
+for (let index = 0; index < 12; index++) {
+  boundedHistoryRun = coordinator.checkpointBuild(boundedHistoryRun, { "game.js": "snapshot-" + index }, { passed: [], failed: [] }, "task-complete", "bounded history test", "2026-01-01T00:00:" + String(index).padStart(2, "0") + ".000Z");
+}
+assert.equal(boundedHistoryRun.checkpoints.length, 8, "checkpoint history is bounded to eight full source snapshots");
+assert.equal(boundedHistoryRun.checkpoints[0].lastKnownGoodFiles["game.js"], "snapshot-4", "bounded history retains the eight newest recovery snapshots");
