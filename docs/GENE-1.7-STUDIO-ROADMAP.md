@@ -1,4 +1,4 @@
-# GENE 1.7 — Studio, Memory, and Asset Intelligence Roadmap
+# GENE 1.7: Studio Forge — Studio-Scale Game Creation
 
 Status: proposal for after GENE 1.6 reliability gates. This document is a plan, not a claim that these capabilities already exist.
 
