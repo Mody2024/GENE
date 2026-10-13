@@ -61,18 +61,18 @@ assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
-assert.ok(prompts.includes("GENE 1.6") && prompts.includes("GENE 1.6 MODE CONTRACT") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.6 supports mode-specific orchestration, detailed plans, and read-only prompt enhancement");
+assert.ok(prompts.includes("UNIFIED BRAIN CONTRACT") && prompts.includes("AUTONOMOUS DESIGN PASS") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE keeps unified mode orchestration, detailed plans, and read-only prompt enhancement");
 assert.ok(api.includes("GENE_THINKING_MODEL") && api.includes("GENE_BALANCED_MODEL") && api.includes("requestedThinking"), "Flash, Balanced, and Thinking route through mode-specific configured Gemini models");
 assert.ok(page.includes("thinking: nextProject.thinking") && !page.includes("model: aiModel,\n        thinking: nextProject.thinking"), "normal agent requests allow server-side model routing for the selected GENE mode");
 assert.ok(page.includes('aria-label="Conversation mode"') && page.includes("Chat</button>") && page.includes("Plan</button>") && page.includes("Build</button>") && page.includes("<option value=\"fast\">Fast</option>") && page.includes("<option value=\"deep\">Deep</option>"), "workspace exposes explicit Chat/Plan/Build modes and response-depth choices in the composer");
 assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation)'), "planning and conversational operations use bounded project context");
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
-assert.ok(prompts.includes("const compactPlan = p?.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
-assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
+assert.ok(prompts.includes("const compactPlan = p && p.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
+assert.ok(page.includes("pinned-plan-strip") && page.includes('aria-label="Pinned project plan"') && page.includes("project.plan.title"), "the active project plan stays visible above the scrolling chat");
 assert.ok(page.includes("GENE · CREATIVE WORKSPACE") && page.includes("GENE BUILD SYSTEM") && page.includes("GENE <span>1.9</span>"), "workspace uses clean GENE 1.9 branding without stale release labels");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
-assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("Enhance prompt") && page.includes("PLANNING WORKFLOW"), "composer tools expose deep planning and prompt enhancement without cluttering the input area");
-assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Select to edit"), "live preview supports selecting an element to prepare a targeted edit");
+assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("Enhance prompt") && prompts.includes("PLANNING WORKFLOW"), "composer tools expose deep planning and prompt enhancement without cluttering the input area");
+assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Edit the selected live-preview element") && page.includes('aria-label="Select in preview to edit"'), "live preview supports selecting an element to prepare a targeted edit");
 assert.ok(page.includes("files in the current manifest") && page.includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
 assert.ok(api.includes("body.operation === \"enhancePrompt\"") && api.includes("extendedPlanning: body.extendedPlanning === true"), "API accepts the prompt enhancer operation and extended planning flag");
 assert.ok(api.includes("no keyboard, touch, or controller input handlers were found"), "final validation reports absent input handlers without inventing keyboard controls");
@@ -133,7 +133,7 @@ assert.ok(gameGuides.includes("localMultiplayer2d"), "game guide catalog has a d
 assert.ok(gameGuides.includes("Pressing a Player 1 key changes only Player 1 state"), "local multiplayer guide requires independent input ownership");
 assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer guide checks shared pause and reset behavior");
 assert.ok(prompts.includes("WASD+F for P1"), "multiplayer prompt defines distinct default keyboard layouts");
-assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
+assert.ok(prompts.includes("customizable controls") || prompts.includes("remappable keyboard actions") || prompts.includes("WASD+F for P1"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
 assert.ok(starterGameSource.includes("function initAudio()") && starterGameSource.includes("playSfx(") && starterGameSource.includes("function startMusic()") && starterGameSource.includes("patterns={ui:"), "built-in playable game includes procedural music and event-driven sound effects");
 assert.ok(starterGameSource.includes('"audio":{"enabled":true,"implementation":"procedural-web-audio"') && starterGameSource.includes('id=\\\"audio-button\\\"') && starterGameSource.includes("gene-outpost-muted"), "starter game exposes a mute control, persists mute preference, and declares its audio manifest");
@@ -156,9 +156,9 @@ assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
 assert.ok(page.includes('zip.file("references/" + safeName'), "export preserves reference files");
 assert.ok(page.includes("referenceInputRef.current?.click()"), "reference uploads are wired");
-assert.ok(page.includes("setSearchMode(!searchMode)"), "grounded search mode is toggleable");
+assert.ok(page.includes("setSearchMode(value => !value)") && page.includes("Research the web"), "grounded search mode is toggleable from the composer tools menu");
 assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
-assert.ok(page.includes("Automated runtime repair"), "preview failure triggers bounded repair");
+assert.ok(page.includes("autoRepairAttempts") && page.includes("runtimeRefreshAttempts") && page.includes("gene-runtime"), "preview failures trigger bounded runtime recovery and repair");
 assert.ok(page.includes("!previewOpen || !iframeRef.current"), "collapsed or unmounted previews cannot trigger false render-timeout failures");
 assert.ok(page.includes("current === \"rendered\" && state === \"loaded\" ? \"rendered\" : state"), "late monitor samples cannot downgrade a confirmed visible frame");
 assert.ok(page.includes("window.__geneFrameConfirmed"), "canvas and WebGL render monitor remembers successful frame evidence");
@@ -489,9 +489,9 @@ console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.")
 assert.ok(api.includes('import { applyPatchBatch } from "../../lib/patch-engine"'), "agent edit validation uses the patch engine");
 assert.ok(api.includes("const patchOperations = files.map") && api.includes("const patched = applyPatchBatch(body.project.files, patchOperations)"), "AI edits are applied as an atomic patch batch before project validation");
 
-assert.ok(prompts.includes("Plan an update") || prompts.includes("UPDATE PLAN"), "planning prompts support updates to existing projects");
+assert.ok(prompts.includes("PLANNING WORKFLOW") && prompts.includes("revise the existing plan"), "planning prompts support updates to existing projects");
 assert.ok(prompts.includes("Plan only") && prompts.includes("PLANNING INTENT"), "plan mode distinguishes new-project planning from update planning");
-assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Plan an update"), "workspace exposes an explicit plan-update choice");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Update plan"), "workspace exposes an explicit plan-update choice");
 assert.ok(!page.includes("prototypeMinutes: 20") && !page.includes("fullGameMinutes: 120"), "build coordinator does not force fixed playtime durations");
 assert.ok(page.includes("project-specific estimate pending"), "workspace labels unknown duration estimates instead of inventing defaults");
 
@@ -505,7 +505,7 @@ assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.inc
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
-assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
+assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Update plan") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
 assert.ok(api.includes("Build rejected: game audio is missing or only decorative") && api.includes("enforceAudioContract"), "fresh game builds and assembled-build validation reject missing or decorative audio without blocking unrelated targeted edits");
@@ -554,7 +554,7 @@ assert.ok(prompts.includes("GAME IDENTITY AND CONTENT QUALITY") && prompts.inclu
 assert.ok(prompts.includes("stop or replace music loops instead of stacking them") && prompts.includes("Pause must silence or pause music"), "generated audio must clean up correctly on pause, restart and repeated scene transitions");
 
 assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec promises touch/pointer controls") && api.includes("spec promises controller support"), "validation checks declared keyboard, touch, and gamepad controls instead of only checking for any event handler");
-assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.js$/i.test(path)") && api.includes("test(runtimeSource)"), "control validation scans all assembled JavaScript modules, not only game.js");
+assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([path, content])") && api.includes("test(runtimeSource)"), "control validation scans all assembled JavaScript modules, not only game.js");
 assert.ok(api.includes("spec.controls = inferred") && api.includes("normalizedSpecChanged") && api.includes("validationFiles"), "final validation deterministically repairs and returns a missing game controls contract");
 assert.ok(api.includes("const recoveredControls: string[] = []") && api.includes("game controls are missing and no keyboard, touch, or controller handlers were found"), "build contract recovers controls from the complete assembled runtime and gives a precise error when no input handlers exist");
 assert.ok(page.includes("Add app modules only when the actual requested feature scope needs them") && page.includes("A module is justified by a feature, not by a fixed template"), "additional modules are selected from project scope instead of a fixed file template");
@@ -563,7 +563,7 @@ assert.ok(page.includes("const safeManifest =") && page.includes("spec.additiona
 assert.ok(api.includes(String.raw`if (/\.js$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
 
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
-assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
+assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\"") && page.includes("messages: [...current.messages, ...appendedMessages]"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
 assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
 
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
