@@ -52,15 +52,15 @@ const browser = await chromium.launch({
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 });
 try {
-  const capabilityResponse = await browser.newPage();
-  const capabilityResult = await capabilityResponse.request.get(baseURL + "/api/capabilities?kind=game&engine=webgl3d");
+  const capabilityContext = await browser.newContext();
+  const capabilityResult = await capabilityContext.request.get(baseURL + "/api/capabilities?kind=game&engine=webgl3d");
   assert.equal(capabilityResult.status(), 200, "capability endpoint should respond for a supported game engine");
   const capabilityBody = await capabilityResult.json();
   assert.ok(capabilityBody.ok && capabilityBody.capabilities.some(item => item.id === "online-multiplayer" && item.level === "pipeline-dependent"), "capability API must clearly label online multiplayer as pipeline-dependent");
   assert.ok(capabilityBody.capabilities.some(item => item.id === "native-binaries" && item.level === "pipeline-dependent"), "capability API must not imply native binaries are automatically available");
-  const invalidCapability = await capabilityResponse.request.get(baseURL + "/api/capabilities?kind=app&engine=bogus");
+  const invalidCapability = await capabilityContext.request.get(baseURL + "/api/capabilities?kind=app&engine=bogus");
   assert.equal(invalidCapability.status(), 400, "capability endpoint must reject unknown engines");
-  await capabilityResponse.close();
+  await capabilityContext.close();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const fatalErrors = [];
   page.on("pageerror", error => fatalErrors.push(error.message));
