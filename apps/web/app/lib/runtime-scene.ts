@@ -36,7 +36,10 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           rotation: vector(raw.rotation ?? raw.rotation3d, { x: 0, y: 0, z: 0 }),
           scale: vector(raw.scale ?? raw.scale3d, { x: 1, y: 1, z: 1 }),
           color,
-          visible: raw.visible !== false
+          visible: raw.visible !== false,
+          material: (() => { const m = raw.material && typeof raw.material === "object" ? raw.material as Record<string, unknown> : {}; const finite = (v: unknown, fallback: number) => Number.isFinite(Number(v)) ? Math.max(0, Math.min(1, Number(v))) : fallback; return { roughness: finite(m.roughness, 0.65), metalness: finite(m.metalness, 0), emissive: typeof m.emissive === "string" && /^#[0-9a-f]{6}$/i.test(m.emissive) ? m.emissive : "#000000" }; })(),
+          light: (() => { const l = raw.light && typeof raw.light === "object" ? raw.light as Record<string, unknown> : {}; const intensity = Number(l.intensity); return { intensity: Number.isFinite(intensity) ? Math.max(0, Math.min(20, intensity)) : 1, color: typeof l.color === "string" && /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : color }; })(),
+          camera: (() => { const c = raw.camera && typeof raw.camera === "object" ? raw.camera as Record<string, unknown> : {}; const fov = Number(c.fov); return { fov: Number.isFinite(fov) ? Math.max(10, Math.min(120, fov)) : 60 }; })()
         };
       })
     };
