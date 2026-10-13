@@ -412,7 +412,7 @@ const sceneSpec = { scene: { objects: [
 const sceneBootstrap = sceneRuntimeModule.buildRuntimeSceneBootstrap({ "game-spec.json": JSON.stringify(sceneSpec) });
 const sceneVm = await import("node:vm");
 const sceneWindow = {};
-sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace(/<\\/script>$/, ""), { window: sceneWindow });
+sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace("</script>", ""), { window: sceneWindow });
 assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getTransform("crate"))), { position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 } }, "runtime scene bootstrap round-trips saved transforms");
 assert.equal(sceneWindow.GENE_SCENE.getVisibleObjects().length, 1, "runtime scene bootstrap preserves hidden object state");
 assert.equal(sceneWindow.GENE_SCENE.getObject("crate").material.metalness, 0.8, "runtime scene bootstrap preserves material properties");
