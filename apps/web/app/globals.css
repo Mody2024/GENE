@@ -703,7 +703,7 @@ button:active:not(:disabled){transform:translateY(1px) scale(.985)}
 .composer .plan-intent-switch{display:flex;gap:6px;padding:8px 12px 0}
 .composer .plan-intent-switch button{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:6px 9px;font-size:10px;color:var(--muted)}
 .composer .plan-intent-switch button.tool-active{border-color:color-mix(in srgb,var(--green) 35%,var(--border));color:var(--text);background:color-mix(in srgb,var(--green) 8%,var(--surface))}
-.composer textarea{display:block;width:100%;min-height:50px;max-height:180px;resize:vertical;border:0;background:transparent}
+.composer textarea{display:block;width:100%;min-height:50px;max-height:180px;resize:none;overflow-y:auto;border:0;background:transparent;transition:height .12s ease}
 .composer textarea:focus-visible{outline:none}
 .composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 10px 10px 12px}
 .composer-quick-tools{display:flex;align-items:center;gap:8px;min-width:0}
