@@ -1,0 +1,48 @@
+/**
+ * Bridges the saved Scene Studio manifest into the isolated playable runtime.
+ * The bridge is renderer-agnostic: generated Canvas/WebGL engines can consume the
+ * same validated transforms without relying on editor-only React state.
+ */
+export function buildRuntimeSceneBootstrap(files: Record<string, string> | undefined): string {
+  let scene: Record<string, unknown> = {};
+  try {
+    const spec = JSON.parse((files || {})["game-spec.json"] || "{}") as Record<string, unknown>;
+    const rawScene = spec.scene && typeof spec.scene === "object" && !Array.isArray(spec.scene)
+      ? spec.scene as Record<string, unknown>
+      : {};
+    const rawObjects = Array.isArray(rawScene.objects) ? rawScene.objects
+      : Array.isArray(spec.sceneObjects) ? spec.sceneObjects
+      : Array.isArray(spec.objects) ? spec.objects
+      : [];
+    const vector = (value: unknown, fallback: { x: number; y: number; z: number }) => {
+      const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      const axis = (key: "x" | "y" | "z") => {
+        const n = Number(raw[key]);
+        return Number.isFinite(n) ? Math.max(-100000, Math.min(100000, n)) : fallback[key];
+      };
+      return { x: axis("x"), y: axis("y"), z: axis("z") };
+    };
+    scene = {
+      version: 1,
+      objects: rawObjects.slice(0, 500).map((entry, index) => {
+        const raw = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
+        const id = typeof raw.id === "string" ? raw.id.slice(0, 120) : "scene-object-" + (index + 1);
+        const name = typeof raw.name === "string" ? raw.name.slice(0, 120) : "Object " + (index + 1);
+        const color = typeof raw.color === "string" && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : "#8b9bb4";
+        return {
+          id, name,
+          type: typeof raw.type === "string" ? raw.type.slice(0, 60) : "mesh",
+          position: vector(raw.position ?? raw.position3d ?? raw.translation, { x: 0, y: 0, z: 0 }),
+          rotation: vector(raw.rotation ?? raw.rotation3d, { x: 0, y: 0, z: 0 }),
+          scale: vector(raw.scale ?? raw.scale3d, { x: 1, y: 1, z: 1 }),
+          color,
+          visible: raw.visible !== false
+        };
+      })
+    };
+  } catch {
+    scene = { version: 1, objects: [], error: "Invalid game-spec.json scene manifest" };
+  }
+  const serialized = JSON.stringify(scene).replace(/</g, "\\u003c");
+  return "<script>window.GENE_SCENE=" + serialized + ";window.GENE_SCENE.getObject=function(id){return this.objects.find(function(o){return o.id===id})||null};window.GENE_SCENE.getVisibleObjects=function(){return this.objects.filter(function(o){return o.visible})};window.GENE_SCENE.getTransform=function(id){var o=this.getObject(id);return o?{position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale)}:null};</script>";
+}
