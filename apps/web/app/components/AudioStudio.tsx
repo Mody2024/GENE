@@ -91,7 +91,8 @@ export default function AudioStudio({ files, readOnly = false, onSave }: Props) 
       const music = kind === "music";
       const master = enabled ? levels.master : 0;
       const bus = music ? levels.music : levels.sfx;
-      const volume = Math.max(0.0001, master * bus * (kind === "impact" ? 0.32 : 0.55));
+      const volume = master * bus * (kind === "impact" ? 0.32 : 0.55);
+      if (volume <= 0) { setStatus("Preview muted because the master or selected bus level is zero, or audio is disabled."); return; }
       const addVoice = (frequency: number, at: number, duration: number, wave: OscillatorType, gainScale = 1) => {
         const oscillator = context.createOscillator();
         const gain = context.createGain();
