@@ -633,8 +633,12 @@ const identicalMerge = projectMemory.mergeConcurrentSourceChanges(
 assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do not create a false conflict");
 
 const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
+const webglSceneViewport = read("apps/web/app/components/WebGLSceneViewport.tsx");
 const audioStudio = read("apps/web/app/components/AudioStudio.tsx");
 assert.ok(sceneStudio.includes("legend>Material") && sceneStudio.includes("legend>Light") && sceneStudio.includes("legend>Camera"), "Scene Studio exposes material, light and camera inspectors");
+assert.ok(sceneStudio.includes('import WebGLSceneViewport from "./WebGLSceneViewport"') && sceneStudio.includes('useState<"webgl" | "isometric">("webgl")'), "Scene Studio defaults to the integrated WebGL viewport and retains the isometric editor");
+assert.ok(webglSceneViewport.includes('getContext("webgl"') && webglSceneViewport.includes("requestAnimationFrame(render)") && webglSceneViewport.includes("camera.current.yaw") && webglSceneViewport.includes("camera.current.distance"), "WebGL scene viewport renders real GPU geometry with orbit and zoom controls");
+assert.ok(webglSceneViewport.includes("gl!.drawArrays(gl!.TRIANGLES,0,36)") && webglSceneViewport.includes("onSelect(chosen.id)"), "WebGL viewport draws scene objects and supports object selection");
 assert.ok(sceneStudio.includes('aria-label={"Move " + selected.name + " negative " + axis}') && sceneStudio.includes("Rotate Y +15°") && sceneStudio.includes("Scale +10%"), "Scene Studio provides selected-object axis nudges, rotation and scale controls");
 assert.ok(page.includes('import AudioStudio from "./components/AudioStudio"') && page.includes('id: "audio" as const') && page.includes('section === "audio"'), "Audio Studio is integrated into workspace navigation");
 assert.ok(audioStudio.includes("window.AudioContext") && audioStudio.includes("createOscillator()") && audioStudio.includes("oscillator.start(at)") && audioStudio.includes("oscillator.stop(at + duration"), "Audio Studio uses real Web Audio oscillators with envelopes and explicit node lifetimes");
