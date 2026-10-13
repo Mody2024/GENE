@@ -5,8 +5,12 @@ import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectK
 import { checkpointBuild, createBuildRun, recoverFromCheckpoint, resumeBuild, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
+import SceneStudio from "./components/SceneStudio";
+import AudioStudio from "./components/AudioStudio";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
+import { mergeConcurrentSourceChanges } from "./lib/project-memory";
+import { buildProjectStorageCandidates } from "./lib/project-storage";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -145,13 +149,14 @@ export default function Home() {
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
-  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "versions">("chat");
+  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
   const [expandedPreview, setExpandedPreview] = useState(false);
   const [editedFile, setEditedFile] = useState("");
   const [fileDirty, setFileDirty] = useState(false);
   const [notice, setNotice] = useState("");
+  const [persistenceWarning, setPersistenceWarning] = useState("");
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
   const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
   const [showActivity, setShowActivity] = useState(false);
@@ -205,11 +210,35 @@ export default function Home() {
   useEffect(() => {
     if (!project) return;
     const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 8);
-    setProjects(prev => {
-      const next = [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); localStorage.setItem(ACTIVE_KEY, project.id); } catch {}
-      return next;
-    });
+    setProjects(prev => [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8));
+
+    let savedStrategy: string | null = null;
+    try {
+      for (const candidate of buildProjectStorageCandidates(merged)) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate.projects));
+          localStorage.setItem(ACTIVE_KEY, project.id);
+          savedStrategy = candidate.strategy;
+          break;
+        } catch {
+          // Quota errors are expected during fallback attempts; try a smaller snapshot.
+        }
+      }
+    } catch {
+      savedStrategy = null;
+    }
+
+    if (savedStrategy === "full") {
+      setPersistenceWarning("");
+    } else if (savedStrategy === "trim-history") {
+      setPersistenceWarning("Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.");
+    } else if (savedStrategy === "active-project") {
+      setPersistenceWarning("Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.");
+    } else if (savedStrategy === "active-project-minimal") {
+      setPersistenceWarning("Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export a project ZIP now to create a separate backup.");
+    } else {
+      setPersistenceWarning("GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.");
+    }
   }, [project]);
 
   useEffect(() => {
@@ -446,7 +475,6 @@ export default function Home() {
       let responseOk = true;
       const baseRequest = {
         mode: operation === "build" || operation === "edit" || operation === "surprise" || operation === "buildPart" ? "build" : nextProject.mode,
-        model: aiModel,
         thinking: nextProject.thinking,
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
         answers: nextAnswers,
@@ -846,7 +874,18 @@ export default function Home() {
         const error = payload?.error?.message || "GENE could not complete the request.";
         addActivity("Request failed: " + error);
         const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
-        setProject(failed);
+        setProject(current => {
+          if (!current || current.id !== failed.id) return current;
+          const knownIds = new Set(current.messages.map(item => item.id));
+          const appendedMessages = failed.messages.filter(item => !knownIds.has(item.id));
+          return {
+            ...current,
+            buildRun: activeBuildRun || current.buildRun || failed.buildRun,
+            livingPreview: activeBuildRun ? failed.livingPreview : current.livingPreview,
+            messages: [...current.messages, ...appendedMessages],
+            updatedAt: now()
+          };
+        });
         setNotice(error);
         return;
       }
@@ -887,23 +926,54 @@ export default function Home() {
         updatedAt: now()
       };
       setProject(current => {
-        if (!current || current.id !== updated.id) return updated;
+        // A late response must never switch the workspace back to an older project.
+        if (!current || current.id !== updated.id) return current;
         const knownIds = new Set(current.messages.map(item => item.id));
         const appendedMessages = updated.messages.filter(item => !knownIds.has(item.id));
         const isReadOnlyReply = operation === "chat" || operation === "research";
         if (isReadOnlyReply) {
           return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };
         }
-        if (!buildInProgress) return updated;
+
+        const sourceMerge = mergeConcurrentSourceChanges(nextProject.files, current.files, updated.files, changedPaths);
+        const planChangedDuringRequest = JSON.stringify(current.plan ?? null) !== JSON.stringify(nextProject.plan ?? null);
+        const planConflict = Boolean(result.plan && planChangedDuringRequest);
+        if (sourceMerge.conflicts.length || planConflict) {
+          const conflicts = sourceMerge.conflicts.length ? " Conflicting files: " + sourceMerge.conflicts.join(", ") + "." : "";
+          const planConflictText = planConflict ? " The approved plan also changed while this request was running." : "";
+          const conflictMessage = message("assistant",
+            "GENE discarded this stale result to protect newer project edits. Nothing from this response was applied. Retry the request against the latest source." + conflicts + planConflictText,
+            "error");
+          return {
+            ...current,
+            messages: [...current.messages, ...appendedMessages, conflictMessage],
+            updatedAt: now()
+          };
+        }
+
+        let versions = current.versions;
+        if (changedPaths.length && updated.versions[0]) {
+          const latestNumber = current.versions.reduce((maximum, version) => Math.max(maximum, version.number), 0);
+          const safeVersion = {
+            ...updated.versions[0],
+            number: Math.max(updated.versions[0].number, latestNumber + 1),
+            files: { ...sourceMerge.files }
+          };
+          versions = [safeVersion, ...current.versions].slice(0, 8);
+        }
+
         return {
           ...current,
-          ...updated,
-          files: { ...current.files, ...updated.files },
-          versions: updated.versions,
-          plan: updated.plan,
+          name: current.name === nextProject.name ? updated.name : current.name,
+          mode: current.mode === nextProject.mode ? updated.mode : current.mode,
+          answers: current.answers,
+          question: current.question === nextProject.question ? updated.question : current.question,
+          files: sourceMerge.files,
+          versions,
+          plan: result.plan ? updated.plan : current.plan,
           buildRun: activeBuildRun || current.buildRun || updated.buildRun,
           livingPreview: changedPaths.length ? updated.livingPreview : current.livingPreview,
-          activeFile: updated.activeFile,
+          activeFile: current.activeFile === nextProject.activeFile && changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : current.activeFile,
           messages: [...current.messages, ...appendedMessages],
           updatedAt: now()
         };
@@ -930,7 +1000,7 @@ export default function Home() {
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(current => {
-        if (!current || current.id !== failed.id) return failed;
+        if (!current || current.id !== failed.id) return current;
         const knownIds = new Set(current.messages.map(item => item.id));
         return {
           ...current,
@@ -1268,7 +1338,6 @@ export default function Home() {
         body: JSON.stringify({
           operation: "enhancePrompt",
           mode: "plan",
-          model: aiModel,
           thinking: project.thinking,
           extendedPlanning,
           message: draft.trim(),
@@ -1526,6 +1595,32 @@ export default function Home() {
     add("Gameplay playtest", "warn", "These checks do not simulate collisions, progression, difficulty or win/loss behavior. Play the game and verify those mechanics yourself.");
     setBuildReport({ checkedAt: now(), projectUpdatedAt: project.updatedAt, checkedDirty: fileDirty, checkedFile: project.activeFile, checkedEditorContent: editedFile, checks });
     addActivity("Build checks finished: " + checks.filter(check => check.status === "pass").length + " passed, " + checks.filter(check => check.status === "warn").length + " warnings, " + checks.filter(check => check.status === "fail").length + " failed.");
+  }
+
+  function saveStudioFiles(nextFiles: Record<string, string>, label: string) {
+    if (!project) return;
+    if (project.mode === "plan") {
+      setNotice("Plan mode is read-only. Switch to Build mode before editing project manifests.");
+      return;
+    }
+    const version: BuildVersion = {
+      number: (project.versions[0]?.number || 0) + 1,
+      label,
+      files: { ...nextFiles },
+      createdAt: now(),
+      testSummary: "Studio manifest saved. Runtime integration and preview behavior still need verification."
+    };
+    const updatedProject = { ...project, files: nextFiles, activeFile: "game-spec.json", versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
+    setProject(updatedProject);
+    setEditedFile(nextFiles["game-spec.json"] || "{}");
+    setFileDirty(false);
+    setNotice("Saved " + label + " as version " + version.number + " in game-spec.json. Confirm runtime integration in preview.");
+    setPreviewKey(n => n + 1);
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice("Saved " + label + " v" + version.number + " and synced files to " + data.projectPath + ". Preview integration still needs testing."))
+        .catch(error => setNotice("Scene data saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
   }
 
   function saveManualEdit() {
@@ -1838,6 +1933,8 @@ export default function Home() {
     { id: "files" as const, icon: "▤", label: "Files" },
     { id: "tasks" as const, icon: "☷", label: "Plan & tasks" },
     { id: "assets" as const, icon: "◇", label: "Assets" },
+    { id: "scene" as const, icon: "▧", label: "Scene Studio" },
+    { id: "audio" as const, icon: "♫", label: "Audio Studio" },
     { id: "versions" as const, icon: "↺", label: "Versions" }
   ];
 
@@ -1889,8 +1986,8 @@ export default function Home() {
               <button className={project.mode === "plan" ? "active" : ""} onClick={() => setProject({ ...project, mode: "plan" })}>Plan</button>
               <button className={project.mode === "build" ? "active" : ""} onClick={() => setProject({ ...project, mode: "build" })}>Build</button>
             </div>
-            <select className="thinking-select" value={project.thinking} aria-label="Thinking mode" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
-              <option value="fast">Fast</option><option value="balanced">Balanced</option><option value="deep">Deep</option>
+            <select className="thinking-select" value={project.thinking} aria-label="GENE 1.6 model mode" title="Flash: fast iterations · Balanced: default quality · Thinking: highest configured reasoning effort" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
+              <option value="fast">GENE 1.6 Flash</option><option value="balanced">GENE 1.6 Balanced</option><option value="deep">GENE 1.6 Thinking</option>
             </select>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
@@ -1903,6 +2000,7 @@ export default function Home() {
         </header>
 
         {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
+        {persistenceWarning && <div className="notice persistence-warning" role="status" aria-live="polite"><span>{persistenceWarning}</span><button onClick={() => setPersistenceWarning("")}>Dismiss</button></div>}
 
         {binaryBuildLinks && <div className="binary-build-result" role="status">
           <div className="binary-build-result-heading"><strong>Cloud build results</strong><span>{binaryBuildId ? binaryBuildId.slice(0, 8) : ""}</span></div>
@@ -1920,10 +2018,16 @@ export default function Home() {
         <div className={"workspace" + (!previewOpen ? " preview-minimized" : "")}>
           <section className="conversation-panel">
             {section === "chat" && <>
+              {project.plan && <div className="pinned-plan-strip" role="region" aria-label="Pinned project plan">
+                <div className="pinned-plan-mark">✓</div>
+                <div className="pinned-plan-copy"><div className="pinned-plan-label">PINNED PROJECT PLAN <span>· {project.plan.engine === "canvas2d" ? "2D" : project.plan.engine === "webgl3d" ? "3D" : "WEB APP"}</span></div><strong>{project.plan.title}</strong><p>{project.plan.summary}</p></div>
+                <div className="pinned-plan-progress">{project.buildRun ? <><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length}</strong><small>tasks passed</small></> : <><strong>{project.plan.tasks.length}</strong><small>planned tasks</small></>}</div>
+                <button type="button" onClick={() => setSection("tasks")}>Open plan ↗</button>
+              </div>}
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow">GENE 1.3 FLASH</div>
+                  <div className="eyebrow">GENE 1.6 FLASH</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
                   <div className="starter-grid">
@@ -1991,7 +2095,7 @@ export default function Home() {
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
               {project.buildRun && <div className="build-check-panel">
-                <div className="build-check-head"><div><div className="eyebrow">GENE 1.4 FLASH</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="build-check-head"><div><div className="eyebrow">GENE 1.6 BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
                 <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
                 <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
                 {(project.buildRun.status === "failed" || project.buildRun.status === "recovering" || project.buildRun.tasks.some(task => task.status === "failed" || task.status === "blocked")) && <button className="primary-button" disabled={busy || buildInProgress} onClick={() => void runAgent("Resume this existing GENE build from its latest saved checkpoint. Restore checkpoint files, keep every passed task unchanged, retry only unfinished or failed tasks, then rerun final validation and repair. Do not restart from zero or claim completion unless all required tasks pass.", "build")}>Resume from checkpoint</button>}
@@ -2008,6 +2112,19 @@ export default function Home() {
               </div>
               {project.plan ? <><div className="plan-overview"><h3>{project.plan.title}</h3><p>{project.plan.summary}</p><div className="plan-metrics"><span>{project.plan.engine}</span>{project.kind === "app" ? <><span>{project.plan.mechanics.length} planned features</span><span>{project.plan.tasks.length} implementation steps</span></> : <><span>Target {project.plan.performanceBudget.targetFps} FPS</span><span>Max enemies {project.plan.performanceBudget.maxEnemies}</span></>}</div></div><div className="task-list">{project.plan.tasks.map((task, i) => <div key={task}><span>{String(i + 1).padStart(2, "0")}</span><p>{task}</p><small>{Object.keys(project.files).length ? "Source exists; verify task completion in the live game." : "Planned"}</small></div>)}</div><button className="primary-button" onClick={startBuild} disabled={busy}>Start building plan →</button></> : <div className="empty-state">{project.kind === "app" ? "No plan yet. Describe the app in Chat, then GENE will help define its screens and user flows." : "No plan yet. Describe a game in Chat, then GENE will interview you one question at a time."}</div>}
             </div>}
+
+            {section === "audio" && <AudioStudio
+              files={project.files}
+              readOnly={project.mode === "plan"}
+              onSave={saveStudioFiles}
+            />}
+
+            {section === "scene" && <SceneStudio
+              files={project.files}
+              readOnly={project.mode === "plan"}
+              onSave={saveStudioFiles}
+              onWireRuntime={prompt => { setSection("chat"); setDraft(prompt); setNotice("Prepared a request to integrate the scene manifest into the actual runtime. Review it in Chat and send it to apply."); }}
+            />}
 
             {section === "assets" && <div className="tool-view forge-view">
   <div className="tool-view-heading">
@@ -2031,7 +2148,7 @@ export default function Home() {
       <div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.kind} · {asset.style}</small></div><button className="icon-button" title="Remove this asset from the project" onClick={() => removeForgeAsset(asset.id)}>×</button></div>
       {project.files[asset.objPath] ? <ObjViewport obj={project.files[asset.objPath]} mtl={project.files[asset.mtlPath] || ""} label={asset.name} /> : <div className="forge-missing-mesh">OBJ file missing</div>}
       <div className="forge-asset-stats"><span>{asset.partCount} parts</span><span>{asset.triangleCount.toLocaleString()} triangles</span></div>
-      <div className="forge-asset-actions"><button className="primary-button" onClick={() => { setForgeTargetId(asset.id); setForgeKind((["character","vehicle","building","environment","prop","weapon"].includes(asset.kind) ? asset.kind : "prop") as typeof forgeKind); setForgePrompt(""); setForgeNotice("You are editing the same saved recipe. Describe the changes you want; GENE will generate a new version of this mesh."); }}>Edit with AI</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.objPath)}>OBJ ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.mtlPath)}>MTL ↓</button></div>
+      <div className="forge-asset-actions"><button className="primary-button" onClick={() => { setForgeTargetId(asset.id); setForgeKind((["character","vehicle","building","environment","prop","weapon"].includes(asset.kind) ? asset.kind : "prop") as typeof forgeKind); setForgePrompt(""); setForgeNotice("You are editing the same saved recipe. Describe the changes you want; GENE will generate a new version of this mesh."); }}>Edit with AI</button><button className="secondary-button" onClick={() => { setSection("chat"); setDraft("Integrate the saved 3D asset \""+asset.name.replace(/["\\]/g,"")+"\": use "+asset.objPath+" and "+asset.mtlPath+" from the project files. Load it into the actual playable scene at an appropriate scale and position, assign its material, add appropriate collision if needed, and connect its gameplay role. Preserve existing controls and features. Do not create a substitute primitive or claim integration until the asset is visibly present in the preview."); setNotice("Prepared a scene-integration request for "+asset.name+". Review it in Chat and send it to apply the change."); }}>Integrate into game</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.objPath)}>OBJ ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.mtlPath)}>MTL ↓</button></div>
     </article>)}
   </div>}
 </div>}{section === "versions" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">RECOVERY</div><h2>Versions</h2><p>Every successful source-changing response creates a local snapshot. Restoring creates another snapshot, so history stays intact.</p></div>{project.versions.length ? <div className="version-list">{project.versions.map(version => <div key={version.number} className="version-item"><div className="version-number">v{String(version.number).padStart(3, "0")}</div><div className="version-meta"><strong>{version.label}</strong><small>{new Date(version.createdAt).toLocaleString()} · {Object.keys(version.files).length} files</small><p>{version.testSummary}</p></div><button className="secondary-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}</div> : <div className="empty-state">No versions yet. A version is created when GENE returns files or you save a manual edit.</div>}</div>}

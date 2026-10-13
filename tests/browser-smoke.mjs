@@ -52,6 +52,18 @@ const browser = await chromium.launch({
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 });
 try {
+  const capabilityContext = await browser.newContext();
+  const capabilityResult = await capabilityContext.request.get(baseURL + "/api/capabilities?kind=game&engine=webgl3d");
+  assert.equal(capabilityResult.status(), 200, "capability endpoint should respond for a supported game engine");
+  const capabilityBody = await capabilityResult.json();
+  assert.ok(capabilityBody.ok && capabilityBody.capabilities.some(item => item.id === "online-multiplayer" && item.level === "pipeline-dependent"), "capability API must clearly label online multiplayer as pipeline-dependent");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "native-binaries" && item.level === "pipeline-dependent"), "capability API must not imply native binaries are automatically available");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "audio-mixer" && item.level === "partial"), "capability API must expose the audio mixer as partial until runtime wiring is verified");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "asset-integration" && item.level === "partial"), "capability API must distinguish saved meshes from verified scene integration");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "spatial-audio" && item.level === "partial"), "capability API must not overclaim 3D positional audio");
+  const invalidCapability = await capabilityContext.request.get(baseURL + "/api/capabilities?kind=app&engine=bogus");
+  assert.equal(invalidCapability.status(), 400, "capability endpoint must reject unknown engines");
+  await capabilityContext.close();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const fatalErrors = [];
   page.on("pageerror", error => fatalErrors.push(error.message));
@@ -144,8 +156,40 @@ try {
   await page.getByRole("button", { name: "Run build checks" }).click();
   await page.getByText("JavaScript syntax", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('.rail button[title="Scene Studio"]').click();
+  await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Add object" }).click();
+  await page.getByRole("button", { name: /Undo/ }).click();
+  assert.equal(await page.locator(".scene-object-row").count(), 0, "Scene Studio undo removes the unsaved object entry");
+  await page.getByRole("button", { name: /Redo/ }).click();
+  assert.equal(await page.locator(".scene-object-row").count(), 1, "Scene Studio redo restores the object entry");
+  const sceneCanvas = page.getByLabel("Interactive isometric scene viewport");
+  await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
+  const sceneCanvasBox = await sceneCanvas.boundingBox();
+  assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
+  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.5, sceneCanvasBox.y + sceneCanvasBox.height * 0.533);
+  await page.mouse.down();
+  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.53, sceneCanvasBox.y + sceneCanvasBox.height * 0.55, { steps: 4 });
+  await page.mouse.up();
+  const positionX = page.locator(".scene-vector").first().locator("input").first();
+  await page.waitForFunction(() => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==0; }, { timeout: 5000 });
+  assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
+  await page.getByLabel("Name").fill("Browser-tested scene prop");
+  await page.getByLabel("Type").selectOption("box");
+  await page.getByRole("button", { name: "Save scene data" }).click();
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
+  const savedSceneSpec = await page.locator(".code-editor").inputValue();
+  assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
+  await page.locator('.rail button[title="Audio Studio"]').click();
+  await page.getByRole("heading", { name: "Audio Studio" }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: /UI confirm/ }).click();
+  await page.getByText("UI confirmation sound previewed.", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Save audio manifest" }).click();
+  await page.locator('.rail button[title="Files"]').click();
+  await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
+  const savedAudioSpec = await page.locator(".code-editor").inputValue();
+  assert.ok(savedAudioSpec.includes('"audio"') && savedAudioSpec.includes('"procedural-web-audio"') && savedAudioSpec.includes('"buses"') && savedAudioSpec.includes('"events"'), "Audio Studio test bench plays a real Web Audio cue and persists the audio manifest into game-spec.json");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
 
   const webglProject = {
