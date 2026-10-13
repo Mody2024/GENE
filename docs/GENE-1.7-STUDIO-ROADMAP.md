@@ -7,6 +7,9 @@ Status: living implementation roadmap. This document is not a claim that every l
 Implemented on the `feat/gene-monster-builder` branch (not yet merged or promoted to production):
 - Capability-aware studio contract and `/api/capabilities` endpoint, including explicit partial capability records for the audio mixer and scene asset integration.
 - Stronger game-generation acceptance guidance for event-driven sound, browser-safe audio startup, bus/mute controls, graceful missing-audio behavior, honest spatial-audio claims, coherent asset silhouettes/materials, and mesh/material budgets.
+- New games are explicitly required to implement sound by default unless the user asks for silence. The prompt now specifies an integrated AudioManager, genre-matched procedural music/SFX fallback when real media assets are absent, event-driven gameplay/UI sound, Settings controls, volume buses, pause/restart cleanup, and source-aligned audio metadata.
+- Added a server-side build gate for newly built/assembled games: it checks the audio metadata, master/music/SFX buses, at least three mapped events, an actual browser audio playback API, and connected sound-event playback calls. A mute button or metadata alone does not pass. Targeted edits do not get blocked solely because an older project has not yet adopted the audio contract.
+- Added regression assertions for the default-audio prompt, exact audio metadata shape, and server-side audio validation.
 - Saved Forge meshes now offer an **Integrate into game** action. It prepares a chat request tied to that asset's actual OBJ/MTL file paths and asks for scene loading, materials, collision/gameplay integration, and visible preview proof; the user reviews and sends the request rather than the UI pretending integration already happened.
 - Regression assertions cover the new contract and asset-integration workflow.
 
