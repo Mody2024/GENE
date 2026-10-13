@@ -8,6 +8,7 @@ import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
+import { buildProjectStorageCandidates } from "./lib/project-storage";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -153,6 +154,7 @@ export default function Home() {
   const [editedFile, setEditedFile] = useState("");
   const [fileDirty, setFileDirty] = useState(false);
   const [notice, setNotice] = useState("");
+  const [persistenceWarning, setPersistenceWarning] = useState("");
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
   const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
   const [showActivity, setShowActivity] = useState(false);
@@ -206,11 +208,35 @@ export default function Home() {
   useEffect(() => {
     if (!project) return;
     const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 8);
-    setProjects(prev => {
-      const next = [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); localStorage.setItem(ACTIVE_KEY, project.id); } catch {}
-      return next;
-    });
+    setProjects(prev => [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8));
+
+    let savedStrategy: string | null = null;
+    try {
+      for (const candidate of buildProjectStorageCandidates(merged)) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate.projects));
+          localStorage.setItem(ACTIVE_KEY, project.id);
+          savedStrategy = candidate.strategy;
+          break;
+        } catch {
+          // Quota errors are expected during fallback attempts; try a smaller snapshot.
+        }
+      }
+    } catch {
+      savedStrategy = null;
+    }
+
+    if (savedStrategy === "full") {
+      setPersistenceWarning("");
+    } else if (savedStrategy === "trim-history") {
+      setPersistenceWarning("Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.");
+    } else if (savedStrategy === "active-project") {
+      setPersistenceWarning("Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.");
+    } else if (savedStrategy === "active-project-minimal") {
+      setPersistenceWarning("Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export a project ZIP now to create a separate backup.");
+    } else {
+      setPersistenceWarning("GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.");
+    }
   }, [project]);
 
   useEffect(() => {
@@ -1944,6 +1970,7 @@ export default function Home() {
         </header>
 
         {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
+        {persistenceWarning && <div className="notice persistence-warning" role="status" aria-live="polite"><span>{persistenceWarning}</span><button onClick={() => setPersistenceWarning("")}>Dismiss</button></div>}
 
         {binaryBuildLinks && <div className="binary-build-result" role="status">
           <div className="binary-build-result-heading"><strong>Cloud build results</strong><span>{binaryBuildId ? binaryBuildId.slice(0, 8) : ""}</span></div>
