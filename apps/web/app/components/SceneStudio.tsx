@@ -59,6 +59,8 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const source = files["game-spec.json"] || "{}";
   const [selectedId, setSelectedId] = useState("");
   const [objects, setObjects] = useState<SceneObject[]>([]);
+  const [undoStack, setUndoStack] = useState<SceneObject[][]>([]);
+  const [redoStack, setRedoStack] = useState<SceneObject[][]>([]);
   const [specError, setSpecError] = useState("");
   const [status, setStatus] = useState("");
   const [rawSpec, setRawSpec] = useState<Record<string, unknown>>({});
@@ -70,27 +72,49 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       setRawSpec(parsed.spec);
       setSceneMetadata(parsed.scene);
       setObjects(parsed.objects);
+      setUndoStack([]);
+      setRedoStack([]);
       setSpecError("");
       setStatus("");
       setSelectedId(current => parsed.objects.some(object => object.id === current) ? current : parsed.objects[0]?.id || "");
     } catch {
       setSpecError("game-spec.json is not valid JSON. Fix it in Files before editing scene data.");
       setObjects([]);
+      setUndoStack([]);
+      setRedoStack([]);
       setRawSpec({});
       setSceneMetadata({});
     }
   }, [source]);
 
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
-  const updateSelected = (patch: Partial<SceneObject>) => setObjects(current => current.map(object => object.id === selectedId ? { ...object, ...patch } : object));
+  const commitObjects = (next: SceneObject[]) => {
+    const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } }));
+    setUndoStack(current => [...current, snapshot].slice(-40));
+    setRedoStack([]);
+    commitObjects(next);
+  };
+  const undo = () => {
+    if (!undoStack.length) return;
+    setRedoStack(current => [...current, objects.map(object => ({ ...object }))].slice(-40));
+    setObjects(undoStack[undoStack.length - 1]);
+    setUndoStack(current => current.slice(0, -1));
+  };
+  const redo = () => {
+    if (!redoStack.length) return;
+    setUndoStack(current => [...current, objects.map(object => ({ ...object }))].slice(-40));
+    setObjects(redoStack[redoStack.length - 1]);
+    setRedoStack(current => current.slice(0, -1));
+  };
+  const updateSelected = (patch: Partial<SceneObject>) => commitObjects(objects.map(object => object.id === selectedId ? { ...object, ...patch } : object));
   const updateVector = (key: "position" | "rotation" | "scale", axis: keyof Vec3, value: number) => {
     if (!Number.isFinite(value)) return;
-    setObjects(current => current.map(object => object.id === selectedId ? { ...object, [key]: { ...object[key], [axis]: value } } : object));
+    commitObjects(objects.map(object => object.id === selectedId ? { ...object, [key]: { ...object[key], [axis]: value } } : object));
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
     const object: SceneObject = { id, name: "New object", type: "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true };
-    setObjects(current => [...current, object]);
+    commitObjects([...objects, object]);
     setSelectedId(id);
     setStatus("New scene entry added. Save it to write the manifest.");
   };
@@ -126,6 +150,8 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       <div className="scene-studio-toolbar">
         <span>{objects.length} scene {objects.length === 1 ? "entry" : "entries"} · game-spec.json</span>
         <div className="scene-studio-actions">
+          <button className="secondary-button" onClick={undo} disabled={readOnly || !undoStack.length} title="Undo last scene edit">↶ Undo</button>
+          <button className="secondary-button" onClick={redo} disabled={readOnly || !redoStack.length} title="Redo scene edit">↷ Redo</button>
           <button className="secondary-button" onClick={addObject} disabled={readOnly}>＋ Add object</button>
           <button className="primary-button" onClick={saveScene} disabled={readOnly}>Save scene data</button>
         </div>
