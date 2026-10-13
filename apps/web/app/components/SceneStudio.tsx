@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import WebGLSceneViewport from "./WebGLSceneViewport";
 
 type Vec3 = { x: number; y: number; z: number };
 type SceneObject = {
@@ -69,6 +70,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const [redoStack, setRedoStack] = useState<SceneObject[][]>([]);
   const [specError, setSpecError] = useState("");
   const [status, setStatus] = useState("");
+  const [viewportMode, setViewportMode] = useState<"webgl" | "isometric">("webgl");
   const [rawSpec, setRawSpec] = useState<Record<string, unknown>>({});
   const [sceneMetadata, setSceneMetadata] = useState<Record<string, unknown>>({});
   const viewportRef = useRef<HTMLCanvasElement | null>(null);
@@ -236,7 +238,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
         </div>
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save scene changes.</p>}
-      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE CANVAS</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label="Interactive isometric scene viewport" onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend"><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></div></div>
+      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE VIEWPORT</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div><div className="scene-studio-actions scene-view-mode"><button className={viewportMode === "webgl" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("webgl")}>WebGL 3D</button><button className={viewportMode === "isometric" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("isometric")}>Isometric editor</button></div>{viewportMode === "webgl" ? <WebGLSceneViewport objects={objects} selectedId={selectedId} onSelect={setSelectedId} readOnly={readOnly} /> : <><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label="Interactive isometric scene viewport" onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend"><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></div></>}</div>
       {selected && <div className="scene-studio-toolbar" aria-label="Selected object transform controls">
         <span>TRANSFORM GIZMO · {selected.name}</span>
         <div className="scene-studio-actions">
