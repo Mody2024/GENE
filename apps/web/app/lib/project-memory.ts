@@ -46,6 +46,32 @@ export function findConcurrentSourceConflicts(
     .sort();
 }
 
+export type ConcurrentMergeResult = {
+  files: Record<string, string>;
+  conflicts: string[];
+};
+
+/**
+ * Apply only files proposed by the in-flight request. Non-overlapping edits
+ * made since the request started are preserved; overlapping edits are rejected.
+ */
+export function mergeConcurrentSourceChanges(
+  baseFiles: Record<string, string>,
+  currentFiles: Record<string, string>,
+  proposedFiles: Record<string, string>,
+  changedPaths: string[]
+): ConcurrentMergeResult {
+  const conflicts = findConcurrentSourceConflicts(baseFiles, currentFiles, changedPaths)
+    .filter(path => (currentFiles[path] ?? null) !== (proposedFiles[path] ?? null));
+  if (conflicts.length) return { files: { ...currentFiles }, conflicts };
+  const files = { ...currentFiles };
+  for (const path of Array.from(new Set(changedPaths))) {
+    if (Object.prototype.hasOwnProperty.call(proposedFiles, path)) files[path] = proposedFiles[path];
+    else delete files[path];
+  }
+  return { files, conflicts: [] };
+}
+
 export function fingerprintProjectFiles(files: Record<string, string>): { fileHashes: Record<string, string>; revisionHash: string } {
   const fileHashes = Object.fromEntries(
     Object.keys(files).sort().map(path => [path, fingerprint(String(files[path] ?? ""))])
