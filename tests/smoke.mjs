@@ -400,6 +400,29 @@ assert.doesNotThrow(() => new Function(starterFiles["game.js"]), "built-in start
 assert.equal(JSON.parse(starterFiles["game-spec.json"]).audio.implementation, "procedural-web-audio", "built-in starter project metadata declares its real procedural audio implementation");
 assert.ok(starterFiles["game.html"].includes('id="audio-settings"') && starterFiles["game.html"].includes('id="master-volume"') && starterFiles["game.html"].includes('id="music-volume"') && starterFiles["game.html"].includes('id="sfx-volume"'), "starter game provides actual master/music/SFX settings sliders");
 assert.ok(starterFiles["game.js"].includes("function setAudioLevel") && starterFiles["game.js"].includes("gene-outpost-audio-levels") && starterFiles["game.js"].includes("ui.settings.addEventListener"), "starter game applies and persists audio mixer settings at runtime");
+// Executable scene-runtime contract: saved transforms, visibility and Canvas drawing survive the standalone bootstrap.
+const sceneRuntimeJs = tsCompiler.transpileModule(runtimeScene, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const sceneRuntimeModule = await import("data:text/javascript;base64," + Buffer.from(sceneRuntimeJs).toString("base64"));
+const sceneSpec = { scene: { objects: [
+  { id: "crate", name: "Crate", type: "box", position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 }, color: "#123456", visible: true, material: { roughness: 0.2, metalness: 0.8 }, light: { intensity: 2 }, camera: { fov: 75 } },
+  { id: "hidden", name: "Hidden", type: "sphere", visible: false }
+] } };
+const sceneBootstrap = sceneRuntimeModule.buildRuntimeSceneBootstrap({ "game-spec.json": JSON.stringify(sceneSpec) });
+const sceneVm = await import("node:vm");
+const sceneWindow = {};
+sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace(/<\\/script>$/, ""), { window: sceneWindow });
+assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getTransform("crate"))), { position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 } }, "runtime scene bootstrap round-trips saved transforms");
+assert.equal(sceneWindow.GENE_SCENE.getVisibleObjects().length, 1, "runtime scene bootstrap preserves hidden object state");
+assert.equal(sceneWindow.GENE_SCENE.getObject("crate").material.metalness, 0.8, "runtime scene bootstrap preserves material properties");
+const drawCalls = [];
+const mockCtx = { canvas: { width: 800, height: 600 }, save(){}, restore(){}, translate(){}, rotate(){}, scale(){}, beginPath(){}, arc(){}, stroke(){drawCalls.push("stroke")}, moveTo(){}, lineTo(){}, closePath(){}, fill(){drawCalls.push("fill")}, fillRect(){drawCalls.push("rect")}, strokeRect(){drawCalls.push("strokeRect")}, ellipse(){}, set fillStyle(v){}, set strokeStyle(v){}, set lineWidth(v){}, set globalAlpha(v){} };
+assert.equal(sceneWindow.GENE_SCENE.draw2D(mockCtx, { unit: 20 }), 1, "runtime scene renderer draws visible objects only");
+assert.ok(drawCalls.length > 0, "runtime scene draw call produces actual Canvas drawing operations");
+const invalidSceneBootstrap = sceneRuntimeModule.buildRuntimeSceneBootstrap({ "game-spec.json": "{invalid" });
+assert.ok(invalidSceneBootstrap.includes("Invalid game-spec.json scene manifest"), "invalid scene manifests fail safely instead of crashing game startup");
+
 const patchSource = read("apps/web/app/lib/patch-engine.ts");
 const patchJs = tsCompiler.transpileModule(patchSource, {
   compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
