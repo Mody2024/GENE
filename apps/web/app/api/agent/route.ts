@@ -259,7 +259,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
       const hasPlaybackApi = /\b(?:AudioContext|webkitAudioContext|new\s+Audio\s*\()/i.test(runtimeSource);
       const hasConnectedSoundEvents = /\b(?:playSfx|playSound|triggerSound|playAudio|soundManager|audioManager)\b/i.test(runtimeSource);
-      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|musicVolume)\b/i.test(runtimeSource);
+      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic)\b/i.test(runtimeSource);
       const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings)\b/i.test(runtimeSource + "\\n" + html);
       if (audio?.enabled !== true ||
           !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
