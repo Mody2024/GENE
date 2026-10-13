@@ -328,7 +328,7 @@ assert.ok(api.indexOf('finishReason === "MAX_TOKENS"') < api.indexOf("if (candid
 assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144'), "single-file generation uses an adaptive larger output budget to reduce truncation");
 assert.ok(forge.includes("beveledBox") && forge.includes("cornerIndices.values()") && forge.includes('"wedge"') && forge.includes('"torus"'), "Forge builds actual chamfered hard-surface, sloped and ring meshes");
 assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includes("up to four local player slots"), "game guides require professional 3D forms and scalable local multiplayer");
-assert.ok(page.includes("GENE 1.3 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.3 exposes build progress and adapts retries after cutoff");
+assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.6 exposes build progress and adapts retries after cutoff");
 assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
 
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
