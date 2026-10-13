@@ -56,6 +56,20 @@ export function makeAgentInput(input: {
   const stagePath = input.stagePath || "";
   const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
   const fileBudget: Record<string, number> = { "game-spec.json": 7000, "game.html": 5000, "game.css": 7000, "game.js": 9000 };
+  const allProjectEntries = Object.entries(p?.files || {});
+  const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation);
+  const contextManifest = allProjectEntries.map(([path, content]) => path + " (" + String(content).length + " chars)");
+  const prioritizedContextEntries = allProjectEntries.slice().sort(([a], [b]) => {
+    const priority = (path: string) => path === p?.activeFile ? 0 : ["game-spec.json", "game.html", "game.css", "game.js", "index.html", "app.js", "styles.css"].includes(path) ? 1 : /\.(js|ts|css|html|json)$/i.test(path) ? 2 : 3;
+    return priority(a) - priority(b) || a.localeCompare(b);
+  });
+  let compactChars = 0;
+  const compactFiles = Object.fromEntries(prioritizedContextEntries.slice(0, 12).map(([path, content]) => {
+    const budget = Math.max(0, Math.min(5000, 26000 - compactChars));
+    const excerpt = String(content).slice(0, budget);
+    compactChars += excerpt.length;
+    return [path, excerpt];
+  }).filter(([, content]) => String(content).length > 0));
   const stageEntries = Object.entries(p?.files || {}).filter(([path]) => {
     if (!isStage) return true;
     if (isStageRepair && path === stagePath) return true;
@@ -87,7 +101,7 @@ export function makeAgentInput(input: {
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
     "EXISTING PLAN: " + JSON.stringify((input.operation === "chat" || input.operation === "research" || input.operation === "enhancePrompt") && p?.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine } : p?.plan || null),
-    "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : p?.files || {}),
+    "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : compactContext ? { manifest: contextManifest, selectedFileExcerpts: compactFiles } : p?.files || {}),
     "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
       name: ref.name,
       mimeType: ref.mimeType,
