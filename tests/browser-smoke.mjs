@@ -159,6 +159,10 @@ try {
   await page.locator('.rail button[title="Scene Studio"]').click();
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: "Add object" }).click();
+  await page.getByRole("button", { name: /Undo/ }).click();
+  assert.equal(await page.locator(".scene-object-row").count(), 0, "Scene Studio undo removes the unsaved object entry");
+  await page.getByRole("button", { name: /Redo/ }).click();
+  assert.equal(await page.locator(".scene-object-row").count(), 1, "Scene Studio redo restores the object entry");
   await page.getByLabel("Name").fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
   await page.getByRole("button", { name: "Save scene data" }).click();
