@@ -587,6 +587,12 @@ const identicalMerge = projectMemory.mergeConcurrentSourceChanges(
 assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do not create a false conflict");
 
 const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
+const audioStudio = read("apps/web/app/components/AudioStudio.tsx");
+assert.ok(page.includes('import AudioStudio from "./components/AudioStudio"') && page.includes('id: "audio" as const') && page.includes('section === "audio"'), "Audio Studio is integrated into workspace navigation");
+assert.ok(audioStudio.includes("window.AudioContext") && audioStudio.includes("createOscillator()") && audioStudio.includes("oscillator.start(at)") && audioStudio.includes("oscillator.stop(at + duration"), "Audio Studio uses real Web Audio oscillators with envelopes and explicit node lifetimes");
+assert.ok(audioStudio.includes("const EVENT_MAP") && audioStudio.includes('implementation,\n        buses: ["master", "music", "sfx", "ambience", "ui"]') && audioStudio.includes('events: EVENT_MAP'), "Audio Studio persists an explicit audio implementation, mixer bus, volume and event manifest");
+assert.ok(audioStudio.includes("This does not by itself add an audio engine to game.js") && audioStudio.includes("Preview muted because"), "Audio Studio accurately distinguishes editor test audio from game runtime audio and respects mute settings");
+
 assert.ok(page.includes('import SceneStudio from "./components/SceneStudio"') && page.includes('id: "scene" as const') && page.includes('section === "scene"'), "Scene Studio is integrated into workspace navigation");
 assert.ok(sceneStudio.includes('files["game-spec.json"]') && sceneStudio.includes('position: object.position') && sceneStudio.includes('rotation: object.rotation') && sceneStudio.includes('scale: object.scale'), "Scene Studio edits actual game-spec.json source data and persists object transforms");
 assert.ok(sceneStudio.includes("onSave(nextFiles") && sceneStudio.includes("onWireRuntime") && sceneStudio.includes("This is a data editor—not a 3D viewport gizmo yet"), "Scene Studio saves versioned source and accurately distinguishes scene authoring from a live 3D gizmo editor");
