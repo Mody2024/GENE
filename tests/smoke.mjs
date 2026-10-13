@@ -504,7 +504,7 @@ assert.ok(page.includes("project-specific estimate pending"), "workspace labels 
 assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "app-level error boundary exists");
 const appErrorBoundary = read("apps/web/app/error.tsx");
 assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
-assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
+assert.ok(page.includes("function explainAgentError") && page.includes("quota or rate limit") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
