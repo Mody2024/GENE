@@ -710,6 +710,13 @@ export async function POST(request: NextRequest) {
     for (const provider of alternateProviders) {
       if (Date.now() - startedAt > totalBudgetMs - 2_500) break;
       lastFailureProvider = provider.name === "openrouter" ? "OpenRouter" : "Groq";
+      // GENE's OpenRouter fallback must never silently spend credits. Only call
+      // model IDs explicitly marked as free; paid routes require a separate opt-in
+      // in a future UI rather than an environment-variable override.
+      if (provider.name === "openrouter" && !/:free$/i.test(provider.model)) {
+        lastFailure = { status: 402, detail: "Configured OpenRouter model is not marked :free (" + provider.model + "). GENE blocked this request to avoid unexpected provider charges." };
+        continue;
+      }
       try {
         const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
         const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
