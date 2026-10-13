@@ -69,7 +69,7 @@ export function makeAgentInput(input: {
     const budget = Math.max(0, Math.min(5000, 26000 - compactChars));
     const excerpt = String(content).slice(0, budget);
     compactChars += excerpt.length;
-    return [path, excerpt];
+    return [path, excerpt] as const;
   }).filter(([, content]) => String(content).length > 0));
   const stageEntries = Object.entries(p?.files || {}).filter(([path]) => {
     if (!isStage) return true;
