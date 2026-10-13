@@ -584,6 +584,14 @@ const identicalMerge = projectMemory.mergeConcurrentSourceChanges(
   { "game.js": "base" }, { "game.js": "same" }, { "game.js": "same" }, ["game.js"]
 );
 assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do not create a false conflict");
+
+const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
+assert.ok(page.includes('import SceneStudio from "./components/SceneStudio"') && page.includes('id: "scene" as const') && page.includes('section === "scene"'), "Scene Studio is integrated into workspace navigation");
+assert.ok(sceneStudio.includes('files["game-spec.json"]') && sceneStudio.includes('position: object.position') && sceneStudio.includes('rotation: object.rotation') && sceneStudio.includes('scale: object.scale'), "Scene Studio edits actual game-spec.json source data and persists object transforms");
+assert.ok(sceneStudio.includes("onSave(nextFiles") && sceneStudio.includes("onWireRuntime") && sceneStudio.includes("This is a data editor—not a 3D viewport gizmo yet"), "Scene Studio saves versioned source and accurately distinguishes scene authoring from a live 3D gizmo editor");
+assert.ok(page.includes("saveSceneFiles") && page.includes("Scene manifest saved"), "Scene data saves as a recoverable project version and can sync to the local agent");
+assert.ok(css.includes("GENE 1.7 Scene Studio") && css.includes(".scene-studio-layout") && css.includes("@media (max-width:720px)"), "Scene Studio has responsive hierarchy and transform inspector styles");
+
 assert.ok(page.includes("mergeConcurrentSourceChanges") && page.includes("discarded this stale result") && page.includes("if (!current || current.id !== updated.id) return current;"), "workspace rejects stale overlapping AI results without switching active projects");
 assert.ok(page.includes("if (!current || current.id !== failed.id) return current;"), "failed late responses cannot switch the workspace back to an inactive project");
 
