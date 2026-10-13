@@ -37,6 +37,7 @@ assert.ok(api.includes("GEMINI_API_KEY_2") && api.includes("GEMINI_API_KEY_3"), 
 assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lite"), "Gemini failover includes supported stable fallback models");
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
 assert.ok(api.includes("OPENROUTER_CREDITS_OR_PAID_ROUTE") && api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter credit, key, and rate-limit failures are reported distinctly");
+assert.ok(api.includes('!/:free$/i.test(provider.model)') && api.includes("avoid unexpected provider charges"), "OpenRouter fallback blocks model overrides that are not explicitly marked free");
 assert.ok(page.includes("backup AI route needs credits or selected a paid model") && page.includes("GENE tried Gemini and its OpenRouter backup"), "provider failures are explained in plain language without implying every OpenRouter model is paid");
 assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError)"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
