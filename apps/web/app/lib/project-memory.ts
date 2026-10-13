@@ -10,7 +10,7 @@ export type CanonicalProjectMemory = {
     engine: string;
     tasks: string[];
     mechanics: string[];
-    performanceBudget: GeneProject["plan"] extends infer P ? P extends { performanceBudget: infer B } ? B : never : never;
+    performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number };
   };
   source: { activeFile: string; filePaths: string[]; currentVersion: number; fileCount: number };
   build: null | {
