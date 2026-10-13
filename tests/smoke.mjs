@@ -464,6 +464,7 @@ assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan 
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
 assert.ok(api.includes("Build rejected: game audio is missing or only decorative") && api.includes("enforceAudioContract"), "fresh game builds and assembled-build validation reject missing or decorative audio without blocking unrelated targeted edits");
+assert.ok(api.includes('!["edit", "chat", "buildPart", "interview", "plan", "research"].includes(body.operation)') && api.includes("enforceAudioForThisResponse"), "strict audio validation applies to complete new builds without blocking staged generation or targeted edits");
 assert.ok(api.includes('audio?.enabled !== true') && api.includes('"procedural-web-audio", "asset-backed"') && api.includes('["master", "music", "sfx"]'), "game build validation requires truthful audio metadata, mixer buses and real playback");
 assert.ok(api.includes("hasPlaybackApi") && api.includes("hasConnectedSoundEvents") && api.includes("events.length < 3"), "audio validation checks playback code and mapped events rather than trusting metadata alone");
 assert.ok(api.includes("hasMusicPlayback") && api.includes("hasAudioControls") && api.includes("adjustable audio controls"), "audio validation requires a music path and adjustable controls, not effects alone");
