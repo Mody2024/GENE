@@ -12,7 +12,7 @@ export type CanonicalProjectMemory = {
     mechanics: string[];
     performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number };
   };
-  source: { activeFile: string; filePaths: string[]; currentVersion: number; fileCount: number };
+  source: { activeFile: string; filePaths: string[]; fileHashes: Record<string, string>; revisionHash: string; currentVersion: number; fileCount: number };
   build: null | {
     status: string;
     planRevision: number;
@@ -26,12 +26,30 @@ export type CanonicalProjectMemory = {
 
 const compact = (value: unknown, max = 600) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+function fingerprint(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function fingerprintProjectFiles(files: Record<string, string>): { fileHashes: Record<string, string>; revisionHash: string } {
+  const fileHashes = Object.fromEntries(
+    Object.keys(files).sort().map(path => [path, fingerprint(String(files[path] ?? ""))])
+  );
+  const manifest = Object.keys(fileHashes).map(path => path + ":" + fileHashes[path]).join("\n");
+  return { fileHashes, revisionHash: fingerprint(manifest) };
+}
+
 export function buildCanonicalProjectMemory(project: GeneProject): CanonicalProjectMemory {
   const plan = project.plan;
   const run = project.buildRun;
   const tasks = run?.tasks ?? [];
   const checkpoints = run?.checkpoints ?? [];
   const latest = checkpoints[checkpoints.length - 1];
+  const sourceFingerprint = fingerprintProjectFiles(project.files ?? {});
   const decisions = Object.entries(project.answers ?? {})
     .filter(([key, value]) => compact(key, 120) && compact(value, 400))
     .slice(-16)
@@ -55,7 +73,9 @@ export function buildCanonicalProjectMemory(project: GeneProject): CanonicalProj
     } : null,
     source: {
       activeFile: compact(project.activeFile, 240),
-      filePaths: Object.keys(project.files ?? {}).slice(0, 100),
+      filePaths: Object.keys(project.files ?? {}).sort().slice(0, 100),
+      fileHashes: sourceFingerprint.fileHashes,
+      revisionHash: sourceFingerprint.revisionHash,
       currentVersion: project.versions?.[0]?.number ?? 0,
       fileCount: Object.keys(project.files ?? {}).length
     },
