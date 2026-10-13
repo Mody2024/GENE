@@ -259,13 +259,17 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
       const hasPlaybackApi = /\b(?:AudioContext|webkitAudioContext|new\s+Audio\s*\()/i.test(runtimeSource);
       const hasConnectedSoundEvents = /\b(?:playSfx|playSound|triggerSound|playAudio|soundManager|audioManager)\b/i.test(runtimeSource);
+      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|musicVolume)\b/i.test(runtimeSource);
+      const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings)\b/i.test(runtimeSource + "\\n" + html);
       if (audio?.enabled !== true ||
           !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
           !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
           events.length < 3 ||
           !hasPlaybackApi ||
-          !hasConnectedSoundEvents) {
-        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), implement real AudioContext/Audio playback plus connected playSfx/playSound-style event calls in the assembled JavaScript, and wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
+          !hasConnectedSoundEvents ||
+          !hasMusicPlayback ||
+          !hasAudioControls) {
+        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), implement real AudioContext/Audio playback, a music playback path, adjustable audio controls, and connected playSfx/playSound-style event calls in the assembled JavaScript; wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
       }
     }
     if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
