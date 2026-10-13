@@ -43,8 +43,9 @@ function GeneMark({ className = "" }: { className?: string }) {
   </svg>;
 }
 function now() { return new Date().toISOString(); }
-function explainAgentError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error || "Unknown error");
+function explainAgentError(error: unknown, code?: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error || "Unknown error");
+  const raw = (rawMessage + " " + String(code || "")).trim();
   if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "The backup AI route needs credits or selected a paid model. GENE tried its configured backup after Gemini failed, but no project changes were applied. Use a model marked :free and remove any paid-model override, or add credits to that provider.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
@@ -922,7 +923,7 @@ export default function Home() {
       }
       if (!responseOk || !payload?.ok) {
         const rawError = payload?.error?.message || "GENE could not complete the request.";
-        const error = explainAgentError(rawError);
+        const error = explainAgentError(rawError, payload?.error?.code);
         addActivity("Request failed: " + rawError);
         const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
         setProject(current => {
