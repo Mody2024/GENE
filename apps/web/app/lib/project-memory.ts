@@ -35,6 +35,17 @@ function fingerprint(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+/** Detect overlapping edits made after an AI request captured its source snapshot. */
+export function findConcurrentSourceConflicts(
+  baseFiles: Record<string, string>,
+  currentFiles: Record<string, string>,
+  changedPaths: string[]
+): string[] {
+  return Array.from(new Set(changedPaths))
+    .filter(path => (baseFiles[path] ?? null) !== (currentFiles[path] ?? null))
+    .sort();
+}
+
 export function fingerprintProjectFiles(files: Record<string, string>): { fileHashes: Record<string, string>; revisionHash: string } {
   const fileHashes = Object.fromEntries(
     Object.keys(files).sort().map(path => [path, fingerprint(String(files[path] ?? ""))])
