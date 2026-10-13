@@ -493,6 +493,11 @@ assert.ok(api.includes("const original = String(body.message || body.project?.in
 assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
 
 assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
+assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
+assert.ok(prompts.includes("AudioContext") && prompts.includes("setMusicVolume") && prompts.includes("setSfxVolume") && prompts.includes("playSfx(eventName, options)"), "game prompts require an integrated audio manager with real music, SFX and volume controls");
+assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("Audio is part of the definition of done"), "audio is an explicit deliverable with source-aligned project metadata");
+assert.ok(prompts.includes("stop/replace music loops instead of stacking them") && prompts.includes("Pause must silence/pause music"), "generated audio must clean up correctly on pause, restart and repeated scene transitions");
+
 assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec promises touch/pointer controls") && api.includes("spec promises controller support"), "validation checks declared keyboard, touch, and gamepad controls instead of only checking for any event handler");
 assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.js$/i.test(path)") && api.includes("test(runtimeSource)"), "control validation scans all assembled JavaScript modules, not only game.js");
 assert.ok(api.includes("spec.controls = inferred") && api.includes("normalizedSpecChanged") && api.includes("validationFiles"), "final validation deterministically repairs and returns a missing game controls contract");
