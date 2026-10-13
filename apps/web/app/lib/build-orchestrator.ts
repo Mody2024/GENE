@@ -127,6 +127,20 @@ export function setTaskStatus(
   };
 }
 
+function retainRecentCheckpoints(checkpoints: BuildCheckpoint[], maxCount = 8, maxSnapshotChars = 1_500_000): BuildCheckpoint[] {
+  const retained: BuildCheckpoint[] = [];
+  let totalChars = 0;
+  // Walk newest-first so the latest recovery point is never discarded just to fit the budget.
+  for (const checkpoint of checkpoints.slice().reverse()) {
+    const snapshotChars = Object.values(checkpoint.lastKnownGoodFiles).reduce((total, source) => total + source.length, 0);
+    if (retained.length >= maxCount) break;
+    if (retained.length > 0 && totalChars + snapshotChars > maxSnapshotChars) break;
+    retained.push(checkpoint);
+    totalChars += snapshotChars;
+  }
+  return retained.reverse();
+}
+
 export function checkpointBuild(
   run: BuildRun,
   files: Record<string, string>,
@@ -153,7 +167,7 @@ export function checkpointBuild(
   return {
     ...run,
     // Keep a bounded recovery history: every checkpoint may contain a full source snapshot.
-    checkpoints: [...run.checkpoints, checkpoint].slice(-8),
+    checkpoints: retainRecentCheckpoints([...run.checkpoints, checkpoint]),
     updatedAt: isoNow(now),
     status: reason === "user-interruption" ? "paused" : run.status,
   };
