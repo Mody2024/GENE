@@ -195,7 +195,7 @@ function normalizeExecutableHtmlScripts(files: Array<{ path: string; content: st
   return files.map(file => file.path === "game.html" ? { ...file, content: html } : file.path === "game.js" ? { ...file, content: js } : file);
 }
 
-function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
+function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game", enforceAudioContract = true) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
@@ -253,6 +253,21 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
     // Validate the complete assembled JavaScript project so valid modular controls are not rejected.
     const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
+    if (projectKind === "game" && enforceAudioContract) {
+      const audio = spec.audio;
+      const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];
+      const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
+      const hasPlaybackApi = /\b(?:AudioContext|webkitAudioContext|new\s+Audio\s*\()/i.test(runtimeSource);
+      const hasConnectedSoundEvents = /\b(?:playSfx|playSound|triggerSound|playAudio|soundManager|audioManager)\b/i.test(runtimeSource);
+      if (audio?.enabled !== true ||
+          !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
+          !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
+          events.length < 3 ||
+          !hasPlaybackApi ||
+          !hasConnectedSoundEvents) {
+        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), implement real AudioContext/Audio playback plus connected playSfx/playSound-style event calls in the assembled JavaScript, and wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
+      }
+    }
     if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
     if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
     if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
@@ -849,7 +864,7 @@ export async function POST(request: NextRequest) {
         Object.entries(patched.files).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
         titleCandidates
       );
-      validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
+      validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind, false);
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");
