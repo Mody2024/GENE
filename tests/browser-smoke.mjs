@@ -156,8 +156,17 @@ try {
   await page.getByRole("button", { name: "Run build checks" }).click();
   await page.getByText("JavaScript syntax", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('.rail button[title="Scene Studio"]').click();
+  await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Add object" }).click();
+  await page.getByLabel("Name").fill("Browser-tested scene prop");
+  await page.getByLabel("Type").selectOption("box");
+  await page.getByRole("button", { name: "Save scene data" }).click();
+  await page.getByText("Saved scene data to game-spec.json", { exact: false }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
+  const savedSceneSpec = await page.locator(".code-editor").inputValue();
+  assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
 
   const webglProject = {
