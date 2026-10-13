@@ -16,9 +16,18 @@ function fail(message: string, status = 400, code = "GENE_BUILD_ERROR") {
   return NextResponse.json({ ok: false, error: { code, message } }, { status });
 }
 function config() {
-  const token = process.env.GENE_BUILD_GITHUB_TOKEN?.trim();
-  const password = process.env.GENE_BUILD_PASSWORD?.trim();
-  const key = Buffer.from(process.env.GENE_BUILD_ENCRYPTION_KEY || "", "base64");
+  // Accept common deployment-secret aliases. Encryption keys may be supplied as
+  // 64-character hex, base64-encoded 32 bytes, or a raw 32-byte value.
+  const token = (process.env.GENE_BUILD_GITHUB_TOKEN || process.env.GENE_BUILD_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "").trim();
+  const password = (process.env.GENE_BUILD_PASSWORD || process.env.BUILD_PASSWORD || "").trim();
+  const rawKey = process.env.GENE_BUILD_ENCRYPTION_KEY || process.env.GENE_BUILD_KEY || "";
+  let key = Buffer.alloc(0);
+  if (/^[a-f0-9]{64}$/i.test(rawKey.trim())) key = Buffer.from(rawKey.trim(), "hex");
+  else {
+    const decoded = Buffer.from(rawKey.trim(), "base64");
+    if (decoded.length === 32) key = decoded;
+    else if (Buffer.byteLength(rawKey, "utf8") === 32) key = Buffer.from(rawKey, "utf8");
+  }
   if (!token || !password || key.length !== 32 || REPO.length !== 2 || REPO.some(x => !x)) return null;
   return { token, key, password, owner: REPO[0], repo: REPO[1] };
 }
@@ -52,7 +61,16 @@ function encrypt(value: unknown, key: Buffer) {
 }
 export async function POST(request: NextRequest) {
   const cfg = config();
-  if (!cfg) return fail("Cloud binary building is not configured yet. Add GENE_BUILD_GITHUB_TOKEN, GENE_BUILD_ENCRYPTION_KEY, and GENE_BUILD_PASSWORD in Vercel, then redeploy.", 503, "GENE_BUILD_NOT_CONFIGURED");
+  if (!cfg) {
+    const missing: string[] = [];
+    if (!(process.env.GENE_BUILD_GITHUB_TOKEN || process.env.GENE_BUILD_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "").trim()) missing.push("GitHub build token (GENE_BUILD_GITHUB_TOKEN / GENE_BUILD_TOKEN / GITHUB_TOKEN / GH_TOKEN)");
+    if (!(process.env.GENE_BUILD_PASSWORD || process.env.BUILD_PASSWORD || "").trim()) missing.push("GENE_BUILD_PASSWORD");
+    const rawKey = process.env.GENE_BUILD_ENCRYPTION_KEY || process.env.GENE_BUILD_KEY || "";
+    const keyLooksValid = /^[a-f0-9]{64}$/i.test(rawKey.trim()) || Buffer.from(rawKey.trim(), "base64").length === 32 || Buffer.byteLength(rawKey, "utf8") === 32;
+    if (!keyLooksValid) missing.push("GENE_BUILD_ENCRYPTION_KEY (32 bytes as 64-char hex, base64, or raw 32-byte value)");
+    if (REPO.length !== 2 || REPO.some(x => !x)) missing.push("GENE_BUILD_REPOSITORY (owner/repo)");
+    return fail("Cloud binary builder configuration check failed: " + missing.join("; ") + ". Values are not exposed. Confirm these variables are set for the Production environment and redeploy after changes.", 503, "GENE_BUILD_NOT_CONFIGURED");
+  }
   let body: any;
   try { body = await request.json(); } catch { return fail("Invalid build request JSON."); }
   const supplied = request.headers.get("x-gene-build-password") || "";
