@@ -495,10 +495,18 @@ export async function POST(request: NextRequest) {
     return jsonError("Gemini is not configured. Add GEMINI_API_KEY to apps/web/.env.local (local development) or your deployment environment. GENE did not generate or change any project files.", 503, "GEMINI_NOT_CONFIGURED");
   }
 
+  const requestedThinking = body.thinking === "fast" ? "fast" : body.thinking === "deep" ? "deep" : "balanced";
+  const configuredModel = requestedThinking === "fast"
+    ? (process.env.GENE_FAST_MODEL || "gemini-3.8-flash")
+    : requestedThinking === "deep"
+      ? (process.env.GENE_THINKING_MODEL || process.env.GENE_BALANCED_MODEL || process.env.GENE_FAST_MODEL || "gemini-3.8-flash")
+      : (process.env.GENE_BALANCED_MODEL || process.env.GENE_FAST_MODEL || "gemini-3.8-flash");
+  // Explicit validated overrides remain supported; normal UI requests omit the model so
+  // the selected GENE mode is not accidentally forced to the health-check model.
   const model = typeof body.model === "string" && /^gemini-[a-zA-Z0-9.-]+$/.test(body.model)
     ? body.model
-    : (process.env.GENE_FAST_MODEL || "gemini-3.8-flash");
-  const thinkingLevel = body.thinking === "fast" ? "low" : body.thinking === "deep" ? "high" : "medium";
+    : configuredModel;
+  const thinkingLevel = requestedThinking === "fast" ? "low" : requestedThinking === "deep" ? "high" : "medium";
   const userInput = makeAgentInput({
     operation: body.operation,
     stagePath: typeof body.stagePath === "string" ? body.stagePath : undefined,
