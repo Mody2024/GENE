@@ -58,7 +58,7 @@ export function makeAgentInput(input: {
 }) {
   const p = input.project;
   const projectKind = p?.kind === "app" ? "app" : "game";
-  const compactPlan = p?.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine, tasks: p.plan.tasks.slice(0, 20), mechanics: p.plan.mechanics.slice(0, 20), performanceBudget: p.plan.performanceBudget } : null;
+  const compactPlan = p && p.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine, tasks: p.plan.tasks.slice(0, 20), mechanics: p.plan.mechanics.slice(0, 20), performanceBudget: p.plan.performanceBudget } : null;
   const isStage = input.operation === "buildPart";
   const stagePath = input.stagePath || "";
   const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
@@ -103,7 +103,7 @@ export function makeAgentInput(input: {
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
-    "GENE 1.6 MODE CONTRACT: " + (input.thinking === "low" ? "FLASH — prioritize fast, compact iterations; avoid unnecessary architecture; keep changes small and validate the critical path." : input.thinking === "high" ? "THINKING — use the strongest available reasoning effort; compare viable approaches; plan dependencies and failure recovery; apply genre/product-specialist reasoning; define concrete acceptance checks; inspect likely edge cases before finalizing. Do not claim tools or tests were run unless they were." : "BALANCED — use a practical plan, respect dependencies, implement the complete central flow, and validate the important behaviors without unnecessary verbosity."),
+    "GENE 1.8 MODE CONTRACT: " + (input.thinking === "low" ? "FLASH — prioritize fast, compact iterations; avoid unnecessary architecture; keep changes small and validate the critical path." : input.thinking === "high" ? "THINKING — use the strongest available reasoning effort; compare viable approaches; plan dependencies and failure recovery; apply genre/product-specialist reasoning; define concrete acceptance checks; inspect likely edge cases before finalizing. Do not claim tools or tests were run unless they were." : "BALANCED — use a practical plan, respect dependencies, implement the complete central flow, and validate the important behaviors without unnecessary verbosity."),
     "EXTENDED PLANNING: " + (input.extendedPlanning ? "ENABLED — produce a deeper, phased, dependency-aware plan with architecture, file/module ownership, detailed gameplay or user flows, content scope, risks, test gates, milestones, and acceptance criteria. Keep the plan useful and structured rather than padded." : "STANDARD — make the plan clear and actionable without unnecessary expansion."),
     "USER MESSAGE: " + input.message,
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
