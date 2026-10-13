@@ -817,35 +817,50 @@ export default function Home() {
             if (validationAttempt >= 2) break;
 
             const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game-spec.json" :
-               /input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+               /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game.js" :
                /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
                /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
                /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
-            addActivity("Attempting targeted repair of " + repairPath + " (" + (validationAttempt + 1) + "/2)");
-            let repaired = false;
-            for (let repairAttempt = 1; repairAttempt <= 2 && !repaired; repairAttempt++) {
-              const repairResponse = await fetch("/api/agent", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  ...baseRequest,
-                  operation: "buildPart",
-                  stagePath: repairPath,
-                  message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + repairPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + ". Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + repairPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
-                  project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
-                })
-              });
-              const repairPayload = await repairResponse.json().catch(() => null);
-              const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === repairPath);
-              if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
-                stagedFiles[repairPath] = repairFile.content;
-                modelUsed = repairPayload.model || modelUsed;
-                repaired = true;
-                addActivity("Repaired " + repairPath + "; rerunning full-project validation");
-              } else {
-                addActivity("Repair attempt for " + repairPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+            // Audio is a cross-file contract: real playback belongs in game.js and
+            // its honest implementation/bus/event contract belongs in game-spec.json.
+            // Repairing only the spec can never fix missing sound code, and repairing
+            // only code can never fix missing audio metadata.
+            const repairPaths = /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError)
+              ? ["game.js", "game-spec.json"] : [repairPath];
+            let repaired = true;
+            for (const targetPath of repairPaths) {
+              addActivity("Attempting targeted repair of " + targetPath + " (" + (validationAttempt + 1) + "/3)");
+              let fileRepaired = false;
+              for (let repairAttempt = 1; repairAttempt <= 2 && !fileRepaired; repairAttempt++) {
+                const focusedAudioInstruction = /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError)
+                  ? (targetPath === "game.js"
+                    ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
+                    : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
+                  : "";
+                const repairResponse = await fetch("/api/agent", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    ...baseRequest,
+                    operation: "buildPart",
+                    stagePath: targetPath,
+                    message: "TARGETED FINAL-VALIDATION REPAIR. Change only " + targetPath + " to fix this exact validation failure: " + validationError.slice(0, 900) + "." + focusedAudioInstruction + " Existing complete project files and the approved plan are in context. Preserve the requested game's/app's visual identity and working mechanics. Return one complete replacement file for " + targetPath + ", not a patch, no other files, no inline executable script tags in game.html, and no provider/AI watermark. Keep it concise and syntactically valid." + (repairAttempt === 2 ? " Previous repair attempt failed. Use the simplest safe complete implementation that fixes the reported requirement." : ""),
+                    project: { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan }
+                  })
+                });
+                const repairPayload = await repairResponse.json().catch(() => null);
+                const repairFile = (repairPayload?.result?.files || []).find((file: { path?: string }) => file.path === targetPath);
+                if (repairResponse.ok && repairPayload?.ok && repairFile && typeof repairFile.content === "string") {
+                  stagedFiles[targetPath] = repairFile.content;
+                  modelUsed = repairPayload.model || modelUsed;
+                  fileRepaired = true;
+                  addActivity("Repaired " + targetPath + "; rerunning full-project validation");
+                } else {
+                  addActivity("Repair attempt for " + targetPath + " failed: " + String(repairPayload?.error?.message || "no valid replacement file").slice(0, 160));
+                }
               }
+              if (!fileRepaired) { repaired = false; break; }
             }
             if (!repaired) break;
           }
