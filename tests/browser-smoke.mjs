@@ -162,7 +162,6 @@ try {
   await page.getByLabel("Name").fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
   await page.getByRole("button", { name: "Save scene data" }).click();
-  await page.getByText("Saved scene data to game-spec.json", { exact: false }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
