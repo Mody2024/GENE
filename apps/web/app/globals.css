@@ -124,3 +124,19 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .preview-actions button.tool-active{border-color:var(--green);color:var(--green);background:color-mix(in srgb,var(--green) 11%,var(--surface))}
 .preview-stage:has(iframe) iframe{background:var(--surface)}
 @media(max-width:620px){.gene15-tools{align-items:stretch}.extended-plan-toggle{flex:1 1 100%}.gene15-tools>button{width:100%}.preview-actions button[title^="Select"]{max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+
+/* GENE 1.6: keep the source-of-truth plan visible while the conversation scrolls. */
+.pinned-plan-strip{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface);min-width:0}
+.pinned-plan-mark{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border:1px solid var(--border-strong);border-radius:9px;color:var(--green);font-weight:700}
+.pinned-plan-copy{flex:1;min-width:0}
+.pinned-plan-label{font-size:9px;letter-spacing:.12em;color:var(--muted);font-weight:750;margin-bottom:2px}
+.pinned-plan-label span{letter-spacing:.04em}
+.pinned-plan-copy>strong{display:block;font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pinned-plan-copy p{margin:2px 0 0;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:620px}
+.pinned-plan-progress{display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;gap:1px}
+.pinned-plan-progress strong{font-size:12px;font-variant-numeric:tabular-nums}
+.pinned-plan-progress small{font-size:9px;color:var(--muted)}
+.pinned-plan-strip>button{border:1px solid var(--border-strong);background:var(--surface-2);border-radius:8px;padding:7px 10px;font-size:11px;white-space:nowrap}
+.pinned-plan-strip>button:hover{background:var(--surface-3)}
+@media(max-width:760px){.pinned-plan-strip{gap:8px;padding:9px 10px}.pinned-plan-copy p{display:none}.pinned-plan-progress{display:none}.pinned-plan-strip>button{padding:6px 8px;font-size:10px}.pinned-plan-label{font-size:8px}.pinned-plan-copy>strong{font-size:11px}}
