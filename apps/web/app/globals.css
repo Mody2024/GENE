@@ -140,3 +140,29 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .pinned-plan-strip>button{border:1px solid var(--border-strong);background:var(--surface-2);border-radius:8px;padding:7px 10px;font-size:11px;white-space:nowrap}
 .pinned-plan-strip>button:hover{background:var(--surface-3)}
 @media(max-width:760px){.pinned-plan-strip{gap:8px;padding:9px 10px}.pinned-plan-copy p{display:none}.pinned-plan-progress{display:none}.pinned-plan-strip>button{padding:6px 8px;font-size:10px}.pinned-plan-label{font-size:8px}.pinned-plan-copy>strong{font-size:11px}}
+
+
+/* GENE 1.7 Scene Studio — compact, keyboard-friendly source-backed inspector */
+.scene-studio { min-width: 0; }
+.scene-studio-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:18px 0 14px; color:var(--muted,#9298a5); font-size:12px; }
+.scene-studio-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.scene-studio-layout { display:grid; grid-template-columns:minmax(190px,0.85fr) minmax(300px,1.4fr); gap:14px; align-items:start; }
+.scene-object-list,.scene-inspector { min-width:0; border:1px solid var(--border,#30343d); border-radius:12px; padding:12px; background:var(--panel,#15171d); }
+.scene-list-heading { color:var(--muted,#9298a5); font-size:10px; font-weight:800; letter-spacing:.13em; margin:2px 0 12px; }
+.scene-object-row { display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:1px solid transparent; border-radius:8px; padding:10px 8px; background:transparent; color:inherit; cursor:pointer; }
+.scene-object-row:hover,.scene-object-row.active { background:var(--panel-raised,#20232b); border-color:var(--border,#30343d); }
+.scene-object-symbol { display:grid; place-items:center; width:30px; height:30px; flex:0 0 30px; border-radius:8px; background:var(--surface-secondary,#292d36); font-size:18px; }
+.scene-object-name { min-width:0; overflow-wrap:anywhere; font-size:12px; font-weight:700; }
+.scene-object-name small { display:block; margin-top:4px; color:var(--muted,#9298a5); font-size:10px; font-weight:500; }
+.scene-empty { color:var(--muted,#9298a5); padding:16px 8px; font-size:12px; line-height:1.6; }
+.scene-field { display:flex; flex-direction:column; gap:6px; margin-bottom:13px; color:var(--muted,#9298a5); font-size:11px; font-weight:700; }
+.scene-field input,.scene-field select,.scene-vector input { box-sizing:border-box; width:100%; min-width:0; min-height:36px; border:1px solid var(--border,#30343d); border-radius:7px; background:var(--background,#101116); color:var(--foreground,#f1f2f5); padding:7px 9px; font:inherit; }
+.scene-field input[type=color] { padding:3px; height:38px; }
+.scene-vector { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; min-width:0; border:1px solid var(--border,#30343d); border-radius:9px; padding:10px; margin:0 0 13px; }
+.scene-vector legend { color:var(--muted,#9298a5); font-size:11px; font-weight:800; text-transform:capitalize; padding:0 5px; }
+.scene-vector label { min-width:0; display:flex; flex-direction:column; gap:5px; color:var(--muted,#9298a5); font-size:10px; font-weight:800; }
+.scene-visible { display:flex; align-items:center; gap:8px; font-size:12px; margin:12px 0; }
+.scene-delete { margin-top:4px; }
+.scene-studio-bottom { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; padding:14px; border:1px solid var(--border,#30343d); border-radius:10px; }
+.scene-studio-bottom p,.scene-studio-hint { max-width:600px; color:var(--muted,#9298a5); font-size:11px; line-height:1.6; margin:0; }
+@media (max-width:720px) { .scene-studio-layout { grid-template-columns:minmax(0,1fr); } .scene-studio-toolbar { align-items:flex-start; } .scene-studio-bottom { align-items:flex-start; } }
