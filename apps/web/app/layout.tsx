@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GENE — AI App & Game Builder",
-  description: "Plan, build, preview and edit interactive web apps and browser games through AI chat with GENE.",
+  title: "GENE Studio — AI App & Game Builder",
+  description: "A clean, focused AI workspace to plan, build, preview, test and refine real web apps and playable browser games.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
