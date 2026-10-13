@@ -1737,7 +1737,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE Project";
-      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
