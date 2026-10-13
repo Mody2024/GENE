@@ -463,6 +463,9 @@ export default function Home() {
     }
     const nextProject: GeneProject = {
       ...project,
+      // Automatic runtime repair is a source mutation and must never be blocked
+      // merely because the user last left the workspace in read-only Plan mode.
+      mode: silent && operationOverride === "edit" ? "build" : project.mode,
       kind: inferredKind,
       name: isFirstIdea && /^(untitled (game|app)|new project)$/i.test(project.name) ? "New project" : project.name,
       initialPrompt: isFirstIdea && operation !== "chat" && operation !== "research" ? prompt : project.initialPrompt,
