@@ -104,7 +104,7 @@ export function makeAgentInput(input: {
     "USER MESSAGE: " + input.message,
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
-    "CANONICAL PROJECT MEMORY (structured current truth; use this over stale chat when they conflict, unless the user explicitly changes a decision): " + (p ? formatCanonicalProjectMemory({ ...p, answers: input.answers || p.answers }) : "No project exists yet."),
+    "CANONICAL PROJECT MEMORY (structured current truth; use this over stale chat when they conflict, unless the user explicitly changes a decision): " + (p ? formatCanonicalProjectMemory({ ...p, answers: { ...(p.answers || {}), ...(input.answers || {}) } }) : "No project exists yet."),
     "EXISTING PLAN: " + JSON.stringify(compactContext ? compactPlan : p?.plan || null),
     "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : compactContext ? { manifest: contextManifest, selectedFileExcerpts: compactFiles } : p?.files || {}),
     "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
