@@ -463,6 +463,10 @@ assert.ok(page.includes("Describe what to update, fix, or add to this project"),
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
+assert.ok(api.includes("Build rejected: game audio is missing or only decorative") && api.includes("enforceAudioContract"), "fresh game builds and assembled-build validation reject missing or decorative audio without blocking unrelated targeted edits");
+assert.ok(api.includes('audio?.enabled !== true') && api.includes('"procedural-web-audio", "asset-backed"') && api.includes('["master", "music", "sfx"]'), "game build validation requires truthful audio metadata, mixer buses and real playback");
+assert.ok(api.includes("hasPlaybackApi") && api.includes("hasConnectedSoundEvents") && api.includes("events.length < 3"), "audio validation checks playback code and mapped events rather than trusting metadata alone");
+
 assert.ok(page.includes("FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS") && page.includes("Final content pass completed") === false, "build pipeline requests a distinct full-game expansion pass rather than treating the prototype as the finished game");
 assert.ok(page.includes("final-content-pass") && page.includes("Expand the prototype into the full game"), "build task ledger includes a separate full-game expansion stage");
 
@@ -494,6 +498,7 @@ assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.
 
 assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
 assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
+assert.ok(prompts.includes('audio:{enabled:true,implementation:"procedural-web-audio"|"asset-backed",buses:["master","music","sfx","ambience","ui"]') && prompts.includes("at least three mapped events"), "audio metadata shape matches the strict server-side game build contract");
 assert.ok(prompts.includes("AudioContext") && prompts.includes("setMusicVolume") && prompts.includes("setSfxVolume") && prompts.includes("playSfx(eventName, options)"), "game prompts require an integrated audio manager with real music, SFX and volume controls");
 assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("Audio is part of the definition of done"), "audio is an explicit deliverable with source-aligned project metadata");
 assert.ok(prompts.includes("stop/replace music loops instead of stacking them") && prompts.includes("Pause must silence/pause music"), "generated audio must clean up correctly on pause, restart and repeated scene transitions");
