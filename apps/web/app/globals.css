@@ -672,3 +672,65 @@ button:active:not(:disabled){transform:translateY(1px) scale(.985)}
 @media(max-width:900px){.gene-app{grid-template-columns:50px minmax(0,1fr)}.project-sidebar{display:none}.workspace{grid-template-columns:minmax(0,1fr)}.preview-panel{display:none}.preview-panel.expanded{display:flex;left:50px}.conversation-scroll{padding:22px 18px 28px}.composer-wrap{padding:0 14px}.welcome-block{margin:18px auto 32px}}
 @media(max-width:560px){.gene-app{grid-template-columns:44px minmax(0,1fr);min-height:100dvh;height:100dvh}.rail{padding:12px 4px 8px;gap:6px}.rail-item{width:34px;height:34px}.brand-orbit{width:34px;height:34px}.topbar{min-height:56px;height:auto;flex-basis:auto;gap:8px;padding:9px 10px}.breadcrumb{gap:6px;min-width:0}.breadcrumb strong{max-width:95px}.top-actions{gap:5px}.mode-switch button{min-width:30px;padding:5px 7px}.thinking-select{max-width:78px}.conversation-scroll{padding:18px 13px 24px}.welcome-block{margin:10px auto 28px}.welcome-block h1{font-size:clamp(31px,9vw,40px)}.welcome-block>p{font-size:13px}.starter-grid{grid-template-columns:1fr 1fr;gap:7px}.starter-grid button{min-height:78px;padding:10px;grid-template-columns:29px 1fr;column-gap:8px}.starter-icon{width:29px;height:29px}.starter-grid strong{font-size:11px}.starter-grid small{font-size:10px}.message-content{max-width:calc(100% - 38px)}.assistant-copy{font-size:13px}.composer-wrap{padding:0 8px}.composer{margin-bottom:8px;border-radius:15px}.composer-toolbar{padding:9px 12px 0}.composer textarea{min-height:38px;padding:8px 12px;font-size:13px}.composer-bottom{padding:4px 8px 8px 12px}.composer-tools{gap:9px}.composer-tools button{font-size:10px}.key-hint{display:none}.send-button{height:34px;min-width:36px;padding:0 10px}.statusbar{padding:0 8px}.about-dialog{padding:20px}.about-detail-grid{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+
+/* GENE 1.9 — cleaner studio controls and true composer-first hierarchy */
+.project-kind-chip{display:none!important}
+.topbar .breadcrumb .saved-pill{display:none!important}
+.topbar{min-height:58px;height:58px;flex-basis:58px}
+.topbar .breadcrumb{min-width:0;flex:1}
+.topbar .breadcrumb>span:first-child{color:var(--faint)}
+.topbar .breadcrumb strong{max-width:min(42vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-actions{gap:8px}
+.mode-switch{display:none!important}
+.thinking-select{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;color:var(--muted);font-size:11px;padding:7px 24px 7px 9px;max-width:120px}
+.composer-thinking{max-width:112px;min-height:31px}
+.composer{padding:0;overflow:visible}
+.composer-toolbar{display:flex;align-items:center;gap:8px;padding:9px 10px 0 12px}
+.composer-mode-switch{display:flex;align-items:center;gap:3px;padding:3px;border-radius:10px;background:var(--surface-3);border:1px solid var(--border)}
+.composer-mode-switch button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:29px;padding:5px 11px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:11px;font-weight:600;white-space:nowrap}
+.composer-mode-switch button span{font-size:13px;opacity:.8}
+.composer-mode-switch button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.composer-options{margin-left:auto;position:relative}
+.composer-tools-menu>summary{list-style:none;display:flex;align-items:center;justify-content:center;min-width:31px;height:30px;padding:0 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer;font-size:16px}
+.composer-tools-menu>summary::-webkit-details-marker,.header-overflow-menu>summary::-webkit-details-marker{display:none}
+.composer-tools-menu[open]>summary,.header-overflow-menu[open]>summary{border-color:var(--border-strong);background:var(--surface-3);color:var(--text)}
+.composer-tools-menu-panel{position:absolute;z-index:30;right:0;bottom:calc(100% + 9px);top:auto;width:min(270px,calc(100vw - 76px));padding:8px;border:1px solid var(--border-strong);border-radius:13px;background:var(--surface);box-shadow:var(--shadow);animation:gene-rise .16s ease both}
+.composer-tools-menu-panel .overflow-menu-caption{padding:8px 9px 6px}
+.composer-tools-menu-panel .menu-action{display:flex;width:100%;align-items:center;gap:10px;padding:10px;border:0;border-radius:8px;background:transparent;text-align:left;font-size:12px}
+.composer-tools-menu-panel .menu-action:hover{background:var(--surface-3)}
+.composer-tools-menu-panel small{display:block;padding:8px 9px 6px;color:var(--muted);font-size:10px;line-height:1.55}
+.composer .plan-intent-switch{display:flex;gap:6px;padding:8px 12px 0}
+.composer .plan-intent-switch button{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:6px 9px;font-size:10px;color:var(--muted)}
+.composer .plan-intent-switch button.tool-active{border-color:color-mix(in srgb,var(--green) 35%,var(--border));color:var(--text);background:color-mix(in srgb,var(--green) 8%,var(--surface))}
+.composer textarea{display:block;width:100%;min-height:50px;max-height:180px;resize:vertical;border:0;background:transparent}
+.composer textarea:focus-visible{outline:none}
+.composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 10px 10px 12px}
+.composer-quick-tools{display:flex;align-items:center;gap:8px;min-width:0}
+.composer-quick-tools .icon-only-tool{width:31px;height:31px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);font-size:15px}
+.composer-quick-tools .icon-only-tool:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.key-hint{font-size:10px;color:var(--faint);white-space:nowrap}
+.send-button{min-height:34px;height:34px;border-radius:10px}
+.header-overflow-menu{position:relative}
+.header-overflow-menu>summary{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--muted);list-style:none;cursor:pointer;font-size:17px}
+.header-overflow-panel{z-index:40;max-height:min(70vh,560px);overflow:auto}
+.header-overflow-panel .menu-action,.header-overflow-panel button{border-radius:9px}
+.sidebar-bottom .connection-row{font-size:11px}
+.sidebar-bottom>small{font-size:10px;color:var(--faint)}
+/* Chat is the default mode, never a surprise build. */
+@media(max-width:560px){
+ .topbar{min-height:52px;height:52px;flex-basis:52px}
+ .topbar .breadcrumb>span:first-child,.topbar .breadcrumb .crumb-slash,.topbar .breadcrumb .rename-project{display:none}
+ .topbar .breadcrumb strong{max-width:34vw}
+ .top-actions{gap:5px}
+ .top-play-button{padding:7px 8px}
+ .composer-toolbar{padding:8px 8px 0}
+ .composer-mode-switch button{padding:5px 8px;font-size:10px}
+ .composer-thinking{max-width:95px;font-size:10px}
+ .composer textarea{min-height:46px;padding:8px 11px}
+ .key-hint{display:none}
+ .composer-bottom{padding:4px 8px 8px}
+ .composer-quick-tools{gap:5px}
+ .composer-quick-tools .icon-only-tool{width:29px;height:29px}
+ .send-button{height:32px;min-height:32px}
+}
