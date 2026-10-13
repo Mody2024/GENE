@@ -19,7 +19,7 @@ function compactProject(project: GeneProject, options: {
   });
   const buildRun = project.buildRun ? {
     ...project.buildRun,
-    checkpoints: project.buildRun.checkpoints.slice(-options.checkpointCount)
+    checkpoints: options.checkpointCount > 0 ? project.buildRun.checkpoints.slice(-options.checkpointCount) : []
   } : project.buildRun;
   return {
     ...project,
