@@ -667,3 +667,11 @@ This log records implementation evidence separately from acceptance claims.
 3. Prove editor-save → runtime-render → reload round trips for Canvas 2D and WebGL games.
 4. Run audio regression fixtures and native cloud builds.
 5. Merge/deploy only after the final revision and live URL are verified.
+
+
+### WebGL viewport continuation — 2026-10-13
+- Added `WebGLSceneViewport.tsx`, a dependency-free WebGL 1 renderer using GPU shader programs and cube geometry for visible authored objects, with a world grid, orbit controls, zoom, and object selection.
+- Integrated a default WebGL 3D mode into Scene Studio while retaining the isometric Canvas editor as a fallback/alternate mode.
+- Added explicit axis-based position nudges, Y rotation and scale controls alongside the existing exact numeric transform inspector.
+- Added smoke-test source contracts for WebGL context/render loop, orbit/zoom, selection and Scene Studio integration.
+- This is a first functional WebGL viewport, not yet a full professional editor: primitive cube geometry is currently used for authored objects, true drag gizmos are not implemented, and renderer-level integration tests/build verification remain mandatory.
