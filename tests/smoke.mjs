@@ -21,6 +21,7 @@ const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const forge = read("apps/web/app/api/forge/route.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
+const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
@@ -133,6 +134,8 @@ assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer 
 assert.ok(prompts.includes("WASD+F for P1"), "multiplayer prompt defines distinct default keyboard layouts");
 assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
+assert.ok(starterGameSource.includes("function initAudio()") && starterGameSource.includes('playSfx("pickup")') && starterGameSource.includes('playSfx("damage")') && starterGameSource.includes("function startMusic()"), "built-in playable game includes procedural music and event-driven pickup/damage audio");
+assert.ok(starterGameSource.includes('"audio":{"enabled":true,"implementation":"procedural-web-audio"') && starterGameSource.includes('id=\\\"audio-button\\\"') && starterGameSource.includes("gene-outpost-muted"), "starter game exposes a mute control, persists mute preference, and declares its audio manifest");
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
 assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in browser storage");
 assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
@@ -378,6 +381,13 @@ assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includ
 
 // GENE 1.4 executable utility tests (not only source-string assertions).
 const tsCompiler = await import("typescript");
+const starterGameJs = tsCompiler.transpileModule(starterGameSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const starterGameModule = await import("data:text/javascript;base64," + Buffer.from(starterGameJs).toString("base64"));
+const starterFiles = starterGameModule.playableDemoFiles();
+assert.doesNotThrow(() => new Function(starterFiles["game.js"]), "built-in starter runtime with audio must parse as valid JavaScript");
+assert.equal(JSON.parse(starterFiles["game-spec.json"]).audio.implementation, "procedural-web-audio", "built-in starter project metadata declares its real procedural audio implementation");
 const patchSource = read("apps/web/app/lib/patch-engine.ts");
 const patchJs = tsCompiler.transpileModule(patchSource, {
   compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
