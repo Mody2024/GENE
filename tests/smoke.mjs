@@ -108,7 +108,7 @@ assert.ok(api.includes("groundingChunks"), "grounding sources are returned to us
 assert.ok(api.includes("project spec needs a title"), "builder requires meaningful project specs");
 assert.ok(api.includes('projectKind === "app"'), "agent validation distinguishes apps from games");
 assert.ok(api.includes("app spec needs a concise summary"), "app builds require structured app metadata");
-assert.ok(page.includes('createNewProject("app")'), "workspace can create a dedicated web app project");
+assert.ok(page.includes("Start one unified project") && page.includes("createNewProject()"), "workspace creates a unified project and lets GENE identify game, website, or app from the brief");
 assert.ok(page.includes('"game.html": "index.html"') && page.includes('"game.js": "app.js"'), "app exports use standard HTML/CSS/JavaScript file names");
 assert.ok(page.includes("importProjectPaths(currentFiles, importedKind)"), "app-friendly exported source names import back into editable files");
 assert.ok(page.includes('sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"}'), "only app previews enable form events; game previews keep the tighter sandbox");
