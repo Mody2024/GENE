@@ -545,6 +545,10 @@ const memorySnapshot = projectMemory.buildCanonicalProjectMemory({
 assert.equal(memorySnapshot.confirmedDecisions.length, 2, "canonical project memory preserves user-confirmed answers");
 assert.equal(memorySnapshot.currentPlan.engine, "webgl3d", "canonical project memory preserves the selected engine");
 assert.equal(memorySnapshot.source.fileCount, 2, "canonical project memory tracks the current source manifest");
+assert.ok(memorySnapshot.source.revisionHash && memorySnapshot.source.fileHashes["game.js"], "canonical memory fingerprints the current source revision and individual files");
+assert.equal(projectMemory.fingerprintProjectFiles({ "b.js": "b", "a.js": "a" }).revisionHash, projectMemory.fingerprintProjectFiles({ "a.js": "a", "b.js": "b" }).revisionHash, "source revision fingerprint is stable regardless of object key order");
+assert.notEqual(projectMemory.fingerprintProjectFiles({ "game.js": "before" }).revisionHash, projectMemory.fingerprintProjectFiles({ "game.js": "after" }).revisionHash, "source revision fingerprint changes when source changes");
+
 assert.equal(memorySnapshot.build.lastError, "Temporary generation error", "canonical project memory retains the latest recoverable error");
 assert.ok(projectMemory.formatCanonicalProjectMemory({ id: "minimal", name: "Minimal", initialPrompt: "x", mode: "plan", thinking: "balanced", messages: [], answers: {}, files: {}, versions: [], activeFile: "", references: [], updatedAt: "2026-01-01" }).includes('"schemaVersion":1'), "canonical memory has an explicit schema version");
 let boundedHistoryRun = baseRun;
