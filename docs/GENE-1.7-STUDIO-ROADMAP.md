@@ -315,6 +315,131 @@ Acceptance: explanations link to real current files and tests; sandbox experimen
 
 Acceptance: changing a source file invalidates only relevant stale checks; a release summary accurately distinguishes passed, failed, skipped, and unverified criteria.
 
+
+### 31. Studio-scale Game Director and specialist coordination
+
+- Create a director that turns the approved game brief into a single canonical design bible, production plan, asset requirements, quality targets, and acceptance tests.
+- Coordinate bounded specialist roles for gameplay, world/level design, character/art, animation, UI/UX, audio, narrative, performance, and QA; each role owns explicit deliverables and must use shared project contracts.
+- Resolve disagreements through the canonical brief and measurable constraints instead of letting agents silently overwrite each other's decisions.
+- Define dependency-aware stages: playable core loop first, then vertical slice, content production, integration, polish, and release validation.
+- Give each specialist a limited context package containing relevant files, current decisions, and test evidence; avoid sending every agent the entire project transcript.
+- Require integration gates after each major stage and preserve the last known-good playable milestone.
+- Let users choose creative freedom versus strict adherence to the brief, with explicit approval required for major scope changes.
+
+Acceptance: a multi-specialist fixture produces one consistent design spec, no duplicate conflicting ownership, a playable milestone, and traceable approvals for major decisions.
+
+### 32. Visual bible and asset-consistency critic
+
+- Create a project art bible describing style, silhouette language, scale, palette, material response, shape language, lighting, camera framing, UI typography, and reference boundaries.
+- Generate asset sheets and turnarounds where supported, plus a scene-level look-development target before mass asset production.
+- Compare imported/generated assets to the project's approved references and constraints using measurable metadata and image-based similarity where available.
+- Detect mismatched scale, incompatible art styles, inconsistent roughness/metalness, palette drift, texture density mismatch, repeated props, and overly uniform procedural placement.
+- Support approval sets and rejected examples so users can teach the project its visual direction without fine-tuning a model.
+- Keep reference images and third-party assets' source/license metadata attached to their use.
+- Report when visual review is unavailable or subjective; do not treat a heuristic similarity score as proof of professional quality.
+
+Acceptance: deliberately mismatched asset fixtures trigger actionable warnings; accepted assets remain stable across later generation passes unless the user changes the art bible.
+
+### 33. Cinematic staging and camera grammar
+
+- Provide data-driven cinematic sequences with camera tracks, shot sizes, focus targets, timing, dialogue beats, animation cues, transitions, and skip/replay behavior.
+- Use reusable camera grammars for reveal, chase, boss introduction, traversal, dialogue, victory, and tutorial demonstrations.
+- Validate that cinematics return input control, respect pause/skip settings, and recover after interruption, scene unload, or player death.
+- Connect animation, sound, subtitles, gameplay events, and camera cues through stable timeline event IDs.
+- Include a storyboard/blocking preview before generating expensive final assets or animation.
+- Keep all sequences editable in the project and avoid rendering a fake cutscene as a substitute for a functioning native sequence.
+
+Acceptance: test sequences can be skipped, paused where supported, replayed, and interrupted safely; all required events fire in the expected order.
+
+### 34. Combat and interaction feel tuner
+
+- Create genre-specific tuning surfaces for movement acceleration, turn rate, input buffering, coyote time, jump curve, camera response, attack startup/active/recovery frames, hit-stop, recoil, stagger, dodge windows, enemy telegraphs, and feedback intensity.
+- Link every exposed tuning value to actual runtime behavior and provide safe ranges plus a restore-defaults action.
+- Use repeatable micro-test arenas for movement, platforming, melee, ranged combat, driving, and interactions.
+- Capture input-to-response latency and frame-time metrics when the runtime exposes them; distinguish measured values from estimated values.
+- Offer A/B comparison of two tuning profiles with identical seeds and test scenarios.
+- Preserve accessibility options and avoid making camera shake, flashes, vibration, or loud sounds mandatory for gameplay clarity.
+
+Acceptance: tuning changes produce observable behavior differences, regression tests catch invalid values, and users can restore the prior profile.
+
+### 35. Living-world simulation and systemic interactions
+
+- Add opt-in world-system templates for weather, time of day, day/night schedules, ambient life, destructible props, physics interactions, environmental hazards, factions, and NPC routines.
+- Define interactions through data-driven rules and events instead of independent hard-coded scripts that conflict.
+- Validate system combinations for performance, impossible states, runaway event loops, and broken quest or navigation assumptions.
+- Use deterministic seeds and configurable simulation depth so the same world can run in high detail nearby and simplified simulation at distance where the engine supports it.
+- Provide per-system budgets and explicit capability notes for each target engine.
+- Make systems composable and optional; small games should not inherit a heavy simulation framework they don't need.
+
+Acceptance: interaction fixtures cover expected state changes, simulation can be paused/reset, and low-end profiles reduce optional work without breaking core rules.
+
+### 36. Procedural content with authored control
+
+- Combine deterministic procedural generation with artist-authored anchor points, exclusions, landmarks, critical paths, and hand-edited overrides.
+- Use parameters and seed manifests for terrain, vegetation, props, dungeons, encounters, loot, and environment dressing.
+- Preserve manual edits when upstream parameters change by tracking authored overrides separately from generated output.
+- Add generation previews, density/overlap checks, navigation validation, visual repetition detection, and regeneration scopes.
+- Let creators regenerate only one room, biome, encounter, or asset family without changing the rest of the world.
+- Keep platform-aware budgets and use chunking/streaming only where the engine and target support it.
+- Prefer a small, distinctive, art-directed world over a huge empty map when the project's scope does not justify an open world.
+
+Acceptance: same seed and configuration reproduce the same generated result; local regeneration preserves unrelated authored work and stable references.
+
+### 37. Physics, destruction, and material interaction toolkit
+
+- Add reusable, engine-aware templates for rigid-body props, breakable objects, doors, switches, ropes, moving platforms, vehicles, ragdolls, and environmental reactions where supported.
+- Define material response profiles for impact sounds, particles, decals, damage, friction, bounce, and break behavior.
+- Validate collider shape/scale, mass, collision layers, tunneling risk, joints, and interactions with gameplay navigation.
+- Offer low-cost alternatives when full simulation is too expensive or unavailable, and label approximations honestly.
+- Make destruction deterministic or seed-controlled where practical so tests and replays can reproduce outcomes.
+- Provide a physics test arena and reset mechanism to prevent debugging experiments from corrupting the main level.
+
+Acceptance: representative physics fixtures behave within declared tolerances, reset cleanly, and have a supported fallback for targets without equivalent features.
+
+### 38. Visual effects and feedback choreography
+
+- Build a shared VFX library and event grammar for impacts, muzzle flashes, magic, environmental dust, weather, footsteps, pickups, damage, UI feedback, and objective completion.
+- Synchronize effects with animation, audio, camera cues, and gameplay events through a common event contract.
+- Add lifetime, particle-count, overdraw, transparency, light-count, and memory budgets; provide reduced-quality variants for weak hardware.
+- Detect effects that obscure UI, obscure critical threats, persist after their owner is removed, or trigger repeatedly without bounds.
+- Support deterministic effect seeds and editor previews, plus a clear mute/disable-effects debugging mode.
+- Add accessibility controls for flashes, camera shake, motion intensity, and visual clutter.
+
+Acceptance: effect events clean up after scene reload, stay within budgets or warn, and never serve as the only indication of a critical game state.
+
+### 39. Camera, lighting, and rendering art direction
+
+- Provide camera templates and validation for third-person follow, first-person, top-down, racing, platformer, dialogue, and cinematic views.
+- Detect common presentation issues: camera clipping, player obstruction, poor framing, inaccessible UI safe areas, excessive exposure shifts, flicker, and missing light probes/reflections where relevant.
+- Offer engine-aware lighting recipes and environment presets, with performance tiers rather than assuming expensive real-time lighting is always available.
+- Support screenshot-based composition reviews for key scenes and compare them to project-approved reference targets.
+- Ensure quality profiles can reduce shadows, reflections, post-processing, foliage density, and particles while preserving readability.
+- Report engine/rendering features that are unsupported on the selected export target.
+
+Acceptance: sample scenes have stable camera behavior and visual readability at declared quality tiers; unsupported rendering features are never silently assumed.
+
+### 40. Game production vertical-slice gate
+
+- Require a small, representative vertical slice before broad content generation: one polished environment, one complete gameplay loop, one representative character/enemy, core UI, audio, save/restart, and a tested export target.
+- Evaluate integration and consistency across art, gameplay, sound, UI, performance, accessibility, and packaging before scaling the same patterns to more content.
+- Record quality targets and approved patterns from the slice as reusable templates for subsequent levels and assets.
+- Detect when a generated project has breadth without depth: many placeholders, disconnected menus, repeated assets, unimplemented objectives, or no verified end-to-end loop.
+- Allow users to waive scope-specific criteria explicitly, but preserve the resulting limitation in the project health report.
+- Keep milestone checkpoints so the project can return to the last playable slice after a failed content expansion.
+
+Acceptance: content expansion starts only after a declared vertical-slice checklist is passed or the user explicitly accepts documented exceptions.
+
+### 41. Creative brief, reference analysis, and originality guardrails
+
+- Translate user references into abstract design traits: pacing, camera language, color mood, combat rhythm, UI density, environment scale, and progression patterns.
+- Keep a traceable creative brief showing which traits are user-requested and how GENE interprets them into original implementation choices.
+- Avoid copying protected characters, logos, maps, dialogue, signature assets, or soundtrack material; offer genre-level alternatives when a reference request is too close to an existing work.
+- Compare new work against the project's own art bible and prior assets to avoid accidental inconsistency and unintentional near-duplicates.
+- Provide source/license metadata and user approval gates for external assets and generated content.
+- Make originality review an aid, not a legal guarantee; disclose that automated checks cannot prove non-infringement.
+
+Acceptance: reference-driven builds have a documented original brief, provenance for imported assets, and clear warnings for unresolved rights or licensing concerns.
+
 ## Ideas to keep in the backlog until 1.6 is stable
 
 - Visual node editor for scene and gameplay systems.
