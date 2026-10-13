@@ -1920,6 +1920,12 @@ export default function Home() {
         <div className={"workspace" + (!previewOpen ? " preview-minimized" : "")}>
           <section className="conversation-panel">
             {section === "chat" && <>
+              {project.plan && <div className="pinned-plan-strip" role="region" aria-label="Pinned project plan">
+                <div className="pinned-plan-mark">✓</div>
+                <div className="pinned-plan-copy"><div className="pinned-plan-label">PINNED PROJECT PLAN <span>· {project.plan.engine === "canvas2d" ? "2D" : project.plan.engine === "webgl3d" ? "3D" : "WEB APP"}</span></div><strong>{project.plan.title}</strong><p>{project.plan.summary}</p></div>
+                <div className="pinned-plan-progress">{project.buildRun ? <><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length}</strong><small>tasks passed</small></> : <><strong>{project.plan.tasks.length}</strong><small>planned tasks</small></>}</div>
+                <button type="button" onClick={() => setSection("tasks")}>Open plan ↗</button>
+              </div>}
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
