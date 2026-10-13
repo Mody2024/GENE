@@ -516,6 +516,7 @@ assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline
 
 assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
+assert.ok(page.includes("Integrate into game") && page.includes("Load it into the actual playable scene") && page.includes("visibly present in the preview"), "saved Forge meshes have a source-linked scene-integration workflow that requests visible runtime proof");
 
 
 const studioContract = read("apps/web/app/lib/studio-contract.ts");
