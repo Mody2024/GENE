@@ -921,8 +921,9 @@ export default function Home() {
         responseOk = response.ok;
       }
       if (!responseOk || !payload?.ok) {
-        const error = payload?.error?.message || "GENE could not complete the request.";
-        addActivity("Request failed: " + error);
+        const rawError = payload?.error?.message || "GENE could not complete the request.";
+        const error = explainAgentError(rawError);
+        addActivity("Request failed: " + rawError);
         const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
         setProject(current => {
           if (!current || current.id !== failed.id) return current;
