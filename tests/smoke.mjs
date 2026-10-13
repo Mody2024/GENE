@@ -548,6 +548,27 @@ assert.equal(memorySnapshot.source.fileCount, 2, "canonical project memory track
 assert.ok(memorySnapshot.source.revisionHash && memorySnapshot.source.fileHashes["game.js"], "canonical memory fingerprints the current source revision and individual files");
 assert.equal(projectMemory.fingerprintProjectFiles({ "b.js": "b", "a.js": "a" }).revisionHash, projectMemory.fingerprintProjectFiles({ "a.js": "a", "b.js": "b" }).revisionHash, "source revision fingerprint is stable regardless of object key order");
 assert.notEqual(projectMemory.fingerprintProjectFiles({ "game.js": "before" }).revisionHash, projectMemory.fingerprintProjectFiles({ "game.js": "after" }).revisionHash, "source revision fingerprint changes when source changes");
+const nonOverlappingMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base-game", "game.css": "base-css" },
+  { "game.js": "base-game", "game.css": "user-css" },
+  { "game.js": "ai-game", "game.css": "base-css" },
+  ["game.js"]
+);
+assert.deepEqual(nonOverlappingMerge.conflicts, [], "AI changes to a file do not conflict with a concurrent edit to a different file");
+assert.equal(nonOverlappingMerge.files["game.js"], "ai-game", "non-overlapping AI changes are applied");
+assert.equal(nonOverlappingMerge.files["game.css"], "user-css", "non-overlapping user edits are preserved");
+const overlappingMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base" }, { "game.js": "user-edit" }, { "game.js": "ai-edit" }, ["game.js"]
+);
+assert.deepEqual(overlappingMerge.conflicts, ["game.js"], "concurrent edits to the same file are detected");
+assert.equal(overlappingMerge.files["game.js"], "user-edit", "conflicting merge leaves the newer user source untouched");
+const identicalMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base" }, { "game.js": "same" }, { "game.js": "same" }, ["game.js"]
+);
+assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do not create a false conflict");
+assert.ok(page.includes("mergeConcurrentSourceChanges") && page.includes("discarded this stale result") && page.includes("if (!current || current.id !== updated.id) return current;"), "workspace rejects stale overlapping AI results without switching active projects");
+assert.ok(page.includes("if (!current || current.id !== failed.id) return current;"), "failed late responses cannot switch the workspace back to an inactive project");
+
 
 assert.equal(memorySnapshot.build.lastError, "Temporary generation error", "canonical project memory retains the latest recoverable error");
 assert.ok(projectMemory.formatCanonicalProjectMemory({ id: "minimal", name: "Minimal", initialPrompt: "x", mode: "plan", thinking: "balanced", messages: [], answers: {}, files: {}, versions: [], activeFile: "", references: [], updatedAt: "2026-01-01" }).includes('"schemaVersion":1'), "canonical memory has an explicit schema version");
