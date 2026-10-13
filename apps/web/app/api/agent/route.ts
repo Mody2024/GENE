@@ -568,6 +568,7 @@ export async function POST(request: NextRequest) {
   let successfulModel = model;
   let successfulProvider = "gemini";
   let lastFailure = { status: 502, detail: "Configured AI providers did not complete the request." };
+  let lastFailureProvider = "Gemini";
   let attempts = 0;
   let outputFailure: "truncated" | "malformed" | null = null;
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
@@ -708,6 +709,7 @@ export async function POST(request: NextRequest) {
     }
     for (const provider of alternateProviders) {
       if (Date.now() - startedAt > totalBudgetMs - 2_500) break;
+      lastFailureProvider = provider.name === "openrouter" ? "OpenRouter" : "Groq";
       try {
         const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
         const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
@@ -759,6 +761,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!payload) {
+    if (lastFailureProvider === "OpenRouter") {
+      const detail = lastFailure.detail || "No additional provider detail was returned.";
+      if (lastFailure.status === 402 || /payment required|insufficient credits|not enough credits|paid model|requires credits|balance too low/i.test(detail)) {
+        return jsonError("OpenRouter rejected the fallback because this request appears to require credits or a paid route. GENE defaults to a free model, but the configured GENE_OPENROUTER_MODEL can override it and free-provider capacity can vary. Set GENE_OPENROUTER_MODEL to a model marked :free, or remove that override, and verify the OpenRouter key. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_CREDITS_OR_PAID_ROUTE");
+      }
+      if (lastFailure.status === 401 || lastFailure.status === 403) {
+        return jsonError("OpenRouter rejected its API key or account access. Verify OPENROUTER_API_KEY in the deployment environment and redeploy. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
+      }
+      if (lastFailure.status === 429 || /rate.?limit|too many requests|quota/i.test(detail)) {
+        return jsonError("OpenRouter's free route is rate-limited or temporarily out of capacity. This does not by itself mean the model is paid. Wait and retry, or configure another available provider. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");
+      }
+      return jsonError("GENE tried Gemini and then its OpenRouter fallback, but OpenRouter did not complete the request. Check the configured model and API key, then retry. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_FALLBACK_FAILED");
+    }
     if (outputFailure) {
       const truncated = outputFailure === "truncated";
       return jsonError(
