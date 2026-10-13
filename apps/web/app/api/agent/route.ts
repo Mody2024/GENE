@@ -840,7 +840,8 @@ export async function POST(request: NextRequest) {
     }
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
     result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
-    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
+    const enforceAudioForThisResponse = !["edit", "chat", "buildPart", "interview", "plan", "research"].includes(body.operation);
+    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind, enforceAudioForThisResponse);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
       if (!isSafeProjectPath(requestedPath)) {
