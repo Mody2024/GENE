@@ -83,7 +83,7 @@ function parseModelJson(text: string): AgentResponse {
 function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"], projectKind: "game" | "app" = "game"): AgentResponse {
   if (typeof input.reply !== "string" || !input.reply.trim()) throw new Error("GENE response needs a non-empty user-facing reply.");
   const result: AgentResponse = {
-    reply: input.reply.trim().slice(0, 12_000),
+    reply: input.reply.trim(),
     files: Array.isArray(input.files) ? input.files : [],
     question: null,
     plan: null,
@@ -609,11 +609,13 @@ export async function POST(request: NextRequest) {
               ? (attempt.fallback ? 5_120 : 6_144)
               : body.operation === "build" || body.operation === "surprise" || body.operation === "edit"
                 ? (attempt.fallback ? 6_144 : 10_240)
-                : body.operation === "plan" && body.extendedPlanning
-                  ? (attempt.fallback ? 3_072 : 6_144)
-                  : body.operation === "enhancePrompt"
-                    ? 2_048
-                    : (attempt.fallback ? 1_536 : 3_072),
+                : body.operation === "plan"
+                  ? (attempt.fallback ? 5_120 : 8_192)
+                  : body.operation === "chat" || body.operation === "research"
+                    ? (attempt.fallback ? 4_096 : 8_192)
+                    : body.operation === "enhancePrompt"
+                      ? 2_048
+                      : (attempt.fallback ? 2_560 : 4_096),
             thinkingConfig: { thinkingLevel: attempt.fallback || body.thinking === "fast" ? "low" : thinkingLevel }
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
@@ -722,7 +724,7 @@ export async function POST(request: NextRequest) {
             messages: [{ role: "system", content: system }, { role: "user", content: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete." }],
             response_format: { type: "json_object" },
             temperature: body.operation === "interview" ? 0.35 : 0.2,
-            max_tokens: body.operation === "buildPart" ? 5_500 : isBuild ? 7_000 : 2_000
+            max_tokens: body.operation === "buildPart" ? 5_500 : isBuild ? 7_000 : body.operation === "plan" ? 5_000 : body.operation === "chat" || body.operation === "research" ? 6_000 : 3_000
           }),
           signal: AbortSignal.timeout(Math.min(14_000, remainingMs))
         });
