@@ -191,6 +191,7 @@ export default function Home() {
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
   const autoRepairAttempts = useRef(0);
+  const runtimeRefreshAttempts = useRef(0);
 
   useEffect(() => {
     try {
@@ -302,8 +303,20 @@ export default function Home() {
           } : current);
         }
         if (state === "error") {
-          const errorText = event.data.message || "unknown runtime error";
-          setNotice("The game runtime reported an error: " + errorText);
+          const errorText = String(event.data.message || event.data.stack || "unknown runtime error").slice(0, 1200);
+          // Browser previews can hit a transient iframe/context race. Retry the
+          // actual preview once before invoking the AI repair path; never loop reloads.
+          if (runtimeRefreshAttempts.current < 1) {
+            runtimeRefreshAttempts.current += 1;
+            setNotice("Preview hit a runtime error. GENE is automatically restarting the live preview once…");
+            window.setTimeout(() => {
+              setPreviewOpen(true);
+              setPreviewKey(value => value + 1);
+              setRuntimeState("loaded");
+            }, 350);
+            return;
+          }
+          setNotice("The live preview reported a runtime error: " + errorText + " — source is preserved; GENE will attempt a targeted repair. Use Refresh preview to retry manually if needed.");
           setProject(current => current ? {
             ...current,
             livingPreview: { status: "error", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [errorText], currentObjectives: [], canContinuePlaying: false },
@@ -801,7 +814,8 @@ export default function Home() {
             if (validationAttempt >= 2) break;
 
             const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
+              (/audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game-spec.json" :
+               /input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
                /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
                /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
                /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
@@ -992,6 +1006,7 @@ export default function Home() {
         };
       });
       if (changedPaths.length) {
+        runtimeRefreshAttempts.current = 0;
         addActivity("Files updated: " + changedPaths.join(", "));
         setSection("chat");
         setPreviewOpen(true);
@@ -2032,7 +2047,7 @@ export default function Home() {
           </div>
         </header>
 
-        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span><button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
+        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span>{(runtimeState === "error" || /preview.*runtime error|could not confirm a visible game frame/i.test(notice)) && hasGame && <button onClick={() => { runtimeRefreshAttempts.current = 0; setPreviewOpen(true); setPreviewKey(value => value + 1); setRuntimeState("loaded"); setNotice("Refreshing live preview…"); }}>Refresh preview ↻</button>}<button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
         {persistenceWarning && <div className="notice persistence-warning" role="status" aria-live="polite"><span>{persistenceWarning}</span><button onClick={() => setPersistenceWarning("")}>Dismiss</button></div>}
 
         {binaryBuildLinks && <div className="binary-build-result" role="status">
