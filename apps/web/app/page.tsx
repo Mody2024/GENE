@@ -1676,7 +1676,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE project";
-      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
@@ -1809,7 +1809,7 @@ export default function Home() {
     const jsName = projectKind === "app" ? "app.js" : "game.js";
     const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
     const projectTitle = project.plan?.title || project.name || "GENE project";
-    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files));
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
     Object.entries(project.files).forEach(([path, source]) => {
       if (path === "game.html") return;
       zip.file(exportProjectPath(path, projectKind), source);
@@ -1878,7 +1878,7 @@ export default function Home() {
         zip.file(prefix + exportProjectPath(path, projectKind), source);
       });
       zip.file(prefix + "source/game.html", version.files["game.html"] || "");
-      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files)));
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files) + buildRuntimeSceneBootstrap(version.files)));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
