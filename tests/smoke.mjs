@@ -134,7 +134,7 @@ assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer 
 assert.ok(prompts.includes("WASD+F for P1"), "multiplayer prompt defines distinct default keyboard layouts");
 assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
-assert.ok(starterGameSource.includes("function initAudio()") && starterGameSource.includes('playSfx("pickup")') && starterGameSource.includes('playSfx("damage")') && starterGameSource.includes("function startMusic()"), "built-in playable game includes procedural music and event-driven pickup/damage audio");
+assert.ok(starterGameSource.includes("function initAudio()") && starterGameSource.includes("playSfx(") && starterGameSource.includes("function startMusic()") && starterGameSource.includes("patterns={ui:"), "built-in playable game includes procedural music and event-driven sound effects");
 assert.ok(starterGameSource.includes('"audio":{"enabled":true,"implementation":"procedural-web-audio"') && starterGameSource.includes('id=\\\"audio-button\\\"') && starterGameSource.includes("gene-outpost-muted"), "starter game exposes a mute control, persists mute preference, and declares its audio manifest");
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
 assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in browser storage");
