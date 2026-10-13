@@ -12,6 +12,9 @@ type SceneObject = {
   scale: Vec3;
   color: string;
   visible: boolean;
+  material: { roughness: number; metalness: number; emissive: string };
+  light: { intensity: number; color: string };
+  camera: { fov: number };
 };
 type Props = {
   files: Record<string, string>;
@@ -39,7 +42,10 @@ function normalizeObject(value: unknown, index: number): SceneObject {
     rotation: safeVector(raw.rotation ?? raw.rotation3d, zero()),
     scale: safeVector(raw.scale ?? raw.scale3d, one()),
     color: typeof raw.color === "string" ? raw.color : typeof raw.materialColor === "string" ? raw.materialColor : "#8b9bb4",
-    visible: raw.visible !== false
+    visible: raw.visible !== false,
+    material: { roughness: Math.max(0, Math.min(1, Number((raw.material as Record<string, unknown> | undefined)?.roughness ?? 0.65) || 0)), metalness: Math.max(0, Math.min(1, Number((raw.material as Record<string, unknown> | undefined)?.metalness ?? 0) || 0)), emissive: /^#[0-9a-f]{6}$/i.test(String((raw.material as Record<string, unknown> | undefined)?.emissive ?? "#000000")) ? String((raw.material as Record<string, unknown> | undefined)?.emissive ?? "#000000") : "#000000" },
+    light: { intensity: Math.max(0, Math.min(20, Number((raw.light as Record<string, unknown> | undefined)?.intensity ?? 1) || 0)), color: /^#[0-9a-f]{6}$/i.test(String((raw.light as Record<string, unknown> | undefined)?.color ?? raw.color ?? "#ffffff")) ? String((raw.light as Record<string, unknown> | undefined)?.color ?? raw.color ?? "#ffffff") : "#ffffff" },
+    camera: { fov: Math.max(10, Math.min(120, Number((raw.camera as Record<string, unknown> | undefined)?.fov ?? 60) || 60)) }
   };
 }
 function readScene(files: Record<string, string>) {
@@ -127,7 +133,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
 
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
   const commitObjects = (next: SceneObject[]) => {
-    const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } }));
+    const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale }, material: { ...object.material }, light: { ...object.light }, camera: { ...object.camera } }));
     setUndoStack(current => [...current, snapshot].slice(-40));
     setRedoStack([]);
     setObjects(next);
@@ -178,7 +184,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
-    const object: SceneObject = { id, name: "New object", type: "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true };
+    const object: SceneObject = { id, name: "New object", type: "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
     setStatus("New scene entry added. Save it to write the manifest.");
@@ -195,7 +201,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     const nextSpec = { ...rawSpec, scene: { ...sceneMetadata, objects: objects.map(object => ({
       id: object.id, name: object.name, type: object.type,
       position: object.position, rotation: object.rotation, scale: object.scale,
-      color: object.color, visible: object.visible
+      color: object.color, visible: object.visible, material: object.material, light: object.light, camera: object.camera
     })) } };
     const nextFiles = { ...files, "game-spec.json": JSON.stringify(nextSpec, null, 2) + "\n" };
     onSave(nextFiles, "Scene data: " + objects.length + " objects");
@@ -244,6 +250,9 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
               {(["x", "y", "z"] as const).map(axis => <label key={axis}>{axis.toUpperCase()}<input type="number" step={key === "rotation" ? 5 : 0.1} value={selected[key][axis]} onChange={event => updateVector(key, axis, Number(event.target.value))} disabled={readOnly} /></label>)}
             </fieldset>)}
             <label className="scene-field">Display color<input type="color" value={/^#[0-9a-f]{6}$/i.test(selected.color) ? selected.color : "#8b9bb4"} onChange={event => updateSelected({ color: event.target.value })} disabled={readOnly} /></label>
+            <fieldset className="scene-vector"><legend>Material</legend><label>Roughness<input type="number" min="0" max="1" step="0.05" value={selected.material.roughness} onChange={event => updateSelected({ material: { ...selected.material, roughness: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} disabled={readOnly} /></label><label>Metalness<input type="number" min="0" max="1" step="0.05" value={selected.material.metalness} onChange={event => updateSelected({ material: { ...selected.material, metalness: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} disabled={readOnly} /></label><label>Emissive<input type="color" value={selected.material.emissive} onChange={event => updateSelected({ material: { ...selected.material, emissive: event.target.value } })} disabled={readOnly} /></label></fieldset>
+            {selected.type.toLowerCase().includes("light") && <fieldset className="scene-vector"><legend>Light</legend><label>Intensity<input type="number" min="0" max="20" step="0.25" value={selected.light.intensity} onChange={event => updateSelected({ light: { ...selected.light, intensity: Math.max(0, Math.min(20, Number(event.target.value) || 0)) } })} disabled={readOnly} /></label><label>Light color<input type="color" value={selected.light.color} onChange={event => updateSelected({ light: { ...selected.light, color: event.target.value } })} disabled={readOnly} /></label></fieldset>}
+            {selected.type.toLowerCase().includes("camera") && <fieldset className="scene-vector"><legend>Camera</legend><label>Field of view<input type="number" min="10" max="120" step="1" value={selected.camera.fov} onChange={event => updateSelected({ camera: { fov: Math.max(10, Math.min(120, Number(event.target.value) || 60)) } })} disabled={readOnly} /></label></fieldset>}
             <label className="scene-visible"><input type="checkbox" checked={selected.visible} onChange={event => updateSelected({ visible: event.target.checked })} disabled={readOnly} /> Visible</label>
             <button className="secondary-button scene-delete" onClick={deleteSelected} disabled={readOnly}>Remove selected entry</button>
           </> : <div className="scene-empty">Select an entry to edit its properties.</div>}
