@@ -58,6 +58,9 @@ try {
   const capabilityBody = await capabilityResult.json();
   assert.ok(capabilityBody.ok && capabilityBody.capabilities.some(item => item.id === "online-multiplayer" && item.level === "pipeline-dependent"), "capability API must clearly label online multiplayer as pipeline-dependent");
   assert.ok(capabilityBody.capabilities.some(item => item.id === "native-binaries" && item.level === "pipeline-dependent"), "capability API must not imply native binaries are automatically available");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "audio-mixer" && item.level === "partial"), "capability API must expose the audio mixer as partial until runtime wiring is verified");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "asset-integration" && item.level === "partial"), "capability API must distinguish saved meshes from verified scene integration");
+  assert.ok(capabilityBody.capabilities.some(item => item.id === "spatial-audio" && item.level === "partial"), "capability API must not overclaim 3D positional audio");
   const invalidCapability = await capabilityContext.request.get(baseURL + "/api/capabilities?kind=app&engine=bogus");
   assert.equal(invalidCapability.status(), 400, "capability endpoint must reject unknown engines");
   await capabilityContext.close();
