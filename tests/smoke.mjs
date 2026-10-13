@@ -583,3 +583,32 @@ sizeBudgetRun = coordinator.checkpointBuild(sizeBudgetRun, { "game.js": "b".repe
 assert.equal(sizeBudgetRun.checkpoints.length, 1, "checkpoint storage budget prunes older snapshots before browser storage grows without bound");
 assert.equal(sizeBudgetRun.checkpoints[0].lastKnownGoodFiles["game.js"].charAt(0), "b", "checkpoint budget always preserves the newest recovery snapshot");
 
+
+const projectStorageSource = read("apps/web/app/lib/project-storage.ts");
+assert.ok(page.includes("buildProjectStorageCandidates(merged)") && page.includes("GENE could not save this change to browser storage"), "workspace retries storage with smaller snapshots and warns if every attempt fails");
+assert.ok(page.includes("persistenceWarning &&") && page.includes("aria-live=\"polite\""), "storage quota recovery is visible and accessible");
+const projectStorageJs = tsCompiler.transpileModule(projectStorageSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const projectStorage = await import("data:text/javascript;base64," + Buffer.from(projectStorageJs).toString("base64"));
+const storageFixture = {
+  id: "storage-test", name: "Storage test", kind: "game", initialPrompt: "Keep source safe", mode: "build", thinking: "balanced",
+  messages: Array.from({ length: 100 }, (_, index) => ({ id: String(index), role: "assistant", content: "history " + index, createdAt: "2026-01-01" })),
+  answers: {}, plan: null, files: { "game.js": "keep-current-source" },
+  versions: Array.from({ length: 5 }, (_, index) => ({ number: 5 - index, label: "v" + index, files: { "game.js": "version-" + index }, createdAt: "2026-01-01", testSummary: "test" })),
+  activeFile: "game.js",
+  references: [{ id: "image-ref", name: "reference.png", mimeType: "image/png", kind: "image", dataBase64: "VERY-LARGE-IMAGE-PAYLOAD", size: 1000000 }],
+  updatedAt: "2026-01-01",
+  buildRun: { ...checkpointRun, checkpoints: Array.from({ length: 4 }, (_, index) => ({ ...checkpointRun.checkpoints[0], id: "cp-" + index, lastKnownGoodFiles: { "game.js": "checkpoint-" + index } })) }
+};
+const storageCandidates = projectStorage.buildProjectStorageCandidates([storageFixture, { ...storageFixture, id: "older-project" }]);
+assert.equal(storageCandidates.length, 4, "storage persistence has progressively smaller fallback snapshots");
+assert.equal(storageCandidates[0].projects.length, 2, "first storage attempt preserves all supplied projects");
+assert.equal(storageCandidates[1].projects.length, 2, "history trimming does not immediately discard project records");
+assert.equal(storageCandidates[1].projects[0].versions.length, 2, "history fallback limits saved source versions");
+assert.equal(storageCandidates[1].projects[1].buildRun.checkpoints.length, 0, "inactive projects drop duplicated checkpoint snapshots first");
+assert.equal(storageCandidates[2].projects.length, 1, "next fallback preserves the active project and drops older project records");
+assert.equal(storageCandidates[2].projects[0].files["game.js"], "keep-current-source", "storage fallback always preserves active source files");
+assert.equal(storageCandidates[2].projects[0].references[0].dataBase64, undefined, "storage fallback removes large image payloads while retaining reference metadata");
+assert.equal(storageCandidates[3].projects[0].versions.length, 0, "last fallback drops duplicate version snapshots before current source");
+assert.equal(storageCandidates[3].projects[0].buildRun.checkpoints.length, 0, "last fallback removes checkpoint snapshots only after smaller options fail");
