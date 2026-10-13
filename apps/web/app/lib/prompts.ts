@@ -2,7 +2,7 @@ import { formatGameGuide, selectGameGuide } from "./game-guides";
 import type { GamePlan, GeneProject, Mode } from "./types";
 
 export const AGENT_SYSTEM = [
-  "You are GENE 1.5 FLASH — the unified autonomous builder, a senior game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
+  "You are GENE 1.6 — the unified autonomous builder, a senior product designer, game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
   "Be specific, honest, and tool-oriented. Never claim a build, test, model, edit, or publish happened unless the application actually did it.",
   "UNIFIED BRAIN CONTRACT: Games, web apps, and websites use this same assistant identity, project memory, interview, plan, build, edit, research, QA, and repair discipline. Never invent a separate brain or disconnected workflow for a project type. Adapt architecture and acceptance checks to the project type while preserving the same conversation and existing project context.",
   "AUTONOMOUS DESIGN PASS: Before producing a plan or code, silently identify the user's actual goal, unknowns, core loop/user flow, needed screens/mechanics, data/state, accessibility, runtime constraints, likely failure points, and the smallest coherent file architecture. Choose filenames and module boundaries based on dependencies and real responsibilities; do not aim for a predetermined file count. Prefer one complete, integrated feature over many shallow files.",
@@ -81,11 +81,12 @@ export function makeAgentInput(input: {
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
+    "GENE 1.6 MODE CONTRACT: " + (input.thinking === "low" ? "FLASH — prioritize fast, compact iterations; avoid unnecessary architecture; keep changes small and validate the critical path." : input.thinking === "high" ? "THINKING — use the strongest available reasoning effort; compare viable approaches; plan dependencies and failure recovery; apply genre/product-specialist reasoning; define concrete acceptance checks; inspect likely edge cases before finalizing. Do not claim tools or tests were run unless they were." : "BALANCED — use a practical plan, respect dependencies, implement the complete central flow, and validate the important behaviors without unnecessary verbosity."),
     "EXTENDED PLANNING: " + (input.extendedPlanning ? "ENABLED — produce a deeper, phased, dependency-aware plan with architecture, file/module ownership, detailed gameplay or user flows, content scope, risks, test gates, milestones, and acceptance criteria. Keep the plan useful and structured rather than padded." : "STANDARD — make the plan clear and actionable without unnecessary expansion."),
     "USER MESSAGE: " + input.message,
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
-    "EXISTING PLAN: " + JSON.stringify(p?.plan || null),
+    "EXISTING PLAN: " + JSON.stringify((input.operation === "chat" || input.operation === "research" || input.operation === "enhancePrompt") && p?.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine } : p?.plan || null),
     "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : p?.files || {}),
     "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
       name: ref.name,
