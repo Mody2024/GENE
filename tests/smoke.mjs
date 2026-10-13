@@ -390,6 +390,8 @@ const starterGameModule = await import("data:text/javascript;base64," + Buffer.f
 const starterFiles = starterGameModule.playableDemoFiles();
 assert.doesNotThrow(() => new Function(starterFiles["game.js"]), "built-in starter runtime with audio must parse as valid JavaScript");
 assert.equal(JSON.parse(starterFiles["game-spec.json"]).audio.implementation, "procedural-web-audio", "built-in starter project metadata declares its real procedural audio implementation");
+assert.ok(starterFiles["game.html"].includes('id="audio-settings"') && starterFiles["game.html"].includes('id="master-volume"') && starterFiles["game.html"].includes('id="music-volume"') && starterFiles["game.html"].includes('id="sfx-volume"'), "starter game provides actual master/music/SFX settings sliders");
+assert.ok(starterFiles["game.js"].includes("function setAudioLevel") && starterFiles["game.js"].includes("gene-outpost-audio-levels") && starterFiles["game.js"].includes("ui.settings.addEventListener"), "starter game applies and persists audio mixer settings at runtime");
 const patchSource = read("apps/web/app/lib/patch-engine.ts");
 const patchJs = tsCompiler.transpileModule(patchSource, {
   compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
