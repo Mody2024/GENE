@@ -257,8 +257,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const audio = spec.audio;
       const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];
       const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
-      const hasPlaybackApi = /\b(?:AudioContext|webkitAudioContext|new\s+Audio\s*\()/i.test(runtimeSource);
-      const hasConnectedSoundEvents = /\b(?:playSfx|playSound|triggerSound|playAudio|soundManager|audioManager)\b/i.test(runtimeSource);
+      const hasPlaybackApi = /\bnew\s+(?:window\.)?(?:AudioContext|webkitAudioContext|Audio)\s*\(|document\.createElement\s*\(\s*["\x27]audio["\x27]\s*\)/i.test(runtimeSource);
+      const soundCalls = runtimeSource.match(/\b(?:playSfx|playSound|triggerSound|playAudio)\s*\(/g) || [];
+      const hasConnectedSoundEvents = soundCalls.length >= 2 && /\b(?:soundManager|audioManager|playSfx|playSound|triggerSound|playAudio)\b/i.test(runtimeSource);
+      const hasSoundOutput = /\.(?:start|play)\s*\(/i.test(runtimeSource);
       const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic)\b/i.test(runtimeSource);
       const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings)\b/i.test(runtimeSource + "\\n" + html);
       if (audio?.enabled !== true ||
@@ -266,10 +268,11 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
           events.length < 3 ||
           !hasPlaybackApi ||
+          !hasSoundOutput ||
           !hasConnectedSoundEvents ||
           !hasMusicPlayback ||
           !hasAudioControls) {
-        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), implement real AudioContext/Audio playback, a music playback path, adjustable audio controls, and connected playSfx/playSound-style event calls in the assembled JavaScript; wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
+        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), instantiate a real AudioContext or audio element, start/play an audio node or media element, provide a music playback path and adjustable audio controls, and connect playSfx/playSound-style event calls in the assembled JavaScript; wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
       }
     }
     if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
