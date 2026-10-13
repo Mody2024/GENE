@@ -52,6 +52,7 @@ export function makeAgentInput(input: {
 }) {
   const p = input.project;
   const projectKind = p?.kind === "app" ? "app" : "game";
+  const compactPlan = p?.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine, tasks: p.plan.tasks.slice(0, 20), mechanics: p.plan.mechanics.slice(0, 20), performanceBudget: p.plan.performanceBudget } : null;
   const isStage = input.operation === "buildPart";
   const stagePath = input.stagePath || "";
   const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
@@ -100,7 +101,7 @@ export function makeAgentInput(input: {
     "USER MESSAGE: " + input.message,
     "INITIAL GAME IDEA: " + (p?.initialPrompt || input.message),
     "KNOWN ANSWERS: " + JSON.stringify(input.answers || p?.answers || {}),
-    "EXISTING PLAN: " + JSON.stringify((input.operation === "chat" || input.operation === "research" || input.operation === "enhancePrompt") && p?.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine } : p?.plan || null),
+    "EXISTING PLAN: " + JSON.stringify(compactContext ? compactPlan : p?.plan || null),
     "CURRENT FILES: " + JSON.stringify(isStage ? stageFiles : compactContext ? { manifest: contextManifest, selectedFileExcerpts: compactFiles } : p?.files || {}),
     "REFERENCE MATERIAL: " + JSON.stringify((p?.references || []).map(ref => ({
       name: ref.name,
