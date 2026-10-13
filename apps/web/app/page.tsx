@@ -846,7 +846,18 @@ export default function Home() {
         const error = payload?.error?.message || "GENE could not complete the request.";
         addActivity("Request failed: " + error);
         const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
-        setProject(failed);
+        setProject(current => {
+          if (!current || current.id !== failed.id) return current;
+          const knownIds = new Set(current.messages.map(item => item.id));
+          const appendedMessages = failed.messages.filter(item => !knownIds.has(item.id));
+          return {
+            ...current,
+            buildRun: activeBuildRun || current.buildRun || failed.buildRun,
+            livingPreview: activeBuildRun ? failed.livingPreview : current.livingPreview,
+            messages: [...current.messages, ...appendedMessages],
+            updatedAt: now()
+          };
+        });
         setNotice(error);
         return;
       }
@@ -961,7 +972,7 @@ export default function Home() {
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
       setProject(current => {
-        if (!current || current.id !== failed.id) return failed;
+        if (!current || current.id !== failed.id) return current;
         const knownIds = new Set(current.messages.map(item => item.id));
         return {
           ...current,
