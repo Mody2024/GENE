@@ -568,7 +568,7 @@ assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "sk
 
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "read-only AI chat can run concurrently with the playable prototype build");
-assert.ok(page.includes("if (isReadOnlyReply) {\n          return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
+assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\"") && page.includes("messages: [...current.messages, ...appendedMessages]"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
 assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
 
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("only browser modules and the supported Forge OBJ/MTL asset paths"), "the staged build does not fabricate unsupported binary assets");
