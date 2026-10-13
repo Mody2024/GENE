@@ -7,6 +7,7 @@ import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
+import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -886,23 +887,54 @@ export default function Home() {
         updatedAt: now()
       };
       setProject(current => {
-        if (!current || current.id !== updated.id) return updated;
+        // A late response must never switch the workspace back to an older project.
+        if (!current || current.id !== updated.id) return current;
         const knownIds = new Set(current.messages.map(item => item.id));
         const appendedMessages = updated.messages.filter(item => !knownIds.has(item.id));
         const isReadOnlyReply = operation === "chat" || operation === "research";
         if (isReadOnlyReply) {
           return { ...current, messages: [...current.messages, ...appendedMessages], updatedAt: now() };
         }
-        if (!buildInProgress) return updated;
+
+        const sourceMerge = mergeConcurrentSourceChanges(nextProject.files, current.files, updated.files, changedPaths);
+        const planChangedDuringRequest = JSON.stringify(current.plan ?? null) !== JSON.stringify(nextProject.plan ?? null);
+        const planConflict = Boolean(result.plan && planChangedDuringRequest);
+        if (sourceMerge.conflicts.length || planConflict) {
+          const conflicts = sourceMerge.conflicts.length ? " Conflicting files: " + sourceMerge.conflicts.join(", ") + "." : "";
+          const planConflictText = planConflict ? " The approved plan also changed while this request was running." : "";
+          const conflictMessage = message("assistant",
+            "GENE discarded this stale result to protect newer project edits. Nothing from this response was applied. Retry the request against the latest source." + conflicts + planConflictText,
+            "error");
+          return {
+            ...current,
+            messages: [...current.messages, ...appendedMessages, conflictMessage],
+            updatedAt: now()
+          };
+        }
+
+        let versions = current.versions;
+        if (changedPaths.length && updated.versions[0]) {
+          const latestNumber = current.versions.reduce((maximum, version) => Math.max(maximum, version.number), 0);
+          const safeVersion = {
+            ...updated.versions[0],
+            number: Math.max(updated.versions[0].number, latestNumber + 1),
+            files: { ...sourceMerge.files }
+          };
+          versions = [safeVersion, ...current.versions].slice(0, 8);
+        }
+
         return {
           ...current,
-          ...updated,
-          files: { ...current.files, ...updated.files },
-          versions: updated.versions,
-          plan: updated.plan,
+          name: current.name === nextProject.name ? updated.name : current.name,
+          mode: current.mode === nextProject.mode ? updated.mode : current.mode,
+          answers: current.answers,
+          question: current.question === nextProject.question ? updated.question : current.question,
+          files: sourceMerge.files,
+          versions,
+          plan: result.plan ? updated.plan : current.plan,
           buildRun: activeBuildRun || current.buildRun || updated.buildRun,
           livingPreview: changedPaths.length ? updated.livingPreview : current.livingPreview,
-          activeFile: updated.activeFile,
+          activeFile: current.activeFile === nextProject.activeFile && changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : current.activeFile,
           messages: [...current.messages, ...appendedMessages],
           updatedAt: now()
         };
