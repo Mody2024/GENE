@@ -147,6 +147,7 @@ assert.ok(runtimeAssets.includes("window.GENE3D.parseOBJ") && runtimeAssets.incl
 assert.ok(runtimeScene.includes("window.GENE_SCENE") && runtimeScene.includes("getVisibleObjects") && runtimeScene.includes("getTransform"), "runtime scene bridge exposes validated object transforms and visibility");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
 assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
+assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files))") && page.includes("buildRuntimeSceneBootstrap(version.files))"), "standalone and ZIP exports include the scene manifest");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
 assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
