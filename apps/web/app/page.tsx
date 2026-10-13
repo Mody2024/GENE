@@ -1889,8 +1889,8 @@ export default function Home() {
               <button className={project.mode === "plan" ? "active" : ""} onClick={() => setProject({ ...project, mode: "plan" })}>Plan</button>
               <button className={project.mode === "build" ? "active" : ""} onClick={() => setProject({ ...project, mode: "build" })}>Build</button>
             </div>
-            <select className="thinking-select" value={project.thinking} aria-label="Thinking mode" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
-              <option value="fast">Fast</option><option value="balanced">Balanced</option><option value="deep">Deep</option>
+            <select className="thinking-select" value={project.thinking} aria-label="GENE 1.6 model mode" title="Flash: fast iterations · Balanced: default quality · Thinking: highest configured reasoning effort" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
+              <option value="fast">GENE 1.6 Flash</option><option value="balanced">GENE 1.6 Balanced</option><option value="deep">GENE 1.6 Thinking</option>
             </select>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
             <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
