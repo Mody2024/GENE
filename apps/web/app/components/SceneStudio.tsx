@@ -92,7 +92,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } }));
     setUndoStack(current => [...current, snapshot].slice(-40));
     setRedoStack([]);
-    commitObjects(next);
+    setObjects(next);
   };
   const undo = () => {
     if (!undoStack.length) return;
@@ -121,7 +121,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const deleteSelected = () => {
     if (!selected) return;
     const next = objects.filter(object => object.id !== selected.id);
-    setObjects(next);
+    commitObjects(next);
     setSelectedId(next[0]?.id || "");
     setStatus("Object removed from the scene manifest. Save to persist the change.");
   };
