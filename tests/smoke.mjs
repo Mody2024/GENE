@@ -145,6 +145,8 @@ assert.ok(playPage.includes("buildRuntimeAssetBootstrap(project?.files)"), "full
 assert.ok(runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("window.__GENE_ASSETS__"), "asset runtime bridge has a size cap and explicit namespace");
 assert.ok(runtimeAssets.includes("window.GENE3D.parseOBJ") && runtimeAssets.includes("window.GENE3D.parseMTL"), "asset runtime bridge provides real OBJ geometry and MTL material parsers");
 assert.ok(runtimeScene.includes("window.GENE_SCENE") && runtimeScene.includes("getVisibleObjects") && runtimeScene.includes("getTransform"), "runtime scene bridge exposes validated object transforms and visibility");
+assert.ok(runtimeScene.includes("roughness") && runtimeScene.includes("metalness") && runtimeScene.includes("intensity") && runtimeScene.includes("fov"), "runtime scene bridge preserves material, light and camera settings");
+assert.ok(sceneStudio.includes("legend>Material") && sceneStudio.includes("legend>Light") && sceneStudio.includes("legend>Camera"), "Scene Studio exposes material, light and camera inspectors");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
 assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files))") && page.includes("buildRuntimeSceneBootstrap(version.files))"), "standalone and ZIP exports include the scene manifest");
