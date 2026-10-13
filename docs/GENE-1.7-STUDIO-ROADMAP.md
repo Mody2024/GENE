@@ -440,6 +440,171 @@ Acceptance: content expansion starts only after a declared vertical-slice checkl
 
 Acceptance: reference-driven builds have a documented original brief, provenance for imported assets, and clear warnings for unresolved rights or licensing concerns.
 
+
+## Implementation phases: GENE 1.7 Studio-scale Game Builder
+
+This section converts the approved roadmap into dependency-ordered, testable phases. These are implementation gates, not promises that all features can be completed in a single code-generation pass. Each phase must pass its acceptance checks before later work builds on it. Keep the project playable and retain a known-good checkpoint throughout.
+
+### Phase 0 — Baseline, scope, and release safety
+**Goal:** establish a trustworthy baseline before changing the runtime.
+- Capture the current branch/head, production baseline, repository structure, existing tests, API contracts, preview architecture, export workflows, and model/provider configuration.
+- Build a feature-to-test matrix for existing behavior; identify critical user flows and known failures.
+- Ensure every phase has a scoped branch/commit, bounded file edits, diff review, and rollback path.
+- Define supported target matrix: web preview/deployment, ZIP source export, and any native engine/EXE/APK target only where an actual build pipeline exists.
+- Define redacted diagnostics and prohibit logging secrets, user tokens, or raw environment values.
+**Gate:** baseline checks pass or pre-existing failures are documented; production remains unchanged until explicit promotion.
+
+### Phase 1 — Persistent project state, dependency graph, and recovery
+**Goal:** prevent the AI from losing decisions or damaging working projects.
+- Separate canonical plan, accepted decisions, tasks, project memory, source revision, asset registry, and test evidence from the chat transcript.
+- Add revision IDs and content hashes; track dependencies among files, scenes, assets, audio events, controls, UI screens, tests, and exports where parsers support them.
+- Implement checkpoints, atomic multi-file apply, conflict detection, per-file diffs, selective acceptance, rollback, and last-known-good preview.
+- Bound retrieved context to relevant files and deltas; keep sensitive data out of project memory.
+**Gate:** reload preserves approved decisions; failed multi-file edit leaves prior project intact; concurrent/stale edits are detected; rollback restores the last known-good revision.
+
+### Phase 2 — Honest capability registry and production contracts
+**Goal:** prevent GENE from claiming unsupported capabilities.
+- Create machine-readable capability records per runtime/engine and export target for scene editing, model import, animation, audio, physics, networking, tests, and packaging.
+- Define project contracts: target hardware, control scheme, visual direction, gameplay loop, save requirements, audio requirements, accessibility, and acceptance criteria.
+- Track each capability as supported, partial, preview-only, unavailable, or unverified.
+- Build a shared asset/provenance manifest with stable IDs, source/license metadata, hashes, and import status.
+**Gate:** unsupported features are disclosed before generation; every shipped asset reference resolves; release summaries distinguish pass/fail/skipped/unverified.
+
+### Phase 3 — Director orchestration and specialist task graph
+**Goal:** coordinate work like a small production team.
+- Convert the brief into a canonical design bible, dependency-aware tasks, owners, deliverables, risk levels, and validation steps.
+- Define bounded specialists for gameplay, level/world, art, animation, UI, audio, narrative, performance, and QA; share structured contracts, not full transcript dumps.
+- Add conflict arbitration, task cancellation/resume, incremental context, and integration gates.
+- Ensure new user instructions update plan deltas without duplicating the entire plan or silently invalidating approved work.
+**Gate:** representative project tasks have traceable dependencies/owners, resume correctly, and integrate without conflicting edits.
+
+### Phase 4 — Playable core loop and input/UI foundations
+**Goal:** make a genuinely playable game before expensive content.
+- Improve genre templates for movement, camera, interaction, objectives, enemies, win/loss, restart, pause, settings, checkpoints, and save states where relevant.
+- Provide keyboard/gamepad/touch input maps, remapping where supported, input hints, focus handling, and controller reconnect behavior.
+- Add a gameplay tuning panel connected to real runtime parameters.
+- Add state-transition and control-contract tests; reject a game with missing required controls or unreachable critical menu states.
+**Gate:** a sample game completes the core loop, supports declared input types, pauses/restarts safely, and passes controls/menu regression tests.
+
+### Phase 5 — Vertical slice and quality gate
+**Goal:** prove the complete pipeline on one small representative level before scaling.
+- Build one blockout level with one representative character/enemy, one complete objective loop, core UI, representative audio, animation, VFX, lighting, and save/restart behavior.
+- Define objective acceptance checks and target hardware budgets before generating detail.
+- Test the full user path from launch through gameplay to win/loss/restart and project export.
+- Record approved style, tuning, asset conventions, performance budget, and reusable scene patterns.
+**Gate:** vertical-slice checklist passes or the user explicitly approves documented exceptions; do not mass-generate content before this gate.
+
+### Phase 6 — Art bible, model pipeline, and asset intelligence
+**Goal:** replace inconsistent primitive-only output with a validated multi-tier asset pipeline.
+- Create a visual bible and stable scale/material/style conventions.
+- Support authored imports and procedural modeling tiers, clearly distinguishing placeholder, procedural approximation, and detailed/imported assets.
+- Add asset IDs, thumbnails, metadata, import validation, material checks, collision checks, scale checks, duplicate detection, target budgets, and license/provenance tracking.
+- Add replace-in-place while preserving references; generate LODs/texture variants only when the target pipeline supports them.
+- Add a visual consistency review with human approval and honest uncertainty.
+**Gate:** representative assets load, match the approved conventions, remain linked after replacement, and fit the target budget or produce actionable warnings.
+
+### Phase 7 — Source-linked visual scene editor
+**Goal:** let creators adjust actual project scenes without relying on chat for every change.
+- Implement hierarchy, select/move/rotate/scale, snapping, visibility/lock, grouping, duplicate, multi-select, and undo/redo for supported scene formats.
+- Add context-aware inspectors for transforms, materials, lights, cameras, collisions, audio emitters, and components where supported.
+- Serialize edits into the native project representation using transactional changes and validate before refreshing preview.
+- Mark unsupported properties as unavailable instead of faking edits.
+**Gate:** an edited object persists after reload and export; undo/rollback works; unsupported fields are clearly reported.
+
+### Phase 8 — Character, rigging, and animation pipeline
+**Goal:** make characters behave and animate coherently.
+- Validate rig hierarchy, bind pose, animation clips, scale, missing bones, root motion, and retarget compatibility.
+- Add preview timeline, animation state machines, locomotion/attack/hit/death/interact transitions, and animation-event contracts.
+- Connect footstep, impact, VFX, and gameplay cues to animation events.
+- Use imported/generated clips only when the asset and target support them; clearly label placeholders.
+**Gate:** fixture characters switch and blend supported clips, required events fire, and missing/incompatible animation is reported without breaking gameplay.
+
+### Phase 9 — Level, world, and encounter generation
+**Goal:** generate playable, authored-feeling spaces rather than disconnected scenery.
+- Build level graph/critical path first, then blockout, encounters, navigation, landmarks, optional routes, checkpoints, and art dressing.
+- Add deterministic seeds, authored anchors/exclusions, local regeneration, difficulty curves, and preservation of manual overrides.
+- Validate reachability, spawn safety, collisions, out-of-bounds areas, softlocks, checkpoints, and objective completion.
+- Add optional weather/time/NPC/faction/destruction systems only where needed and supported.
+**Gate:** representative levels have reachable objectives and recovery paths; local regeneration preserves unrelated authored work.
+
+### Phase 10 — Audio, music, and dialogue
+**Goal:** provide a coherent, testable audio system rather than disconnected sound effects.
+- Add audio brief, event map, asset import/metadata/provenance, procedural SFX, and provider-backed music/voice only when configured.
+- Add centralized runtime service, buses, volume/mute, fades/crossfades, priorities, concurrency caps, cleanup, browser user-gesture handling, and failure fallbacks.
+- Add adaptive/layered music and spatial audio only on compatible runtimes; generate accessible settings and captions where appropriate.
+- Add audio panel, test scene, asset/manifest validation, and low-end budgets.
+**Gate:** critical events map to valid assets or explicit silent states; mixer/settings work; missing/corrupt sound doesn't break gameplay; claims distinguish structural tests from audible QA.
+
+### Phase 11 — Camera, lighting, VFX, physics, and cinematic presentation
+**Goal:** coordinate visual and physical feedback.
+- Add camera templates, composition checks, supported lighting recipes, performance tiers, and obstruction/clipping warnings.
+- Add data-driven VFX event choreography tied to animation, sound, camera, and gameplay.
+- Add physics/destruction templates with collider/material validation and safe fallbacks.
+- Add cinematic timeline/shot grammar, dialogue/subtitle cues, skip/replay/interruption handling, and native editable sequences where supported.
+**Gate:** effects clean up on reload, cinematics safely return control, physics fixtures reset, and declared budgets are met or flagged.
+
+### Phase 12 — Narrative, quests, progression, saves, and backend safety
+**Goal:** support complete longer-form game loops and real apps without fragile state.
+- Add structured dialogue/quest graphs, prerequisites, world flags, inventory links, objective tracking, and localization-ready strings.
+- Validate graph reachability, dead ends, missing responses, contradictory conditions, and persistence of required player choices.
+- Add versioned save schemas, migration preview, backup/export/import, corruption recovery, and tests for interrupted writes.
+- For backend projects, validate auth/authorization/data ownership, rate limits, secret boundaries, and failure states.
+**Gate:** required quest paths are reachable; save/load and migrations pass fixtures; no secrets appear in client bundles; offline status is not misrepresented.
+
+### Phase 13 — Multiplayer and simulation validation
+**Goal:** distinguish real multiplayer from local co-op or a mock.
+- Interview for network topology and requirements; create network contracts for authority, replication, join/leave, reconnect, timeouts, and version compatibility.
+- Add deterministic tests for latency, jitter, packet loss, duplicates, disconnect/reconnect, and concurrent player actions.
+- Add server-side validation/rate limits for security-sensitive actions and privacy-safe diagnostics.
+- Require two-client end-to-end testing before claiming online multiplayer is verified.
+**Gate:** real multi-client evidence or a clearly documented unverified/unsupported state; local split-screen is labeled accurately.
+
+### Phase 14 — AI playtesting, diagnostics, and performance budgets
+**Goal:** turn generated output into evidence-driven iterative development.
+- Generate test charters from project contracts; exercise controls, objectives, menus, save/load, edge cases, and declared multiplayer paths.
+- Capture source revision, seed, action trace, screenshots, DOM/runtime state, logs, and relevant snapshots for reproducible failures.
+- Add dependency impact analysis and focused regression tests after each repair.
+- Track measured versus estimated frame time, memory, draw calls, asset/audio sizes, startup time, and target-specific constraints where observable.
+- Add adaptive quality tiers and low-end mode that change actual runtime settings.
+**Gate:** seeded failures reproduce; repairs pass relevant regressions; performance reports label measured versus estimated data.
+
+### Phase 15 — Packaging, portability, and release engineering
+**Goal:** produce verifiable deliverables.
+- Validate ZIP portability, asset paths, dependency/license reports, environment-variable requirements, and unsupported features.
+- Make builds resumable by artifact/task; persist logs and retry only failed stages where practical.
+- Generate release manifests with source revision, runtime/engine version, asset hashes, target, build settings, and validation results.
+- Verify artifact checksums; test launch/install where an appropriate runner/device exists; distinguish native binaries from wrappers.
+- Separate preview, staging, and production promotion with rollback instructions and secret-safe signing practices.
+**Gate:** each release maps to an exact revision and artifact integrity record; skipped device/OS tests remain explicitly unverified.
+
+### Phase 16 — Studio usability, collaboration, and learning
+**Goal:** make advanced workflows usable without overwhelming beginners.
+- Add contextual inspector/help, concise versus learning modes, sandbox experiments, and explanations linked to current files/tests.
+- Add review comments, task handoff briefs, conflict warnings, attributable revisions, and role-based controls only where backend support exists.
+- Add localization and RTL checks, captions, keyboard navigation, contrast, reduced-motion options, and accessible control hints.
+- Provide starter projects and examples with verified run/export instructions.
+**Gate:** first-time user can build, run, edit, recover, and export a supported starter; explanations remain linked to current revision.
+
+### Phase 17 — End-to-end regression, pilot, and staged rollout
+**Goal:** verify the integrated product before promotion.
+- Run contract/unit tests, production build, browser smoke tests, representative project fixtures, asset checks, preview/runtime tests, and target-specific export checks.
+- Compare against the vertical-slice golden fixtures and verify no regressions in plan pinning, model routing, file patching, preview handshakes, controls, ZIP export, and error recovery.
+- Run a small pilot on representative app, 2D, and 3D projects; document limitations and unresolved issues.
+- Merge and deploy only after required gates pass; verify the deployed revision and run production smoke tests.
+- Keep a rollback target and release notes. A green CI run alone does not prove every generated game or native artifact is correct.
+**Gate:** all required tests pass, skipped/unavailable tests are listed, production revision is verified, and rollback is available.
+
+## Cross-phase rules
+
+1. Keep every milestone buildable and preserve a known-good revision.
+2. Prefer small patch-based edits and bounded tasks over replacing large source files.
+3. Use actual project/preview evidence; never claim a screenshot, sound, model, or binary was validated if it was not.
+4. Mark generated content as placeholder/procedural/imported/verified as appropriate.
+5. Keep provider keys server-side; redact diagnostics and track asset provenance.
+6. Optimize for coherent, tested quality and target hardware rather than asset count or map size.
+7. Features requiring unavailable providers, engine capabilities, signing keys, native runners, or devices remain explicitly unsupported/unverified—not fabricated.
+8. The 1.7 roadmap is complete only when each shipped phase has code, tests, documentation, and evidence, not merely when the plan is committed.
+
 ## Ideas to keep in the backlog until 1.6 is stable
 
 - Visual node editor for scene and gameplay systems.
