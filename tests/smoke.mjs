@@ -635,7 +635,7 @@ assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do 
 const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
 const audioStudio = read("apps/web/app/components/AudioStudio.tsx");
 assert.ok(sceneStudio.includes("legend>Material") && sceneStudio.includes("legend>Light") && sceneStudio.includes("legend>Camera"), "Scene Studio exposes material, light and camera inspectors");
-assert.ok(sceneStudio.includes("Move \" + selected.name + \" negative ") && sceneStudio.includes("Rotate Y +15°") && sceneStudio.includes("Scale +10%"), "Scene Studio provides selected-object axis nudges, rotation and scale controls");
+assert.ok(sceneStudio.includes('aria-label={"Move " + selected.name + " negative " + axis}') && sceneStudio.includes("Rotate Y +15°") && sceneStudio.includes("Scale +10%"), "Scene Studio provides selected-object axis nudges, rotation and scale controls");
 assert.ok(page.includes('import AudioStudio from "./components/AudioStudio"') && page.includes('id: "audio" as const') && page.includes('section === "audio"'), "Audio Studio is integrated into workspace navigation");
 assert.ok(audioStudio.includes("window.AudioContext") && audioStudio.includes("createOscillator()") && audioStudio.includes("oscillator.start(at)") && audioStudio.includes("oscillator.stop(at + duration"), "Audio Studio uses real Web Audio oscillators with envelopes and explicit node lifetimes");
 assert.ok(audioStudio.includes("const EVENT_MAP") && audioStudio.includes('implementation,\n        buses: ["master", "music", "sfx", "ambience", "ui"]') && audioStudio.includes('events: EVENT_MAP'), "Audio Studio persists an explicit audio implementation, mixer bus, volume and event manifest");
