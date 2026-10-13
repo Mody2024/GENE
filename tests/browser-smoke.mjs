@@ -166,6 +166,15 @@ try {
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
   assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
+  await page.locator('.rail button[title="Audio Studio"]').click();
+  await page.getByRole("heading", { name: "Audio Studio" }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: /UI confirm/ }).click();
+  await page.getByText("UI confirmation sound previewed.", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Save audio manifest" }).click();
+  await page.locator('.rail button[title="Files"]').click();
+  await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
+  const savedAudioSpec = await page.locator(".code-editor").inputValue();
+  assert.ok(savedAudioSpec.includes('"audio"') && savedAudioSpec.includes('"procedural-web-audio"') && savedAudioSpec.includes('"buses"') && savedAudioSpec.includes('"events"'), "Audio Studio test bench plays a real Web Audio cue and persists the audio manifest into game-spec.json");
   assert.equal(fatalErrors.length, 0, "the page and game iframe should not emit JavaScript errors: " + fatalErrors.join(" | "));
 
   const webglProject = {
