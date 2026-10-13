@@ -163,6 +163,17 @@ try {
   assert.equal(await page.locator(".scene-object-row").count(), 0, "Scene Studio undo removes the unsaved object entry");
   await page.getByRole("button", { name: /Redo/ }).click();
   assert.equal(await page.locator(".scene-object-row").count(), 1, "Scene Studio redo restores the object entry");
+  const sceneCanvas = page.getByLabel("Interactive isometric scene viewport");
+  await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
+  const sceneCanvasBox = await sceneCanvas.boundingBox();
+  assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
+  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.5, sceneCanvasBox.y + sceneCanvasBox.height * 0.533);
+  await page.mouse.down();
+  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.53, sceneCanvasBox.y + sceneCanvasBox.height * 0.55, { steps: 4 });
+  await page.mouse.up();
+  const positionX = page.locator(".scene-vector").first().locator("input").first();
+  await page.waitForFunction(() => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==0; }, { timeout: 5000 });
+  assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
   await page.getByLabel("Name").fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
   await page.getByRole("button", { name: "Save scene data" }).click();
