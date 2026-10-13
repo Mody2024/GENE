@@ -675,3 +675,8 @@ This log records implementation evidence separately from acceptance claims.
 - Added explicit axis-based position nudges, Y rotation and scale controls alongside the existing exact numeric transform inspector.
 - Added smoke-test source contracts for WebGL context/render loop, orbit/zoom, selection and Scene Studio integration.
 - This is a first functional WebGL viewport, not yet a full professional editor: primitive cube geometry is currently used for authored objects, true drag gizmos are not implemented, and renderer-level integration tests/build verification remain mandatory.
+
+
+### Build-error follow-up — 2026-10-13
+- Inspected the Vercel build output for deployment `dpl_3f7GJ2LuhTkgGEXzzsXccoKBDmVQ`; it pinpointed a syntax error in the generated `runtime-scene.ts` bootstrap string (unescaped quote in embedded Canvas drawing code).
+- Reworked the bootstrap into a template literal and interpolated the already-serialized manifest, removing the invalid embedded quote escaping. This is a source-level fix; a new green build is still required to prove it.
