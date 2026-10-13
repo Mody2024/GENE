@@ -553,3 +553,8 @@ for (let index = 0; index < 12; index++) {
 }
 assert.equal(boundedHistoryRun.checkpoints.length, 8, "checkpoint history is bounded to eight full source snapshots");
 assert.equal(boundedHistoryRun.checkpoints[0].lastKnownGoodFiles["game.js"], "snapshot-4", "bounded history retains the eight newest recovery snapshots");
+let sizeBudgetRun = coordinator.checkpointBuild(baseRun, { "game.js": "a".repeat(800_000) }, { passed: [], failed: [] }, "task-complete", "large snapshot A");
+sizeBudgetRun = coordinator.checkpointBuild(sizeBudgetRun, { "game.js": "b".repeat(800_000) }, { passed: [], failed: [] }, "task-complete", "large snapshot B");
+assert.equal(sizeBudgetRun.checkpoints.length, 1, "checkpoint storage budget prunes older snapshots before browser storage grows without bound");
+assert.equal(sizeBudgetRun.checkpoints[0].lastKnownGoodFiles["game.js"].charAt(0), "b", "checkpoint budget always preserves the newest recovery snapshot");
+
