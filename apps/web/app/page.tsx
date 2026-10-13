@@ -5,6 +5,7 @@ import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectK
 import { checkpointBuild, createBuildRun, recoverFromCheckpoint, resumeBuild, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
+import SceneStudio from "./components/SceneStudio";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
@@ -147,7 +148,7 @@ export default function Home() {
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
-  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "versions">("chat");
+  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "versions">("chat");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
   const [expandedPreview, setExpandedPreview] = useState(false);
@@ -1595,6 +1596,32 @@ export default function Home() {
     addActivity("Build checks finished: " + checks.filter(check => check.status === "pass").length + " passed, " + checks.filter(check => check.status === "warn").length + " warnings, " + checks.filter(check => check.status === "fail").length + " failed.");
   }
 
+  function saveSceneFiles(nextFiles: Record<string, string>, label: string) {
+    if (!project) return;
+    if (project.mode === "plan") {
+      setNotice("Plan mode is read-only. Switch to Build mode before editing scene data.");
+      return;
+    }
+    const version: BuildVersion = {
+      number: (project.versions[0]?.number || 0) + 1,
+      label,
+      files: { ...nextFiles },
+      createdAt: now(),
+      testSummary: "Scene manifest saved. Runtime integration and preview behavior still need verification."
+    };
+    const updatedProject = { ...project, files: nextFiles, activeFile: "game-spec.json", versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
+    setProject(updatedProject);
+    setEditedFile(nextFiles["game-spec.json"] || "{}");
+    setFileDirty(false);
+    setNotice("Saved " + label + " as version " + version.number + ". Scene data is in game-spec.json; confirm runtime integration in preview.");
+    setPreviewKey(n => n + 1);
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice("Saved scene data v" + version.number + " and synced files to " + data.projectPath + ". Preview integration still needs testing."))
+        .catch(error => setNotice("Scene data saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
+  }
+
   function saveManualEdit() {
     if (!project) return;
     if (project.mode === "plan") {
@@ -1905,6 +1932,7 @@ export default function Home() {
     { id: "files" as const, icon: "▤", label: "Files" },
     { id: "tasks" as const, icon: "☷", label: "Plan & tasks" },
     { id: "assets" as const, icon: "◇", label: "Assets" },
+    { id: "scene" as const, icon: "▧", label: "Scene Studio" },
     { id: "versions" as const, icon: "↺", label: "Versions" }
   ];
 
@@ -2082,6 +2110,13 @@ export default function Home() {
               </div>
               {project.plan ? <><div className="plan-overview"><h3>{project.plan.title}</h3><p>{project.plan.summary}</p><div className="plan-metrics"><span>{project.plan.engine}</span>{project.kind === "app" ? <><span>{project.plan.mechanics.length} planned features</span><span>{project.plan.tasks.length} implementation steps</span></> : <><span>Target {project.plan.performanceBudget.targetFps} FPS</span><span>Max enemies {project.plan.performanceBudget.maxEnemies}</span></>}</div></div><div className="task-list">{project.plan.tasks.map((task, i) => <div key={task}><span>{String(i + 1).padStart(2, "0")}</span><p>{task}</p><small>{Object.keys(project.files).length ? "Source exists; verify task completion in the live game." : "Planned"}</small></div>)}</div><button className="primary-button" onClick={startBuild} disabled={busy}>Start building plan →</button></> : <div className="empty-state">{project.kind === "app" ? "No plan yet. Describe the app in Chat, then GENE will help define its screens and user flows." : "No plan yet. Describe a game in Chat, then GENE will interview you one question at a time."}</div>}
             </div>}
+
+            {section === "scene" && <SceneStudio
+              files={project.files}
+              readOnly={project.mode === "plan"}
+              onSave={saveSceneFiles}
+              onWireRuntime={prompt => { setSection("chat"); setDraft(prompt); setNotice("Prepared a request to integrate the scene manifest into the actual runtime. Review it in Chat and send it to apply."); }}
+            />}
 
             {section === "assets" && <div className="tool-view forge-view">
   <div className="tool-view-heading">
