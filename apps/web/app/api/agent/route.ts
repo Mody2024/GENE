@@ -257,10 +257,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const audio = spec.audio;
       const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];
       const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
-      const hasPlaybackApi = /\bnew\s+(?:window\.)?(?:AudioContext|webkitAudioContext|Audio)\s*\(|document\.createElement\s*\(\s*["\x27]audio["\x27]\s*\)/i.test(runtimeSource);
+      const hasPlaybackApi = /\bnew\s+(?:window\.)?(?:AudioContext|webkitAudioContext|Audio)\s*\(|new\s*\(\s*(?:window\.)?(?:AudioContext|webkitAudioContext)\b|document\.createElement\s*\(\s*["\x27]audio["\x27]\s*\)/i.test(runtimeSource);
       const soundCalls = runtimeSource.match(/\b(?:playSfx|playSound|triggerSound|playAudio)\s*\(/g) || [];
       const hasConnectedSoundEvents = soundCalls.length >= 2 && /\b(?:soundManager|audioManager|playSfx|playSound|triggerSound|playAudio)\b/i.test(runtimeSource);
-      const hasSoundOutput = /\.(?:start|play)\s*\(/i.test(runtimeSource);
+      const hasSoundOutput = /\.(?:start|play)\s*\(/i.test(runtimeSource) || /\b(?:playTone|playBeep|synthesizeTone|scheduleSound|startOscillator)\s*\(/i.test(runtimeSource);
       // Accept equivalent real music paths (Web Audio nodes or media elements),
       // not just one preferred helper name, while still requiring actual playback.
       const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic|startBgm|playBgm|startBackgroundMusic|playBackgroundMusic|musicSource|musicOscillator|musicNode|bgmPlayer|musicPlayer)\b/i.test(runtimeSource) ||
@@ -313,6 +313,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, or controller handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
         spec.controls = recoveredControls;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+        // Persist deterministic contract repairs into the actual returned files.
+        // Otherwise validation could pass while the staged snapshot kept the bad spec.
+        const normalizedSpecFile = normalized.find(file => file.path === "game-spec.json");
+        if (normalizedSpecFile) normalizedSpecFile.content = byPath["game-spec.json"];
       }
       if (typeof spec.objective !== "string" || !spec.objective.trim()) throw new Error("Build rejected: the main objective is missing.");
       if (typeof spec.winCondition !== "string" || !spec.winCondition.trim()) throw new Error("Build rejected: the win condition is missing.");
