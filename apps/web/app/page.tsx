@@ -38,10 +38,11 @@ function uid() {
 }
 function GeneMark({ className = "" }: { className?: string }) {
   return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE">
-    <path d="M20 5.5 31.8 12.3 31.8 26 20 34.5 8.2 27.7 8.2 14Z" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
-    <path d="M8.5 14 20 20.8 31.5 14M20 20.8V34" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round"/>
-    <circle cx="20" cy="20.5" r="3.4" fill="currentColor"/>
-    <circle cx="20" cy="5.5" r="2.3" fill="currentColor"/><circle cx="31.8" cy="12.3" r="2.3" fill="currentColor"/><circle cx="31.8" cy="26" r="2.3" fill="currentColor"/><circle cx="8.2" cy="27.7" r="2.3" fill="currentColor"/>
+    <defs><linearGradient id="gene-core-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".98" /><stop offset="1" stopColor="currentColor" stopOpacity=".56" /></linearGradient></defs>
+    <circle cx="20" cy="20" r="5.4" fill="url(#gene-core-gradient)" />
+    <ellipse cx="20" cy="20" rx="15.5" ry="7.2" fill="none" stroke="currentColor" strokeWidth="1.35" strokeOpacity=".78" transform="rotate(-36 20 20)" />
+    <ellipse cx="20" cy="20" rx="15.5" ry="7.2" fill="none" stroke="currentColor" strokeWidth="1.05" strokeOpacity=".38" transform="rotate(38 20 20)" />
+    <circle cx="32.2" cy="11.4" r="2.15" fill="currentColor" /><circle cx="8.2" cy="26.9" r="1.9" fill="currentColor" /><circle cx="26.4" cy="33.6" r="1.55" fill="currentColor" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }
@@ -58,15 +59,14 @@ function message(role: "user" | "assistant" | "system", content: string, kind?: 
   return { id: uid(), role, content, createdAt: now(), kind };
 }
 function newProject(kind: ProjectKind = "game"): GeneProject {
-  const isApp = kind === "app";
   return {
     id: uid(),
-    name: isApp ? "Untitled app" : "Untitled game",
+    name: "New project",
     kind,
     initialPrompt: "",
     mode: "plan",
     thinking: "balanced",
-    messages: [message("assistant", isApp ? "Hey, I'm GENE. Tell me what kind of web app you want to build. I'll help shape the plan, then build it here so we can preview and edit it together." : "Hey, I'm GENE. Tell me the game you're imagining. I'll ask one meaningful question at a time, then we can review the plan before building.")],
+    messages: [message("assistant", "Hey, I'm GENE. Tell me what you want to create — a game, web app, website, tool, or something else. I'll help shape the plan, then build the actual project files here so we can preview and refine them together.")],
     answers: {},
     question: null,
     plan: null,
@@ -76,6 +76,14 @@ function newProject(kind: ProjectKind = "game"): GeneProject {
     references: [],
     updatedAt: now()
   };
+}
+function inferProjectKind(prompt: string, fallback: ProjectKind): ProjectKind {
+  const value = prompt.toLowerCase();
+  const appIntent = /\b(website|web site|web app|webapp|dashboard|landing page|portfolio site|e-commerce|ecommerce|storefront|admin panel|saas|browser app|mobile app|task manager|calculator app|chat app|productivity app|website builder|tool|platform)\b/.test(value);
+  const gameIntent = /\b(game|gameplay|platformer|runner|rpg|fps|shooter|survival|metroidvania|racing|puzzle game|multiplayer|boss fight|level|enemy ai|character controller|2d game|3d game|simulator)\b/.test(value);
+  if (appIntent && !gameIntent) return "app";
+  if (gameIntent && !appIntent) return "game";
+  return fallback;
 }
 function fileName(path: string, kind: ProjectKind = "game") {
   const leaf = path.split("/").pop() || path;
@@ -177,6 +185,7 @@ export default function Home() {
   const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
   const [forgeNotice, setForgeNotice] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
@@ -421,6 +430,7 @@ export default function Home() {
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
     const isFirstIdea = !project.initialPrompt;
+    const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
@@ -437,6 +447,8 @@ export default function Home() {
     }
     const nextProject: GeneProject = {
       ...project,
+      kind: inferredKind,
+      name: isFirstIdea && /^(untitled (game|app)|new project)$/i.test(project.name) ? "New project" : project.name,
       initialPrompt: isFirstIdea && operation !== "chat" && operation !== "research" ? prompt : project.initialPrompt,
       answers: nextAnswers,
       question: answerKey ? null : project.question,
@@ -1940,31 +1952,43 @@ export default function Home() {
   ];
 
   return (
-    <main className={"gene-app " + theme} data-theme={theme}>
+    <main className={"gene-app " + theme + (sidebarOpen ? "" : " sidebar-collapsed")} data-theme={theme}>
       <aside className="rail">
         <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
+        <button className="rail-item sidebar-toggle" title={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-label={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><span>{sidebarOpen ? "◧" : "☷"}</span></button>
         <div className="rail-separator" />
         {nav.map(item => <button key={item.id} className={"rail-item " + (section === item.id ? "selected" : "")} title={item.label} onClick={() => setSection(item.id)}><span>{item.icon}</span></button>)}
         <div className="rail-spacer" />
         <button className="rail-item" title="Switch theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}><span>{theme === "dark" ? "☼" : "☾"}</span></button>
-        <button className="avatar" title="GENE 1.2 Flash"><GeneMark /></button>
+        <button className="avatar" title="GENE 1.8 Space Workspace"><GeneMark /></button>
       </aside>
 
       <aside className="project-sidebar">
         <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={() => createNewProject("game")}>＋</button></div>
-        <button className="new-project" onClick={() => createNewProject("game")}><span>＋</span> New game project</button>
-        <button className="new-project" onClick={() => createNewProject("app")}><span>＋</span> New web app project</button>
-        <button className="import-project-button" onClick={loadPlayableDemo}>▶ Try playable demo</button>
-        <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
-        <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
+        <button className="new-project-entry" title="Start one unified project. GENE identifies whether you want a game, website, or app from your brief." onClick={() => createNewProject()}><span className="new-project-plus">＋</span><span>New project</span><span className="new-project-entry-hint">⌘ K</span></button>
+        <details className="sidebar-disclosure workspace-tools">
+          <summary><span>Project tools</span><span className="menu-caret">⌄</span></summary>
+          <div className="sidebar-disclosure-content">
+            <button className="import-project-button" onClick={loadPlayableDemo}>▶ Open playable demo</button>
+            <input ref={projectImportRef} className="visually-hidden" type="file" accept=".zip,.gene.json,application/zip,application/json" onChange={importProject} />
+            <button className="import-project-button" onClick={() => projectImportRef.current?.click()}>↥ Import project ZIP</button>
+          </div>
+        </details>
         <div className="sidebar-section-label">CURRENT PROJECT</div>
         <div className="project-card"><span className="project-dot" /><div className="project-name">{project.name}</div><small>{hasGame ? (project.kind === "app" ? "App source created" : "Playable source created") : "Design in progress"}</small><button className="project-delete" title="Delete this chat and project" onClick={() => deleteProject(project.id)}>×</button></div>
-        {projects.filter(p => p.id !== project.id).length > 0 && <>
-          <div className="sidebar-section-label">RECENT CHATS</div>
-          {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
-        </>}
-        <div className="sidebar-section-label">PROJECT FILES</div>
-        {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear here after GENE builds a project.</div>}
+        {projects.filter(p => p.id !== project.id).length > 0 && <details className="sidebar-disclosure">
+          <summary><span>Recent projects</span><span className="disclosure-count">{projects.filter(p => p.id !== project.id).length}</span></summary>
+          <div className="sidebar-disclosure-content">
+            {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
+          </div>
+        </details>}
+        <details className="sidebar-disclosure file-disclosure">
+          <summary><span>Project files</span><span className="disclosure-count">{Object.keys(project.files).length}</span></summary>
+          <div className="sidebar-disclosure-content">
+            {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear after your first build.</div>}
+            <button className="open-files-button" onClick={() => setSection("files")}>Open file workspace <span>↗</span></button>
+          </div>
+        </details>
         <div className="sidebar-bottom">
           <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Checking AI connection" : apiReady ? "AI providers ready" : "Add an AI provider key"}</div>
           <small>{apiReady ? aiModel : "Gemini, Groq or OpenRouter key required"}</small>
@@ -1982,21 +2006,29 @@ export default function Home() {
         <header className="topbar">
           <div className="breadcrumb"><span>Projects</span><span className="crumb-slash">/</span><strong>{project.name}</strong><button className="rename-project" title="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
-            <span className="project-kind-chip">{project.kind === "app" ? "WEB APP" : "GAME"}</span>
+            <span className="project-kind-chip">{project.kind === "app" ? "APP" : "GAME"}</span>
             <div className="mode-switch" role="group" aria-label="Agent mode">
-              <button className={project.mode === "plan" ? "active" : ""} onClick={() => setProject({ ...project, mode: "plan" })}>Plan</button>
-              <button className={project.mode === "build" ? "active" : ""} onClick={() => setProject({ ...project, mode: "build" })}>Build</button>
+              <button className={project.mode === "plan" ? "active" : ""} title="Planning mode" aria-label="Planning mode" onClick={() => setProject({ ...project, mode: "plan" })}>◎</button>
+              <button className={project.mode === "build" ? "active" : ""} title="Build mode" aria-label="Build mode" onClick={() => setProject({ ...project, mode: "build" })}>⌘</button>
             </div>
-            <select className="thinking-select" value={project.thinking} aria-label="GENE 1.6 model mode" title="Flash: fast iterations · Balanced: default quality · Thinking: highest configured reasoning effort" onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
-              <option value="fast">GENE 1.6 Flash</option><option value="balanced">GENE 1.6 Balanced</option><option value="deep">GENE 1.6 Thinking</option>
+            <select className="thinking-select" value={project.thinking} aria-label="GENE reasoning mode" title="Reasoning effort: Fast, Thinking, or GENE BH. This selects effort, not a promise to reveal private chain-of-thought." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
+              <option value="fast">GENE Fast</option><option value="balanced">GENE Thinking</option><option value="deep">GENE BH</option>
             </select>
-            <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} onClick={openFullscreenGame} disabled={!hasGame}>↗ Preview</button>
-            <button className="mobile-preview-button" title="Open live preview" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}>◫ Preview</button>
-            <button className={"sync-button " + (isSyncedToLocal ? "synced" : "")} title="Write the actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || buildInProgress || localAgentStatus === "checking"}>{isSyncedToLocal ? "Synced to disk ✓" : "Sync files ↥"}</button>
-             <button className="publish-button" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || buildInProgress || publishBusy}>{publishBusy ? "Publishing…" : publishConfigured ? "Publish ↗" : "Publish setup"}</button>
-            <select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select>
-            <button className="binary-build-button" title={binaryBuildConfigured ? "Compile real EXE/APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || buildInProgress || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build binary ↗" : "Build setup ↗"}</button>
-            <span className="package-progress-label" aria-live="polite">{packageProgress !== null ? "Packing " + packageProgress + "%" : ""}</span><button className="icon-button subtle" title={packageProgress !== null ? "Packaging project ZIP" : "Download project source ZIP"} onClick={downloadProject} disabled={packageProgress !== null}>{packageProgress !== null ? packageProgress + "%" : "↓"}</button>
+            <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} aria-label="Open live preview" onClick={openFullscreenGame} disabled={!hasGame}><span>▷</span><span className="top-play-label">Preview</span></button>
+            <details className="header-overflow-menu">
+              <summary title="Project actions" aria-label="Open project actions"><span>···</span></summary>
+              <div className="header-overflow-panel">
+                <div className="overflow-menu-caption">PROJECT ACTIONS</div>
+                <button className={"menu-action " + (isSyncedToLocal ? "synced" : "")} title="Write actual project files to your computer using GENE Local Agent" onClick={syncToLocalAgent} disabled={!hasGame || busy || buildInProgress || localAgentStatus === "checking"}><span>↥</span><span>{isSyncedToLocal ? "Synced to disk" : "Sync real project files"}</span></button>
+                <button className="menu-action" title={publishConfigured ? "Publish a static web version through Vercel" : "Configure Vercel publishing credentials"} onClick={() => void publishProject()} disabled={!hasGame || busy || buildInProgress || publishBusy}><span>↗</span><span>{publishBusy ? "Publishing…" : publishConfigured ? "Publish project" : "Publish setup"}</span></button>
+                <div className="overflow-build-row">
+                  <label>Build target<select className="binary-target-select" aria-label="Binary build target" value={binaryTarget} onChange={e => setBinaryTarget(e.target.value as "both" | "windows" | "android")} disabled={binaryBuildBusy}><option value="both">EXE + APK</option><option value="windows">Windows EXE</option><option value="android">Android APK</option></select></label>
+                  <button className="menu-build-button" title={binaryBuildConfigured ? "Compile an installer or APK on cloud build machines" : "Cloud builder needs one-time GitHub/Vercel setup"} onClick={() => void buildBinary(binaryTarget)} disabled={!hasGame || busy || buildInProgress || binaryBuildBusy}>{binaryBuildBusy ? "Building…" : binaryBuildConfigured ? "Build" : "Build setup"}</button>
+                </div>
+                <button className="menu-action" title="Download the actual source files as a project ZIP" onClick={downloadProject} disabled={packageProgress !== null}><span>↓</span><span>{packageProgress !== null ? "Packing " + packageProgress + "%" : "Export project ZIP"}</span></button>
+                <button className="menu-action" title="Open live preview in an expanded workspace" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}><span>⛶</span><span>Expand preview</span></button>
+              </div>
+            </details>
           </div>
         </header>
 
@@ -2021,14 +2053,14 @@ export default function Home() {
             {section === "chat" && <>
               {project.plan && <div className="pinned-plan-strip" role="region" aria-label="Pinned project plan">
                 <div className="pinned-plan-mark">✓</div>
-                <div className="pinned-plan-copy"><div className="pinned-plan-label">PINNED PROJECT PLAN <span>· {project.plan.engine === "canvas2d" ? "2D" : project.plan.engine === "webgl3d" ? "3D" : "WEB APP"}</span></div><strong>{project.plan.title}</strong><p>{project.plan.summary}</p></div>
+                <div className="pinned-plan-copy"><div className="pinned-plan-label">PROJECT PLAN <span>· {project.plan.engine === "canvas2d" ? "2D" : project.plan.engine === "webgl3d" ? "3D" : "WEB APP"}</span></div><strong>{project.plan.title}</strong><p>{project.plan.summary}</p></div>
                 <div className="pinned-plan-progress">{project.buildRun ? <><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length}</strong><small>tasks passed</small></> : <><strong>{project.plan.tasks.length}</strong><small>planned tasks</small></>}</div>
                 <button type="button" onClick={() => setSection("tasks")}>Open plan ↗</button>
               </div>}
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow">GENE 1.6 FLASH</div>
+                  <div className="eyebrow">GENE 1.8 · SPACE WORKSPACE</div>
                   {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
                   <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
                   <div className="starter-grid">
@@ -2067,24 +2099,37 @@ export default function Home() {
                   <ol>{project.plan.tasks.slice(0, 7).map((task, i) => <li key={task}><span>{String(i + 1).padStart(2, "0")}</span>{task}</li>)}</ol>
                   <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy || buildInProgress}>{buildInProgress ? "Build in progress…" : busy ? "Working…" : "Build this plan"} <span>→</span></button>
                 </div>}
-                {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "GENE is building" : queuedRequestCount ? "Requests queued" : "GENE is working"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " The preview is available; new chat requests queue safely." : ""}</small></div><button onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide activity" : "View activity"}</button></div>}
+                {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
+                {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
+                  <div className="real-progress-heading"><span>BUILD RECORD</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} tasks verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
+                  <div className="real-progress-track"><span style={{ width: (project.buildRun.tasks.length ? project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100 : 0) + "%" }} /></div>
+                  <div className="real-progress-tasks">{project.buildRun.tasks.map(task => <div key={task.id} className={"real-progress-task " + task.status}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "↻" : task.status === "failed" ? "!" : task.status === "blocked" ? "×" : "·"}</span><strong>{task.title}</strong><small>{task.status}{task.files.length ? " · " + task.files.join(", ") : ""}</small></div>)}</div>
+                  <p>Progress reflects task states reported by GENE&apos;s build coordinator and validation. No token counter or simulated thinking stream is shown.</p>
+                </div>}
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
               <form className="composer" onSubmit={onSubmit}>
                 {project.mode === "plan" && <div className="composer-tools plan-intent-switch" role="group" aria-label="Planning intent">
-                  <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} onClick={() => setPlanIntent("create")}>Plan a new project</button>
-                  <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}>Plan an update</button>
+                  <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} title="Create a new project plan" onClick={() => setPlanIntent("create")}><span>＋</span> New plan</button>
+                  <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} title="Update this project's existing plan" onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
                 </div>}
-                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN MODE · read-only" : "BUILD MODE · files may change"}</span><span className="composer-context">{searchMode ? "WEB RESEARCH · READ-ONLY" : project.thinking.toUpperCase() + " THINKING"}</span></div>
-                <div className="composer-tools gene15-tools">
-                  <label className="extended-plan-toggle"><input type="checkbox" checked={extendedPlanning} onChange={e => setExtendedPlanning(e.target.checked)} /> <span><strong>Extended planning</strong><small>Deeper phases, architecture, dependencies and test gates</small></span></label>
-                  <button type="button" title="Improve the draft prompt without starting a build" onClick={enhanceDraftPrompt} disabled={!draft.trim() || enhancingPrompt || busy}>{enhancingPrompt ? "Enhancing…" : "✦ Enhance prompt"}</button>
+                <div className="composer-toolbar"><span className="composer-context">{project.mode === "plan" ? "PLAN" : "BUILD"} · {project.mode === "plan" ? "design and decisions" : "real source changes"}</span><span className="composer-context">{searchMode ? "SEARCH ON" : project.thinking === "fast" ? "FAST" : project.thinking === "deep" ? "GENE BH" : "THINKING"}</span></div>
+                <div className="composer-options">
+                  <button type="button" className={"tool-chip " + (extendedPlanning ? "tool-active" : "")} aria-pressed={extendedPlanning} title="Ask more interview questions when useful and expand phases, architecture, dependencies, and test gates." onClick={() => setExtendedPlanning(value => !value)}><span>✦</span> Deep planning <i>{extendedPlanning ? "On" : "Off"}</i></button>
+                  <details className="composer-tools-menu">
+                    <summary title="More chat tools"><span>···</span><span>Tools</span></summary>
+                    <div className="composer-tools-menu-panel">
+                      <div className="overflow-menu-caption">CHAT TOOLS</div>
+                      <button type="button" className="menu-action" title="Improve the draft prompt without starting a build" onClick={enhanceDraftPrompt} disabled={!draft.trim() || enhancingPrompt || busy}><span>✦</span><span>{enhancingPrompt ? "Enhancing prompt…" : "Enhance prompt"}</span></button>
+                      <small>Deep planning uses the chosen AI provider to clarify more decisions before building; it does not display private chain-of-thought.</small>
+                    </div>
+                  </details>
                 </div>
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
                 <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={project.mode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe your app or game, or answer GENE's question…") : hasGame ? "Ask GENE to change a feature, screen, mechanic, art, or performance…" : "Describe the app or game you want GENE to build…"} rows={3} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
-                <div className="composer-bottom"><div className="composer-tools"><button type="button" title="Attach reference images, documentation, or source files" onClick={() => referenceInputRef.current?.click()}>＋ Reference</button><button type="button" className={searchMode ? "tool-active" : ""} title="Research current documentation and references with Google Search grounding" onClick={() => setSearchMode(!searchMode)}>⌕ Search {searchMode ? "ON" : "web"}</button><button type="button" title="Surprise me" onClick={surpriseMe}>✦ Surprise me</button><span className="key-hint">Enter to send · Shift+Enter for newline</span></div><button className="send-button" type="submit" disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue request" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                <div className="composer-bottom"><div className="composer-tools composer-quick-tools"><button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button><button type="button" className={"icon-only-tool " + (searchMode ? "tool-active" : "")} aria-pressed={searchMode} title="Toggle web research grounded in current documentation" aria-label="Toggle web research" onClick={() => setSearchMode(!searchMode)}>⌕</button><button type="button" className="icon-only-tool" title="Let GENE choose an idea" aria-label="Surprise me" onClick={surpriseMe}>✧</button><span className="key-hint">Enter ↵</span></div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
@@ -2096,7 +2141,7 @@ export default function Home() {
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
               {project.buildRun && <div className="build-check-panel">
-                <div className="build-check-head"><div><div className="eyebrow">GENE 1.6 BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="build-check-head"><div><div className="eyebrow">GENE 1.8 BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
                 <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
                 <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
                 {(project.buildRun.status === "failed" || project.buildRun.status === "recovering" || project.buildRun.tasks.some(task => task.status === "failed" || task.status === "blocked")) && <button className="primary-button" disabled={busy || buildInProgress} onClick={() => void runAgent("Resume this existing GENE build from its latest saved checkpoint. Restore checkpoint files, keep every passed task unchanged, retry only unfinished or failed tasks, then rerun final validation and repair. Do not restart from zero or claim completion unless all required tasks pass.", "build")}>Resume from checkpoint</button>}
@@ -2156,7 +2201,7 @@ export default function Home() {
           </section>
 
           {previewOpen ? <aside className={"preview-panel" + (expandedPreview ? " expanded" : "")}>
-            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button type="button" className={customEditMode ? "tool-active" : ""} title="Select an element in the live preview to edit it with GENE" disabled={!hasGame} onClick={() => { setCustomEditMode(value => !value); setNotice(customEditMode ? "Custom edit selection cancelled." : "Click an element in the preview. GENE will identify it and prepare an edit prompt."); }}>✎ Select to edit</button><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); setCustomEditMode(false); }}>–</button><button title={runtimeState === "error" ? "Refresh preview after an error" : "Refresh preview"} onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); setCustomEditMode(false); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
+            <div className="preview-header"><div className="preview-title"><span className="live-dot" /><div><strong>Live preview</strong><small>{hasGame ? runtimeLabel(runtimeState) : "Waiting for first build"}</small></div></div><div className="preview-actions"><button type="button" className={"preview-icon-action " + (customEditMode ? "tool-active" : "")} aria-pressed={customEditMode} title="Select an element in the live preview to prepare an edit request" aria-label="Select in preview to edit" disabled={!hasGame} onClick={() => { setCustomEditMode(value => !value); setNotice(customEditMode ? "Preview selection cancelled." : "Select an element in the live preview. GENE will prepare a specific edit request for you to review."); }}>⌖</button><button title="Minimize preview" onClick={() => { setPreviewOpen(false); setExpandedPreview(false); setCustomEditMode(false); }}>–</button><button title={runtimeState === "error" ? "Refresh preview after an error" : "Refresh preview"} onClick={() => { setPreviewKey(n => n + 1); setRuntimeState("idle"); setCustomEditMode(false); }}>↻</button><button title="Open fullscreen game" disabled={!hasGame} onClick={openFullscreenGame}>⛶</button></div></div>
             <div className="preview-stage">{hasGame ? <iframe key={previewKey} ref={iframeRef} title="GENE live game preview" sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"} srcDoc={previewDoc} /> : <div className="preview-placeholder"><div className="preview-illustration"><span className="mountain m1" /><span className="mountain m2" /><span className="sun" /><span className="player-shape" /></div><div className="preview-placeholder-text"><strong>Your game, live.</strong><span>Build a project to run the actual generated source here.</span></div></div>}</div>
             {expandedPreview && hasGame && <form className="expanded-live-editor" onSubmit={event => { event.preventDefault(); if (draft.trim() && !busy) void runAgent(draft); }}>
               <div className="expanded-live-editor-label"><span className="live-dot" /> EDIT LIVE <span>Chat edits update this preview</span></div>
