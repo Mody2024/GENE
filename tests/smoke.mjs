@@ -63,6 +63,7 @@ assert.ok(prompts.includes("GENE 1.6") && prompts.includes("GENE 1.6 MODE CONTRA
 assert.ok(page.includes("GENE 1.6 Flash") && page.includes("GENE 1.6 Balanced") && page.includes("GENE 1.6 Thinking"), "workspace exposes the three named GENE 1.6 modes");
 assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation)'), "planning and conversational operations use bounded project context");
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
+assert.ok(prompts.includes("const compactPlan = p?.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
 assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
 assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("GENE 1.6 BUILD SYSTEM"), "workspace branding identifies the current GENE 1.6 release line");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
