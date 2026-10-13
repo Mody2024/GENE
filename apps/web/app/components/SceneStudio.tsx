@@ -218,7 +218,15 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       <p>Author and arrange scene entries in a lightweight interactive isometric viewport, then refine transforms in the inspector. The preview visualizes scene-manifest objects; the game itself updates only when its runtime consumes this schema.</p>
     </div>
     {specError ? <div className="forge-notice">{specError}</div> : <>
-      <div className="scene-studio-toolbar">
+      <style>{`
+      .scene-axis-controls{display:inline-flex;align-items:center;gap:5px;padding:3px 6px;border:1px solid var(--border,#314154);border-radius:8px}
+      .scene-axis-controls strong{font-size:11px;opacity:.8}
+      .scene-axis-controls:first-child strong{color:#ef7777}
+      .scene-axis-controls:nth-child(2) strong{color:#77d6a4}
+      .scene-axis-controls:nth-child(3) strong{color:#78aaff}
+      .scene-viewport-canvas{touch-action:none}
+    `}</style>
+    <div className="scene-studio-toolbar">
         <span>{objects.length} scene {objects.length === 1 ? "entry" : "entries"} · game-spec.json</span>
         <div className="scene-studio-actions">
           <button className="secondary-button" onClick={undo} disabled={readOnly || !undoStack.length} title="Undo last scene edit">↶ Undo</button>
