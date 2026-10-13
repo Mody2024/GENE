@@ -229,6 +229,18 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save scene changes.</p>}
       <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE CANVAS</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label="Interactive isometric scene viewport" onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend"><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></div></div>
+      {selected && <div className="scene-studio-toolbar" aria-label="Selected object transform controls">
+        <span>TRANSFORM GIZMO · {selected.name}</span>
+        <div className="scene-studio-actions">
+          {(["x", "y", "z"] as const).map(axis => <span key={axis} className="scene-axis-controls">
+            <strong>{axis.toUpperCase()}</strong>
+            <button className="secondary-button" onClick={() => updateVector("position", axis, Math.round((selected.position[axis] - 0.5) * 100) / 100)} disabled={readOnly} aria-label={"Move " + selected.name + " negative " + axis}>−</button>
+            <button className="secondary-button" onClick={() => updateVector("position", axis, Math.round((selected.position[axis] + 0.5) * 100) / 100)} disabled={readOnly} aria-label={"Move " + selected.name + " positive " + axis}>+</button>
+          </span>)}
+          <button className="secondary-button" onClick={() => updateSelected({ rotation: { ...selected.rotation, y: selected.rotation.y + 15 } })} disabled={readOnly}>Rotate Y +15°</button>
+          <button className="secondary-button" onClick={() => updateSelected({ scale: { x: selected.scale.x * 1.1, y: selected.scale.y * 1.1, z: selected.scale.z * 1.1 } })} disabled={readOnly}>Scale +10%</button>
+        </div>
+      </div>}
       <div className="scene-studio-layout">
         <div className="scene-object-list">
           <div className="scene-list-heading">HIERARCHY</div>
