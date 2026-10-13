@@ -446,7 +446,6 @@ export default function Home() {
       let responseOk = true;
       const baseRequest = {
         mode: operation === "build" || operation === "edit" || operation === "surprise" || operation === "buildPart" ? "build" : nextProject.mode,
-        model: aiModel,
         thinking: nextProject.thinking,
         history: nextProject.messages.slice(-4).map(m => ({ role: m.role, content: m.content.slice(0, 800) })),
         answers: nextAnswers,
@@ -1268,7 +1267,6 @@ export default function Home() {
         body: JSON.stringify({
           operation: "enhancePrompt",
           mode: "plan",
-          model: aiModel,
           thinking: project.thinking,
           extendedPlanning,
           message: draft.trim(),
