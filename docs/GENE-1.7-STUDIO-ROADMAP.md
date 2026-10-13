@@ -197,6 +197,124 @@ Treat sound as a first-class part of every generated game, app, and interactive 
 
 Acceptance: recovery snapshots restore a known-good revision, exports produce an actionable portability report, diagnostics are redacted, and quality/cost profiles measurably alter work rather than only changing labels.
 
+
+### 21. Whole-project dependency graph and impact analysis
+
+- Maintain a machine-readable graph connecting plans, tasks, scenes, scripts, assets, audio events, UI screens, data schemas, tests, and exports.
+- Before a change, identify its direct and downstream dependencies; e.g. changing an input action should surface affected tutorials, key prompts, tests, and controller mappings.
+- Track ownership and source of truth for duplicated values so the same setting is not silently copied into unrelated files.
+- Detect orphan files, unused assets, missing references, circular dependencies, dead routes, duplicate IDs, and mismatched event names.
+- Generate an impact summary and focused regression-test list for each proposed edit.
+- Keep the graph incremental and cacheable; avoid rescanning the entire project on every chat message.
+- Show confidence and unknown edges for project types the analyzer cannot fully parse.
+
+Acceptance: a fixture with a renamed asset/event reports all affected references before the change and verifies that the repaired graph has no broken links.
+
+### 22. Project-specific knowledge base and decision memory
+
+- Keep confirmed decisions, rejected approaches, coding conventions, architecture constraints, user-approved defaults, known bugs, and verified build instructions in structured project memory separate from the chat transcript.
+- Record the source, timestamp, revision, and confidence of each decision; allow users to inspect, edit, pin, or forget stored facts.
+- Resolve conflicts explicitly: newer user instructions can supersede older decisions, but the system must not silently discard important constraints.
+- Retrieve only relevant memory for a task and summarize deltas instead of attaching the entire conversation or plan to every request.
+- Store reproducible failed-attempt summaries so the agent doesn't repeatedly retry the same broken approach.
+- Keep credentials, private keys, personal data, and sensitive values out of memory and logs.
+- Support export/import of project memory and graceful recovery when storage is unavailable.
+
+Acceptance: after reload or a new session, GENE preserves approved decisions and project constraints without inventing unconfirmed facts or resending the entire transcript.
+
+### 23. Multiplayer and network architecture workbench
+
+- Add an explicit multiplayer design interview: local co-op, LAN, online peer-hosted, dedicated server, or asynchronous; player count, authority, persistence, latency tolerance, and reconnect behavior.
+- Generate a network contract covering message types, state ownership, validation, replication frequency, join/leave, reconnect, timeout, and version compatibility.
+- Distinguish local split-screen from network multiplayer and from a visual mock of multiplayer; clearly report which mode is actually implemented.
+- Add deterministic simulation fixtures for latency, jitter, packet loss, duplicate messages, disconnects, reconnects, and out-of-order events.
+- Provide server-authoritative patterns for competitive or security-sensitive actions, server-side input validation, rate limits, and abuse-resistant state changes.
+- Add multiplayer session telemetry and privacy-safe diagnostics; never log authentication tokens or private message content by default.
+- Validate lobby, ready states, player spawning, late join, host migration where supported, and return-to-menu paths.
+
+Acceptance: multiplayer claims require a real two-client test or a clearly labeled limitation; simulated network tests cannot be presented as proof of a live online deployment.
+
+### 24. Data, save files, migrations, and backend workbench
+
+- Model application data and game saves as versioned schemas with validation, defaults, migration paths, and rollback strategy.
+- Detect incompatible save/schema changes before applying them and provide migration previews on representative fixtures.
+- Add save-slot inspection, backup/export/import, corruption detection, and recovery to the last valid save where possible.
+- For backend-connected apps, define authentication, authorization, row/data ownership, rate limits, secret boundaries, and failure states before generating endpoints.
+- Provide local/offline fallback only where product semantics allow it; never silently pretend remote persistence succeeded.
+- Add test fixtures for empty data, malformed input, stale versions, interrupted writes, duplicate submissions, and unavailable services.
+- Keep secrets in supported server-side environment configuration and scan generated client bundles for accidental exposure.
+
+Acceptance: schema upgrades preserve valid old data in tested fixtures, invalid data fails safely, and offline/remote persistence status is reported truthfully.
+
+### 25. Release engineering and reproducible delivery
+
+- Add a release manifest containing source revision, target platform, runtime/engine version, dependencies, asset hashes, build settings, and validation results.
+- Produce checksums and verify that uploaded artifacts match the files created by the build job.
+- Separate development preview, test/staging, and production release channels with explicit promotion steps and rollback targets.
+- Make builds resumable by artifact/task, with persisted logs and clear retry boundaries; a failed Android signing step should not require regenerating unrelated assets.
+- Track binary provenance and report whether an EXE/APK is a real native build, a web wrapper, or an unavailable target.
+- Verify installation/launch smoke tests when infrastructure permits, and report the exact validation level if a real device or OS runner is unavailable.
+- Include signing-key safety, environment-variable checks, dependency licenses, release notes, and artifact retention policy.
+
+Acceptance: every published artifact maps to an exact source revision and has integrity metadata; unsupported or untested release claims are visibly labeled.
+
+### 26. Content pipeline, procedural variation, and asset consistency
+
+- Maintain a canonical asset registry with stable IDs, semantic tags, dimensions, scale, material conventions, animation/sound links, origin, and usage locations.
+- Generate consistent asset variants (biome, damage state, rarity, colorway, size) from explicit rules rather than unrelated one-off outputs.
+- Add import pipelines for supported image, model, audio, font, and animation formats with validation, thumbnails, and actionable error reports.
+- Use deterministic seeds and parameter manifests for procedural assets and level content so a specific output can be regenerated.
+- Detect duplicate/near-duplicate files, wrong scale, incompatible texture dimensions, missing material references, and assets that exceed target budgets.
+- Support placeholder-to-final replacement while preserving stable asset IDs and all scene/event references.
+- Add an asset license and provenance gate before shipping or sharing a project.
+
+Acceptance: replacing an asset preserves valid references, repeatable procedural generation uses the same seed/settings, and missing imports cannot silently ship as if complete.
+
+### 27. Narrative, dialogue, quest, and world-state systems
+
+- Provide structured narrative tools for characters, dialogue trees, quest objectives, prerequisites, branching outcomes, inventory conditions, and world-state flags.
+- Validate dialogue graph reachability, missing responses, dead-end quests, contradictory state requirements, and unachievable objectives.
+- Link dialogue, subtitles, voice assets, portraits, animation cues, and sound events through stable IDs.
+- Support localization-ready strings and per-language voice/subtitle variants without hardcoding text into gameplay logic.
+- Add narrative preview paths to test choices, consequences, quest completion, failure, and replay.
+- Preserve player choices in save data only when the chosen save schema supports them.
+- Keep authored content under user control; AI suggestions should not overwrite approved story canon without a reviewable change.
+
+Acceptance: representative quest graphs have reachable completion/failure paths, no unhandled dialogue node, and testable save/load behavior for required story flags.
+
+### 28. Collaboration, review, and task handoff
+
+- Support safe project handoff with a compact project brief, open tasks, known failures, architecture notes, and exact current revision.
+- Add task ownership/status and conflict warnings for files edited by multiple collaborators or simultaneous AI jobs.
+- Allow review comments on a file diff, scene object, plan task, asset, or test failure rather than only on the whole chat response.
+- Provide role-based permissions for viewing, editing, approving releases, and managing deployment secrets where a connected collaboration backend supports it.
+- Keep user and AI changes attributable in revision history without exposing private credentials.
+- Let a user pause a long build, inspect the current checkpoint, resume it, or cancel without losing the last working project.
+
+Acceptance: concurrent edits never silently overwrite each other, and a handed-off task contains enough verified context to resume without replaying the entire conversation.
+
+### 29. Learning playground and explainable project structure
+
+- Offer optional explanations attached to actual generated files and components: what it does, where it is used, how to change it, and which tests cover it.
+- Add safe “teach me” walkthroughs for scene hierarchy, signals/events, materials, input, data flow, audio routing, and deployment.
+- Let users switch between concise builder mode and learning mode without forcing long tutorials into every answer.
+- Include small isolated experiments/sandboxes for testing a script, shader, material, or gameplay rule before applying it to the main project.
+- Add examples that demonstrate good project structure, performance-aware patterns, and common failure recovery.
+- Keep explanations synchronized with source revisions and mark them stale after relevant edits.
+
+Acceptance: explanations link to real current files and tests; sandbox experiments cannot accidentally overwrite the production project.
+
+### 30. Quality gates, risk scoring, and honest project health
+
+- Calculate project health from explicit evidence: broken references, failed tests, known runtime errors, missing controls, build status, asset/license status, and target compatibility.
+- Separate blockers, warnings, unverified areas, and optional polish; never collapse them into a single unexplained “100% complete” score.
+- Require risk-based gates for destructive migrations, public releases, online multiplayer, permissions, and handling user data.
+- Let users configure acceptable release criteria, but do not allow a setting to relabel a known failing check as passing.
+- Show the latest successful validation revision and mark checks stale when relevant source files change.
+- Provide a “what remains before release?” report with actionable steps and evidence for each status.
+
+Acceptance: changing a source file invalidates only relevant stale checks; a release summary accurately distinguishes passed, failed, skipped, and unverified criteria.
+
 ## Ideas to keep in the backlog until 1.6 is stable
 
 - Visual node editor for scene and gameplay systems.
