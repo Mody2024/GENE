@@ -1094,7 +1094,7 @@ export default function Home() {
       );
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [runtimeState, busy, project?.id, project?.files, notice, runAgent]);
+  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, notice, runAgent]);
 
   async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
     const normalizedUrl = url.trim().replace(/\/+$/, "");
