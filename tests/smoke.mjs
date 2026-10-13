@@ -516,3 +516,12 @@ assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline
 
 assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
+
+
+const studioContract = read("apps/web/app/lib/studio-contract.ts");
+const capabilitiesApi = read("apps/web/app/api/capabilities/route.ts");
+assert.ok(studioContract.includes("getStudioCapabilities") && studioContract.includes("buildStudioContract"), "GENE exposes a reusable studio capability registry and production contract");
+assert.ok(studioContract.includes("pipeline-dependent") && studioContract.includes("not a native game") && studioContract.includes("online multiplayer"), "capability registry honestly distinguishes conditional native builds and real networking");
+assert.ok(studioContract.includes("polished, coherent vertical slice") && studioContract.includes("art direction") && studioContract.includes("weak hardware"), "studio contract prioritizes coherent game quality and target performance over asset count");
+assert.ok(prompts.includes('import { buildStudioContract } from "./studio-contract";') && prompts.includes("buildStudioContract(projectKind"), "all AI operations receive the capability-aware production contract");
+assert.ok(capabilitiesApi.includes("getStudioCapabilities") && capabilitiesApi.includes("INVALID_PROJECT_KIND") && capabilitiesApi.includes("INVALID_ENGINE"), "capability API validates requested project kind and engine before returning support information");
