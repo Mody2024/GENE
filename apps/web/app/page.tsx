@@ -59,15 +59,14 @@ function message(role: "user" | "assistant" | "system", content: string, kind?: 
   return { id: uid(), role, content, createdAt: now(), kind };
 }
 function newProject(kind: ProjectKind = "game"): GeneProject {
-  const isApp = kind === "app";
   return {
     id: uid(),
-    name: isApp ? "Untitled app" : "Untitled game",
+    name: "New project",
     kind,
     initialPrompt: "",
     mode: "plan",
     thinking: "balanced",
-    messages: [message("assistant", isApp ? "Hey, I'm GENE. Tell me what kind of web app you want to build. I'll help shape the plan, then build it here so we can preview and edit it together." : "Hey, I'm GENE. Tell me the game you're imagining. I'll ask one meaningful question at a time, then we can review the plan before building.")],
+    messages: [message("assistant", "Hey, I'm GENE. Tell me what you want to create — a game, web app, website, tool, or something else. I'll help shape the plan, then build the actual project files here so we can preview and refine them together.")],
     answers: {},
     question: null,
     plan: null,
@@ -77,6 +76,14 @@ function newProject(kind: ProjectKind = "game"): GeneProject {
     references: [],
     updatedAt: now()
   };
+}
+function inferProjectKind(prompt: string, fallback: ProjectKind): ProjectKind {
+  const value = prompt.toLowerCase();
+  const appIntent = /\b(website|web site|web app|webapp|dashboard|landing page|portfolio site|e-commerce|ecommerce|storefront|admin panel|saas|browser app|mobile app|task manager|calculator app|chat app|productivity app|website builder|tool|platform)\b/.test(value);
+  const gameIntent = /\b(game|gameplay|platformer|runner|rpg|fps|shooter|survival|metroidvania|racing|puzzle game|multiplayer|boss fight|level|enemy ai|character controller|2d game|3d game|simulator)\b/.test(value);
+  if (appIntent && !gameIntent) return "app";
+  if (gameIntent && !appIntent) return "game";
+  return fallback;
 }
 function fileName(path: string, kind: ProjectKind = "game") {
   const leaf = path.split("/").pop() || path;
@@ -423,6 +430,7 @@ export default function Home() {
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
     const isFirstIdea = !project.initialPrompt;
+    const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
@@ -439,6 +447,8 @@ export default function Home() {
     }
     const nextProject: GeneProject = {
       ...project,
+      kind: inferredKind,
+      name: isFirstIdea && /^(untitled (game|app)|new project)$/i.test(project.name) ? "New project" : project.name,
       initialPrompt: isFirstIdea && operation !== "chat" && operation !== "research" ? prompt : project.initialPrompt,
       answers: nextAnswers,
       question: answerKey ? null : project.question,
@@ -1955,13 +1965,7 @@ export default function Home() {
 
       <aside className="project-sidebar">
         <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={() => createNewProject("game")}>＋</button></div>
-        <details className="new-project-menu">
-          <summary><span className="new-project-plus">＋</span><span>New project</span><span className="menu-caret">⌄</span></summary>
-          <div className="new-project-options">
-            <button onClick={() => createNewProject("game")}><span className="project-type-icon">◇</span><span><strong>Game project</strong><small>2D, 3D or multiplayer</small></span></button>
-            <button onClick={() => createNewProject("app")}><span className="project-type-icon">▦</span><span><strong>Web app project</strong><small>Sites, tools and dashboards</small></span></button>
-          </div>
-        </details>
+        <button className="new-project-entry" title="Start one unified project. GENE identifies whether you want a game, website, or app from your brief." onClick={() => createNewProject()}><span className="new-project-plus">＋</span><span>New project</span><span className="new-project-entry-hint">⌘ K</span></button>
         <details className="sidebar-disclosure workspace-tools">
           <summary><span>Project tools</span><span className="menu-caret">⌄</span></summary>
           <div className="sidebar-disclosure-content">
