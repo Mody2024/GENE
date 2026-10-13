@@ -9,6 +9,7 @@ import SceneStudio from "./components/SceneStudio";
 import AudioStudio from "./components/AudioStudio";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
+import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
 
@@ -365,7 +366,7 @@ export default function Home() {
       "})();"
     ].join("\n");
     const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
-    const assetBootstrap = buildRuntimeAssetBootstrap(project.files);
+    const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files);
     return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
