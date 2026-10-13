@@ -1070,7 +1070,7 @@ export default function Home() {
         setCanQueueBuildRequests(false);
       }
     }
-  }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, localAgentStatus, localAgentToken, localAgentUrl]);
+  }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, interactionMode, extendedPlanning, localAgentStatus, localAgentToken, localAgentUrl]);
 
   useEffect(() => {
     if (busy || buildInProgress || !project || pendingBuildRequests.current.length === 0) return;
