@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Vec3 = { x: number; y: number; z: number };
 type SceneObject = {
@@ -65,6 +65,8 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const [status, setStatus] = useState("");
   const [rawSpec, setRawSpec] = useState<Record<string, unknown>>({});
   const [sceneMetadata, setSceneMetadata] = useState<Record<string, unknown>>({});
+  const viewportRef = useRef<HTMLCanvasElement | null>(null);
+  const dragRef = useRef<{ id: string; startX: number; startY: number; original: SceneObject[]; originalPosition: Vec3 } | null>(null);
 
   useEffect(() => {
     try {
@@ -87,6 +89,41 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     }
   }, [source]);
 
+
+  useEffect(() => {
+    const canvas = viewportRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const width = 960, height = 540;
+    canvas.width = width; canvas.height = height;
+    const bg = ctx.createLinearGradient(0, 0, 0, height);
+    bg.addColorStop(0, "#111b2a"); bg.addColorStop(1, "#080d16");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+    const project = (p: Vec3) => ({ x: width / 2 + (p.x - p.z) * 32, y: height * .58 + (p.x + p.z) * 16 - p.y * 38 });
+    for (let i = -12; i <= 12; i++) {
+      const a = project({ x: i, y: 0, z: -12 }), b = project({ x: i, y: 0, z: 12 });
+      const d = project({ x: -12, y: 0, z: i }), e = project({ x: 12, y: 0, z: i });
+      ctx.strokeStyle = i === 0 ? "#416d80" : "#223345"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    }
+    const visible = objects.filter(o => o.visible).sort((a,b) => a.position.x+a.position.z+a.position.y-b.position.x-b.position.z-b.position.y);
+    for (const o of visible) {
+      const p = project(o.position), sx = Math.max(.2,Math.min(4,Math.abs(o.scale.x))), sy = Math.max(.2,Math.min(4,Math.abs(o.scale.y))), sz = Math.max(.2,Math.min(4,Math.abs(o.scale.z)));
+      const rx = 14*sx, ry = 9*sz, h = 25*sy, active = o.id === selectedId, type = o.type.toLowerCase();
+      ctx.save(); ctx.translate(p.x,p.y);
+      ctx.fillStyle="#000"; ctx.globalAlpha=.28; ctx.beginPath(); ctx.ellipse(0,6,rx*1.3,ry,0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle=o.color; ctx.strokeStyle=active?"#ffffff":"#263747"; ctx.lineWidth=active?2.5:1;
+      if(type.includes("light")) { ctx.strokeStyle=o.color; ctx.beginPath(); ctx.arc(0,-h,13,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-20,-h); ctx.lineTo(20,-h); ctx.moveTo(0,-h-20); ctx.lineTo(0,-h+20); ctx.stroke(); }
+      else if(type.includes("camera")) { ctx.beginPath(); ctx.moveTo(-12,-h-6); ctx.lineTo(12,-h-6); ctx.lineTo(17,-h+6); ctx.lineTo(-17,-h+6); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      else if(type.includes("sphere")) { ctx.beginPath(); ctx.ellipse(0,-h,rx,ry,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.strokeStyle="#ffffff55"; ctx.beginPath(); ctx.ellipse(0,-h,rx*.45,ry,0,0,Math.PI*2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.moveTo(-rx,-h); ctx.lineTo(0,-h-ry); ctx.lineTo(rx,-h); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.globalAlpha=.65; ctx.beginPath(); ctx.moveTo(-rx,-h); ctx.lineTo(-rx,0); ctx.lineTo(0,ry); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(rx,-h); ctx.lineTo(rx,0); ctx.lineTo(0,ry); ctx.lineTo(0,-h+ry); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; ctx.stroke(); }
+      if(active) { ctx.strokeStyle="#79eac6"; ctx.lineWidth=1.5; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.ellipse(0,3,rx*1.7,ry*1.7,0,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.restore(); ctx.fillStyle=active?"#e8fff8":"#9bb1c6"; ctx.font=active?"bold 12px sans-serif":"11px sans-serif"; ctx.textAlign="center"; ctx.fillText(o.name.slice(0,24),p.x,p.y-h-19);
+    }
+    ctx.fillStyle="#9bb1c6"; ctx.font="11px sans-serif"; ctx.textAlign="left"; ctx.fillText("SCENE PREVIEW · ISOMETRIC EDITOR",18,24); ctx.fillText("Drag an object to move it across the ground plane",18,height-18);
+  }, [objects, selectedId]);
+
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
   const commitObjects = (next: SceneObject[]) => {
     const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } }));
@@ -106,6 +143,33 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     setObjects(redoStack[redoStack.length - 1]);
     setRedoStack(current => current.slice(0, -1));
   };
+
+  const viewportPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect=event.currentTarget.getBoundingClientRect();
+    return { x:(event.clientX-rect.left)*960/rect.width, y:(event.clientY-rect.top)*540/rect.height };
+  };
+  const onViewportPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if(readOnly)return;
+    const point=viewportPoint(event);
+    const hit=[...objects].reverse().filter(o=>o.visible).find(o=>{const x=480+(o.position.x-o.position.z)*32,y=540*.58+(o.position.x+o.position.z)*16-o.position.y*38;return Math.abs(point.x-x)<32*Math.max(1,Math.abs(o.scale.x))&&Math.abs(point.y-(y-25*o.scale.y))<34*Math.max(1,Math.abs(o.scale.y));});
+    if(!hit)return;
+    setSelectedId(hit.id);
+    dragRef.current={id:hit.id,startX:point.x,startY:point.y,original:objects.map(o=>({...o,position:{...o.position},rotation:{...o.rotation},scale:{...o.scale}})),originalPosition:{...hit.position}};
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onViewportPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const drag=dragRef.current;if(!drag||readOnly)return;
+    const point=viewportPoint(event),dx=point.x-drag.startX,dy=point.y-drag.startY;
+    const moveX=dx/64+dy/32,moveZ=dy/32-dx/64;
+    setObjects(current=>current.map(o=>o.id===drag.id?{...o,position:{...o.position,x:Math.round((drag.originalPosition.x+moveX)*10)/10,z:Math.round((drag.originalPosition.z+moveZ)*10)/10}}:o));
+  };
+  const onViewportPointerUp = () => {
+    const drag=dragRef.current;if(!drag)return;
+    const current=objects.find(o=>o.id===drag.id);
+    if(current&&(current.position.x!==drag.originalPosition.x||current.position.z!==drag.originalPosition.z)){setUndoStack(stack=>[...stack,drag.original].slice(-40));setRedoStack([]);setStatus("Moved "+current.name+". Save scene data to persist the transform.");}
+    dragRef.current=null;
+  };
+
   const updateSelected = (patch: Partial<SceneObject>) => commitObjects(objects.map(object => object.id === selectedId ? { ...object, ...patch } : object));
   const updateVector = (key: "position" | "rotation" | "scale", axis: keyof Vec3, value: number) => {
     if (!Number.isFinite(value)) return;
@@ -144,7 +208,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     <div className="tool-view-heading">
       <div className="eyebrow">GENE STUDIO · SOURCE-LINKED SCENE DATA</div>
       <h2>Scene Studio</h2>
-      <p>Author named scene entries and their transforms in the real game-spec.json file. This is a data editor—not a 3D viewport gizmo yet. The live game changes only after its runtime consumes this scene schema.</p>
+      <p>Author and arrange scene entries in a lightweight interactive isometric viewport, then refine transforms in the inspector. The preview visualizes scene-manifest objects; the game itself updates only when its runtime consumes this schema.</p>
     </div>
     {specError ? <div className="forge-notice">{specError}</div> : <>
       <div className="scene-studio-toolbar">
@@ -157,6 +221,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
         </div>
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save scene changes.</p>}
+      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE CANVAS</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label="Interactive isometric scene viewport" onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend"><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></div></div>
       <div className="scene-studio-layout">
         <div className="scene-object-list">
           <div className="scene-list-heading">HIERARCHY</div>
@@ -185,7 +250,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       </div>
       <div className="scene-studio-bottom">
         <button className="secondary-button" onClick={wireRuntime} disabled={readOnly || !objects.length}>Ask GENE to wire scene into runtime ↗</button>
-        <p>Positions, rotations and scales are stored in game-spec.json. They affect the preview only once the game's renderer reads this schema.</p>
+        <p>Drag visible objects on the canvas or enter exact transforms in the inspector. Position, rotation, scale, color and visibility are stored in game-spec.json; runtime wiring is still required for those entries to appear in the playable game.</p>
       </div>
       {status && <div className="forge-notice">{status}</div>}
     </>}
