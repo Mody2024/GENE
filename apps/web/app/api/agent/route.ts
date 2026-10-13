@@ -195,7 +195,7 @@ function normalizeExecutableHtmlScripts(files: Array<{ path: string; content: st
   return files.map(file => file.path === "game.html" ? { ...file, content: html } : file.path === "game.js" ? { ...file, content: js } : file);
 }
 
-function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game") {
+function validateFiles(files: Array<{ path: string; content: string }>, operation: string, plannedEngine?: string, mode?: string, projectKind: "game" | "app" = "game", enforceAudioContract = true) {
   if (!Array.isArray(files)) throw new Error("AI returned no file list.");
   if (mode === "plan" && files.length > 0) throw new Error("Plan mode is read-only. The model returned source files and they were rejected.");
   if ((operation === "plan" || operation === "interview" || operation === "research") && files.length > 0) {
@@ -253,6 +253,28 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
     // Validate the complete assembled JavaScript project so valid modular controls are not rejected.
     const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
+    if (projectKind === "game" && enforceAudioContract) {
+      const audio = spec.audio;
+      const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];
+      const events = audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? Object.entries(audio.events) : [];
+      const hasPlaybackApi = /\bnew\s+(?:window\.)?(?:AudioContext|webkitAudioContext|Audio)\s*\(|document\.createElement\s*\(\s*["\x27]audio["\x27]\s*\)/i.test(runtimeSource);
+      const soundCalls = runtimeSource.match(/\b(?:playSfx|playSound|triggerSound|playAudio)\s*\(/g) || [];
+      const hasConnectedSoundEvents = soundCalls.length >= 2 && /\b(?:soundManager|audioManager|playSfx|playSound|triggerSound|playAudio)\b/i.test(runtimeSource);
+      const hasSoundOutput = /\.(?:start|play)\s*\(/i.test(runtimeSource);
+      const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic)\b/i.test(runtimeSource);
+      const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings)\b/i.test(runtimeSource + "\\n" + html);
+      if (audio?.enabled !== true ||
+          !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
+          !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
+          events.length < 3 ||
+          !hasPlaybackApi ||
+          !hasSoundOutput ||
+          !hasConnectedSoundEvents ||
+          !hasMusicPlayback ||
+          !hasAudioControls) {
+        throw new Error("Build rejected: game audio is missing or only decorative. Add game-spec.json audio metadata (enabled=true, implementation=procedural-web-audio or asset-backed, buses including master/music/sfx, and at least three mapped events), instantiate a real AudioContext or audio element, start/play an audio node or media element, provide a music playback path and adjustable audio controls, and connect playSfx/playSound-style event calls in the assembled JavaScript; wire sounds to actual gameplay/UI transitions. A mute button, silent hook, or metadata alone does not count. No files were saved.");
+      }
+    }
     if (/<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html)) throw new Error("Build rejected: put executable source in game.js, not inline script tags in game.html.");
     if (/<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html)) throw new Error("Build rejected: projects may not depend on external script or stylesheet CDNs.");
     if (/\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(js)) throw new Error("Build rejected: JavaScript contains an external runtime dependency.");
@@ -495,10 +517,18 @@ export async function POST(request: NextRequest) {
     return jsonError("Gemini is not configured. Add GEMINI_API_KEY to apps/web/.env.local (local development) or your deployment environment. GENE did not generate or change any project files.", 503, "GEMINI_NOT_CONFIGURED");
   }
 
+  const requestedThinking = body.thinking === "fast" ? "fast" : body.thinking === "deep" ? "deep" : "balanced";
+  const configuredModel = requestedThinking === "fast"
+    ? (process.env.GENE_FAST_MODEL || "gemini-3.8-flash")
+    : requestedThinking === "deep"
+      ? (process.env.GENE_THINKING_MODEL || process.env.GENE_BALANCED_MODEL || process.env.GENE_FAST_MODEL || "gemini-3.8-flash")
+      : (process.env.GENE_BALANCED_MODEL || process.env.GENE_FAST_MODEL || "gemini-3.8-flash");
+  // Explicit validated overrides remain supported; normal UI requests omit the model so
+  // the selected GENE mode is not accidentally forced to the health-check model.
   const model = typeof body.model === "string" && /^gemini-[a-zA-Z0-9.-]+$/.test(body.model)
     ? body.model
-    : (process.env.GENE_FAST_MODEL || "gemini-3.8-flash");
-  const thinkingLevel = body.thinking === "fast" ? "low" : body.thinking === "deep" ? "high" : "medium";
+    : configuredModel;
+  const thinkingLevel = requestedThinking === "fast" ? "low" : requestedThinking === "deep" ? "high" : "medium";
   const userInput = makeAgentInput({
     operation: body.operation,
     stagePath: typeof body.stagePath === "string" ? body.stagePath : undefined,
@@ -813,7 +843,8 @@ export async function POST(request: NextRequest) {
     }
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
     result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
-    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind);
+    const enforceAudioForThisResponse = !["edit", "chat", "buildPart", "interview", "plan", "research"].includes(body.operation);
+    const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind, enforceAudioForThisResponse);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
       if (!isSafeProjectPath(requestedPath)) {
@@ -841,7 +872,7 @@ export async function POST(request: NextRequest) {
         Object.entries(patched.files).map(([path, fileContent]) => ({ path, content: String(fileContent) })),
         titleCandidates
       );
-      validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind);
+      validateFiles(mergedFiles, "build", result.plan?.engine || body.project?.plan?.engine, "build", projectKind, false);
     }
     if (body.operation === "interview" && !result.question && !result.plan) {
       throw new Error("Interview result must ask exactly one next question or return a completed plan.");

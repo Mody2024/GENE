@@ -21,6 +21,8 @@ const page = read("apps/web/app/page.tsx");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const forge = read("apps/web/app/api/forge/route.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
+const runtimeScene = read("apps/web/app/lib/runtime-scene.ts");
+const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
@@ -59,7 +61,16 @@ assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
-assert.ok(prompts.includes("GENE 1.5 FLASH") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.5 supports detailed extended plans and a read-only prompt enhancement operation");
+assert.ok(prompts.includes("GENE 1.6") && prompts.includes("GENE 1.6 MODE CONTRACT") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE 1.6 supports mode-specific orchestration, detailed plans, and read-only prompt enhancement");
+assert.ok(api.includes("GENE_THINKING_MODEL") && api.includes("GENE_BALANCED_MODEL") && api.includes("requestedThinking"), "Flash, Balanced, and Thinking route through mode-specific configured Gemini models");
+assert.ok(page.includes("thinking: nextProject.thinking") && !page.includes("model: aiModel,\n        thinking: nextProject.thinking"), "normal agent requests allow server-side model routing for the selected GENE mode");
+assert.ok(page.includes("GENE 1.6 Flash") && page.includes("GENE 1.6 Balanced") && page.includes("GENE 1.6 Thinking"), "workspace exposes the three named GENE 1.6 modes");
+assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation)'), "planning and conversational operations use bounded project context");
+assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
+assert.ok(prompts.includes("const compactPlan = p?.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
+assert.ok(page.includes("pinned-plan-strip") && page.includes("PINNED PROJECT PLAN"), "the active project plan stays visible above the scrolling chat");
+assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("GENE 1.6 BUILD SYSTEM"), "workspace branding identifies the current GENE 1.6 release line");
+assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("✦ Enhance prompt"), "workspace exposes extended planning and prompt enhancement controls");
 assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Select to edit"), "live preview supports selecting an element to prepare a targeted edit");
 assert.ok(page.includes("files in the current manifest") && page.includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
@@ -124,6 +135,8 @@ assert.ok(gameGuides.includes("Pause freezes both players"), "local multiplayer 
 assert.ok(prompts.includes("WASD+F for P1"), "multiplayer prompt defines distinct default keyboard layouts");
 assert.ok(prompts.includes("custom controls") || prompts.includes("remappable keyboard actions"), "game builder contract requires customizable controls");
 assert.ok(read("apps/web/app/lib/starter-game.ts").includes("navigator.getGamepads"), "playable starter exercises browser gamepad support");
+assert.ok(starterGameSource.includes("function initAudio()") && starterGameSource.includes("playSfx(") && starterGameSource.includes("function startMusic()") && starterGameSource.includes("patterns={ui:"), "built-in playable game includes procedural music and event-driven sound effects");
+assert.ok(starterGameSource.includes('"audio":{"enabled":true,"implementation":"procedural-web-audio"') && starterGameSource.includes('id=\\\"audio-button\\\"') && starterGameSource.includes("gene-outpost-muted"), "starter game exposes a mute control, persists mute preference, and declares its audio manifest");
 assert.ok(prompts.includes('input.operation === "research"'), "research uses its own agent instruction");
 assert.ok(page.includes('localStorage.setItem(STORAGE_KEY'), "projects persist in browser storage");
 assert.ok(page.includes('title="GENE live game preview"'), "preview runs in a sandboxed iframe");
@@ -131,6 +144,13 @@ assert.ok(page.includes("buildRuntimeAssetBootstrap(project.files)"), "live game
 assert.ok(playPage.includes("buildRuntimeAssetBootstrap(project?.files)"), "fullscreen play route exposes generated model assets");
 assert.ok(runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("window.__GENE_ASSETS__"), "asset runtime bridge has a size cap and explicit namespace");
 assert.ok(runtimeAssets.includes("window.GENE3D.parseOBJ") && runtimeAssets.includes("window.GENE3D.parseMTL"), "asset runtime bridge provides real OBJ geometry and MTL material parsers");
+assert.ok(runtimeScene.includes("window.GENE_SCENE") && runtimeScene.includes("getVisibleObjects") && runtimeScene.includes("getTransform"), "runtime scene bridge exposes validated object transforms and visibility");
+assert.ok(runtimeScene.includes("roughness") && runtimeScene.includes("metalness") && runtimeScene.includes("intensity") && runtimeScene.includes("fov"), "runtime scene bridge preserves material, light and camera settings");
+assert.ok(runtimeScene.includes("window.GENE_SCENE.draw2D") && runtimeScene.includes("getVisibleObjects"), "runtime scene bridge can draw visible authored objects into a Canvas 2D renderer");
+assert.ok(prompts.includes("SCENE STUDIO RUNTIME CONTRACT") && prompts.includes("convert each visible object into real GPU geometry"), "generation prompts require renderers to consume authored scene transforms");
+assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
+assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
+assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files))") && page.includes("buildRuntimeSceneBootstrap(version.files))"), "standalone and ZIP exports include the scene manifest");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
 assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
@@ -321,7 +341,7 @@ assert.ok(api.indexOf('finishReason === "MAX_TOKENS"') < api.indexOf("if (candid
 assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144'), "single-file generation uses an adaptive larger output budget to reduce truncation");
 assert.ok(forge.includes("beveledBox") && forge.includes("cornerIndices.values()") && forge.includes('"wedge"') && forge.includes('"torus"'), "Forge builds actual chamfered hard-surface, sloped and ring meshes");
 assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includes("up to four local player slots"), "game guides require professional 3D forms and scalable local multiplayer");
-assert.ok(page.includes("GENE 1.3 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.3 exposes build progress and adapts retries after cutoff");
+assert.ok(page.includes("GENE 1.6 FLASH") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.6 exposes build progress and adapts retries after cutoff");
 assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
 
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
@@ -369,6 +389,40 @@ assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includ
 
 // GENE 1.4 executable utility tests (not only source-string assertions).
 const tsCompiler = await import("typescript");
+const promptSyntax = tsCompiler.transpileModule(prompts, { compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }, reportDiagnostics: true });
+assert.equal((promptSyntax.diagnostics || []).filter(item => item.category === tsCompiler.DiagnosticCategory.Error).length, 0, "production prompt source must remain syntactically valid TypeScript");
+const starterGameJs = tsCompiler.transpileModule(starterGameSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const starterGameModule = await import("data:text/javascript;base64," + Buffer.from(starterGameJs).toString("base64"));
+const starterFiles = starterGameModule.playableDemoFiles();
+assert.doesNotThrow(() => new Function(starterFiles["game.js"]), "built-in starter runtime with audio must parse as valid JavaScript");
+assert.equal(JSON.parse(starterFiles["game-spec.json"]).audio.implementation, "procedural-web-audio", "built-in starter project metadata declares its real procedural audio implementation");
+assert.ok(starterFiles["game.html"].includes('id="audio-settings"') && starterFiles["game.html"].includes('id="master-volume"') && starterFiles["game.html"].includes('id="music-volume"') && starterFiles["game.html"].includes('id="sfx-volume"'), "starter game provides actual master/music/SFX settings sliders");
+assert.ok(starterFiles["game.js"].includes("function setAudioLevel") && starterFiles["game.js"].includes("gene-outpost-audio-levels") && starterFiles["game.js"].includes("ui.settings.addEventListener"), "starter game applies and persists audio mixer settings at runtime");
+// Executable scene-runtime contract: saved transforms, visibility and Canvas drawing survive the standalone bootstrap.
+const sceneRuntimeJs = tsCompiler.transpileModule(runtimeScene, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const sceneRuntimeModule = await import("data:text/javascript;base64," + Buffer.from(sceneRuntimeJs).toString("base64"));
+const sceneSpec = { scene: { objects: [
+  { id: "crate", name: "Crate", type: "box", position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 }, color: "#123456", visible: true, material: { roughness: 0.2, metalness: 0.8 }, light: { intensity: 2 }, camera: { fov: 75 } },
+  { id: "hidden", name: "Hidden", type: "sphere", visible: false }
+] } };
+const sceneBootstrap = sceneRuntimeModule.buildRuntimeSceneBootstrap({ "game-spec.json": JSON.stringify(sceneSpec) });
+const sceneVm = await import("node:vm");
+const sceneWindow = {};
+sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace("</script>", ""), { window: sceneWindow });
+assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getTransform("crate"))), { position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 } }, "runtime scene bootstrap round-trips saved transforms");
+assert.equal(sceneWindow.GENE_SCENE.getVisibleObjects().length, 1, "runtime scene bootstrap preserves hidden object state");
+assert.equal(sceneWindow.GENE_SCENE.getObject("crate").material.metalness, 0.8, "runtime scene bootstrap preserves material properties");
+const drawCalls = [];
+const mockCtx = { canvas: { width: 800, height: 600 }, save(){}, restore(){}, translate(){}, rotate(){}, scale(){}, beginPath(){}, arc(){}, stroke(){drawCalls.push("stroke")}, moveTo(){}, lineTo(){}, closePath(){}, fill(){drawCalls.push("fill")}, fillRect(){drawCalls.push("rect")}, strokeRect(){drawCalls.push("strokeRect")}, ellipse(){}, set fillStyle(v){}, set strokeStyle(v){}, set lineWidth(v){}, set globalAlpha(v){} };
+assert.equal(sceneWindow.GENE_SCENE.draw2D(mockCtx, { unit: 20 }), 1, "runtime scene renderer draws visible objects only");
+assert.ok(drawCalls.length > 0, "runtime scene draw call produces actual Canvas drawing operations");
+const invalidSceneBootstrap = sceneRuntimeModule.buildRuntimeSceneBootstrap({ "game-spec.json": "{invalid" });
+assert.ok(invalidSceneBootstrap.includes("Invalid game-spec.json scene manifest"), "invalid scene manifests fail safely instead of crashing game startup");
+
 const patchSource = read("apps/web/app/lib/patch-engine.ts");
 const patchJs = tsCompiler.transpileModule(patchSource, {
   compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
@@ -454,6 +508,13 @@ assert.ok(page.includes("Describe what to update, fix, or add to this project"),
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes(">Plan an update</button>") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
+assert.ok(api.includes("Build rejected: game audio is missing or only decorative") && api.includes("enforceAudioContract"), "fresh game builds and assembled-build validation reject missing or decorative audio without blocking unrelated targeted edits");
+assert.ok(api.includes('!["edit", "chat", "buildPart", "interview", "plan", "research"].includes(body.operation)') && api.includes("enforceAudioForThisResponse"), "strict audio validation applies to complete new builds without blocking staged generation or targeted edits");
+assert.ok(api.includes('audio?.enabled !== true') && api.includes('"procedural-web-audio", "asset-backed"') && api.includes('["master", "music", "sfx"]'), "game build validation requires truthful audio metadata, mixer buses and real playback");
+assert.ok(api.includes("hasPlaybackApi") && api.includes("hasConnectedSoundEvents") && api.includes("events.length < 3"), "audio validation checks playback code and mapped events rather than trusting metadata alone");
+assert.ok(api.includes("const soundCalls = runtimeSource.match") && api.includes("soundCalls.length >= 2") && api.includes("hasSoundOutput") && api.includes("hasPlaybackApi = /"), "audio gate requires an instantiated playback API and output call rather than bare AudioContext words");
+assert.ok(api.includes("hasMusicPlayback") && api.includes("hasAudioControls") && api.includes("adjustable audio controls"), "audio validation requires a music path and adjustable controls, not effects alone");
+
 assert.ok(page.includes("FULL GAME EXPANSION PASS — NOT A PROTOTYPE POLISH PASS") && page.includes("Final content pass completed") === false, "build pipeline requests a distinct full-game expansion pass rather than treating the prototype as the finished game");
 assert.ok(page.includes("final-content-pass") && page.includes("Expand the prototype into the full game"), "build task ledger includes a separate full-game expansion stage");
 
@@ -484,6 +545,14 @@ assert.ok(api.includes("const original = String(body.message || body.project?.in
 assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
 
 assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
+assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
+assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("implementation=procedural-web-audio or asset-backed") && prompts.includes("buses master/music/sfx/ambience/ui") && prompts.includes("uiConfirm/playSfx") && prompts.includes("outcome/playSfx"), "audio metadata prompt describes the implementation, buses and named events without fragile quote escaping");
+assert.ok(prompts.includes("AudioContext") && prompts.includes("setMusicVolume") && prompts.includes("setSfxVolume") && prompts.includes("playSfx(eventName, options)"), "game prompts require an integrated audio manager with real music, SFX and volume controls");
+assert.ok(prompts.includes("read and honor its enabled flag, bus names, volume defaults, and event map") && prompts.includes("preserve user-edited audio settings across regeneration"), "generated games must consume and preserve settings authored in Audio Studio");
+assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("Audio is part of the definition of done"), "audio is an explicit deliverable with source-aligned project metadata");
+assert.ok(prompts.includes("GAME IDENTITY AND CONTENT QUALITY") && prompts.includes("distinctive signature mechanic") && prompts.includes("three meaningfully different challenge/encounter beats"), "new games must have a distinctive mechanic, purposeful content variety and art-directed composition");
+assert.ok(prompts.includes("stop or replace music loops instead of stacking them") && prompts.includes("Pause must silence or pause music"), "generated audio must clean up correctly on pause, restart and repeated scene transitions");
+
 assert.ok(api.includes("spec promises keyboard controls") && api.includes("spec promises touch/pointer controls") && api.includes("spec promises controller support"), "validation checks declared keyboard, touch, and gamepad controls instead of only checking for any event handler");
 assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.js$/i.test(path)") && api.includes("test(runtimeSource)"), "control validation scans all assembled JavaScript modules, not only game.js");
 assert.ok(api.includes("spec.controls = inferred") && api.includes("normalizedSpecChanged") && api.includes("validationFiles"), "final validation deterministically repairs and returns a missing game controls contract");
@@ -507,3 +576,133 @@ assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline
 
 assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
+assert.ok(page.includes("Integrate into game") && page.includes("Load it into the actual playable scene") && page.includes("visibly present in the preview"), "saved Forge meshes have a source-linked scene-integration workflow that requests visible runtime proof");
+
+
+const studioContract = read("apps/web/app/lib/studio-contract.ts");
+const capabilitiesApi = read("apps/web/app/api/capabilities/route.ts");
+assert.ok(studioContract.includes("getStudioCapabilities") && studioContract.includes("buildStudioContract"), "GENE exposes a reusable studio capability registry and production contract");
+assert.ok(studioContract.includes("pipeline-dependent") && studioContract.includes("not equivalent to a native game") && studioContract.includes("online multiplayer"), "capability registry honestly distinguishes conditional native builds and real networking");
+assert.ok(studioContract.includes("event-driven audio layer") && studioContract.includes("autoplay restrictions") && studioContract.includes("independently adjustable buses"), "game production contract requires robust event-driven audio with browser-safe startup and separate buses");
+assert.ok(studioContract.includes("SOUND HONESTY") && studioContract.includes("positional 3D audio") && studioContract.includes("never let audio errors stop gameplay"), "audio capability guidance distinguishes real spatial audio and non-blocking fallbacks");
+assert.ok(studioContract.includes("3D ASSET ACCEPTANCE") && studioContract.includes("triangle/material budgets"), "3D asset guidance requires coherent silhouettes, reusable assets and performance budgets");
+assert.ok(studioContract.includes('"audio-mixer"') && studioContract.includes('"asset-integration"'), "capability API reports audio mixer and scene asset integration as explicit partial capabilities");
+assert.ok(studioContract.includes("polished, coherent vertical slice") && studioContract.includes("art direction") && studioContract.includes("weak hardware"), "studio contract prioritizes coherent game quality and target performance over asset count");
+assert.ok(prompts.includes('import { buildStudioContract } from "./studio-contract";') && prompts.includes("buildStudioContract(projectKind"), "all AI operations receive the capability-aware production contract");
+assert.ok(capabilitiesApi.includes("getStudioCapabilities") && capabilitiesApi.includes("INVALID_PROJECT_KIND") && capabilitiesApi.includes("INVALID_ENGINE"), "capability API validates requested project kind and engine before returning support information");
+
+
+const projectMemorySource = read("apps/web/app/lib/project-memory.ts");
+assert.ok(prompts.includes('import { formatCanonicalProjectMemory } from "./project-memory";') && prompts.includes("CANONICAL PROJECT MEMORY"), "AI prompt context includes structured project memory separately from chat");
+assert.ok(projectMemorySource.includes("confirmedDecisions") && projectMemorySource.includes("latestCheckpoint") && projectMemorySource.includes("unfinishedTasks"), "project memory tracks decisions, checkpoint evidence, and unfinished work");
+const memoryJs = tsCompiler.transpileModule(projectMemorySource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const projectMemory = await import("data:text/javascript;base64," + Buffer.from(memoryJs).toString("base64"));
+const memorySnapshot = projectMemory.buildCanonicalProjectMemory({
+  id: "memory-test", name: "Test project", kind: "game", initialPrompt: "A small survival game",
+  mode: "build", thinking: "deep", messages: [], answers: { engine: "WebGL 3D", playerCount: "Single player" },
+  plan: { title: "Survival", summary: "Survive rounds", engine: "webgl3d", tasks: ["movement", "enemies"], mechanics: ["combat"], performanceBudget: { targetFps: 60, maxEnemies: 12, maxObjects: 800, maxParticles: 80 } },
+  files: { "game.js": "start();", "game-spec.json": "{}" }, versions: [{ number: 3, label: "Known good", files: {}, createdAt: "2026-01-01", testSummary: "pass" }],
+  activeFile: "game.js", references: [], updatedAt: "2026-01-01",
+  buildRun: { ...checkpointRun, status: "recovering", lastError: "Temporary generation error" }
+});
+assert.equal(memorySnapshot.confirmedDecisions.length, 2, "canonical project memory preserves user-confirmed answers");
+assert.equal(memorySnapshot.currentPlan.engine, "webgl3d", "canonical project memory preserves the selected engine");
+assert.equal(memorySnapshot.source.fileCount, 2, "canonical project memory tracks the current source manifest");
+assert.ok(memorySnapshot.source.revisionHash && memorySnapshot.source.fileHashes["game.js"], "canonical memory fingerprints the current source revision and individual files");
+assert.equal(projectMemory.fingerprintProjectFiles({ "b.js": "b", "a.js": "a" }).revisionHash, projectMemory.fingerprintProjectFiles({ "a.js": "a", "b.js": "b" }).revisionHash, "source revision fingerprint is stable regardless of object key order");
+assert.notEqual(projectMemory.fingerprintProjectFiles({ "game.js": "before" }).revisionHash, projectMemory.fingerprintProjectFiles({ "game.js": "after" }).revisionHash, "source revision fingerprint changes when source changes");
+const nonOverlappingMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base-game", "game.css": "base-css" },
+  { "game.js": "base-game", "game.css": "user-css" },
+  { "game.js": "ai-game", "game.css": "base-css" },
+  ["game.js"]
+);
+assert.deepEqual(nonOverlappingMerge.conflicts, [], "AI changes to a file do not conflict with a concurrent edit to a different file");
+assert.equal(nonOverlappingMerge.files["game.js"], "ai-game", "non-overlapping AI changes are applied");
+assert.equal(nonOverlappingMerge.files["game.css"], "user-css", "non-overlapping user edits are preserved");
+const overlappingMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base" }, { "game.js": "user-edit" }, { "game.js": "ai-edit" }, ["game.js"]
+);
+assert.deepEqual(overlappingMerge.conflicts, ["game.js"], "concurrent edits to the same file are detected");
+assert.equal(overlappingMerge.files["game.js"], "user-edit", "conflicting merge leaves the newer user source untouched");
+const identicalMerge = projectMemory.mergeConcurrentSourceChanges(
+  { "game.js": "base" }, { "game.js": "same" }, { "game.js": "same" }, ["game.js"]
+);
+assert.deepEqual(identicalMerge.conflicts, [], "identical concurrent results do not create a false conflict");
+
+const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
+const webglSceneViewport = read("apps/web/app/components/WebGLSceneViewport.tsx");
+const audioStudio = read("apps/web/app/components/AudioStudio.tsx");
+assert.ok(sceneStudio.includes("legend>Material") && sceneStudio.includes("legend>Light") && sceneStudio.includes("legend>Camera"), "Scene Studio exposes material, light and camera inspectors");
+assert.ok(sceneStudio.includes('import WebGLSceneViewport from "./WebGLSceneViewport"') && sceneStudio.includes('useState<"webgl" | "isometric">("webgl")'), "Scene Studio defaults to the integrated WebGL viewport and retains the isometric editor");
+assert.ok(webglSceneViewport.includes('getContext("webgl"') && webglSceneViewport.includes("requestAnimationFrame(render)") && webglSceneViewport.includes("camera.current.yaw") && webglSceneViewport.includes("camera.current.distance"), "WebGL scene viewport renders real GPU geometry with orbit and zoom controls");
+assert.ok(webglSceneViewport.includes("gl!.drawArrays(gl!.TRIANGLES,0,36)") && webglSceneViewport.includes("onSelect(chosen.id)"), "WebGL viewport draws scene objects and supports object selection");
+assert.ok(sceneStudio.includes('aria-label={"Move " + selected.name + " negative " + axis}') && sceneStudio.includes("Rotate Y +15°") && sceneStudio.includes("Scale +10%"), "Scene Studio provides selected-object axis nudges, rotation and scale controls");
+assert.ok(page.includes('import AudioStudio from "./components/AudioStudio"') && page.includes('id: "audio" as const') && page.includes('section === "audio"'), "Audio Studio is integrated into workspace navigation");
+assert.ok(audioStudio.includes("window.AudioContext") && audioStudio.includes("createOscillator()") && audioStudio.includes("oscillator.start(at)") && audioStudio.includes("oscillator.stop(at + duration"), "Audio Studio uses real Web Audio oscillators with envelopes and explicit node lifetimes");
+assert.ok(audioStudio.includes("const EVENT_MAP") && audioStudio.includes('implementation,\n        buses: ["master", "music", "sfx", "ambience", "ui"]') && audioStudio.includes('events: EVENT_MAP'), "Audio Studio persists an explicit audio implementation, mixer bus, volume and event manifest");
+assert.ok(audioStudio.includes("This does not by itself add an audio engine to game.js") && audioStudio.includes("Preview muted because"), "Audio Studio accurately distinguishes editor test audio from game runtime audio and respects mute settings");
+
+assert.ok(page.includes('import SceneStudio from "./components/SceneStudio"') && page.includes('id: "scene" as const') && page.includes('section === "scene"'), "Scene Studio is integrated into workspace navigation");
+assert.ok(sceneStudio.includes('files["game-spec.json"]') && sceneStudio.includes('position: object.position') && sceneStudio.includes('rotation: object.rotation') && sceneStudio.includes('scale: object.scale'), "Scene Studio edits actual game-spec.json source data and persists object transforms");
+assert.ok(sceneStudio.includes("onSave(nextFiles") && sceneStudio.includes("onWireRuntime") && sceneStudio.includes("lightweight interactive isometric viewport") && sceneStudio.includes("runtime consumes this schema"), "Scene Studio saves versioned source and accurately distinguishes its interactive authoring viewport from the playable game renderer");
+assert.ok(sceneStudio.includes("const undo =") && sceneStudio.includes("const redo =") && sceneStudio.includes(".slice(-40)") && sceneStudio.includes("onClick={undo}") && sceneStudio.includes("onClick={redo}"), "Scene Studio provides bounded undo/redo for object-manifest edits");
+assert.ok(sceneStudio.includes("Interactive isometric scene viewport") && sceneStudio.includes("onPointerDown={onViewportPointerDown}") && sceneStudio.includes("onPointerMove={onViewportPointerMove}") && sceneStudio.includes("setPointerCapture"), "Scene Studio renders a canvas viewport with pointer-driven scene selection and drag transforms");
+assert.ok(sceneStudio.includes("ctx.rotate(((o.rotation.y || 0) + (o.rotation.z || 0))") && sceneStudio.includes('type.includes("plane")'), "Scene Studio viewport visualizes editable object rotation and plane types");
+assert.ok(browserSmoke.includes("dragging a scene object changes its real position transform") && browserSmoke.includes("sceneCanvas.boundingBox()"), "Playwright verifies scene object dragging changes the transform inspector");
+const sceneCommitHandler = sceneStudio.split("const commitObjects = (next: SceneObject[])")[1]?.split("const undo =")[0] || "";
+assert.ok(sceneCommitHandler.includes("setObjects(next)") && !sceneCommitHandler.includes("commitObjects(next)"), "Scene Studio edit commits update React state instead of recursively calling the history helper");
+assert.ok(page.includes("saveStudioFiles") && page.includes("Studio manifest saved") && page.includes("writeProjectToDisk(updatedProject"), "Scene and audio manifests save as recoverable project versions and can sync to the local agent");
+assert.ok(css.includes("GENE 1.7 Scene Studio") && css.includes(".scene-studio-layout") && css.includes("@media (max-width:720px)"), "Scene Studio has responsive hierarchy and transform inspector styles");
+assert.ok(browserSmoke.includes('button[title="Scene Studio"]') && browserSmoke.includes("Browser-tested scene prop") && browserSmoke.includes("savedSceneSpec.includes"), "Playwright browser test exercises actual Scene Studio object editing and game-spec persistence");
+assert.ok(browserSmoke.includes("Scene Studio undo removes the unsaved object entry") && browserSmoke.includes("Scene Studio redo restores the object entry"), "Playwright browser test exercises Scene Studio undo and redo controls");
+assert.ok(browserSmoke.includes('button[title="Audio Studio"]') && browserSmoke.includes("UI confirmation sound previewed.") && browserSmoke.includes("savedAudioSpec.includes"), "Playwright browser test exercises Audio Studio playback and audio manifest persistence");
+
+assert.ok(page.includes("mergeConcurrentSourceChanges") && page.includes("discarded this stale result") && page.includes("if (!current || current.id !== updated.id) return current;"), "workspace rejects stale overlapping AI results without switching active projects");
+assert.ok(page.includes("if (!current || current.id !== failed.id) return current;"), "failed late responses cannot switch the workspace back to an inactive project");
+
+
+assert.equal(memorySnapshot.build.lastError, "Temporary generation error", "canonical project memory retains the latest recoverable error");
+assert.ok(projectMemory.formatCanonicalProjectMemory({ id: "minimal", name: "Minimal", initialPrompt: "x", mode: "plan", thinking: "balanced", messages: [], answers: {}, files: {}, versions: [], activeFile: "", references: [], updatedAt: "2026-01-01" }).includes('"schemaVersion":1'), "canonical memory has an explicit schema version");
+let boundedHistoryRun = baseRun;
+for (let index = 0; index < 12; index++) {
+  boundedHistoryRun = coordinator.checkpointBuild(boundedHistoryRun, { "game.js": "snapshot-" + index }, { passed: [], failed: [] }, "task-complete", "bounded history test", "2026-01-01T00:00:" + String(index).padStart(2, "0") + ".000Z");
+}
+assert.equal(boundedHistoryRun.checkpoints.length, 8, "checkpoint history is bounded to eight full source snapshots");
+assert.equal(boundedHistoryRun.checkpoints[0].lastKnownGoodFiles["game.js"], "snapshot-4", "bounded history retains the eight newest recovery snapshots");
+let sizeBudgetRun = coordinator.checkpointBuild(baseRun, { "game.js": "a".repeat(800_000) }, { passed: [], failed: [] }, "task-complete", "large snapshot A");
+sizeBudgetRun = coordinator.checkpointBuild(sizeBudgetRun, { "game.js": "b".repeat(800_000) }, { passed: [], failed: [] }, "task-complete", "large snapshot B");
+assert.equal(sizeBudgetRun.checkpoints.length, 1, "checkpoint storage budget prunes older snapshots before browser storage grows without bound");
+assert.equal(sizeBudgetRun.checkpoints[0].lastKnownGoodFiles["game.js"].charAt(0), "b", "checkpoint budget always preserves the newest recovery snapshot");
+
+
+const projectStorageSource = read("apps/web/app/lib/project-storage.ts");
+assert.ok(page.includes("buildProjectStorageCandidates(merged)") && page.includes("GENE could not save this change to browser storage"), "workspace retries storage with smaller snapshots and warns if every attempt fails");
+assert.ok(page.includes("persistenceWarning &&") && page.includes("aria-live=\"polite\""), "storage quota recovery is visible and accessible");
+const projectStorageJs = tsCompiler.transpileModule(projectStorageSource, {
+  compilerOptions: { module: tsCompiler.ModuleKind.ESNext, target: tsCompiler.ScriptTarget.ES2022 }
+}).outputText;
+const projectStorage = await import("data:text/javascript;base64," + Buffer.from(projectStorageJs).toString("base64"));
+const storageFixture = {
+  id: "storage-test", name: "Storage test", kind: "game", initialPrompt: "Keep source safe", mode: "build", thinking: "balanced",
+  messages: Array.from({ length: 100 }, (_, index) => ({ id: String(index), role: "assistant", content: "history " + index, createdAt: "2026-01-01" })),
+  answers: {}, plan: null, files: { "game.js": "keep-current-source" },
+  versions: Array.from({ length: 5 }, (_, index) => ({ number: 5 - index, label: "v" + index, files: { "game.js": "version-" + index }, createdAt: "2026-01-01", testSummary: "test" })),
+  activeFile: "game.js",
+  references: [{ id: "image-ref", name: "reference.png", mimeType: "image/png", kind: "image", dataBase64: "VERY-LARGE-IMAGE-PAYLOAD", size: 1000000 }],
+  updatedAt: "2026-01-01",
+  buildRun: { ...checkpointRun, checkpoints: Array.from({ length: 4 }, (_, index) => ({ ...checkpointRun.checkpoints[0], id: "cp-" + index, lastKnownGoodFiles: { "game.js": "checkpoint-" + index } })) }
+};
+const storageCandidates = projectStorage.buildProjectStorageCandidates([storageFixture, { ...storageFixture, id: "older-project" }]);
+assert.equal(storageCandidates.length, 4, "storage persistence has progressively smaller fallback snapshots");
+assert.equal(storageCandidates[0].projects.length, 2, "first storage attempt preserves all supplied projects");
+assert.equal(storageCandidates[1].projects.length, 2, "history trimming does not immediately discard project records");
+assert.equal(storageCandidates[1].projects[0].versions.length, 2, "history fallback limits saved source versions");
+assert.equal(storageCandidates[1].projects[1].buildRun.checkpoints.length, 0, "inactive projects drop duplicated checkpoint snapshots first");
+assert.equal(storageCandidates[2].projects.length, 1, "next fallback preserves the active project and drops older project records");
+assert.equal(storageCandidates[2].projects[0].files["game.js"], "keep-current-source", "storage fallback always preserves active source files");
+assert.equal(storageCandidates[2].projects[0].references[0].dataBase64, undefined, "storage fallback removes large image payloads while retaining reference metadata");
+assert.equal(storageCandidates[3].projects[0].versions.length, 0, "last fallback drops duplicate version snapshots before current source");
+assert.equal(storageCandidates[3].projects[0].buildRun.checkpoints.length, 0, "last fallback removes checkpoint snapshots only after smaller options fail");
