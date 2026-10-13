@@ -423,7 +423,7 @@ export default function Home() {
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
     const prompt = text.trim();
-    const isReadOnlyConversation = interactionMode === "chat" || (!operationOverride && isConversationOnly(prompt));
+    const isReadOnlyConversation = !operationOverride && (interactionMode === "chat" || isConversationOnly(prompt));
     const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation;
     const queueRequest = () => {
       pendingBuildRequests.current.push(prompt);
