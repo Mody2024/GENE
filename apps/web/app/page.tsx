@@ -299,6 +299,10 @@ export default function Home() {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
+          // A confirmed successful render ends the previous recovery streak.
+          // A future independent crash must receive its own repair attempts.
+          autoRepairAttempts.current = 0;
+          runtimeRefreshAttempts.current = 0;
           setProject(current => current ? {
             ...current,
             buildRun: current.buildRun ? { ...current.buildRun, prototype: current.buildRun.prototype ? { ...current.buildRun.prototype, ready: true } : current.buildRun.prototype, updatedAt: now() } : current.buildRun,
@@ -1034,6 +1038,8 @@ export default function Home() {
         };
       });
       if (changedPaths.length) {
+        // Successful source repair/change starts a fresh runtime verification cycle.
+        autoRepairAttempts.current = 0;
         runtimeRefreshAttempts.current = 0;
         addActivity("Files updated: " + changedPaths.join(", "));
         setSection("chat");
