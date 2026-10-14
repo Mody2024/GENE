@@ -960,15 +960,18 @@ export default function Home() {
         versions = [version, ...versions].slice(0, 8);
         addActivity("Saved version " + String(version.number).padStart(3, "0") + " with " + changedPaths.length + " changed files");
       }
-      if (result.plan) addActivity("Plan updated: " + result.plan.tasks.length + " task(s)");
-      const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : result.plan ? "plan" : result.question ? "question" : undefined);
+      const acceptedPlan = operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise"
+        ? result.plan || nextProject.plan || null
+        : nextProject.plan || null;
+      if ((operation === "plan" || operation === "interview") && result.plan) addActivity("Plan updated: " + result.plan.tasks.length + " task(s)");
+      const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : (operation === "plan" || operation === "interview") && result.plan ? "plan" : result.question ? "question" : undefined);
       const updated: GeneProject = {
         ...nextProject,
         name: (nextProject.name === "Untitled game" || nextProject.name === "Untitled app") ? (result.plan?.title || (isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name)) : nextProject.name,
         mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
         answers: nextAnswers,
         question: operation === "research" || operation === "chat" ? nextProject.question : (result.question || null),
-        plan: result.plan || nextProject.plan,
+        plan: acceptedPlan,
         files,
         versions,
         buildRun: activeBuildRun || nextProject.buildRun || null,
@@ -2130,13 +2133,7 @@ export default function Home() {
                   <button className="text-action" onClick={() => { if(project) void runAgent("Use your recommended smart default for this decision."); }}>Use smart default</button>
                   <button className="text-action" onClick={startBuild}>Skip questions and build</button>
                 </div>}
-                {project.plan && <div className="plan-card">
-                  <div className="plan-card-head"><span className="plan-icon">✓</span><div><div className="eyebrow">IMPLEMENTATION PLAN</div><h3>{project.plan.title}</h3></div></div>
-                  <p>{project.plan.summary}</p>
-                  <div className="plan-metrics"><span>{project.plan.tasks.length} tasks</span><span>{project.plan.mechanics.length} mechanics</span><span>{project.plan.engine === "canvas2d" ? "Canvas 2D" : "WebGL 3D"}</span><span>{project.plan.performanceBudget.targetFps} FPS target</span></div>
-                  <ol>{project.plan.tasks.slice(0, 7).map((task, i) => <li key={task}><span>{String(i + 1).padStart(2, "0")}</span>{task}</li>)}</ol>
-                  <button className="primary-button plan-build-button" onClick={startBuild} disabled={busy || buildInProgress}>{buildInProgress ? "Build in progress…" : busy ? "Working…" : "Build this plan"} <span>→</span></button>
-                </div>}
+                {/* The plan lives in the pinned workspace header and Tasks view, never as a moving chat message. */}
                 {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
                 {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
                   <div className="real-progress-heading"><span>BUILD RECORD</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} tasks verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
