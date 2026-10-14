@@ -1025,7 +1025,7 @@ export default function Home() {
           question: current.question === nextProject.question ? updated.question : current.question,
           files: sourceMerge.files,
           versions,
-          plan: result.plan ? updated.plan : current.plan,
+          plan: (operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise") && result.plan ? updated.plan : current.plan,
           buildRun: activeBuildRun || current.buildRun || updated.buildRun,
           livingPreview: changedPaths.length ? updated.livingPreview : current.livingPreview,
           activeFile: current.activeFile === nextProject.activeFile && changedPaths.includes(nextProject.activeFile) ? changedPaths[0] : current.activeFile,
