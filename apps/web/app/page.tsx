@@ -50,8 +50,8 @@ function explainAgentError(error: unknown, code?: unknown): string {
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
   if (/OPENROUTER_FALLBACK_FAILED/i.test(raw)) {
-    const detailMatch = raw.match(/(?:Detail|Provider detail):\\s*([\\s\\S]+)/i);
-    const detail = (detailMatch?.[1] || "").replace(/\\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})\\b/g, "[redacted]").slice(0, 280);
+    const detailMatch = raw.match(/(?:Detail|Provider detail):\s*([\s\S]+)/i);
+    const detail = (detailMatch?.[1] || "").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})\b/g, "[redacted]").slice(0, 280);
     return "GENE tried Gemini and its OpenRouter fallback, but neither completed this request. Check provider key validity, free-model availability, and quota; project files were preserved." + (detail ? " Provider detail: " + detail : "");
   }
   if (/GEMINI_CAPACITY_BUSY|overloaded|high demand|temporarily unavailable/i.test(raw)) return "The AI service is temporarily busy. GENE tried its configured fallback path but did not get a successful response. Retry shortly; your existing project files were preserved.";
