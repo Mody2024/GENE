@@ -26,7 +26,16 @@ const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
+const planContract = await import("../apps/web/app/lib/plan-contract.mjs");
 const browserSmoke = read("tests/browser-smoke.mjs");
+
+const repairedAppTasks = planContract.ensurePlanTasks(["Build the dashboard", "", "Build the dashboard"], "app");
+assert.equal(repairedAppTasks.length, 3, "sparse model plans are repaired to three distinct tasks");
+assert.equal(repairedAppTasks[0], "Build the dashboard", "plan repair preserves valid model output");
+assert.equal(new Set(repairedAppTasks.map(task => task.toLowerCase())).size, 3, "plan repair removes duplicate task names");
+assert.equal(planContract.ensurePlanTasks([], "game").length, 3, "empty game plans receive actionable defaults");
+assert.equal(planContract.ensurePlanMechanics([], "app").length, 1, "missing app feature metadata gets a safe fallback");
+assert.ok(api.includes("ensurePlanTasks(plan.tasks, projectKind)"), "API repairs sparse plans instead of rejecting them");
 
 assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
 assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned Next version");
