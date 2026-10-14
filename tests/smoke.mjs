@@ -81,6 +81,11 @@ assert.ok(css.includes(".composer{position:relative;z-index:70;overflow:visible;
 assert.ok(css.includes(".header-overflow-panel{z-index:120") && css.includes(".topbar{position:relative;z-index:80"), "project overflow menu renders above workspace content instead of behind it");
 assert.ok(page.includes("GENE · CREATIVE WORKSPACE") && page.includes("GENE BUILD SYSTEM") && page.includes("GENE <span>1.9</span>"), "workspace uses clean GENE 1.9 branding without stale release labels");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
+assert.ok(page.includes('className={"gene-app studio-v2 "') && page.includes("studio-topbar") && page.includes("studio-welcome") && page.includes("studio-composer"), "studio redesign applies the new hierarchy to the actual live workspace");
+assert.ok(css.includes(".studio-v2 .welcome-block h1 em") && css.includes(".studio-v2 .studio-question-card") && css.includes(".studio-v2 .composer-context-label"), "studio redesign styles welcome, one-question interview and contextual composer");
+assert.ok(css.includes(".studio-v2.light .composer textarea") && css.includes("@media(max-width:560px)") && css.includes("prefers-reduced-motion:reduce"), "studio redesign preserves light theme, mobile layout and reduced-motion accessibility");
+assert.ok(!page.includes('project.mode === "plan" && <div className="composer-tools plan-intent-switch"'), "plan intent controls are not duplicated above and inside the composer");
+
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("Enhance prompt") && prompts.includes("PLANNING WORKFLOW"), "composer tools expose deep planning and prompt enhancement without cluttering the input area");
 assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Edit the selected live-preview element") && page.includes('aria-label="Select in preview to edit"'), "live preview supports selecting an element to prepare a targeted edit");
 assert.ok(page.includes("files in the current manifest") && page.includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
