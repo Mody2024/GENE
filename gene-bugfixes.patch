@@ -1,0 +1,57 @@
+diff --git a/apps/web/app/lib/prompts.ts b/apps/web/app/lib/prompts.ts
+index 9f8b1e1..beb9ec3 100644
+--- a/apps/web/app/lib/prompts.ts
++++ b/apps/web/app/lib/prompts.ts
+@@ -4,6 +4,7 @@ import { buildStudioContract } from "./studio-contract";
+ import { formatCanonicalProjectMemory } from "./project-memory";
+ 
+ export const AGENT_SYSTEM = [
++  "RUNTIME SAFETY RULE: Declare and initialise every array, object and state variable (for example hazards, enemies, bullets, particles) at the top of the script before any function, loop or event handler reads it. Never read a collection that is created later or only inside another function. Guard optional lists with a default such as const hazards = [];",
+   "You are GENE 1.9 — the unified autonomous builder, a senior product designer, game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
+   "Be specific, honest, and tool-oriented. Never claim a build, test, model, edit, or publish happened unless the application actually did it.",
+   "UNIFIED BRAIN CONTRACT: Games, web apps, and websites use this same assistant identity, project memory, interview, plan, build, edit, research, QA, and repair discipline. Never invent a separate brain or disconnected workflow for a project type. Adapt architecture and acceptance checks to the project type while preserving the same conversation and existing project context.",
+diff --git a/apps/web/app/page.tsx b/apps/web/app/page.tsx
+index ba07fe9..7b3aa2a 100644
+--- a/apps/web/app/page.tsx
++++ b/apps/web/app/page.tsx
+@@ -202,6 +202,7 @@ export default function Home() {
+   const projectImportRef = useRef<HTMLInputElement>(null);
+   const autoRepairAttempts = useRef(0);
+   const runtimeRefreshAttempts = useRef(0);
++  const lastRuntimeError = useRef("");
+ 
+   useEffect(() => {
+     try {
+@@ -331,6 +332,7 @@ export default function Home() {
+         }
+         if (state === "error") {
+           const errorText = String(event.data.message || event.data.stack || "unknown runtime error").slice(0, 1200);
++          lastRuntimeError.current = errorText;
+           // Browser previews can hit a transient iframe/context race. Retry the
+           // actual preview once before invoking the AI repair path; never loop reloads.
+           if (runtimeRefreshAttempts.current < 1) {
+@@ -416,7 +418,7 @@ export default function Home() {
+       "[250,650,1200,2000,3200,4300].forEach(function(ms){setTimeout(report,ms);});",
+       "})();"
+     ].join("\n");
+-    const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
++    const instrumentation = "(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;var all=[];function Wrapped(a){var c=new AC(a);all.push(c);return c;}Wrapped.prototype=AC.prototype;try{window.AudioContext=Wrapped;window.webkitAudioContext=Wrapped;}catch(e){}function unlock(){all.forEach(function(c){if(c.state==='suspended'){try{c.resume();}catch(e){}}});}['pointerdown','touchstart','keydown','click'].forEach(function(t){window.addEventListener(t,unlock,true);});})();(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
+     const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files);
+     return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+   }, [project?.files, project?.id, previewKey]);
+@@ -1124,13 +1126,13 @@ export default function Home() {
+       setNotice("GENE detected a preview failure and is automatically diagnosing and repairing the source (attempt " + attempt + "/3). Your last saved files and versions are preserved.");
+       addActivity("Automatic runtime repair started (attempt " + attempt + "/3); preserving the current checkpoint.");
+       void runAgent(
+-        "AUTOMATIC RUNTIME RECOVERY — attempt " + attempt + " of 3. The game/app preview failed to render or emitted a runtime error. Inspect the current source, HTML, CSS, spec and recent runtime error details in context. Identify the actual cause; make the smallest safe source repair, preserve existing mechanics and visual design, then let GENE refresh and re-check the preview. Do not merely explain the issue. Return only genuinely changed files. Runtime status: " + (notice || "no visible frame confirmed") + ".",
++        "AUTOMATIC RUNTIME RECOVERY — attempt " + attempt + " of 3. The game/app preview failed to render or emitted a runtime error. Inspect the current source, HTML, CSS, spec and recent runtime error details in context. Identify the actual cause; make the smallest safe source repair, preserve existing mechanics and visual design, then let GENE refresh and re-check the preview. Do not merely explain the issue. Return only genuinely changed files. Runtime status: " + (lastRuntimeError.current || "no visible frame confirmed") + ". If the error says a name is undefined, find its first use and make sure it is declared and initialised before any code runs that reads it.",
+         "edit",
+         true
+       );
+     }, 450);
+     return () => window.clearTimeout(timer);
+-  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, notice, runAgent]);
++  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, runAgent]);
+ 
+   async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
+     const normalizedUrl = url.trim().replace(/\/+$/, "");
