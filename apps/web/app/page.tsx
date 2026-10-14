@@ -2065,6 +2065,7 @@ export default function Home() {
           <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             
+            <button type="button" className="mobile-preview-button" title="Open live preview in a focused workspace" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}><span>▷</span><span>Live preview</span></button>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} aria-label="Open live preview" onClick={openFullscreenGame} disabled={!hasGame}><span>▷</span><span className="top-play-label">Preview</span></button>
             <details className="header-overflow-menu">
               <summary title="Project actions" aria-label="Open project actions"><span>···</span></summary>
