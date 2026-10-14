@@ -1105,6 +1105,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px sol
 .studio-v2 .scene-object-list{display:grid;gap:5px;margin-top:10px}
 .studio-v2 .scene-object-list button{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:9px;border:1px solid transparent;border-radius:8px;background:transparent;color:#b8c0b7;text-align:left;font-size:10px}
 .studio-v2 .scene-object-list button:hover{background:rgba(255,255,255,.035)}
+.studio-v2 .scene-object-row.active{background:rgba(201,242,122,.07);border-color:rgba(201,242,122,.22);color:#e2f2d0}
 .studio-v2 .scene-object-list button[aria-pressed="true"],.studio-v2 .scene-object-list button.selected{background:rgba(201,242,122,.07);border-color:rgba(201,242,122,.22);color:#e2f2d0}
 .studio-v2 .scene-object-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .studio-v2 .scene-field{display:grid;gap:6px;margin-top:12px;color:#aeb6ad;font-size:10px}
@@ -1132,7 +1133,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px sol
 .studio-v2.light .scene-viewport-top,.studio-v2.light .audio-studio-top{color:#303a30}
 .studio-v2.light .scene-field input,.studio-v2.light .scene-field select,.studio-v2.light .scene-vector input,.studio-v2.light .audio-implementation{background:#f8faf5;color:#252b25;border-color:rgba(30,40,30,.17)}
 .studio-v2.light .scene-object-list button{color:#424b42}
-.studio-v2.light .scene-object-list button[aria-pressed="true"],.studio-v2.light .scene-object-list button.selected{color:#334a20;background:#eaf2df}
+.studio-v2.light .scene-object-list button[aria-pressed="true"],.studio-v2.light .scene-object-list button.selected,.studio-v2.light .scene-object-row.active{color:#334a20;background:#eaf2df}
 .studio-v2.light .audio-studio-top h2,.studio-v2.light .audio-preview-card h3{color:#252b25}
 .studio-v2.light .audio-preview-card p,.studio-v2.light .scene-studio-hint{color:#687168}
 @media(max-width:760px){
