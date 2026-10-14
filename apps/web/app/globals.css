@@ -1088,3 +1088,60 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px sol
  .studio-v2 .real-progress-task{grid-template-columns:18px minmax(0,1fr)}
  .studio-v2 .real-progress-task small{grid-column:2}
 }
+
+
+/* GENE 1.9 studio redesign — pass 4: Scene Studio and Audio Studio are first-class workspaces. */
+.studio-v2 .scene-studio,.studio-v2 .audio-studio{max-width:1100px;margin:0 auto;padding:clamp(18px,3vw,34px);color:var(--studio-ink)}
+.studio-v2 .scene-studio-layout{gap:14px}
+.studio-v2 .scene-studio-toolbar,.studio-v2 .scene-studio-bottom,.studio-v2 .audio-studio-top,.studio-v2 .audio-studio-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.studio-v2 .scene-studio-toolbar{padding:11px;border:1px solid var(--studio-line);border-radius:12px;background:#17191c}
+.studio-v2 .scene-studio-toolbar button,.studio-v2 .scene-view-mode button,.studio-v2 .scene-axis-controls button{border:1px solid var(--studio-line-strong);border-radius:8px;background:#22262a;color:#cdd3cb;padding:8px 10px;font-size:10px}
+.studio-v2 .scene-studio-toolbar button:hover,.studio-v2 .scene-view-mode button:hover,.studio-v2 .scene-axis-controls button:hover{border-color:rgba(201,242,122,.4)}
+.studio-v2 .scene-viewport-wrap{overflow:hidden;border:1px solid var(--studio-line-strong);border-radius:14px;background:#0d1012}
+.studio-v2 .scene-viewport-top{padding:11px 13px;border-bottom:1px solid var(--studio-line);background:#17191c;color:#b8c0b6;font-size:10px}
+.studio-v2 .scene-viewport-legend{padding:10px 12px;border-top:1px solid var(--studio-line);color:#89928e;font-size:9px;line-height:1.7}
+.studio-v2 .scene-inspector{padding:15px;border:1px solid var(--studio-line);border-radius:13px;background:#17191c}
+.studio-v2 .scene-list-heading{font-size:10px;letter-spacing:.1em;color:#aab3a7}
+.studio-v2 .scene-object-list{display:grid;gap:5px;margin-top:10px}
+.studio-v2 .scene-object-list button{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:9px;border:1px solid transparent;border-radius:8px;background:transparent;color:#b8c0b7;text-align:left;font-size:10px}
+.studio-v2 .scene-object-list button:hover{background:rgba(255,255,255,.035)}
+.studio-v2 .scene-object-list button[aria-pressed="true"],.studio-v2 .scene-object-list button.selected{background:rgba(201,242,122,.07);border-color:rgba(201,242,122,.22);color:#e2f2d0}
+.studio-v2 .scene-object-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-v2 .scene-field{display:grid;gap:6px;margin-top:12px;color:#aeb6ad;font-size:10px}
+.studio-v2 .scene-field input,.studio-v2 .scene-field select,.studio-v2 .scene-vector input{min-width:0;border:1px solid var(--studio-line-strong);border-radius:8px;background:#111315;color:#e1e6dd;padding:8px;font-size:10px}
+.studio-v2 .scene-vector{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.studio-v2 .scene-axis-controls{display:flex;flex-wrap:wrap;gap:5px}
+.studio-v2 .scene-studio-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.studio-v2 .scene-studio-actions button{font-size:10px}
+.studio-v2 .scene-studio-hint{margin-top:12px;padding:10px;border:1px solid var(--studio-line);border-radius:9px;color:#929a93;font-size:10px;line-height:1.7}
+.studio-v2 .scene-empty{border:1px dashed var(--studio-line-strong);border-radius:12px;padding:18px;color:#929a93}
+.studio-v2 .audio-studio-top{padding-bottom:17px;margin-bottom:18px;border-bottom:1px solid var(--studio-line)}
+.studio-v2 .audio-studio-top h2{font-size:clamp(22px,3vw,30px);letter-spacing:-.04em;color:#e5e9e0}
+.studio-v2 .audio-implementation{border:1px solid var(--studio-line-strong);border-radius:9px;background:#111315;color:#c8d0c6;padding:9px;font-size:10px}
+.studio-v2 .audio-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.studio-v2 .audio-preview-card{padding:15px;border:1px solid var(--studio-line);border-radius:13px;background:#17191c}
+.studio-v2 .audio-preview-card h3{font-size:12px;color:#e1e6dc}
+.studio-v2 .audio-preview-card p{font-size:10px;line-height:1.7;color:#8e9790}
+.studio-v2 .audio-level-list{display:grid;gap:13px;margin-top:15px}
+.studio-v2 .audio-level{display:grid;grid-template-columns:minmax(70px,.4fr) minmax(0,1fr) 34px;gap:10px;align-items:center;color:#bbc3b9;font-size:10px}
+.studio-v2 .audio-level input[type="range"]{width:100%;accent-color:var(--studio-accent)}
+.studio-v2 .audio-level output{color:#dce7d2;font-variant-numeric:tabular-nums;text-align:right}
+.studio-v2 .audio-studio-bottom{margin-top:18px;padding-top:14px;border-top:1px solid var(--studio-line)}
+.studio-v2 .scene-visible{accent-color:var(--studio-accent)}
+.studio-v2.light .scene-studio-toolbar,.studio-v2.light .scene-inspector,.studio-v2.light .audio-preview-card{background:#fff;color:#252b25;border-color:rgba(30,40,30,.14)}
+.studio-v2.light .scene-viewport-top,.studio-v2.light .audio-studio-top{color:#303a30}
+.studio-v2.light .scene-field input,.studio-v2.light .scene-field select,.studio-v2.light .scene-vector input,.studio-v2.light .audio-implementation{background:#f8faf5;color:#252b25;border-color:rgba(30,40,30,.17)}
+.studio-v2.light .scene-object-list button{color:#424b42}
+.studio-v2.light .scene-object-list button[aria-pressed="true"],.studio-v2.light .scene-object-list button.selected{color:#334a20;background:#eaf2df}
+.studio-v2.light .audio-studio-top h2,.studio-v2.light .audio-preview-card h3{color:#252b25}
+.studio-v2.light .audio-preview-card p,.studio-v2.light .scene-studio-hint{color:#687168}
+@media(max-width:760px){
+ .studio-v2 .scene-studio,.studio-v2 .audio-studio{padding:16px 12px}
+ .studio-v2 .scene-studio-layout{grid-template-columns:minmax(0,1fr)}
+ .studio-v2 .audio-preview-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:560px){
+ .studio-v2 .scene-studio-toolbar{justify-content:flex-start}
+ .studio-v2 .scene-vector{gap:4px}
+ .studio-v2 .audio-level{grid-template-columns:58px minmax(0,1fr) 30px;gap:7px}
+}
