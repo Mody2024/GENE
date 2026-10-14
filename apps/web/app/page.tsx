@@ -1999,7 +1999,7 @@ export default function Home() {
   ];
 
   return (
-    <main className={"gene-app " + theme + (sidebarOpen ? "" : " sidebar-collapsed")} data-theme={theme}>
+    <main className={"gene-app studio-v2 " + theme + (sidebarOpen ? "" : " sidebar-collapsed")} data-theme={theme}>
       <aside className="rail">
         <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
         <button className="rail-item sidebar-toggle" title={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-label={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><span>{sidebarOpen ? "◧" : "☷"}</span></button>
@@ -2051,8 +2051,8 @@ export default function Home() {
       </aside>
 
       <section className="main-column">
-        <header className="topbar">
-          <div className="breadcrumb"><span>Projects</span><span className="crumb-slash">/</span><strong>{project.name}</strong><button className="rename-project" title="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
+        <header className="topbar studio-topbar">
+          <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} aria-label="Open live preview" onClick={openFullscreenGame} disabled={!hasGame}><span>▷</span><span className="top-play-label">Preview</span></button>
@@ -2099,12 +2099,12 @@ export default function Home() {
                 <button type="button" onClick={() => setSection("tasks")}>Open plan ↗</button>
               </div>}
               <div className="conversation-scroll">
-                {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block">
+                {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block studio-welcome">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow">GENE · CREATIVE WORKSPACE</div>
-                  {project.kind === "app" ? <h1>Build an app<br /><em>worth using.</em></h1> : <h1>Make a game<br /><em>worth playing.</em></h1>}
-                  <p>{project.kind === "app" ? "Describe the tool, website or dashboard you need. We\'ll plan the experience, build the real interface and refine it together." : "Tell GENE what you\'re imagining. We\'ll plan it together, then build and test the actual files."}</p>
-                  <div className="starter-grid">
+                  <div className="eyebrow welcome-eyebrow"><span className="welcome-eyebrow-dot" /> YOUR AI CREATION STUDIO</div>
+                  {project.kind === "app" ? <h1>From idea<br /><em>to something real.</em></h1> : <h1>Make your next<br /><em>great game.</em></h1>}
+                  <p className="welcome-description">{project.kind === "app" ? "Describe the product you have in mind. Shape the experience together, build real source files, and refine the result in the live workspace." : "Bring a game idea. GENE helps shape the design, builds the actual project files, and gives you a live place to test and refine."}</p>
+                  <div className="starter-grid studio-starter-grid">
                     {project.kind === "app" ? <>
                       <button onClick={() => setDraft("Build a polished personal portfolio website with project cards, about and contact sections, responsive navigation and a working contact form interaction.")}><span className="starter-icon warm">↗</span><strong>Portfolio site</strong><small>Projects, about and contact</small></button>
                       <button onClick={() => setDraft("Build a clean task manager web app with add, edit, complete and delete tasks; priority, search, filters, local persistence and a useful empty state.")}><span className="starter-icon rose">✓</span><strong>Task manager</strong><small>Tasks, priorities and filters</small></button>
@@ -2118,15 +2118,15 @@ export default function Home() {
                     </>}
                   </div>
                 </div>}
-                {activeMessages.map(msg => <div key={msg.id} className={"message-row " + msg.role + (msg.kind ? " kind-" + msg.kind : "")}>
+                {activeMessages.map(msg => <div key={msg.id} className={"message-row studio-message-row " + msg.role + (msg.kind ? " kind-" + msg.kind : "")}>
                   {msg.role !== "user" && <div className="message-avatar">{msg.role === "system" ? "•" : "G"}</div>}
                   <div className="message-content">
                     {msg.role === "user" ? <div className="user-bubble">{msg.content}</div> : <div className="assistant-copy">{msg.content}</div>}
                     {msg.kind === "error" && <div className="inline-error">No verified changes were applied.</div>}
                   </div>
                 </div>)}
-                {project.question && <div className="question-card">
-                  <div className="question-kicker">ONE DECISION AT A TIME</div>
+                {project.question && <div className="question-card studio-question-card">
+                  <div className="question-progress-label"><span className="question-progress-dot" /> PROJECT INTERVIEW <span className="question-progress-step">ONE DECISION AT A TIME</span></div>
                   <h3>{project.question.text}</h3>
                   {project.question.why && <p>{project.question.why}</p>}
                   <div className="choice-list">{(project.question.choices || []).map(choice => <button key={choice} onClick={() => void runAgent(choice)} disabled={busy}>{choice}<span>↗</span></button>)}</div>
@@ -2144,11 +2144,12 @@ export default function Home() {
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
-              <form className="composer" onSubmit={onSubmit}>
+              <form className="composer studio-composer" onSubmit={onSubmit}>
                 {project.mode === "plan" && <div className="composer-tools plan-intent-switch" role="group" aria-label="Planning intent">
                   <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} title="Create a new project plan" onClick={() => setPlanIntent("create")}><span>＋</span> New plan</button>
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} title="Update this project's existing plan" onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
                 </div>}
+                <div className="composer-context-label"><span className="composer-context-dot" /> {interactionMode === "chat" ? "Chat with GENE" : interactionMode === "plan" ? "Plan your project" : "Build and edit"}<span className="composer-context-hint">{interactionMode === "chat" ? "Ideas, questions, and edits" : interactionMode === "plan" ? "Shape scope before building" : "Apply changes to real files"}</span></div>
                 <div className="composer-toolbar">
                   <div className="composer-mode-switch" role="group" aria-label="Conversation mode">
                     <button type="button" className={interactionMode === "chat" ? "active" : ""} aria-pressed={interactionMode === "chat"} onClick={() => setInteractionMode("chat")}><span>◌</span> Chat</button>
