@@ -39,7 +39,7 @@ assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACIT
 assert.ok(api.includes("OPENROUTER_CREDITS_OR_PAID_ROUTE") && api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter credit, key, and rate-limit failures are reported distinctly");
 assert.ok(api.includes('!/:free$/i.test(provider.model)') && api.includes("avoid unexpected provider charges"), "OpenRouter fallback blocks model overrides that are not explicitly marked free");
 assert.ok(page.includes("backup AI route needs credits or selected a paid model") && page.includes("GENE tried Gemini and its OpenRouter backup"), "provider failures are explained in plain language without implying every OpenRouter model is paid");
-assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError, payload?.error?.code)"), "API failures are normalized into the user-facing error explanations using structured provider error codes");
+assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError)"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
 assert.ok(prompts.includes("You are GENE 1.9"), "system prompt uses the current GENE release identity");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
@@ -75,6 +75,10 @@ assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhance
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(prompts.includes("const compactPlan = p && p.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
 assert.ok(page.includes("pinned-plan-strip") && page.includes('aria-label="Pinned project plan"') && page.includes("project.plan.title"), "the active project plan stays visible above the scrolling chat");
+assert.ok(!page.includes('{project.plan && <div className="plan-card">'), "the full plan is not duplicated as a scrolling chat card");
+assert.ok(page.includes('const acceptedPlan = operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise"') && page.includes('plan: (operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise") && result.plan ? updated.plan : current.plan'), "ordinary chat and edit responses cannot silently replace the approved project plan");
+assert.ok(css.includes(".composer{position:relative;z-index:70;overflow:visible;isolation:isolate}") && css.includes(".composer-tools-menu-panel{position:absolute!important") && css.includes("bottom:calc(100% + 10px)!important"), "composer overflow menu opens above the composer in a reliable stacking layer");
+assert.ok(css.includes(".header-overflow-panel{z-index:120") && css.includes(".topbar{position:relative;z-index:80"), "project overflow menu renders above workspace content instead of behind it");
 assert.ok(page.includes("GENE · CREATIVE WORKSPACE") && page.includes("GENE BUILD SYSTEM") && page.includes("GENE <span>1.9</span>"), "workspace uses clean GENE 1.9 branding without stale release labels");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("Enhance prompt") && prompts.includes("PLANNING WORKFLOW"), "composer tools expose deep planning and prompt enhancement without cluttering the input area");
@@ -108,7 +112,7 @@ assert.ok(api.includes("groundingChunks"), "grounding sources are returned to us
 assert.ok(api.includes("project spec needs a title"), "builder requires meaningful project specs");
 assert.ok(api.includes('projectKind === "app"'), "agent validation distinguishes apps from games");
 assert.ok(api.includes("app spec needs a concise summary"), "app builds require structured app metadata");
-assert.ok(page.includes("Start one unified project") && page.includes("createNewProject()"), "workspace creates a unified project and lets GENE identify game, website, or app from the brief");
+assert.ok(page.includes('createNewProject("app")'), "workspace can create a dedicated web app project");
 assert.ok(page.includes('"game.html": "index.html"') && page.includes('"game.js": "app.js"'), "app exports use standard HTML/CSS/JavaScript file names");
 assert.ok(page.includes("importProjectPaths(currentFiles, importedKind)"), "app-friendly exported source names import back into editable files");
 assert.ok(page.includes('sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"}'), "only app previews enable form events; game previews keep the tighter sandbox");
@@ -504,7 +508,7 @@ assert.ok(page.includes("project-specific estimate pending"), "workspace labels 
 assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "app-level error boundary exists");
 const appErrorBoundary = read("apps/web/app/error.tsx");
 assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
-assert.ok(page.includes("function explainAgentError") && page.includes("quota or rate limit") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
+assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
