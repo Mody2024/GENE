@@ -10,6 +10,8 @@ export type GeneProject = {
   id: string;
   name: string;
   kind?: ProjectKind;
+  /** User-selected engine for a new project; reused by planning, generation and the scene editor. */
+  preferredEngine?: GamePlan["engine"];
   initialPrompt: string;
   mode: Mode;
   thinking: Thinking;

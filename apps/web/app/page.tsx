@@ -64,15 +64,16 @@ function explainAgentError(error: unknown, code?: unknown): string {
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
   return { id: uid(), role, content, createdAt: now(), kind };
 }
-function newProject(kind: ProjectKind = "game"): GeneProject {
+function newProject(kind: ProjectKind = "game", preferredEngine?: GeneProject["preferredEngine"]): GeneProject {
   return {
     id: uid(),
     name: "New project",
     kind,
+    preferredEngine,
     initialPrompt: "",
     mode: "plan",
     thinking: "balanced",
-    messages: [message("assistant", "Hey, I'm GENE. Tell me what you want to create — a game, web app, website, tool, or something else. I'll help shape the plan, then build the actual project files here so we can preview and refine them together.")],
+    messages: [message("assistant", preferredEngine === "canvas2d" ? "Your 2D game workspace is ready. Describe the core loop, camera and controls. GENE will keep this on Canvas 2D unless you change that choice." : preferredEngine === "webgl3d" ? "Your 3D game workspace is ready. Describe the world, camera, controls and gameplay loop. GENE will keep this on WebGL 3D unless you change that choice." : preferredEngine === "webapp" ? "Your web app workspace is ready. Describe the main workflow, users and screens. GENE will build a responsive web app rather than a game." : "Hey, I'm GENE. Tell me what you want to create — a game, web app, website, tool, or something else. I'll help shape the plan, then build the actual project files here so we can preview and refine them together.")],
     answers: {},
     question: null,
     plan: null,
@@ -193,6 +194,7 @@ export default function Home() {
   const [forgeNotice, setForgeNotice] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -272,6 +274,19 @@ export default function Home() {
     localStorage.setItem("gene.theme", theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    const handleWorkspaceKeys = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setShowNewProjectDialog(true);
+        return;
+      }
+      if (event.key === "Escape" && showNewProjectDialog) setShowNewProjectDialog(false);
+    };
+    window.addEventListener("keydown", handleWorkspaceKeys);
+    return () => window.removeEventListener("keydown", handleWorkspaceKeys);
+  }, [showNewProjectDialog]);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem("gene.local-agent-url") || "http://127.0.0.1:38421";
@@ -478,6 +493,7 @@ export default function Home() {
       // merely because the user last left the workspace in read-only Plan mode.
       mode: silent && operationOverride === "edit" ? "build" : project.mode,
       kind: inferredKind,
+      preferredEngine: inferredKind === "app" ? "webapp" : project.preferredEngine === "webapp" ? undefined : project.preferredEngine,
       name: isFirstIdea && /^(untitled (game|app)|new project)$/i.test(project.name) ? "New project" : project.name,
       initialPrompt: isFirstIdea && operation !== "chat" && operation !== "research" ? prompt : project.initialPrompt,
       answers: nextAnswers,
@@ -1567,12 +1583,20 @@ export default function Home() {
     setNotice("Project renamed to " + name + ".");
   }
 
-  function createNewProject(kind: ProjectKind = "game") {
-    const p = newProject(kind);
+  function createNewProject() {
+    setShowNewProjectDialog(true);
+  }
+
+  function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"]) {
+    const p = newProject(kind, preferredEngine);
     setProject(p);
     setSection("chat");
     setNotice("");
+    setDraft("");
     setActivity([]);
+    setShowNewProjectDialog(false);
+    setPreviewOpen(true);
+    setExpandedPreview(false);
   }
 
   function deleteProject(projectId: string) {
@@ -2021,8 +2045,8 @@ export default function Home() {
       </aside>
 
       <aside className="project-sidebar">
-        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={() => createNewProject("game")}>＋</button></div>
-        <button className="new-project-entry" title="Start one unified project. GENE identifies whether you want a game, website, or app from your brief." onClick={() => createNewProject()}><span className="new-project-plus">＋</span><span>New project</span><span className="new-project-entry-hint">⌘ K</span></button>
+        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
+        <button className="new-project-entry" title="Start one unified project. GENE identifies whether you want a game, website, or app from your brief." onClick={createNewProject}><span className="new-project-plus">＋</span><span>New project</span><span className="new-project-entry-hint">Ctrl/⌘ K</span></button>
         <details className="sidebar-disclosure workspace-tools">
           <summary><span>Project tools</span><span className="menu-caret">⌄</span></summary>
           <div className="sidebar-disclosure-content">
@@ -2222,12 +2246,16 @@ export default function Home() {
               onSave={saveStudioFiles}
             />}
 
-            {section === "scene" && <SceneStudio
+            {section === "scene" && (isApp ? <div className="tool-view app-visual-editor-info">
+              <div className="tool-view-heading"><div className="eyebrow">APP DESIGN WORKSPACE</div><h2>Visual layout</h2><p>This project is a web app, so it uses responsive DOM layouts rather than a 2D/3D game scene. Open source files or ask GENE to adjust its screens while preserving project type.</p></div>
+              <div className="app-editor-choice-grid"><button className="app-editor-choice" onClick={() => setSection("files")}><span>⌘</span><strong>Edit source files</strong><small>Inspect the actual HTML, CSS and JavaScript.</small></button><button className="app-editor-choice" onClick={() => { setSection("chat"); setDraft("Inspect the current app UI and improve its responsive layout, spacing, colors and accessibility while preserving its existing workflows. Make the change in the real project files and validate the main interactions."); }}><span>✦</span><strong>Prepare a UI redesign</strong><small>Start a focused change request in project chat.</small></button></div>
+            </div> : <SceneStudio
               files={project.files}
+              engine={project.plan?.engine || project.preferredEngine || "canvas2d"}
               readOnly={project.mode === "plan"}
               onSave={saveStudioFiles}
               onWireRuntime={prompt => { setSection("chat"); setDraft(prompt); setNotice("Prepared a request to integrate the scene manifest into the actual runtime. Review it in Chat and send it to apply."); }}
-            />}
+            />)}
 
             {section === "assets" && <div className="tool-view forge-view">
   <div className="tool-view-heading">
@@ -2271,6 +2299,19 @@ export default function Home() {
         </div>
         <footer className="statusbar"><div><span className="status-dot online" /> Workspace local state</div><div>{Object.keys(project.files).length} source files <span className="status-divider">·</span> {project.versions.length} versions <span className="status-divider">·</span> {project.thinking} mode</div><button onClick={() => setShowActivity(!showActivity)}>Activity {showActivity ? "▾" : "▴"}</button></footer>
       </section>
+      {showNewProjectDialog && <div className="create-project-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowNewProjectDialog(false); }}>
+        <section className="create-project-dialog" role="dialog" aria-modal="true" aria-labelledby="create-project-title">
+          <button type="button" className="create-project-close" aria-label="Close new project dialog" onClick={() => setShowNewProjectDialog(false)}>×</button>
+          <div className="create-project-heading"><span className="create-project-mark"><GeneMark /></span><div><div className="eyebrow">NEW WORKSPACE</div><h2 id="create-project-title">What are we building?</h2><p>Choose the starting engine. GENE will carry it into planning, code generation and the editor.</p></div></div>
+          <div className="create-project-grid">
+            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "canvas2d")}><span className="create-project-option-icon">2D</span><strong>2D game</strong><small>Canvas · platformers, top-down games, arcade and local multiplayer.</small><span className="create-project-option-footer">LIGHTWEIGHT · CANVAS 2D <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "webgl3d")}><span className="create-project-option-icon">3D</span><strong>3D game</strong><small>WebGL · 3D worlds, camera movement, depth and spatial scenes.</small><span className="create-project-option-footer">3D WORLD · WEBGL <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("app", "webapp")}><span className="create-project-option-icon">UI</span><strong>Web app / website</strong><small>Responsive interfaces, dashboards, tools and interactive flows.</small><span className="create-project-option-footer">SEMANTIC WEB UI <b>→</b></span></button>
+          </div>
+          <button type="button" className="create-project-auto" onClick={() => startNewProject("game")}>Let GENE decide from my description <span>Start with a blank brief →</span></button>
+          <div className="create-project-key-hint"><kbd>Esc</kbd> to close <span>·</span> <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> to reopen</div>
+        </section>
+      </div>}
       {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>1.9</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
     </main>
   );

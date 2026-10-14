@@ -59,6 +59,7 @@ export function makeAgentInput(input: {
   const p = input.project;
   const projectKind = p?.kind === "app" ? "app" : "game";
   const compactPlan = p && p.plan ? { title: p.plan.title, summary: p.plan.summary, kind: p.plan.kind, engine: p.plan.engine, tasks: p.plan.tasks.slice(0, 20), mechanics: p.plan.mechanics.slice(0, 20), performanceBudget: p.plan.performanceBudget } : null;
+  const selectedEngine = projectKind === "app" ? "webapp" : p?.preferredEngine || p?.plan?.engine || "canvas2d";
   const isStage = input.operation === "buildPart";
   const stagePath = input.stagePath || "";
   const isStageRepair = isStage && /TARGETED FINAL-VALIDATION REPAIR/i.test(input.message);
@@ -94,12 +95,13 @@ export function makeAgentInput(input: {
     message: input.message,
     initialPrompt: p?.initialPrompt,
     planTitle: p?.plan?.title,
-    planEngine: p?.plan?.engine === "webapp" ? undefined : p?.plan?.engine
+    planEngine: selectedEngine === "webapp" ? undefined : selectedEngine
   }) : null;
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
+    ...(p?.preferredEngine ? ["USER-SELECTED ENGINE: " + p.preferredEngine + ". Respect this choice in the plan, game-spec.json, renderer and controls. Do not silently switch between 2D and 3D."] : []),
     ...(guide ? ["GENRE-SPECIFIC IMPLEMENTATION GUIDE AND ACCEPTANCE CHECKLIST:\\n" + formatGameGuide(guide)] : ["WEB APP ACCEPTANCE CHECKLIST: polished responsive layout; semantic HTML; keyboard-accessible controls; working navigation/actions/forms; useful visual hierarchy; proper loading/empty/success/error states; field-level validation and actionable error messages; guard duplicate submits; preserve user input on failure; handle offline/timeout/HTTP errors; no fake backend, no external CDN, no hard-coded credentials; avoid dead controls and placeholder-only screens. For every visible control, identify its action and state transition; never render inert buttons or fake success. If persistence or authentication is not wired, label the limitation honestly and do not simulate saved/server data."]),
-    buildStudioContract(projectKind, p?.plan?.engine || (projectKind === "app" ? "webapp" : "canvas2d"), input.operation),
+    buildStudioContract(projectKind, selectedEngine, input.operation),
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
     "THINKING LEVEL: " + (input.thinking || "balanced"),
