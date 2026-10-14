@@ -22,6 +22,7 @@ type Props = {
   readOnly?: boolean;
   onSave: (files: Record<string, string>, label: string) => void;
   onWireRuntime: (prompt: string) => void;
+  engine?: "canvas2d" | "webgl3d" | "webapp";
 };
 
 const zero = (): Vec3 => ({ x: 0, y: 0, z: 0 });
@@ -62,15 +63,24 @@ function readScene(files: Record<string, string>) {
   return { spec, scene, objects: candidate.map(normalizeObject) };
 }
 
-export default function SceneStudio({ files, readOnly = false, onSave, onWireRuntime }: Props) {
+export default function SceneStudio({ files, readOnly = false, onSave, onWireRuntime, engine }: Props) {
   const source = files["game-spec.json"] || "{}";
+  const activeEngine = engine || (() => {
+    try {
+      const spec = JSON.parse(source) as Record<string, unknown>;
+      const declared = String(spec.engine || (spec.plan as Record<string, unknown> | undefined)?.engine || "canvas2d");
+      return declared === "webgl3d" || declared === "webapp" ? declared as "webgl3d" | "webapp" : "canvas2d";
+    } catch { return "canvas2d"; }
+  })();
+  const is2D = activeEngine === "canvas2d";
+  const editAxes: Array<keyof Vec3> = is2D ? ["x", "y"] : ["x", "y", "z"];
   const [selectedId, setSelectedId] = useState("");
   const [objects, setObjects] = useState<SceneObject[]>([]);
   const [undoStack, setUndoStack] = useState<SceneObject[][]>([]);
   const [redoStack, setRedoStack] = useState<SceneObject[][]>([]);
   const [specError, setSpecError] = useState("");
   const [status, setStatus] = useState("");
-  const [viewportMode, setViewportMode] = useState<"webgl" | "isometric">("webgl");
+  const [viewportMode, setViewportMode] = useState<"webgl" | "isometric">(activeEngine === "canvas2d" ? "isometric" : "webgl");
   const [rawSpec, setRawSpec] = useState<Record<string, unknown>>({});
   const [sceneMetadata, setSceneMetadata] = useState<Record<string, unknown>>({});
   const viewportRef = useRef<HTMLCanvasElement | null>(null);
@@ -97,6 +107,9 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     }
   }, [source]);
 
+  useEffect(() => {
+    setViewportMode(activeEngine === "canvas2d" ? "isometric" : "webgl");
+  }, [activeEngine]);
 
   useEffect(() => {
     const canvas = viewportRef.current;
@@ -104,6 +117,54 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     if (!canvas || !ctx) return;
     const width = 960, height = 540;
     canvas.width = width; canvas.height = height;
+    if (is2D) {
+      const bg2d = ctx.createLinearGradient(0, 0, 0, height);
+      bg2d.addColorStop(0, "#111a2a"); bg2d.addColorStop(1, "#0a1020");
+      ctx.fillStyle = bg2d; ctx.fillRect(0, 0, width, height);
+      const unit = 32, originX = width / 2, originY = height / 2;
+      ctx.lineWidth = 1; ctx.strokeStyle = "#263449";
+      for (let x = -15; x <= 15; x++) {
+        ctx.beginPath(); ctx.moveTo(originX + x * unit, 36); ctx.lineTo(originX + x * unit, height - 36); ctx.stroke();
+      }
+      for (let y = -7; y <= 7; y++) {
+        ctx.beginPath(); ctx.moveTo(0, originY + y * unit); ctx.lineTo(width, originY + y * unit); ctx.stroke();
+      }
+      ctx.strokeStyle = "#5a8eac"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(originX, 28); ctx.lineTo(originX, height - 28); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(28, originY); ctx.lineTo(width - 28, originY); ctx.stroke();
+      const visible2d = objects.filter(o => o.visible).slice().sort((a,b) => a.position.y - b.position.y);
+      for (const o of visible2d) {
+        const px = originX + o.position.x * unit, py = originY - o.position.y * unit;
+        const rx = Math.max(7, Math.min(92, 15 * Math.abs(o.scale.x)));
+        const ry = Math.max(7, Math.min(92, 13 * Math.abs(o.scale.y)));
+        const active = o.id === selectedId, type = o.type.toLowerCase();
+        ctx.save(); ctx.translate(px, py); ctx.rotate((o.rotation.z || 0) * Math.PI / 180);
+        ctx.fillStyle = o.color; ctx.strokeStyle = active ? "#ffffff" : "#516580"; ctx.lineWidth = active ? 2.5 : 1.2;
+        if (type.includes("light")) {
+          ctx.strokeStyle = o.color; ctx.beginPath(); ctx.arc(0, 0, Math.max(rx, ry), 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-rx - 7, 0); ctx.lineTo(rx + 7, 0); ctx.moveTo(0, -ry - 7); ctx.lineTo(0, ry + 7); ctx.stroke();
+        } else if (type.includes("camera")) {
+          ctx.beginPath(); ctx.moveTo(0, -ry - 6); ctx.lineTo(rx + 6, ry); ctx.lineTo(-rx - 6, ry); ctx.closePath(); ctx.fill(); ctx.stroke();
+        } else if (type.includes("sphere") || type.includes("circle")) {
+          ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        } else if (type.includes("plane")) {
+          ctx.fillRect(-rx * 1.3, -Math.max(4, ry * .25), rx * 2.6, Math.max(8, ry * .5)); ctx.strokeRect(-rx * 1.3, -Math.max(4, ry * .25), rx * 2.6, Math.max(8, ry * .5));
+        } else {
+          const radius = type.includes("box") || type.includes("rect") ? 3 : 7;
+          ctx.beginPath(); ctx.roundRect(-rx, -ry, rx * 2, ry * 2, radius); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = "#ffffff42"; ctx.beginPath(); ctx.moveTo(-rx * .65, -ry * .35); ctx.lineTo(rx * .55, -ry * .35); ctx.stroke();
+        }
+        if (active) { ctx.strokeStyle = "#bcb1ff"; ctx.setLineDash([5, 4]); ctx.strokeRect(-rx - 7, -ry - 7, rx * 2 + 14, ry * 2 + 14); ctx.setLineDash([]); }
+        ctx.restore();
+        ctx.fillStyle = active ? "#ffffff" : "#aebbd3"; ctx.font = active ? "bold 12px sans-serif" : "11px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(o.name.slice(0, 24), px, py - ry - 13);
+      }
+      ctx.fillStyle = "#cbd5e7"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("2D SCENE CANVAS · XY COORDINATES", 18, 24);
+      ctx.font = "11px sans-serif"; ctx.fillStyle = "#9aa9c3";
+      ctx.fillText("Drag to move · rotate around Z · depth is not used", 18, height - 18);
+      return;
+    }
     const bg = ctx.createLinearGradient(0, 0, 0, height);
     bg.addColorStop(0, "#111b2a"); bg.addColorStop(1, "#080d16");
     ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
@@ -131,7 +192,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
       ctx.restore(); ctx.fillStyle=active?"#e8fff8":"#9bb1c6"; ctx.font=active?"bold 12px sans-serif":"11px sans-serif"; ctx.textAlign="center"; ctx.fillText(o.name.slice(0,24),p.x,p.y-h-19);
     }
     ctx.fillStyle="#9bb1c6"; ctx.font="11px sans-serif"; ctx.textAlign="left"; ctx.fillText("SCENE PREVIEW · ISOMETRIC EDITOR",18,24); ctx.fillText("Drag an object to move it across the ground plane",18,height-18);
-  }, [objects, selectedId]);
+  }, [objects, selectedId, is2D]);
 
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
   const commitObjects = (next: SceneObject[]) => {
@@ -160,7 +221,14 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const onViewportPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if(readOnly)return;
     const point=viewportPoint(event);
-    const hit=[...objects].reverse().filter(o=>o.visible).find(o=>{const x=480+(o.position.x-o.position.z)*32,y=540*.58+(o.position.x+o.position.z)*16-o.position.y*38;return Math.abs(point.x-x)<32*Math.max(1,Math.abs(o.scale.x))&&Math.abs(point.y-(y-25*o.scale.y))<34*Math.max(1,Math.abs(o.scale.y));});
+    const hit=[...objects].reverse().filter(o=>o.visible).find(o=>{
+      if (is2D) {
+        const x = 480 + o.position.x * 32, y = 270 - o.position.y * 32;
+        return Math.abs(point.x - x) < 24 * Math.max(1, Math.abs(o.scale.x)) && Math.abs(point.y - y) < 22 * Math.max(1, Math.abs(o.scale.y));
+      }
+      const x=480+(o.position.x-o.position.z)*32,y=540*.58+(o.position.x+o.position.z)*16-o.position.y*38;
+      return Math.abs(point.x-x)<32*Math.max(1,Math.abs(o.scale.x))&&Math.abs(point.y-(y-25*o.scale.y))<34*Math.max(1,Math.abs(o.scale.y));
+    });
     if(!hit)return;
     setSelectedId(hit.id);
     dragRef.current={id:hit.id,startX:point.x,startY:point.y,original:objects.map(o=>({...o,position:{...o.position},rotation:{...o.rotation},scale:{...o.scale}})),originalPosition:{...hit.position}};
@@ -169,13 +237,19 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const onViewportPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag=dragRef.current;if(!drag||readOnly)return;
     const point=viewportPoint(event),dx=point.x-drag.startX,dy=point.y-drag.startY;
+    if (is2D) {
+      const x = Math.round((drag.originalPosition.x + dx / 32) * 10) / 10;
+      const y = Math.round((drag.originalPosition.y - dy / 32) * 10) / 10;
+      setObjects(current => current.map(o => o.id === drag.id ? { ...o, position: { ...o.position, x, y, z: 0 } } : o));
+      return;
+    }
     const moveX=dx/64+dy/32,moveZ=dy/32-dx/64;
     setObjects(current=>current.map(o=>o.id===drag.id?{...o,position:{...o.position,x:Math.round((drag.originalPosition.x+moveX)*10)/10,z:Math.round((drag.originalPosition.z+moveZ)*10)/10}}:o));
   };
   const onViewportPointerUp = () => {
     const drag=dragRef.current;if(!drag)return;
     const current=objects.find(o=>o.id===drag.id);
-    if(current&&(current.position.x!==drag.originalPosition.x||current.position.z!==drag.originalPosition.z)){setUndoStack(stack=>[...stack,drag.original].slice(-40));setRedoStack([]);setStatus("Moved "+current.name+". Save scene data to persist the transform.");}
+    if(current&&(current.position.x!==drag.originalPosition.x||(is2D ? current.position.y!==drag.originalPosition.y : current.position.z!==drag.originalPosition.z))){setUndoStack(stack=>[...stack,drag.original].slice(-40));setRedoStack([]);setStatus("Moved "+current.name+". Save scene data to persist the transform.");}
     dragRef.current=null;
   };
 
@@ -186,7 +260,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
-    const object: SceneObject = { id, name: "New object", type: "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
+    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: is2D ? "box" : "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
     setStatus("New scene entry added. Save it to write the manifest.");
@@ -215,9 +289,9 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
 
   return <div className="tool-view scene-studio">
     <div className="tool-view-heading">
-      <div className="eyebrow">GENE STUDIO · SOURCE-LINKED SCENE DATA</div>
-      <h2>Scene Studio</h2>
-      <p>Author and arrange scene entries in a lightweight interactive isometric viewport, then refine transforms in the inspector. The preview visualizes scene-manifest objects; the game itself updates only when its runtime consumes this schema.</p>
+      <div className="eyebrow">GENE STUDIO · SOURCE-LINKED SCENE DATA · {is2D ? "2D CANVAS" : activeEngine === "webgl3d" ? "3D WORLD" : "APP LAYOUT"}</div>
+      <h2>Scene Studio <span className="scene-engine-pill">{is2D ? "2D" : activeEngine === "webgl3d" ? "3D" : "Web app"}</span></h2>
+      <p>{is2D ? "Arrange 2D scene objects on an XY canvas with sprite-like shapes, screen-space transforms and an editable hierarchy. Saved entries remain scene metadata until the game runtime draws them." : "Author and arrange 3D scene entries in a WebGL or isometric viewport, then refine transforms in the inspector. The preview visualizes scene-manifest objects; the game updates only when its runtime consumes this schema."}</p>
     </div>
     {specError ? <div className="forge-notice">{specError}</div> : <>
       <style>{`
@@ -238,16 +312,16 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
         </div>
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save scene changes.</p>}
-      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE VIEWPORT</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div><div className="scene-studio-actions scene-view-mode"><button className={viewportMode === "webgl" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("webgl")}>WebGL 3D</button><button className={viewportMode === "isometric" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("isometric")}>Isometric editor</button></div>{viewportMode === "webgl" ? <WebGLSceneViewport objects={objects} selectedId={selectedId} onSelect={setSelectedId} readOnly={readOnly} /> : <><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label="Interactive isometric scene viewport" onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend"><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></div></>}</div>
+      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE VIEWPORT</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div>{is2D ? <div className="scene-studio-actions scene-view-mode"><span className="scene-engine-pill">2D canvas · XY grid</span><span className="scene-studio-hint">No 3D renderer loaded for this project</span></div> : <div className="scene-studio-actions scene-view-mode"><button className={viewportMode === "webgl" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("webgl")}>WebGL 3D</button><button className={viewportMode === "isometric" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("isometric")}>Isometric editor</button></div>}{viewportMode === "webgl" ? <WebGLSceneViewport objects={objects} selectedId={selectedId} onSelect={setSelectedId} readOnly={readOnly} /> : <><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label={is2D ? "Interactive 2D scene viewport" : "Interactive isometric scene viewport"} onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend">{is2D ? <><span>↔ X position</span><span>↕ Y position</span><span>↻ Z rotation</span><span>Drag to move · Inspector for precise transforms</span></> : <><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></>}</div></>}</div>
       {selected && <div className="scene-studio-toolbar" aria-label="Selected object transform controls">
         <span>TRANSFORM GIZMO · {selected.name}</span>
         <div className="scene-studio-actions">
-          {(["x", "y", "z"] as const).map(axis => <span key={axis} className="scene-axis-controls">
+          {editAxes.map(axis => <span key={axis} className="scene-axis-controls">
             <strong>{axis.toUpperCase()}</strong>
             <button className="secondary-button" onClick={() => updateVector("position", axis, Math.round((selected.position[axis] - 0.5) * 100) / 100)} disabled={readOnly} aria-label={"Move " + selected.name + " negative " + axis}>−</button>
             <button className="secondary-button" onClick={() => updateVector("position", axis, Math.round((selected.position[axis] + 0.5) * 100) / 100)} disabled={readOnly} aria-label={"Move " + selected.name + " positive " + axis}>+</button>
           </span>)}
-          <button className="secondary-button" onClick={() => updateSelected({ rotation: { ...selected.rotation, y: selected.rotation.y + 15 } })} disabled={readOnly}>Rotate Y +15°</button>
+          <button className="secondary-button" onClick={() => updateSelected({ rotation: { ...selected.rotation, [is2D ? "z" : "y"]: selected.rotation[is2D ? "z" : "y"] + 15 } })} disabled={readOnly}>Rotate {is2D ? "Z" : "Y"} +15°</button>
           <button className="secondary-button" onClick={() => updateSelected({ scale: { x: selected.scale.x * 1.1, y: selected.scale.y * 1.1, z: selected.scale.z * 1.1 } })} disabled={readOnly}>Scale +10%</button>
         </div>
       </div>}
@@ -269,7 +343,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
             </select></label>
             {(["position", "rotation", "scale"] as const).map(key => <fieldset className="scene-vector" key={key}>
               <legend>{key}</legend>
-              {(["x", "y", "z"] as const).map(axis => <label key={axis}>{axis.toUpperCase()}<input type="number" step={key === "rotation" ? 5 : 0.1} value={selected[key][axis]} onChange={event => updateVector(key, axis, Number(event.target.value))} disabled={readOnly} /></label>)}
+              {editAxes.map(axis => <label key={axis}>{axis.toUpperCase()}<input type="number" step={key === "rotation" ? 5 : 0.1} value={selected[key][axis]} onChange={event => updateVector(key, axis, Number(event.target.value))} disabled={readOnly} /></label>)}
             </fieldset>)}
             <label className="scene-field">Display color<input type="color" value={/^#[0-9a-f]{6}$/i.test(selected.color) ? selected.color : "#8b9bb4"} onChange={event => updateSelected({ color: event.target.value })} disabled={readOnly} /></label>
             <fieldset className="scene-vector"><legend>Material</legend><label>Roughness<input type="number" min="0" max="1" step="0.05" value={selected.material.roughness} onChange={event => updateSelected({ material: { ...selected.material, roughness: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} disabled={readOnly} /></label><label>Metalness<input type="number" min="0" max="1" step="0.05" value={selected.material.metalness} onChange={event => updateSelected({ material: { ...selected.material, metalness: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} disabled={readOnly} /></label><label>Emissive<input type="color" value={selected.material.emissive} onChange={event => updateSelected({ material: { ...selected.material, emissive: event.target.value } })} disabled={readOnly} /></label></fieldset>

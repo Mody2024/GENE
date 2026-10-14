@@ -163,7 +163,7 @@ try {
   assert.equal(await page.locator(".scene-object-row").count(), 0, "Scene Studio undo removes the unsaved object entry");
   await page.getByRole("button", { name: /Redo/ }).click();
   assert.equal(await page.locator(".scene-object-row").count(), 1, "Scene Studio redo restores the object entry");
-  const sceneCanvas = page.getByLabel("Interactive isometric scene viewport");
+  const sceneCanvas = page.getByLabel("Interactive 2D scene viewport");
   await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
   const sceneCanvasBox = await sceneCanvas.boundingBox();
   assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
@@ -356,6 +356,14 @@ try {
   assert.equal(appErrors.length, 0, "the app preview should not emit JavaScript errors: " + appErrors.join(" | "));
   await appPage.close();
 
+  await page.keyboard.press("Control+k");
+  await page.getByRole("dialog", { name: "What are we building?" }).waitFor({ timeout: 5000 });
+  assert.equal(await page.locator(".create-project-option").count(), 3, "project picker offers 2D, 3D and web app choices");
+  await page.getByRole("button", { name: /2D game/ }).click();
+  await page.locator('.rail button[title="Scene Studio"]').click();
+  await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
+  await page.getByLabel("Interactive 2D scene viewport").waitFor({ state: "visible", timeout: 5000 });
+  assert.equal(await page.locator(".scene-viewport").count(), 0, "2D projects do not mount the 3D WebGL viewport");
   console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, app DOM rendering and working form, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
 } finally {
   await browser.close();

@@ -468,13 +468,14 @@ export async function POST(request: NextRequest) {
       const answersSummary = Object.entries(answers).map(([key, value]) => key + ": " + String(value)).join("; ");
       const camera = String(answers.camera || "");
       const originalText = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
-      const is3d = projectKind === "game" && (/3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(originalText) || /3d|first-person|third-person/i.test(camera));
+      const preferredEngine = body.project?.preferredEngine;
+      const is3d = projectKind === "game" && (preferredEngine === "webgl3d" || (preferredEngine !== "canvas2d" && (/3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(originalText) || /3d|first-person|third-person/i.test(camera))));
       const isApp = projectKind === "app";
       const starterPlan = {
         title: originalText.split(/[.!?]/)[0].slice(0, 64) || (isApp ? "Untitled app" : "Untitled game"),
         kind: projectKind,
         summary: "Built-in starter plan from your interview answers (" + answersSummary.slice(0, 420) + "). This is a rule-based plan, not AI-generated.",
-        engine: isApp ? "webapp" : is3d ? "webgl3d" : "canvas2d",
+        engine: isApp ? "webapp" : preferredEngine === "canvas2d" || preferredEngine === "webgl3d" ? preferredEngine : is3d ? "webgl3d" : "canvas2d",
         tasks: isApp
           ? ["Define primary user flow and responsive navigation", "Build the visual system and semantic screens", "Implement persistent state and form validation as required", "Wire every interactive control to visible state changes", "Add loading, empty, success, and recoverable error states", "Validate keyboard/touch behavior and all primary flows"]
           : ["Build a playable core loop with the selected perspective and controls", "Implement input, collisions, state transitions, and feedback", "Create distinct stages, challenges, or missions beyond the prototype", "Add progression, unlocks, and project-specific content", "Implement pause, restart, win/loss, and a complete ending", "Validate gameplay, controls, runtime, and performance"],
@@ -498,7 +499,8 @@ export async function POST(request: NextRequest) {
     }
     if (body.operation === "plan") {
       const original = String(body.message || body.project?.initialPrompt || (projectKind === "app" ? "Untitled app" : "Untitled game"));
-      const is3d = projectKind === "game" && /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original);
+      const preferredEngine = body.project?.preferredEngine;
+      const is3d = projectKind === "game" && (preferredEngine === "webgl3d" || (preferredEngine !== "canvas2d" && /3d|three.?dimensional|subway|runner|driving|horror|first.?person|third.?person/i.test(original)));
       return NextResponse.json({
         ok: true,
         aiMode: "fallback",
@@ -509,7 +511,7 @@ export async function POST(request: NextRequest) {
             title: original.split(/[.!?]/)[0].slice(0, 64) || (projectKind === "app" ? "Untitled app" : "Untitled game"),
             kind: projectKind,
             summary: "Local outline based on your request. Review and refine it after connecting an AI provider.",
-            engine: projectKind === "app" ? "webapp" : is3d ? "webgl3d" : "canvas2d",
+            engine: projectKind === "app" ? "webapp" : preferredEngine === "canvas2d" || preferredEngine === "webgl3d" ? preferredEngine : is3d ? "webgl3d" : "canvas2d",
             tasks: ["Define the core loop and acceptance criteria", "Implement the project shell and responsive layout", "Implement the main mechanic and input handling", "Add distinct progression and content", "Implement success, failure, and restart flows", "Run source, interaction, and runtime validation"],
             mechanics: ["Primary user/game loop", "Input and state management", "Visible feedback and recovery", "Completion and restart"],
             performanceBudget: { targetFps: 60, maxEnemies: projectKind === "app" ? 0 : 8, maxObjects: 160, maxParticles: projectKind === "app" ? 0 : 60 }
@@ -814,6 +816,7 @@ export async function POST(request: NextRequest) {
       result = parseModelJson(text);
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    if (result.plan) result.plan.engine = projectKind === "app" ? "webapp" : body.project?.preferredEngine === "canvas2d" || body.project?.preferredEngine === "webgl3d" ? body.project.preferredEngine : result.plan.engine;
     if (process.env.GENE_AI_REVIEW?.trim().toLowerCase() === "true" &&
         ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
         Array.isArray(result.files) && result.files.length > 0) {

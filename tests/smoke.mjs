@@ -26,6 +26,7 @@ const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
+const studioDesignCss = read("apps/web/app/studio-redesign.css");
 const planContract = await import("../apps/web/app/lib/plan-contract.mjs");
 const browserSmoke = read("tests/browser-smoke.mjs");
 
@@ -84,6 +85,11 @@ assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhance
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(prompts.includes("const compactPlan = p && p.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
 assert.ok(page.includes("pinned-plan-strip") && page.includes('aria-label="Pinned project plan"') && page.includes("project.plan.title"), "the active project plan stays visible above the scrolling chat");
+assert.ok(page.includes("setShowNewProjectDialog(true)") && page.includes("Ctrl/⌘ K") && page.includes("showNewProjectDialog &&"), "New project opens a real project-type picker with a working shortcut");
+assert.ok(page.includes('startNewProject("game", "canvas2d")') && page.includes('startNewProject("game", "webgl3d")') && page.includes('startNewProject("app", "webapp")'), "project picker exposes 2D game, 3D game and web app starting engines");
+assert.ok(types14.includes('preferredEngine?: GamePlan["engine"]') && prompts.includes("USER-SELECTED ENGINE") && api.includes('preferredEngine === "webgl3d"'), "selected engine persists through planning and code generation");
+assert.ok(page.includes('engine={project.plan?.engine || project.preferredEngine || "canvas2d"}') && page.includes("APP DESIGN WORKSPACE"), "scene workspace follows engine and app projects get an app-specific alternative");
+assert.ok(studioDesignCss.includes(".studio-v2 .create-project-option") && studioDesignCss.includes(".studio-v2 .new-project-entry:hover") && studioDesignCss.includes("--studio-soft:#e8eaf4"), "project picker, button states and light-theme contrast fixes are styled");
 assert.ok(page.includes('className="mobile-preview-button"') && page.includes("setExpandedPreview(true)"), "a visible mobile control opens the live preview when its pane is hidden");
 assert.ok(!page.includes('{project.plan && <div className="plan-card">'), "the full plan is not duplicated as a scrolling chat card");
 assert.ok(page.includes('const acceptedPlan = operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise"') && page.includes('plan: (operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise") && result.plan ? updated.plan : current.plan'), "ordinary chat and edit responses cannot silently replace the approved project plan");
@@ -668,10 +674,10 @@ const sceneStudio = read("apps/web/app/components/SceneStudio.tsx");
 const webglSceneViewport = read("apps/web/app/components/WebGLSceneViewport.tsx");
 const audioStudio = read("apps/web/app/components/AudioStudio.tsx");
 assert.ok(sceneStudio.includes("legend>Material") && sceneStudio.includes("legend>Light") && sceneStudio.includes("legend>Camera"), "Scene Studio exposes material, light and camera inspectors");
-assert.ok(sceneStudio.includes('import WebGLSceneViewport from "./WebGLSceneViewport"') && sceneStudio.includes('useState<"webgl" | "isometric">("webgl")'), "Scene Studio defaults to the integrated WebGL viewport and retains the isometric editor");
+assert.ok(sceneStudio.includes('import WebGLSceneViewport from "./WebGLSceneViewport"') && sceneStudio.includes('useState<"webgl" | "isometric">(activeEngine === "canvas2d" ? "isometric" : "webgl")'), "Scene Studio selects a 2D editor or WebGL viewport from the active engine");
 assert.ok(webglSceneViewport.includes('getContext("webgl"') && webglSceneViewport.includes("requestAnimationFrame(render)") && webglSceneViewport.includes("camera.current.yaw") && webglSceneViewport.includes("camera.current.distance"), "WebGL scene viewport renders real GPU geometry with orbit and zoom controls");
 assert.ok(webglSceneViewport.includes("gl!.drawArrays(gl!.TRIANGLES,0,36)") && webglSceneViewport.includes("onSelect(chosen.id)"), "WebGL viewport draws scene objects and supports object selection");
-assert.ok(sceneStudio.includes('aria-label={"Move " + selected.name + " negative " + axis}') && sceneStudio.includes("Rotate Y +15°") && sceneStudio.includes("Scale +10%"), "Scene Studio provides selected-object axis nudges, rotation and scale controls");
+assert.ok(sceneStudio.includes('aria-label={"Move " + selected.name + " negative " + axis}') && sceneStudio.includes('Rotate {is2D ? "Z" : "Y"} +15°') && sceneStudio.includes("Scale +10%"), "Scene Studio provides engine-appropriate axis nudges, rotation and scale controls");
 assert.ok(page.includes('import AudioStudio from "./components/AudioStudio"') && page.includes('id: "audio" as const') && page.includes('section === "audio"'), "Audio Studio is integrated into workspace navigation");
 assert.ok(audioStudio.includes("window.AudioContext") && audioStudio.includes("createOscillator()") && audioStudio.includes("oscillator.start(at)") && audioStudio.includes("oscillator.stop(at + duration"), "Audio Studio uses real Web Audio oscillators with envelopes and explicit node lifetimes");
 assert.ok(audioStudio.includes("const EVENT_MAP") && audioStudio.includes('implementation,\n        buses: ["master", "music", "sfx", "ambience", "ui"]') && audioStudio.includes('events: EVENT_MAP'), "Audio Studio persists an explicit audio implementation, mixer bus, volume and event manifest");
@@ -679,7 +685,7 @@ assert.ok(audioStudio.includes("This does not by itself add an audio engine to g
 
 assert.ok(page.includes('import SceneStudio from "./components/SceneStudio"') && page.includes('id: "scene" as const') && page.includes('section === "scene"'), "Scene Studio is integrated into workspace navigation");
 assert.ok(sceneStudio.includes('files["game-spec.json"]') && sceneStudio.includes('position: object.position') && sceneStudio.includes('rotation: object.rotation') && sceneStudio.includes('scale: object.scale'), "Scene Studio edits actual game-spec.json source data and persists object transforms");
-assert.ok(sceneStudio.includes("onSave(nextFiles") && sceneStudio.includes("onWireRuntime") && sceneStudio.includes("lightweight interactive isometric viewport") && sceneStudio.includes("runtime consumes this schema"), "Scene Studio saves versioned source and accurately distinguishes its interactive authoring viewport from the playable game renderer");
+assert.ok(sceneStudio.includes("onSave(nextFiles") && sceneStudio.includes("onWireRuntime") && sceneStudio.includes("2D scene objects on an XY canvas") && sceneStudio.includes("runtime consumes this schema"), "Scene Studio saves versioned source and distinguishes scene metadata from the playable game renderer");
 assert.ok(sceneStudio.includes("const undo =") && sceneStudio.includes("const redo =") && sceneStudio.includes(".slice(-40)") && sceneStudio.includes("onClick={undo}") && sceneStudio.includes("onClick={redo}"), "Scene Studio provides bounded undo/redo for object-manifest edits");
 assert.ok(sceneStudio.includes("Interactive isometric scene viewport") && sceneStudio.includes("onPointerDown={onViewportPointerDown}") && sceneStudio.includes("onPointerMove={onViewportPointerMove}") && sceneStudio.includes("setPointerCapture"), "Scene Studio renders a canvas viewport with pointer-driven scene selection and drag transforms");
 assert.ok(sceneStudio.includes("ctx.rotate(((o.rotation.y || 0) + (o.rotation.z || 0))") && sceneStudio.includes('type.includes("plane")'), "Scene Studio viewport visualizes editable object rotation and plane types");
