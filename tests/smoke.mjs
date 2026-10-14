@@ -26,7 +26,16 @@ const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
 const playPage = read("apps/web/app/play/[id]/page.tsx");
 const css = read("apps/web/app/globals.css");
+const planContract = await import("../apps/web/app/lib/plan-contract.mjs");
 const browserSmoke = read("tests/browser-smoke.mjs");
+
+const repairedAppTasks = planContract.ensurePlanTasks(["Build the dashboard", "", "Build the dashboard"], "app");
+assert.equal(repairedAppTasks.length, 3, "sparse model plans are repaired to three distinct tasks");
+assert.equal(repairedAppTasks[0], "Build the dashboard", "plan repair preserves valid model output");
+assert.equal(new Set(repairedAppTasks.map(task => task.toLowerCase())).size, 3, "plan repair removes duplicate task names");
+assert.equal(planContract.ensurePlanTasks([], "game").length, 3, "empty game plans receive actionable defaults");
+assert.equal(planContract.ensurePlanMechanics([], "app").length, 1, "missing app feature metadata gets a safe fallback");
+assert.ok(api.includes("ensurePlanTasks(plan.tasks, projectKind)"), "API repairs sparse plans instead of rejecting them");
 
 assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
 assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned Next version");
@@ -38,7 +47,7 @@ assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lit
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
 assert.ok(api.includes("OPENROUTER_CREDITS_OR_PAID_ROUTE") && api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter credit, key, and rate-limit failures are reported distinctly");
 assert.ok(api.includes('!/:free$/i.test(provider.model)') && api.includes("avoid unexpected provider charges"), "OpenRouter fallback blocks model overrides that are not explicitly marked free");
-assert.ok(page.includes("backup AI route needs credits or selected a paid model") && page.includes("GENE tried Gemini and its OpenRouter backup"), "provider failures are explained in plain language without implying every OpenRouter model is paid");
+assert.ok(page.includes("backup AI route needs credits or selected a paid model") && page.includes("GENE tried Gemini and its OpenRouter fallback"), "provider failures are explained in plain language without implying every OpenRouter model is paid");
 assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError)"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
 assert.ok(prompts.includes("You are GENE 1.9"), "system prompt uses the current GENE release identity");
@@ -70,11 +79,12 @@ assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file
 assert.ok(prompts.includes("UNIFIED BRAIN CONTRACT") && prompts.includes("AUTONOMOUS DESIGN PASS") && prompts.includes("EXTENDED PLAN FORMAT") && prompts.includes("PROMPT ENHANCER MODE"), "GENE keeps unified mode orchestration, detailed plans, and read-only prompt enhancement");
 assert.ok(api.includes("GENE_THINKING_MODEL") && api.includes("GENE_BALANCED_MODEL") && api.includes("requestedThinking"), "Flash, Balanced, and Thinking route through mode-specific configured Gemini models");
 assert.ok(page.includes("thinking: nextProject.thinking") && !page.includes("model: aiModel,\n        thinking: nextProject.thinking"), "normal agent requests allow server-side model routing for the selected GENE mode");
-assert.ok(page.includes('aria-label="Conversation mode"') && page.includes("Chat</button>") && page.includes("Plan</button>") && page.includes("Build</button>") && page.includes("<option value=\"fast\">Fast</option>") && page.includes("<option value=\"deep\">Deep</option>"), "workspace exposes explicit Chat/Plan/Build modes and response-depth choices in the composer");
+assert.ok(page.includes('aria-label="Conversation mode"') && page.includes("Chat</button>") && page.includes("Plan</button>") && page.includes("Build</button>") && page.includes("<option value=\"fast\">GENE Fast</option>") && page.includes("<option value=\"deep\">GENE BH</option>"), "workspace exposes explicit Chat/Plan/Build modes and response-depth choices in the composer");
 assert.ok(prompts.includes('const compactContext = ["chat", "research", "enhancePrompt", "plan", "interview"].includes(input.operation)'), "planning and conversational operations use bounded project context");
 assert.ok(prompts.includes("selectedFileExcerpts: compactFiles") && prompts.includes("manifest: contextManifest") && prompts.includes("26000"), "planning and conversational requests receive a bounded source manifest and prioritized file excerpts");
 assert.ok(prompts.includes("const compactPlan = p && p.plan") && prompts.includes("JSON.stringify(compactContext ? compactPlan"), "plan updates receive a compact, bounded plan summary instead of resending every plan field");
 assert.ok(page.includes("pinned-plan-strip") && page.includes('aria-label="Pinned project plan"') && page.includes("project.plan.title"), "the active project plan stays visible above the scrolling chat");
+assert.ok(page.includes('className="mobile-preview-button"') && page.includes("setExpandedPreview(true)"), "a visible mobile control opens the live preview when its pane is hidden");
 assert.ok(!page.includes('{project.plan && <div className="plan-card">'), "the full plan is not duplicated as a scrolling chat card");
 assert.ok(page.includes('const acceptedPlan = operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise"') && page.includes('plan: (operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise") && result.plan ? updated.plan : current.plan'), "ordinary chat and edit responses cannot silently replace the approved project plan");
 assert.ok(css.includes(".composer{position:relative;z-index:70;overflow:visible;isolation:isolate}") && css.includes(".composer-tools-menu-panel{position:absolute!important") && css.includes("bottom:calc(100% + 10px)!important"), "composer overflow menu opens above the composer in a reliable stacking layer");

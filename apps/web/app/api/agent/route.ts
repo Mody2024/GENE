@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AGENT_SYSTEM, makeAgentInput } from "../../lib/prompts";
 import type { AgentResponse } from "../../lib/types";
 import { applyPatchBatch } from "../../lib/patch-engine";
+import { ensurePlanMechanics, ensurePlanTasks } from "../../lib/plan-contract.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -113,10 +114,8 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
     const validEngine = projectKind === "app" ? plan.engine === "webapp" : (plan.engine === "canvas2d" || plan.engine === "webgl3d");
     if (!validEngine) throw new Error(projectKind === "app" ? "Web app plans must use the webapp engine." : "Game plans must use canvas2d or webgl3d.");
     if (plan.kind && plan.kind !== projectKind) throw new Error("The plan project kind does not match the current project.");
-    const tasks = Array.isArray(plan.tasks) ? plan.tasks.filter((task: unknown): task is string => typeof task === "string" && task.trim().length > 0).slice(0, 40).map((task: string) => task.trim().slice(0, 240)) : [];
-    const mechanics = Array.isArray(plan.mechanics) ? plan.mechanics.filter((item: unknown): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 30).map((item: string) => item.trim().slice(0, 180)) : [];
-    if (tasks.length < 3) throw new Error("The plan must include at least three concrete implementation tasks.");
-    if (mechanics.length < 1) throw new Error("The plan must identify at least one concrete feature or gameplay mechanic.");
+    const tasks = ensurePlanTasks(plan.tasks, projectKind);
+    const mechanics = ensurePlanMechanics(plan.mechanics, projectKind);
     const budget = plan.performanceBudget || {};
     const targetFps = Number(budget.targetFps ?? 60);
     const maxEnemies = Number(budget.maxEnemies ?? 0);

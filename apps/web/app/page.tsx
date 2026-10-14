@@ -49,7 +49,11 @@ function explainAgentError(error: unknown, code?: unknown): string {
   if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "The backup AI route needs credits or selected a paid model. GENE tried its configured backup after Gemini failed, but no project changes were applied. Use a model marked :free and remove any paid-model override, or add credits to that provider.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
-  if (/OPENROUTER_FALLBACK_FAILED/i.test(raw)) return "GENE tried Gemini and its OpenRouter backup, but both failed. Check the selected model and API key, then retry. Your existing project files were preserved.";
+  if (/OPENROUTER_FALLBACK_FAILED/i.test(raw)) {
+    const detailMatch = raw.match(/(?:Detail|Provider detail):\s*([\s\S]+)/i);
+    const detail = (detailMatch?.[1] || "").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})\b/g, "[redacted]").slice(0, 280);
+    return "GENE tried Gemini and its OpenRouter fallback, but neither completed this request. Check provider key validity, free-model availability, and quota; project files were preserved." + (detail ? " Provider detail: " + detail : "");
+  }
   if (/GEMINI_CAPACITY_BUSY|overloaded|high demand|temporarily unavailable/i.test(raw)) return "The AI service is temporarily busy. GENE tried its configured fallback path but did not get a successful response. Retry shortly; your existing project files were preserved.";
   if (/timeout|timed out|aborted|ETIMEDOUT|GEMINI_TIMEOUT/i.test(raw)) return "The AI request timed out before it finished. Completed checkpoints and existing project files were preserved; retry with a smaller task.";
   if (/failed to fetch|networkerror|network request failed|offline/i.test(raw)) return "GENE could not reach its server. Check your connection and deployment status, then retry. Your last saved project version was preserved.";
@@ -2010,7 +2014,7 @@ export default function Home() {
         <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
         <button className="rail-item sidebar-toggle" title={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-label={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><span>{sidebarOpen ? "◧" : "☷"}</span></button>
         <div className="rail-separator" />
-        {nav.map(item => <button key={item.id} className={"rail-item " + (section === item.id ? "selected" : "")} title={item.label} onClick={() => setSection(item.id)}><span>{item.icon}</span></button>)}
+        {nav.map(item => <button key={item.id} className={"rail-item " + (section === item.id ? "selected" : "")} title={item.label} aria-label={item.label} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)}><span aria-hidden="true">{item.icon}</span></button>)}
         <div className="rail-spacer" />
         <button className="rail-item" title="Switch theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}><span>{theme === "dark" ? "☼" : "☾"}</span></button>
         <button className="avatar" title="GENE Workspace"><GeneMark /></button>
@@ -2043,8 +2047,8 @@ export default function Home() {
           </div>
         </details>
         <div className="sidebar-bottom">
-          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Connecting…" : apiReady ? "AI ready" : "AI connection unavailable"}</div>
-          <small>{apiReady ? "Ready for conversation and building" : "Check deployment configuration"}</small>
+          <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Connecting…" : apiReady ? "AI configured" : "AI service unavailable"}</div>
+          <small>{apiReady ? "Provider response is checked per request" : "Check provider configuration"}</small>
           <div className="agent-connection">
             <div className="connection-row"><span className={"status-dot " + (localAgentStatus === "connected" ? "online" : localAgentStatus === "error" ? "offline" : "")} />{localAgentStatus === "connected" ? "Local Agent connected" : localAgentStatus === "checking" ? "Checking Local Agent" : localAgentStatus === "error" ? "Local Agent error" : "Local Agent disconnected"}</div>
             {localAgentWorkspace && <small title={localAgentWorkspace}>{localAgentWorkspace}</small>}
@@ -2061,6 +2065,7 @@ export default function Home() {
           <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             
+            <button type="button" className="mobile-preview-button" title="Open live preview in a focused workspace" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}><span>▷</span><span>Live preview</span></button>
             <button className="top-play-button" title={project.kind === "app" ? "Open the current app in a separate tab" : "Play the current game in a separate tab"} aria-label="Open live preview" onClick={openFullscreenGame} disabled={!hasGame}><span>▷</span><span className="top-play-label">Preview</span></button>
             <details className="header-overflow-menu">
               <summary title="Project actions" aria-label="Open project actions"><span>···</span></summary>
