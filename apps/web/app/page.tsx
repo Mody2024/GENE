@@ -2145,10 +2145,6 @@ export default function Home() {
                 <div ref={chatEnd} />
               </div>
               <form className="composer studio-composer" onSubmit={onSubmit}>
-                {project.mode === "plan" && <div className="composer-tools plan-intent-switch" role="group" aria-label="Planning intent">
-                  <button type="button" className={planIntent === "create" ? "tool-active" : ""} aria-pressed={planIntent === "create"} title="Create a new project plan" onClick={() => setPlanIntent("create")}><span>＋</span> New plan</button>
-                  <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} title="Update this project's existing plan" onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
-                </div>}
                 <div className="composer-context-label"><span className="composer-context-dot" /> {interactionMode === "chat" ? "Chat with GENE" : interactionMode === "plan" ? "Plan your project" : "Build and edit"}<span className="composer-context-hint">{interactionMode === "chat" ? "Ideas, questions, and edits" : interactionMode === "plan" ? "Shape scope before building" : "Apply changes to real files"}</span></div>
                 <div className="composer-toolbar">
                   <div className="composer-mode-switch" role="group" aria-label="Conversation mode">
