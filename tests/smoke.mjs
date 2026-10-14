@@ -178,6 +178,8 @@ assert.ok(page.includes("referenceInputRef.current?.click()"), "reference upload
 assert.ok(page.includes("setSearchMode(value => !value)") && page.includes("Research the web"), "grounded search mode is toggleable from the composer tools menu");
 assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
 assert.ok(page.includes("autoRepairAttempts") && page.includes("runtimeRefreshAttempts") && page.includes("gene-runtime"), "preview failures trigger bounded runtime recovery and repair");
+assert.ok(page.includes('if (state === "rendered") {\n          // A confirmed successful render ends the previous recovery streak.') && page.includes("autoRepairAttempts.current = 0;\n        runtimeRefreshAttempts.current = 0;"), "a successful render or source change resets the repair budget for future independent failures");
+
 assert.ok(page.includes("!previewOpen || !iframeRef.current"), "collapsed or unmounted previews cannot trigger false render-timeout failures");
 assert.ok(page.includes("current === \"rendered\" && state === \"loaded\" ? \"rendered\" : state"), "late monitor samples cannot downgrade a confirmed visible frame");
 assert.ok(page.includes("window.__geneFrameConfirmed"), "canvas and WebGL render monitor remembers successful frame evidence");
