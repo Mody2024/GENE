@@ -107,6 +107,19 @@ export function setTaskStatus(
 ): BuildRun {
   const target = run.tasks.find((task) => task.id === taskId);
   if (!target) throw new Error(`Unknown build task "${taskId}".`);
+  if (target.status !== status) {
+    const allowedNext: Record<BuildTask["status"], BuildTask["status"][]> = {
+      queued: ["running", "blocked", "skipped"],
+      running: ["queued", "passed", "failed", "blocked"],
+      passed: [],
+      failed: ["queued"],
+      blocked: ["queued"],
+      skipped: [],
+    };
+    if (!allowedNext[target.status].includes(status)) {
+      throw new Error(`Invalid task status transition for "${taskId}": ${target.status} → ${status}.`);
+    }
+  }
   if (status === "running" && !getReadyTasks(run).some((task) => task.id === taskId) && target.status !== "running") {
     throw new Error(`Task "${taskId}" is not ready; its dependencies must pass first.`);
   }
@@ -116,12 +129,14 @@ export function setTaskStatus(
     attempts: status === "running" && task.status !== "running" ? task.attempts + 1 : task.attempts,
     lastError: status === "failed" || status === "blocked" ? error ?? task.lastError : undefined,
   }));
-  const allTerminal = tasks.every((task) => task.status === "passed" || task.status === "skipped");
+  // "skipped" is not proof of acceptance: until the task model explicitly marks
+  // optional work, every planned task must pass before the run can be completed.
+  const allPassed = tasks.length > 0 && tasks.every((task) => task.status === "passed");
   return {
     ...run,
     tasks,
     activeTaskId: status === "running" ? taskId : (run.activeTaskId === taskId ? undefined : run.activeTaskId),
-    status: allTerminal ? "completed" : status === "failed" ? "recovering" : status === "blocked" ? "needs-input" : "running",
+    status: allPassed ? "completed" : status === "failed" ? "recovering" : status === "blocked" || status === "skipped" ? "needs-input" : "running",
     updatedAt: isoNow(now),
     lastError: status === "failed" || status === "blocked" ? error ?? run.lastError : undefined,
   };

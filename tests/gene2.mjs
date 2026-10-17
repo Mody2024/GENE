@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import * as ts from "typescript";
 import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
 import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
 import { GENE_AUDIO_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
+import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report.mjs";
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
 assert.equal(classifyProviderFailure(400, "This model is unavailable for free. The paid version is available now - use this slug instead: qwen/qwen3-coder"), "unavailable");
@@ -54,3 +57,85 @@ for (const name of ["jump", "coin", "hit", "explosion", "win", "does-not-exist"]
 assert.doesNotThrow(() => { sandbox.GeneAudio.music.start("tense"); sandbox.GeneAudio.music.stop(); sandbox.GeneAudio.setMuted(true); });
 assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
 console.log("GENE 2.0 module tests passed (provider routing, code safety, SVG sanitizer, research, audio kit).");
+
+
+// Cloud-build result contract: successful artifacts need matching identity and verifiable metadata.
+const cloudBuildId = "12345678-1234-4234-9234-123456789abc";
+const goodArtifact = (name) => ({
+  status: "success",
+  url: "https://gene-builds.blob.vercel-storage.com/" + (name === "windows" ? "GENE-" + cloudBuildId + "-Setup.exe" : "GENE-" + cloudBuildId + "-debug.apk"),
+  filename: name === "windows" ? "GENE-" + cloudBuildId + "-Setup.exe" : "GENE-" + cloudBuildId + "-debug.apk",
+  sizeBytes: 250000,
+  sha256: "a".repeat(64),
+  ...(name === "android" ? { signing: "debug" } : {})
+});
+const cloudReport = {
+  buildId: cloudBuildId,
+  state: "success",
+  targets: { windows: goodArtifact("windows"), android: goodArtifact("android") },
+  runUrl: "https://github.com/Mody2024/GENE/actions/runs/12345",
+  completedAt: "2026-10-17T12:00:00.000Z",
+  note: "verified test fixture"
+};
+assert.equal(validateCloudBuildReport(cloudReport, cloudBuildId).ok, true, "valid report with artifact evidence is accepted");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: "----1234----1234----1234----1234" }, cloudBuildId).ok, false, "malformed build identifiers are rejected even when they have 36 characters");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: cloudBuildId }, "----1234----1234----1234----1234").ok, false, "a malformed requested build identifier cannot validate a report");
+const extraFieldReport = validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), accessToken: "must-not-be-exposed" }, android: goodArtifact("android") } }, cloudBuildId);
+assert.equal(extraFieldReport.ok, true, "documented artifact evidence remains valid when unknown metadata is present");
+assert.equal(extraFieldReport.ok && Object.hasOwn(extraFieldReport.report.targets.windows, "accessToken"), false, "unknown artifact metadata is stripped before the report reaches the browser");
+assert.equal(validateCloudBuildReport({ ...cloudReport, runUrl: "https://github.com/Mody2024/GENE/issues/123" }, cloudBuildId).ok, false, "workflow evidence must link to an actual Actions run, not an arbitrary GitHub page");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure" }, android: goodArtifact("android") }, state: "partial" }, cloudBuildId).ok, false, "all target outcomes must use the expected artifact identity");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: "87654321-1234-4234-9234-123456789abc" }, cloudBuildId).ok, false, "cross-build report substitution is rejected");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), sha256: "bad" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "successful artifacts without valid SHA-256 are rejected");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), url: "https://gene-builds.blob.vercel-storage.com/GENE-" + cloudBuildId + "-other.exe" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "download URL path must match the claimed artifact filename");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), url: "https://user@gene-builds.blob.vercel-storage.com/GENE-" + cloudBuildId + "-Setup.exe" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "artifact URLs with embedded credentials are rejected");
+assert.equal(validateCloudBuildReport({ ...cloudReport, state: "partial" }, cloudBuildId).ok, false, "state cannot contradict successful target outcomes");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure", url: "https://evil.test/file.exe" } }, state: "failed" }, cloudBuildId).ok, false, "failed targets cannot expose untrusted downloads");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: goodArtifact("windows") }, state: "success", runUrl: "http://github.com/actions/run" }, cloudBuildId).ok, false, "workflow evidence must use HTTPS");
+const buildRouteSource = readFileSync(new URL("../apps/web/app/api/builds/[buildId]/route.ts", import.meta.url), "utf8");
+assert.ok(buildRouteSource.includes('String(item.display_title || "") === id'), "cloud build status must match the exact requested workflow run ID");
+assert.ok(buildRouteSource.includes("GENE_BUILD_STATUS_UNAVAILABLE"), "GitHub API errors must be reported as unavailable rather than a fabricated queued state");
+assert.ok(buildRouteSource.includes("Could not verify the cloud build result with GitHub"), "status lookup failures must be visible to the user");
+console.log("GENE cloud-build report contract tests passed.");
+
+
+// Build orchestration: skipped required work must never be mistaken for a successful build.
+const orchestratorSource = readFileSync(new URL("../apps/web/app/lib/build-orchestrator.ts", import.meta.url), "utf8");
+const orchestratorJs = ts.transpileModule(orchestratorSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText;
+const orchestratorUrl = "data:text/javascript;base64," + Buffer.from(orchestratorJs).toString("base64");
+const { createBuildRun, setTaskStatus } = await import(orchestratorUrl);
+const skippedRun = createBuildRun({
+  projectId: "verification-test",
+  now: "2026-10-17T12:00:00.000Z",
+  tasks: [{ id: "required-check", title: "Required check", kind: "test", acceptance: ["must pass"] }]
+});
+const skippedResult = setTaskStatus(skippedRun, "required-check", "skipped", "2026-10-17T12:00:01.000Z");
+assert.throws(() => setTaskStatus(skippedRun, "required-check", "passed", "2026-10-17T12:00:01.000Z"), /Invalid task status transition/, "queued tasks cannot be marked passed without running");
+assert.notEqual(skippedResult.status, "completed", "a skipped required task must not produce completed status");
+assert.equal(skippedResult.status, "needs-input", "skipped work should require an explicit decision");
+const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-10-17T12:00:01.000Z");
+const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
+assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
+assert.throws(() => setTaskStatus(passedRun, "required-check", "failed", "2026-10-17T12:00:03.000Z"), /Invalid task status transition/, "a passed task cannot be retroactively marked failed in the same run");
+console.log("GENE build-orchestrator completion-state tests passed.");
+
+
+// GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
+const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
+assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
+assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
+const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");
+const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");
+assert.ok(themePage.includes('useState<"light" | "dark">("light")'), "new workspaces default to the light theme");
+assert.ok(themePage.includes('localStorage.getItem("gene.theme")') && themePage.includes('localStorage.setItem("gene.theme", theme)'), "user theme choice remains persisted");
+assert.ok(themePage.includes("if (!themeReady) return") && themePage.includes("[theme, themeReady]"), "saved theme is read before the default theme can overwrite it");
+assert.ok(themePage.includes("IDEAS, BROUGHT TO LIFE"), "GENE welcome screen carries its own concise creation-focused identity");
+assert.ok(themeLayout.includes('data-theme="light"'), "the document starts light to avoid a dark first-paint flash");
+assert.ok(themeCss.includes("--studio-accent:#3e795f") && themeCss.includes("rgba(211,166,82,.07)"), "GENE light theme uses restrained green and warm-gold identity tokens");
+assert.ok(themeCss.includes("--studio-accent:#b7d9c2") && themeCss.includes("rgba(211,166,82,.055)") && !themeCss.includes("#bbb2ff"), "dark theme uses muted forest-green and warm-gold tokens instead of the old purple accent");
+assert.ok(themePage.includes("GENE genie-inspired mark") && themePage.includes("gene-logo-spark") && themePage.includes("gene-logo-orbit"), "GENE brand mark uses a restrained wish-star and orbit rather than a generic letter alone");
+assert.ok(themeCss.includes(".studio-v2 .brand:focus-visible"), "the brand home control has a visible keyboard focus state");
+console.log("GENE light-first genie identity tests passed.");

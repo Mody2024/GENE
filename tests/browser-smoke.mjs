@@ -171,6 +171,13 @@ try {
   await page.getByRole("heading", { name: "Plan & tasks" }).waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: "Run build checks" }).click();
   await page.getByText("JavaScript syntax", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Runtime identifier safety", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Project file paths", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Source size budget", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Self-contained runtime", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Win / loss state hooks", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Restart / reset hooks", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Pause / resume hooks", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Scene Studio"]').click();
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
@@ -381,6 +388,30 @@ try {
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
   await page.getByLabel("Interactive 2D scene viewport").waitFor({ state: "visible", timeout: 5000 });
   assert.equal(await page.locator(".scene-viewport").count(), 0, "2D projects do not mount the 3D WebGL viewport");
+  const themePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  await themePage.addInitScript(() => {
+    if (localStorage.getItem("gene.theme-test-seeded") !== "1") {
+      localStorage.setItem("gene.theme", "dark");
+      localStorage.setItem("gene.theme-test-seeded", "1");
+    }
+  });
+  await themePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "dark", "saved dark theme survives initial hydration");
+  await themePage.getByTitle("Switch theme").click();
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "theme choice is persisted before reload");
+  const hydratedHealth = themePage.waitForResponse(response => response.url().endsWith("/api/health"), { timeout: 10_000 });
+  await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  await hydratedHealth;
+  // Verify the hydrated React state, not the server's light-first HTML shell.
+  await themePage.getByTitle("Switch theme").click();
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
+  await themePage.getByTitle("Switch theme").click();
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "a changed theme persists after reload");
+  await themePage.close();
+
   console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, app DOM rendering and working form, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
 } finally {
   await browser.close();

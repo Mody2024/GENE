@@ -16,6 +16,7 @@ import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
+import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -41,9 +42,11 @@ function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 function GeneMark({ className = "" }: { className?: string }) {
-  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE mark">
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE genie-inspired mark">
+    <path className="gene-logo-orbit" d="M7.8 10.5C13.2 3.4 23.7 2.1 30.4 7.4" fill="none" stroke="#cda75e" strokeWidth="1.2" strokeLinecap="round" />
     <path d="M30.2 12.1A13.1 13.1 0 1 0 32.9 22H21.2" fill="none" stroke="currentColor" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M20.5 20.5h9.8" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" opacity=".45" />
+    <path className="gene-logo-spark" d="M33 4.4l1.05 2.45 2.45 1.05-2.45 1.05L33 11.4l-1.05-2.45L29.5 7.9l2.45-1.05z" fill="#cda75e" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }
@@ -204,7 +207,8 @@ export default function Home() {
   const [forgeBusy, setForgeBusy] = useState(false);
   const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
   const [forgeNotice, setForgeNotice] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -233,6 +237,7 @@ export default function Home() {
       setProject(fresh);
       setProjects([fresh]);
     }
+    setThemeReady(true);
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
       setPublishConfigured(Boolean(d.publishConfigured));
@@ -285,9 +290,12 @@ export default function Home() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [project?.messages.length, busy]);
 
   useEffect(() => {
+    // Do not overwrite a saved theme with the SSR-safe default before hydration
+    // has read the user's preference from localStorage.
+    if (!themeReady) return;
     localStorage.setItem("gene.theme", theme);
     document.documentElement.dataset.theme = theme;
-  }, [theme]);
+  }, [theme, themeReady]);
 
   useEffect(() => {
     const handleWorkspaceKeys = (event: KeyboardEvent) => {
@@ -1729,9 +1737,31 @@ export default function Home() {
     const required = ["game.html", "game.css", "game.js", "game-spec.json"];
     const missing = required.filter(path => !files[path] || !files[path].trim());
     add("Required source files", missing.length ? "fail" : "pass", missing.length ? "Missing: " + missing.join(", ") : "HTML, CSS, JavaScript and game specification are present.");
+    const allPaths = Object.keys(files);
+    const unsafePaths = allPaths.filter(path =>
+      !path.trim() || path.length > 240 || path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
+      path.includes(String.fromCharCode(92)) || path.split("/").some(part => !part || part === "." || part === "..") ||
+      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))
+    );
+    add("Project file paths", unsafePaths.length ? "fail" : "pass", unsafePaths.length ? "Unsafe relative paths: " + unsafePaths.slice(0, 5).join(", ") : allPaths.length + " project paths are relative and traversal-free.");
+    const fileEntries = Object.entries(files);
+    const oversizedFiles = fileEntries.filter(([, source]) => typeof source !== "string" || source.length > 500_000);
+    const totalSourceChars = fileEntries.reduce((total, [, source]) => total + (typeof source === "string" ? source.length : 0), 0);
+    const withinSourceBudget = allPaths.length <= 100 && oversizedFiles.length === 0 && totalSourceChars <= 8_000_000;
+    add("Source size budget", withinSourceBudget ? "pass" : "fail", withinSourceBudget
+      ? allPaths.length + " files · " + totalSourceChars.toLocaleString() + " source characters; file and project budgets are respected."
+      : "Project limit is 100 files, 500,000 characters per file, and 8,000,000 total characters. Oversized: " + oversizedFiles.slice(0, 5).map(([path]) => path).join(", "));
     const html = files["game.html"] || "";
     const js = files["game.js"] || "";
     const combined = html + "\n" + js;
+    const allJavaScript = fileEntries.filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
+    const hasExecutableInlineScript = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html);
+    const hasExternalRuntime = /<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html) ||
+      /\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(allJavaScript);
+    const runtimeSelfContained = !hasExecutableInlineScript && !hasExternalRuntime;
+    add("Self-contained runtime", runtimeSelfContained ? "pass" : "fail", runtimeSelfContained
+      ? "No executable inline script tags or obvious external CDN/runtime dependencies were detected."
+      : "Move executable code to project JavaScript files and remove external scripts, stylesheets, dynamic imports, or hard-coded external fetch dependencies.");
     let spec: any = null;
     let specParsed = false;
     try { spec = JSON.parse(files["game-spec.json"] || ""); specParsed = Boolean(spec && typeof spec === "object" && !Array.isArray(spec)); } catch {}
@@ -1746,6 +1776,22 @@ export default function Home() {
     try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
     catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
     add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
+    const safetyFiles = Object.entries(files)
+      .filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string")
+      .map(([path, content]) => ({ path, content }));
+    const safety = analyzeProjectScripts(safetyFiles, { scopeChecks: true });
+    const safetyDetails = [
+      ...safety.errors.slice(0, 3).map(error => error.message),
+      ...safety.fixes.slice(0, 2).map(fix => "Potential deterministic repair: " + fix)
+    ];
+    const safetyStatus = safety.errors.length ? "fail" : safety.repaired.length ? "warn" : "pass";
+    add(
+      "Runtime identifier safety",
+      safetyStatus,
+      safetyDetails.length
+        ? safetyDetails.join(" | ")
+        : "No obvious undeclared identifiers or uninitialized collections were detected by conservative static analysis. Runtime behavior still requires live testing."
+    );
     if (isAppSpec) {
       const hasUI = /<(?:main|header|nav|section|form|button|h1|h2|article|input|label)\b/i.test(html);
       add("App interface", hasUI ? "pass" : "fail", hasUI ? "Semantic UI elements are present in the app source." : "No recognizable user interface elements were found.");
@@ -1764,6 +1810,21 @@ export default function Home() {
     }
     add("Live preview", runtimeState === "rendered" ? "pass" : runtimeState === "error" ? "fail" : "warn", runtimeState === "rendered" ? "The sandbox reported a visible render signal." : runtimeState === "error" ? "The preview reported an error or did not render in time." : "Refresh or start the preview to collect runtime evidence.");
     add("Gameplay playtest", "warn", "These checks do not simulate collisions, progression, difficulty or win/loss behavior. Play the game and verify those mechanics yourself.");
+    if (!isAppSpec) {
+      const gameRuntime = allJavaScript + "\n" + html;
+      const hasOutcomeHooks = /\b(?:gameOver|gameover|victory|defeat|winState|lossState|isWon|isLost|isGameOver|onWin|onLose|finishGame|endGame|won|lost)\b/i.test(gameRuntime);
+      const hasRestartHooks = /\b(?:restart|resetGame|startOver|playAgain|newGame)\b/i.test(gameRuntime);
+      const hasPauseHooks = /\b(?:pause|paused|resume|isPaused|togglePause)\b/i.test(gameRuntime);
+      add("Win / loss state hooks", hasOutcomeHooks ? "pass" : "warn", hasOutcomeHooks
+        ? "Recognizable outcome-state code exists; actual win/loss behavior still needs playtesting."
+        : "No obvious win/loss transition identifiers were found. Verify the declared outcome conditions in a real playthrough.");
+      add("Restart / reset hooks", hasRestartHooks ? "pass" : "warn", hasRestartHooks
+        ? "A recognizable restart/reset path exists; confirm it restores all relevant state."
+        : "No obvious restart/reset path was found. Confirm the player can recover after winning or losing.");
+      add("Pause / resume hooks", hasPauseHooks ? "pass" : "warn", hasPauseHooks
+        ? "Recognizable pause/resume code exists; verify timers, audio and input stop/resume correctly."
+        : "No obvious pause/resume path was found. Add one when it fits the game's design.");
+    }
     setBuildReport({ checkedAt: now(), projectUpdatedAt: project.updatedAt, checkedDirty: fileDirty, checkedFile: project.activeFile, checkedEditorContent: editedFile, checks });
     addActivity("Build checks finished: " + checks.filter(check => check.status === "pass").length + " passed, " + checks.filter(check => check.status === "warn").length + " warnings, " + checks.filter(check => check.status === "fail").length + " failed.");
   }
@@ -2213,7 +2274,7 @@ export default function Home() {
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block studio-welcome">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow welcome-eyebrow"><span className="welcome-eyebrow-dot" /> YOUR AI CREATION STUDIO</div>
+                  <div className="eyebrow welcome-eyebrow"><span className="welcome-eyebrow-dot" /> IDEAS, BROUGHT TO LIFE</div>
                   {project.kind === "app" ? <h1>From idea<br /><em>to something real.</em></h1> : <h1>Make your next<br /><em>great game.</em></h1>}
                   <p className="welcome-description">{project.kind === "app" ? "Describe the product you have in mind. Shape the experience together, build real source files, and refine the result in the live workspace." : "Bring a game idea. GENE helps shape the design, builds the actual project files, and gives you a live place to test and refine."}</p>
                   <div className="starter-grid studio-starter-grid">
