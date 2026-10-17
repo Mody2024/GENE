@@ -204,7 +204,7 @@ export default function Home() {
   const [forgeBusy, setForgeBusy] = useState(false);
   const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
   const [forgeNotice, setForgeNotice] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);

@@ -105,3 +105,14 @@ const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-
 const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
 assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
 console.log("GENE build-orchestrator completion-state tests passed.");
+
+
+// GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
+const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");
+const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");
+assert.ok(themePage.includes('useState<"light" | "dark">("light")'), "new workspaces default to the light theme");
+assert.ok(themePage.includes('localStorage.getItem("gene.theme")') && themePage.includes('localStorage.setItem("gene.theme", theme)'), "user theme choice remains persisted");
+assert.ok(themeLayout.includes('data-theme="light"'), "the document starts light to avoid a dark first-paint flash");
+assert.ok(themeCss.includes("--studio-accent:#3e795f") && themeCss.includes("rgba(211,166,82,.07)"), "GENE light theme uses restrained green and warm-gold identity tokens");
+console.log("GENE light-first genie identity tests passed.");
