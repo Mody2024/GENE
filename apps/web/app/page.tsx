@@ -1754,10 +1754,10 @@ export default function Home() {
     const html = files["game.html"] || "";
     const js = files["game.js"] || "";
     const combined = html + "\n" + js;
-    const allJavaScript = fileEntries.filter(([path, source]) => /\\.m?js$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
-    const hasExecutableInlineScript = /<script\\b(?![^>]*\\btype\\s*=\\s*["'](?:application\\/json|application\\/ld\\+json)["'])/i.test(html);
-    const hasExternalRuntime = /<script\\b[^>]*\\bsrc\\s*=\\s*["']https?:|<link\\b[^>]*\\brel\\s*=\\s*["']stylesheet["'][^>]*\\bhref\\s*=\\s*["']https?:/i.test(html) ||
-      /\\bimport\\s*\\(|\\bfrom\\s*["']https?:|\\bfetch\\s*\\(\\s*["']https?:/i.test(allJavaScript);
+    const allJavaScript = fileEntries.filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
+    const hasExecutableInlineScript = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html);
+    const hasExternalRuntime = /<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html) ||
+      /\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(allJavaScript);
     const runtimeSelfContained = !hasExecutableInlineScript && !hasExternalRuntime;
     add("Self-contained runtime", runtimeSelfContained ? "pass" : "fail", runtimeSelfContained
       ? "No executable inline script tags or obvious external CDN/runtime dependencies were detected."
