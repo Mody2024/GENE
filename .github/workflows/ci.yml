@@ -4,7 +4,7 @@ concurrency:
   cancel-in-progress: true
 on:
   push:
-    branches: [main, "feature/**", "feat/**", "gene-1.5-flash", "gene-1.9-total-redesign"]
+    branches: [main, "feature/**", "feat/**", "gene-1.5-flash", "gene-1.9-total-redesign", "gene-2.0-update"]
   pull_request:
     branches: [main]
   workflow_dispatch:

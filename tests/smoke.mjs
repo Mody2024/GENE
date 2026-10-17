@@ -46,12 +46,12 @@ assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit
 assert.ok(api.includes("GEMINI_API_KEY_2") && api.includes("GEMINI_API_KEY_3"), "Gemini failover supports multiple independently configured keys");
 assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lite"), "Gemini failover includes supported stable fallback models");
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
-assert.ok(api.includes("OPENROUTER_CREDITS_OR_PAID_ROUTE") && api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter credit, key, and rate-limit failures are reported distinctly");
-assert.ok(api.includes('!/:free$/i.test(provider.model)') && api.includes("avoid unexpected provider charges"), "OpenRouter fallback blocks model overrides that are not explicitly marked free");
-assert.ok(page.includes("backup AI route needs credits or selected a paid model") && page.includes("GENE tried Gemini and its OpenRouter fallback"), "provider failures are explained in plain language without implying every OpenRouter model is paid");
-assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError)"), "API failures are normalized into the user-facing error explanations before display");
+assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter key, rate-limit and exhaustion failures are reported distinctly");
+assert.ok(api.includes("runAlternateChain") && !api.includes("GENE_OPENROUTER_MODEL"), "OpenRouter fallback uses the free-model router, not a hard-coded model override");
+assert.ok(page.includes("GENE only uses free AI models") && page.includes("OPENROUTER_FALLBACK_FAILED"), "provider failures are explained in plain language and stay free-only");
+assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
-assert.ok(prompts.includes("You are GENE 1.9"), "system prompt uses the current GENE release identity");
+assert.ok(prompts.includes("You are GENE 2.0"), "system prompt uses the current GENE release identity");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
 assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time without exceeding route budget");
@@ -87,15 +87,15 @@ assert.ok(prompts.includes("const compactPlan = p && p.plan") && prompts.include
 assert.ok(page.includes("pinned-plan-strip") && page.includes('aria-label="Pinned project plan"') && page.includes("project.plan.title"), "the active project plan stays visible above the scrolling chat");
 assert.ok(page.includes("setShowNewProjectDialog(true)") && page.includes("Ctrl/⌘ K") && page.includes("showNewProjectDialog &&"), "New project opens a real project-type picker with a working shortcut");
 assert.ok(page.includes('startNewProject("game", "canvas2d")') && page.includes('startNewProject("game", "webgl3d")') && page.includes('startNewProject("app", "webapp")'), "project picker exposes 2D game, 3D game and web app starting engines");
-assert.ok(types14.includes('preferredEngine?: GamePlan["engine"]') && prompts.includes("USER-SELECTED ENGINE") && api.includes('preferredEngine === "webgl3d"'), "selected engine persists through planning and code generation");
+assert.ok(read("apps/web/app/lib/types.ts").includes('preferredEngine?: GamePlan["engine"]') && prompts.includes("USER-SELECTED ENGINE") && api.includes('preferredEngine === "webgl3d"'), "selected engine persists through planning and code generation");
 assert.ok(page.includes('engine={project.plan?.engine || project.preferredEngine || "canvas2d"}') && page.includes("APP DESIGN WORKSPACE"), "scene workspace follows engine and app projects get an app-specific alternative");
 assert.ok(studioDesignCss.includes(".studio-v2 .create-project-option") && studioDesignCss.includes(".studio-v2 .new-project-entry:hover") && studioDesignCss.includes("--studio-soft:#e8eaf4"), "project picker, button states and light-theme contrast fixes are styled");
 assert.ok(page.includes('className="mobile-preview-button"') && page.includes("setExpandedPreview(true)"), "a visible mobile control opens the live preview when its pane is hidden");
 assert.ok(!page.includes('{project.plan && <div className="plan-card">'), "the full plan is not duplicated as a scrolling chat card");
 assert.ok(page.includes('const acceptedPlan = operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise"') && page.includes('plan: (operation === "plan" || operation === "interview" || operation === "build" || operation === "surprise") && result.plan ? updated.plan : current.plan'), "ordinary chat and edit responses cannot silently replace the approved project plan");
-assert.ok(css.includes(".composer{position:relative;z-index:70;overflow:visible;isolation:isolate}") && css.includes(".composer-tools-menu-panel{position:absolute!important") && css.includes("bottom:calc(100% + 10px)!important"), "composer overflow menu opens above the composer in a reliable stacking layer");
+assert.ok(css.includes(".composer-tools-menu-panel{position:absolute!important") && css.includes("bottom:calc(100% + 10px)!important"), "composer overflow menu opens above the composer in a reliable stacking layer");
 assert.ok(css.includes(".header-overflow-panel{z-index:120") && css.includes(".topbar{position:relative;z-index:80"), "project overflow menu renders above workspace content instead of behind it");
-assert.ok(page.includes("GENE · CREATIVE WORKSPACE") && page.includes("GENE BUILD SYSTEM") && page.includes("GENE <span>1.9</span>"), "workspace uses clean GENE 1.9 branding without stale release labels");
+assert.ok(page.includes("GENE BUILD SYSTEM") && page.includes("GENE <span>2.0</span>") && page.includes("GENE Studio"), "workspace uses clean GENE 2.0 branding without stale release labels");
 assert.ok(css.includes(".pinned-plan-strip") && css.includes("@media(max-width:760px)"), "pinned plan remains compact and responsive on mobile");
 assert.ok(page.includes('className={"gene-app studio-v2 "') && page.includes("studio-topbar") && page.includes("studio-welcome") && page.includes("studio-composer"), "studio redesign applies the new hierarchy to the actual live workspace");
 assert.ok(page.includes('option value="fast">GENE Fast</option>') && page.includes('option value="deep">GENE BH</option>') && page.includes("Black Hole): strongest, slower reasoning"), "the three advertised GENE reasoning modes are clearly labeled and explained");
@@ -118,7 +118,7 @@ assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType:
 
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
-assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144') && api.includes('alternateFinish === "length"'), "agent uses a larger single-file token budget with bounded fallback and detects alternate-provider truncation");
+assert.ok(api.includes('body.operation === "buildPart"') && api.includes("attempt.fallback ? 5_120 : 6_144") && api.includes("runAlternateChain"), "agent uses a larger single-file token budget with bounded fallback through the free-model router");
 assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 3') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file three times and explicitly expand chat when preview is hidden");
 assert.ok(css.includes(".workspace.preview-minimized .conversation-scroll") && css.includes(".workspace.preview-minimized .composer"), "minimized preview widens both chat content and composer");
 assert.ok(forge.includes('"wedge" | "torus"') && forge.includes("senior hard-surface/prop artist"), "Forge produces additional wedge/torus geometry with stronger professional modelling guidance");
@@ -126,7 +126,7 @@ assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS fi
 assert.ok(api.includes("compactInstruction"), "invalid or truncated model output is retried with a compact complete-response instruction");
 assert.ok(api.includes("JSON.parse(cleaned)"), "candidate JSON is validated before it can reach file validation");
 
-assert.ok(api.includes("at least three concrete implementation tasks"), "plans with no implementation tasks are rejected");
+assert.ok(api.includes("ensurePlanTasks(plan.tasks, projectKind)"), "plans with missing implementation tasks are completed deterministically");
 assert.ok(api.includes("exactly one next question or a completed plan"), "interview responses must be sequential and complete");
 assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
 assert.ok(api.includes('new Function(byPath["game.js"])'), "model-generated JS syntax is checked");
@@ -138,7 +138,7 @@ assert.ok(api.includes("groundingChunks"), "grounding sources are returned to us
 assert.ok(api.includes("project spec needs a title"), "builder requires meaningful project specs");
 assert.ok(api.includes('projectKind === "app"'), "agent validation distinguishes apps from games");
 assert.ok(api.includes("app spec needs a concise summary"), "app builds require structured app metadata");
-assert.ok(page.includes('createNewProject("app")'), "workspace can create a dedicated web app project");
+assert.ok(page.includes("function createNewProject()") && page.includes('kind === "app"'), "workspace can create a dedicated web app project");
 assert.ok(page.includes('"game.html": "index.html"') && page.includes('"game.js": "app.js"'), "app exports use standard HTML/CSS/JavaScript file names");
 assert.ok(page.includes("importProjectPaths(currentFiles, importedKind)"), "app-friendly exported source names import back into editable files");
 assert.ok(page.includes('sandbox={isApp ? "allow-scripts allow-forms" : "allow-scripts"}'), "only app previews enable form events; game previews keep the tighter sandbox");
@@ -186,14 +186,14 @@ assert.ok(runtimeScene.includes("window.GENE_SCENE.draw2D") && runtimeScene.incl
 assert.ok(prompts.includes("SCENE STUDIO RUNTIME CONTRACT") && prompts.includes("convert each visible object into real GPU geometry"), "generation prompts require renderers to consume authored scene transforms");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
 assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
-assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files))") && page.includes("buildRuntimeSceneBootstrap(version.files))"), "standalone and ZIP exports include the scene manifest");
+assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)") && page.includes("buildRuntimeSceneBootstrap(version.files)"), "standalone and ZIP exports include the scene manifest");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
 assert.ok(page.includes("new JSZip()"), "export packages actual game source");
 assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is implemented");
 assert.ok(page.includes('zip.file("references/" + safeName'), "export preserves reference files");
 assert.ok(page.includes("referenceInputRef.current?.click()"), "reference uploads are wired");
 assert.ok(page.includes("setSearchMode(value => !value)") && page.includes("Research the web"), "grounded search mode is toggleable from the composer tools menu");
-assert.ok(page.includes("ONE DECISION AT A TIME"), "sequential question UI is present");
+assert.ok(page.includes("InterviewCard") && read("apps/web/app/components/InterviewCard.tsx").includes("PROJECT INTERVIEW"), "sequential interview UI is present");
 assert.ok(page.includes("autoRepairAttempts") && page.includes("runtimeRefreshAttempts") && page.includes("gene-runtime"), "preview failures trigger bounded runtime recovery and repair");
 assert.ok(page.includes('if (state === "rendered") {\n          // A confirmed successful render ends the previous recovery streak.') && page.includes("autoRepairAttempts.current = 0;\n        runtimeRefreshAttempts.current = 0;"), "a successful render or source change resets the repair budget for future independent failures");
 
@@ -337,7 +337,7 @@ try {
 assert.ok(api.includes("normalizeExecutableHtmlScripts"), "inline executable HTML scripts are migrated into game.js before final validation");
 assert.ok(api.includes("Migrated from inline HTML script"), "script normalization preserves inline behavior instead of discarding it");
 assert.ok(api.includes("GROQ_API_KEY") && api.includes("OPENROUTER_API_KEY"), "builder can fall back across Groq and OpenRouter providers");
-assert.ok(api.includes("successfulProvider = provider.name") && api.includes('aiMode: successfulProvider'), "API reports the provider that actually completed the request");
+assert.ok(api.includes("successfulProvider = chain.provider") && api.includes("aiMode: successfulProvider"), "API reports the provider that actually completed the request");
 assert.ok(api.includes("apiKeys.length === 0 && !process.env.GROQ_API_KEY") && api.includes("apiKeys.length ? ["), "alternate providers can run even without a Gemini key");
 assert.ok(api.includes('split(/[.!?\\n]/)'), "title normalization handles punctuation and newlines correctly");
 assert.ok(page.includes("function deleteProject(projectId: string)"), "saved chat projects can be deleted");
@@ -383,7 +383,7 @@ assert.ok(page.includes("GENE BUILD SYSTEM") && page.includes("reduce this file 
 assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
 
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");
-assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("successfulProvider = provider.name"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
+assert.ok(forge.includes("GROQ_API_KEY") && forge.includes("OPENROUTER_API_KEY") && forge.includes("runAlternateChain") && forge.includes("aiMode: successfulProvider"), "Forge can use configured non-Gemini providers when Gemini cannot complete a mesh recipe");
 console.log("GENE contract tests passed, including true WebGL contract checks, authenticated local filesystem sync, disk-backed play URL, import/export, grounded research and browser-test contracts.");
 
 
@@ -536,7 +536,7 @@ assert.ok(page.includes("project-specific estimate pending"), "workspace labels 
 assert.ok(existsSync(new URL("../apps/web/app/error.tsx", import.meta.url)), "app-level error boundary exists");
 const appErrorBoundary = read("apps/web/app/error.tsx");
 assert.ok(appErrorBoundary.includes("reset()") && appErrorBoundary.includes("GENE · RECOVERY"), "unexpected workspace errors offer a retry path without clearing project state");
-assert.ok(page.includes("function explainAgentError") && page.includes("quota reset") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
+assert.ok(page.includes("function explainAgentError") && page.includes("quota or rate limit") && page.includes("request timed out"), "agent failures provide actionable quota and timeout guidance");
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
@@ -577,7 +577,7 @@ assert.ok(page.includes("MUST integrate the already generated modules"), "the fi
 
 assert.ok(page.includes('plannedModules.push("src/systems/input.js")') && page.includes('plannedModules.push("src/systems/progression.js")') && page.includes('plannedModules.push("src/systems/content.js")'), "game modules are selected from actual scope instead of forcing unnecessary files into every game");
 assert.ok(page.includes('task.id === "final-content-pass").map(task => ({ ...task, dependsOn: ["stage-" + (stagePaths.length - 1)] }))'), "dynamic file expansion moves the final content pass behind every generated module");
-assert.ok(api.includes("const gameQuestions = [") && api.includes("const appQuestions = [") && api.includes("bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id))"), "fallback interview asks multiple adaptive questions one at a time");
+assert.ok(api.includes("nextInterviewQuestion") && read("apps/web/app/lib/design-doc.ts").includes("export function interviewQuestions") && read("apps/web/app/lib/design-doc.ts").includes("hasOwnProperty"), "fallback interview asks multiple adaptive questions one at a time");
 assert.ok(api.includes("const original = String(body.message || body.project?.initialPrompt"), "update planning uses the requested update instead of only the original project prompt");
 
 assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");

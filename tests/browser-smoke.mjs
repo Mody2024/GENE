@@ -47,8 +47,19 @@ const fixture = {
   updatedAt: new Date().toISOString()
 };
 
+// Polls the published multiplayer snapshot until a player has moved (slow software renderers publish frames late).
+const waitPlayerMoved = (frame, index, direction, from, timeoutMs = 5000) => frame.locator("body").evaluate((_, args) => new Promise(resolve => {
+  const deadline = performance.now() + args.timeoutMs;
+  const tick = () => {
+    const players = window.__geneLocalMultiState.players;
+    const moved = args.direction > 0 ? players[args.index].x > args.from : players[args.index].x < args.from;
+    if (moved || performance.now() > deadline) resolve(players); else setTimeout(tick, 40);
+  };
+  tick();
+}), { index, direction, from, timeoutMs });
 const browser = await chromium.launch({
   headless: true,
+  ...(process.env.GENE_CHROMIUM_PATH ? { executablePath: process.env.GENE_CHROMIUM_PATH } : {}),
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 });
 try {
@@ -100,7 +111,7 @@ try {
   await gameFrame.locator("#game-canvas").click();
   await gameFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
   await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(700);
   const afterX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
   assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game's player position");
 
@@ -137,11 +148,16 @@ try {
   await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.focus());
   const multiBefore = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true })));
-  await multiPage.waitForTimeout(40); // allow the animation loop to publish its next state snapshot
+  await multiPage.waitForTimeout(250); // allow the animation loop to publish its next state snapshot
+  await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keyup", { key: "d", bubbles: true })));
+  await waitPlayerMoved(multiFrame, 0, 1, multiBefore[0].x);
+  await multiPage.waitForTimeout(300);
   const afterP1 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   assert.ok(afterP1[0].x > multiBefore[0].x && afterP1[1].x === multiBefore[1].x, "Player 1 input must not move Player 2");
   await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })));
-  await multiPage.waitForTimeout(40);
+  await multiFrame.locator("body").evaluate(() => window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowLeft", bubbles: true })));
+  await waitPlayerMoved(multiFrame, 1, -1, afterP1[1].x);
+  await multiPage.waitForTimeout(300);
   const afterP2 = await multiFrame.locator("body").evaluate(() => window.__geneLocalMultiState.players);
   assert.ok(afterP2[1].x < afterP1[1].x && afterP2[0].x === afterP1[0].x, "Player 2 input must not move Player 1");
   assert.equal(await multiFrame.locator("#game-canvas").evaluate(canvas => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.length), 800 * 480 * 4, "multiplayer arena renders a full canvas");
@@ -174,7 +190,7 @@ try {
   const positionX = page.locator(".scene-vector").first().locator("input").first();
   await page.waitForFunction(() => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==0; }, { timeout: 5000 });
   assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
-  await page.getByLabel("Name").fill("Browser-tested scene prop");
+  await page.getByLabel("Name", { exact: true }).fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
   await page.getByRole("button", { name: "Save scene data" }).click();
   await page.locator('.rail button[title="Files"]').click();
@@ -242,12 +258,13 @@ try {
   const emptyProject = { ...fixture, id: "playwright-empty-start", name: "Empty starter", initialPrompt: "", mode: "plan", plan: null, files: {}, versions: [], activeFile: "game.js", messages: [{ id: "hello", role: "assistant", content: "Test", createdAt: new Date().toISOString() }] };
   await samplePage.addInitScript(({ project, storageKey, activeKey }) => { if (window.top !== window.self) return; localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: emptyProject, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
   await samplePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await samplePage.getByRole("button", { name: /Try playable demo/i }).click();
+  await samplePage.locator("summary", { hasText: "Project tools" }).click();
+  await samplePage.getByRole("button", { name: /playable demo/i }).click();
   const sampleFrame = samplePage.frameLocator('iframe[title="GENE live game preview"]');
   await sampleFrame.locator("#game-canvas").waitFor({ timeout: 10_000 });
   await samplePage.setViewportSize({ width: 390, height: 844 });
-  await samplePage.waitForTimeout(250);
-  await samplePage.getByTitle("Open live preview").click();
+  await samplePage.waitForTimeout(800);
+  await samplePage.locator(".mobile-preview-button").click();
   await samplePage.locator(".preview-panel.expanded").waitFor({ state: "visible", timeout: 5_000 });
   await sampleFrame.locator("#start-button").click();
   await sampleFrame.locator("#game-message").waitFor({ state: "hidden", timeout: 5_000 });
@@ -268,7 +285,7 @@ try {
   assert.ok(rightBox, "mobile right-direction control should have a visible hit area");
   await samplePage.mouse.move(rightBox.x + rightBox.width / 2, rightBox.y + rightBox.height / 2);
   await samplePage.mouse.down();
-  await samplePage.waitForTimeout(350);
+  await samplePage.waitForTimeout(900);
   await samplePage.mouse.up();
   const sampleAfter = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug?.x);
   const sampleDebug = await sampleFrame.locator("body").evaluate(() => window.__geneStarterDebug);
@@ -287,7 +304,7 @@ try {
     if (typeof window.__geneTestStep !== "function") throw new Error("starter deterministic update hook missing");
     window.__geneTestStep(0.32);
   });
-  await samplePage.waitForTimeout(320);
+  await samplePage.waitForTimeout(900);
   const afterGamepad = await sampleFrame.locator("body").evaluate(() => ({ x: window.__geneStarterDebug?.x, controller: window.__geneControllerStatus }));
   assert.ok(typeof beforeGamepad === "number" && typeof afterGamepad.x === "number" && afterGamepad.x > beforeGamepad, "Gamepad API analog input should move the starter player; before=" + beforeGamepad + "; after=" + JSON.stringify(afterGamepad));
   assert.equal(afterGamepad.controller?.connected, true, "starter reports a connected gamepad honestly");
@@ -303,7 +320,7 @@ try {
     localStorage.setItem(activeKey, project.id);
   }, { project: fixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
   await mobilePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await mobilePage.getByTitle("Open live preview").click();
+  await mobilePage.locator(".mobile-preview-button").click();
   await mobilePage.locator(".preview-panel.expanded").waitFor({ state: "visible", timeout: 5000 });
   await mobilePage.locator('iframe[title="GENE live game preview"]').waitFor({ timeout: 5000 });
   assert.equal(await mobilePage.getByTitle("Close expanded preview").isVisible(), true, "mobile users can open and close the live game preview");

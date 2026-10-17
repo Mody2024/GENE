@@ -2,7 +2,41 @@ export type ProjectKind = "game" | "app";
 export type Mode = "plan" | "build";
 export type Thinking = "fast" | "balanced" | "deep";
 export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error" };
-export type Question = { id: string; text: string; why?: string; choices?: string[] };
+export type Question = {
+  id: string;
+  text: string;
+  why?: string;
+  choices?: string[];
+  /** The option GENE suggests; shown with a badge. */
+  recommended?: string;
+  /** Allow several choices before continuing. */
+  multi?: boolean;
+  /** 1-based position and total, for the interview progress bar. */
+  step?: number;
+  total?: number;
+};
+export type ArtAssetPlanItem = { id: string; kind: "sprite" | "background" | "icon" | "logo"; prompt: string };
+/** Approved design document derived from the interview answers and plan (see lib/design-doc.ts). */
+export type DesignDoc = {
+  version: 1;
+  title: string;
+  pitch: string;
+  genre: string;
+  audience: string;
+  platform: string;
+  camera: string;
+  controls: string;
+  pillars: string[];
+  coreLoop: string[];
+  content: { scope: string; levels: number; progression: string };
+  art: { style: string; palette: string[] };
+  audio: { mood: string; notes: string };
+  scope: { prototypeMinutes: number; fullMinutes: number };
+  milestones: string[];
+  risks: string[];
+  assetPlan: ArtAssetPlanItem[];
+  createdAt: string;
+};
 export type GamePlan = { title: string; summary: string; kind?: ProjectKind; engine: "canvas2d" | "webgl3d" | "webapp"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
 export type BuildVersion = { number: number; label: string; files: Record<string, string>; createdAt: string; testSummary: string };
 export type ReferenceFile = { id: string; name: string; mimeType: string; kind: "image" | "text"; dataBase64?: string; textContent?: string; size: number };

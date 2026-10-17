@@ -2,7 +2,21 @@
 
 GENE is an AI-assisted workspace for building and editing self-contained web apps and browser games through natural-language chat. This repository is the source of truth for the app. Build/test status must describe work the app actually performed; failed generation is rejected rather than presented as a successful game.
 
-## Current milestone: GENE 1.2 Flash foundation
+## GENE 2.0 — free-only, bigger games, safer output
+
+Everything in 2.0 runs on free tiers (Gemini free keys, Groq free, OpenRouter models priced at zero). No paid model or credit is ever selected.
+
+- **Self-healing free model router.** GENE reads OpenRouter's public catalog, keeps only models priced 0/0, ranks them and rotates past any that answer "unavailable for free", rate-limited or broken (dead models are remembered for a while). No model setting is needed; `GENE_OPENROUTER_MODEL` is honoured only if the live catalog confirms it is free.
+- **Crash-proof generated code.** A lexical analyzer auto-repairs `let hazards;` used as an array and rejects builds that use undeclared or out-of-scope identifiers, so errors like `hazards is undefined` are fixed before the preview runs. A second free provider reviews code when a backup key exists (`GENE_AI_REVIEW=false` disables it).
+- **Built-in audio kit.** Every preview, export and play page gets `GeneAudio` (procedural Web Audio: music moods, 20+ sound effects, mute and volume panel, autoplay-unlock handling). It never throws, so audio can no longer take a game down.
+- **Free art studio.** `/api/illustrate` draws original SVG sprites, icons, logos and backgrounds with the free providers; output passes a whitelist sanitizer and is exposed to games as `GENE_ART`. You can also import SVG/OBJ/MTL assets.
+- **Automatic free research.** `/api/research` uses Wikipedia plus the CC0 Poly Haven catalog and builds search links for Kenney, OpenGameArt, Quaternius, itch.io, Sketchfab, Freesound and ambientCG. Notes are attached to the project as a builder reference. The sandboxed runtime cannot download files itself, so downloaded CC0 assets are added with Import.
+- **Adaptive interview and design document.** Questions adapt to the genre, show progress and a recommended answer, and work offline. The answers become a design document (pillars, core loop, milestones, risks, art plan) that is sent with every build request.
+- **Big-game architecture playbook** in the prompts (scenes, state, content data, save, juice) and a redesigned studio stylesheet.
+
+Limits: free tiers have quotas; the code scanner is heuristic; AI-drawn art is SVG, not photorealistic models.
+
+## Earlier milestone: GENE 1.2 Flash foundation
 
 Implemented in this branch:
 - Chat-first workspace inspired by professional AI coding tools, with working navigation and dark/light themes.

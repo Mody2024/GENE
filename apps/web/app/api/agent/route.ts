@@ -3,6 +3,9 @@ import { AGENT_SYSTEM, makeAgentInput } from "../../lib/prompts";
 import type { AgentResponse } from "../../lib/types";
 import { applyPatchBatch } from "../../lib/patch-engine";
 import { ensurePlanMechanics, ensurePlanTasks } from "../../lib/plan-contract.mjs";
+import { extractJsonObjectText, hasAlternateProviderKeys, runAlternateChain } from "../../lib/providers";
+import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
+import { nextInterviewQuestion } from "../../lib/design-doc";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -102,7 +105,10 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
       id: q.id.trim().slice(0, 100),
       text: q.text.trim().slice(0, 1400),
       ...(typeof q.why === "string" && q.why.trim() ? { why: q.why.trim().slice(0, 800) } : {}),
-      ...(Array.isArray(q.choices) ? { choices: q.choices.filter((choice: unknown): choice is string => typeof choice === "string" && choice.trim().length > 0).slice(0, 8).map((choice: string) => choice.trim().slice(0, 180)) } : {})
+      ...(Array.isArray(q.choices) ? { choices: q.choices.filter((choice: unknown): choice is string => typeof choice === "string" && choice.trim().length > 0).slice(0, 8).map((choice: string) => choice.trim().slice(0, 180)) } : {}),
+      ...(typeof q.recommended === "string" && q.recommended.trim() ? { recommended: q.recommended.trim().slice(0, 180) } : {}),
+      ...(q.multi === true ? { multi: true } : {}),
+      ...(Number.isInteger(q.step) && Number.isInteger(q.total) && q.step >= 1 && q.total >= q.step && q.total <= 20 ? { step: q.step, total: q.total } : {})
     };
   }
 
@@ -218,6 +224,23 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (/\.js$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
+  // Generated-code safety pass. Repairs the most common runtime crash deterministically
+  // (a collection declared without a value, e.g. `let hazards;`, later used as an array) and,
+  // only when the COMPLETE project is present, rejects names that are used but never declared
+  // or declared in a different scope. A partial file list (single stage, edit) skips scope checks.
+  {
+    const safety = analyzeProjectScripts(normalized, { scopeChecks: operation === "build" || operation === "surprise" });
+    for (const repaired of safety.repaired) {
+      const target = normalized.find(file => file.path === repaired.path);
+      if (target) {
+        new Function(repaired.content);
+        target.content = repaired.content;
+      }
+    }
+    if (safety.errors.length) {
+      throw new Error("Build rejected: the generated JavaScript would crash at runtime. " + safety.errors.slice(0, 3).map(error => error.message).join(" | ") + " No files were saved.");
+    }
+  }
   if (operation === "build" || operation === "surprise") {
     const byPath = Object.fromEntries(normalized.map(f => [f.path, f.content]));
     for (const path of ["game.html", "game.css", "game.js", "game-spec.json"]) {
@@ -265,7 +288,28 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       const hasMusicPlayback = /\b(?:startMusic|playMusic|musicLoop|musicGain|startProceduralMusic|beginMusic|startBgm|playBgm|startBackgroundMusic|playBackgroundMusic|musicSource|musicOscillator|musicNode|bgmPlayer|musicPlayer)\b/i.test(runtimeSource) ||
         /(?:music|bgm|backgroundMusic)[A-Za-z0-9_$]*\.(?:start|play)\s*\(/i.test(runtimeSource);
       const hasAudioControls = /\b(?:setMasterVolume|setMusicVolume|setSfxVolume|masterGain|musicVolume|sfxVolume|audioSettings|soundSettings|masterVolume|muteAudio|toggleMute|volumeSlider|musicGain|sfxGain)\b/i.test(runtimeSource + "\\n" + html);
-      if (audio?.enabled !== true ||
+      // GENE Runtime Kit: games may use the built-in, tested GeneAudio engine (injected into every runtime)
+      // instead of hand-writing Web Audio. Using it satisfies the audio contract; spec metadata is filled in.
+      const kitSfxNames = Array.from(runtimeSource.matchAll(/GeneAudio\s*\.\s*(?:sfx|play|playSfx)\s*\(\s*["']([\w-]+)["']/g)).map(match => match[1]);
+      const usesKit = /\bGeneAudio\s*\.\s*(?:sfx|play|playSfx|music|startMusic|playMusic)\b/.test(runtimeSource);
+      if (usesKit) {
+        const kitMusic = /GeneAudio\s*\.\s*(?:music\s*\.\s*(?:start|setMood)|startMusic|playMusic)\s*\(/.test(runtimeSource);
+        const kitSfxCalls = (runtimeSource.match(/GeneAudio\s*\.\s*(?:sfx|play|playSfx)\s*\(/g) || []).length;
+        const kitControls = /GeneAudio\s*\.\s*(?:createSettingsPanel|setMasterVolume|setMusicVolume|setSfxVolume|setVolume|toggleMute|setMuted)\b/.test(runtimeSource);
+        if (!kitMusic || kitSfxCalls < 2 || !kitControls) {
+          throw new Error("Build rejected: the game uses GeneAudio but is incomplete. Call GeneAudio.music.start(mood) when play begins, call GeneAudio.sfx(name) from at least two real gameplay/UI events, and expose audio settings with GeneAudio.createSettingsPanel(container) (or a volume/mute control wired to GeneAudio.setMasterVolume / toggleMute). No files were saved.");
+        }
+        const events: Record<string, string> = { ...(audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? audio.events : {}) };
+        for (const name of kitSfxNames) if (!(name in events)) events[name] = name;
+        for (const fallback of ["ui", "hit", "pickup"]) if (Object.keys(events).length < 3 && !(fallback in events)) events[fallback] = fallback;
+        const repairedAudio = { ...(audio && typeof audio === "object" ? audio : {}), enabled: true, implementation: "procedural-web-audio", buses: ["master", "music", "sfx"], events };
+        if (JSON.stringify(repairedAudio) !== JSON.stringify(audio)) {
+          spec.audio = repairedAudio;
+          byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+          const specFile = normalized.find(file => file.path === "game-spec.json");
+          if (specFile) specFile.content = byPath["game-spec.json"];
+        }
+      } else if (audio?.enabled !== true ||
           !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
           !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
           events.length < 3 ||
@@ -399,17 +443,21 @@ export async function POST(request: NextRequest) {
         normalizedSpecChanged = true;
       }
       const validationFiles = files.map(file => ({ ...file, content: byPath[file.path] ?? file.content }));
-      validateFiles(validationFiles, "build", body.project?.plan?.engine, "build", projectKind);
+      // validateFiles repairs file objects in place, so snapshot the incoming contents first.
+      const contentBefore = new Map(validationFiles.map(file => [file.path, file.content] as [string, string]));
+      const validated = validateFiles(validationFiles, "build", body.project?.plan?.engine, "build", projectKind);
+      // Return every file the validator normalised or repaired (spec contract fixes and runtime-safety repairs).
+      const normalizedFiles = validated.filter(file => contentBefore.get(file.path) !== file.content || (normalizedSpecChanged && file.path === "game-spec.json"));
       return NextResponse.json({
         ok: true,
         aiMode: "validation",
         result: {
-          reply: "Assembled project passed GENE's server-side source and project-contract validation.",
-          files: normalizedSpecChanged ? [{ path: "game-spec.json", content: byPath["game-spec.json"] }] : [],
+          reply: "Assembled project passed GENE's server-side source and project-contract validation." + (normalizedFiles.some(file => /\.m?js$/i.test(file.path)) ? " Runtime-safety repairs were applied to generated JavaScript." : ""),
+          files: normalizedFiles,
           plan: body.project?.plan || null,
           complete: true,
           needsUserDecision: false,
-          tests: { passed: ["Required project files present", "Project spec valid", "JavaScript syntax valid", "Runtime contract checks passed"], failed: [] }
+          tests: { passed: ["Required project files present", "Project spec valid", "JavaScript syntax valid", "Undeclared-variable and scope scan passed", "Runtime contract checks passed"], failed: [] }
         }
       });
     } catch (error) {
@@ -437,20 +485,7 @@ export async function POST(request: NextRequest) {
     const known = Object.keys(answers);
     if (body.operation === "interview") {
       const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
-      const appQuestions = [
-        { id: "audience", text: "Who is this app mainly for?", why: "The primary audience determines the main workflow and interface.", choices: ["Just me / personal use", "Customers or the public", "A team or business", "Use smart defaults"] },
-        { id: "platform", text: "Where should the app work first?", why: "This determines responsive layout and the most important input patterns.", choices: ["Desktop web", "Mobile web", "Desktop and mobile", "Use smart defaults"] },
-        { id: "look", text: "What visual direction fits it?", why: "A concrete art direction makes the app feel designed rather than generic.", choices: ["Minimal and professional", "Bold and playful", "Premium glass / editorial", "Use smart defaults"] },
-        { id: "data", text: "Does it need to save user data?", why: "Persistence changes the architecture and validation requirements.", choices: ["No, local temporary state", "Save on this device", "Accounts and cloud data", "Recommend the simplest reliable option"] }
-      ];
-      const gameQuestions = [
-        { id: "genre", text: "What should the core gameplay feel like?", why: "This defines the main loop, challenge, and win/loss rules.", choices: ["Action / combat", "Adventure / story", "Platformer / precision", "Racing / endless runner", "Survival / crafting", "Puzzle / strategy", "Use a creative surprise"] },
-        { id: "camera", text: "What perspective should players use?", why: "Camera and perspective affect controls, level design, and performance.", choices: ["2D side view", "2D top-down", "3D first-person", "3D third-person", "Choose what best fits the idea"] },
-        { id: "content", text: "What should make the full game worth finishing?", why: "The prototype proves the loop; the full game needs distinct content and progression.", choices: ["Story, missions, and an ending", "Levels with new mechanics", "Runs, unlocks, and replayability", "Co-op or competitive play", "A mix chosen for the idea"] },
-        { id: "controls", text: "Which controls must work?", why: "Controls are planned and tested as part of the game, not added as an afterthought.", choices: ["Keyboard and mouse", "Touch controls", "Controller / gamepad", "Keyboard, touch, and controller", "Use the best supported defaults"] }
-      ];
-      const bank = projectKind === "app" ? appQuestions : gameQuestions;
-      const nextQuestion = bank.find(question => !Object.prototype.hasOwnProperty.call(answers, question.id));
+      const nextQuestion = nextInterviewQuestion(projectKind, answers, original);
       if (nextQuestion) {
         return NextResponse.json({
           ok: true,
@@ -687,100 +722,51 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Cross-provider fallback: Gemini is the default, not a hard dependency.
-  // Add GROQ_API_KEY and/or OPENROUTER_API_KEY in Vercel to enable these routes.
-  if (!payload) {
-    const alternateProviders: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
-    if (process.env.GROQ_API_KEY?.trim()) {
-      alternateProviders.push({
-        name: "groq",
-        key: process.env.GROQ_API_KEY.trim(),
-        endpoint: "https://api.groq.com/openai/v1/chat/completions",
-        model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
-      });
-    }
-    if (process.env.OPENROUTER_API_KEY?.trim()) {
-      alternateProviders.push({
-        name: "openrouter",
-        key: process.env.OPENROUTER_API_KEY.trim(),
-        endpoint: "https://openrouter.ai/api/v1/chat/completions",
-        model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
-        headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder" }
-      });
-    }
-    for (const provider of alternateProviders) {
-      if (Date.now() - startedAt > totalBudgetMs - 2_500) break;
-      lastFailureProvider = provider.name === "openrouter" ? "OpenRouter" : "Groq";
-      // GENE's OpenRouter fallback must never silently spend credits. Only call
-      // model IDs explicitly marked as free; paid routes require a separate opt-in
-      // in a future UI rather than an environment-variable override.
-      if (provider.name === "openrouter" && !/:free$/i.test(provider.model)) {
-        lastFailure = { status: 402, detail: "Configured OpenRouter model is not marked :free (" + provider.model + "). GENE blocked this request to avoid unexpected provider charges." };
-        continue;
-      }
-      try {
-        const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
-        const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
-        const remainingMs = Math.max(1_000, totalBudgetMs - (Date.now() - startedAt) - 500);
-        const response = await fetch(provider.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + provider.key,
-            ...(provider.headers || {})
-          },
-          body: JSON.stringify({
-            model: provider.model,
-            messages: [{ role: "system", content: system }, { role: "user", content: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete." }],
-            response_format: { type: "json_object" },
-            temperature: body.operation === "interview" ? 0.35 : 0.2,
-            max_tokens: body.operation === "buildPart" ? 5_500 : isBuild ? 7_000 : body.operation === "plan" ? 5_000 : body.operation === "chat" || body.operation === "research" ? 6_000 : 3_000
-          }),
-          signal: AbortSignal.timeout(Math.min(14_000, remainingMs))
-        });
-        const data = await response.json().catch(() => null);
-        const content = data?.choices?.[0]?.message?.content;
-        if (!response.ok || typeof content !== "string" || !content.trim()) {
-          lastFailure = { status: response.status || 502, detail: provider.name + " fallback: " + String(data?.error?.message || "empty response") };
-          continue;
-        }
-        const alternateFinish = String(data?.choices?.[0]?.finish_reason || "");
-        if (alternateFinish === "length") {
-          outputFailure = "truncated";
-          lastFailure = { status: 422, detail: provider.name + " hit its output token limit before completing JSON." };
-          continue;
-        }
-        let parsed: unknown;
-        try { parsed = JSON.parse(content); } catch {
-          outputFailure = "malformed";
-          lastFailure = { status: 422, detail: provider.name + " returned incomplete or invalid JSON." };
-          continue;
-        }
-        outputFailure = null;
-        payload = { candidates: [{ content: { parts: [{ text: JSON.stringify(parsed) }] }, finishReason: "STOP" }] };
-        successfulModel = provider.model;
-        successfulProvider = provider.name;
-        outputFailure = null;
-        break;
-      } catch (error) {
-        lastFailure = { status: 504, detail: provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network error") };
-      }
+  // Cross-provider fallback (free routes only). Gemini is the default, not a hard dependency.
+  // The router reads OpenRouter's live catalog, keeps only models whose prompt and completion
+  // prices are zero, and rotates through Groq plus those free models. It never calls a model
+  // that is not verified free, to avoid unexpected provider charges.
+  let chainTried: string[] = [];
+  if (!payload && hasAlternateProviderKeys()) {
+    const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
+    const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
+    const chain = await runAlternateChain({
+      system,
+      user: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete.",
+      maxTokens: body.operation === "buildPart" ? 5_500 : isBuild ? 7_000 : body.operation === "plan" ? 5_000 : body.operation === "chat" || body.operation === "research" ? 6_000 : 3_000,
+      temperature: body.operation === "interview" ? 0.35 : 0.2,
+      json: true,
+      deadline: startedAt + totalBudgetMs,
+      perCallMs: 15_000,
+      maxAttempts: 5,
+      siteTitle: "GENE Builder",
+      validate: text => extractJsonObjectText(text) !== null
+    });
+    if (chain.ok) {
+      payload = { candidates: [{ content: { parts: [{ text: extractJsonObjectText(chain.text) as string }] }, finishReason: "STOP" }] };
+      successfulModel = chain.model;
+      successfulProvider = chain.provider;
+      outputFailure = null;
+    } else {
+      lastFailure = { status: chain.failure.status, detail: chain.failure.detail };
+      if (chain.failure.provider !== "none") lastFailureProvider = chain.failure.provider;
+      chainTried = chain.triedModels;
+      if (chain.truncated) outputFailure = "truncated";
+      else if (chain.malformed) outputFailure = "malformed";
     }
   }
 
   if (!payload) {
-    if (lastFailureProvider === "OpenRouter") {
+    if (chainTried.length) {
       const detail = lastFailure.detail || "No additional provider detail was returned.";
-      if (lastFailure.status === 402 || /payment required|insufficient credits|not enough credits|paid model|requires credits|balance too low/i.test(detail)) {
-        return jsonError("OpenRouter rejected the fallback because this request appears to require credits or a paid route. GENE defaults to a free model, but the configured GENE_OPENROUTER_MODEL can override it and free-provider capacity can vary. Set GENE_OPENROUTER_MODEL to a model marked :free, or remove that override, and verify the OpenRouter key. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_CREDITS_OR_PAID_ROUTE");
-      }
+      const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). ";
       if (lastFailure.status === 401 || lastFailure.status === 403) {
-        return jsonError("OpenRouter rejected its API key or account access. Verify OPENROUTER_API_KEY in the deployment environment and redeploy. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
+        return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
       }
-      if (lastFailure.status === 429 || /rate.?limit|too many requests|quota/i.test(detail)) {
-        return jsonError("OpenRouter's free route is rate-limited or temporarily out of capacity. This does not by itself mean the model is paid. Wait and retry, or configure another available provider. Gemini also failed before this fallback. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");
+      if (lastFailure.status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) {
+        return jsonError(summary + "Free routes are rate-limited or out of capacity right now. Wait a minute and retry, or add another free Gemini key (GEMINI_API_KEY_2). Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");
       }
-      return jsonError("GENE tried Gemini and then its OpenRouter fallback, but OpenRouter did not complete the request. Check the configured model and API key, then retry. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_FALLBACK_FAILED");
+      return jsonError(summary + "None of them completed this request. GENE discovers free models automatically, so no model setting needs changing; retry shortly or add another free provider key. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_FALLBACK_FAILED");
     }
     if (outputFailure) {
       const truncated = outputFailure === "truncated";
@@ -817,61 +803,62 @@ export async function POST(request: NextRequest) {
     }
     result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
     if (result.plan) result.plan.engine = projectKind === "app" ? "webapp" : body.project?.preferredEngine === "canvas2d" || body.project?.preferredEngine === "webgl3d" ? body.project.preferredEngine : result.plan.engine;
-    if (process.env.GENE_AI_REVIEW?.trim().toLowerCase() === "true" &&
-        ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
-        Array.isArray(result.files) && result.files.length > 0) {
-      const reviewer: { name: string; key: string; endpoint: string; model: string; headers: Record<string, string> } | null = successfulProvider === "groq"
-        ? (process.env.OPENROUTER_API_KEY?.trim() ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } } : null)
-        : successfulProvider === "openrouter"
-          ? (process.env.GROQ_API_KEY?.trim() ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} } : null)
-          : process.env.GROQ_API_KEY?.trim()
-            ? { name: "groq", key: process.env.GROQ_API_KEY.trim(), endpoint: "https://api.groq.com/openai/v1/chat/completions", model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile", headers: {} }
-            : process.env.OPENROUTER_API_KEY?.trim()
-              ? { name: "openrouter", key: process.env.OPENROUTER_API_KEY.trim(), endpoint: "https://openrouter.ai/api/v1/chat/completions", model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free", headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Builder Reviewer" } }
-              : null;
-      if (reviewer) {
-        try {
-          const candidatePaths = new Set(result.files.map(file => file.path));
-          const reviewInput = {
-            operation: body.operation,
-            stagePath: body.stagePath || null,
-            projectKind,
-            plan: body.project?.plan || result.plan || null,
-            existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => isSafeProjectPath(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
-            candidateFiles: result.files.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
-          };
-          const reviewResponse = await fetch(reviewer.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + reviewer.key, ...reviewer.headers },
-            body: JSON.stringify({
-              model: reviewer.model,
-              messages: [
-                { role: "system", content: "You are GENE's independent code reviewer. Find concrete runtime, syntax, control, and contract bugs; do not redesign working code just for style. Return one JSON object: {reply:string,files:[{path:string,content:string}]}. If the candidate is sound or you cannot confidently fix it, return files:[] and summarize risks briefly. If you change code, return complete replacements only for paths already present in candidateFiles. Preserve the user's request, existing behavior, and no-watermark rule. No markdown." },
-                { role: "user", content: "Review this candidate before GENE validates/saves it. Return full replacement files only for high-confidence fixes.\n" + JSON.stringify(reviewInput) }
-              ],
-              response_format: { type: "json_object" },
-              temperature: 0.1,
-              max_tokens: body.operation === "buildPart" ? 3_000 : 4_000
-            }),
-            signal: AbortSignal.timeout(7_000)
-          });
-          const reviewData = await reviewResponse.json().catch(() => null);
-          const reviewContent = reviewData?.choices?.[0]?.message?.content;
-          if (reviewResponse.ok && typeof reviewContent === "string") {
-            const reviewResult = JSON.parse(reviewContent);
-            if (Array.isArray(reviewResult.files) && reviewResult.files.length > 0 &&
-                reviewResult.files.every((file: any) => file && candidatePaths.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
-              const replacements = new Map<string, string>(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
-              result.files = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
-              result.reply = result.reply + "\n\nA second AI reviewer checked the code and suggested targeted corrections before validation.";
-              reviewedBy = reviewer.name + "/" + reviewer.model;
-            } else if (typeof reviewResult.reply === "string" && reviewResult.reply.trim()) {
-              reviewedBy = reviewer.name + "/" + reviewer.model;
+    // Independent second-opinion review is ON by default whenever a free backup provider key is
+    // configured and enough time budget remains. Set GENE_AI_REVIEW=false to disable it.
+    const reviewEnabled = process.env.GENE_AI_REVIEW?.trim().toLowerCase() !== "false" &&
+      hasAlternateProviderKeys() &&
+      Date.now() - startedAt < totalBudgetMs - 12_000 &&
+      ["buildPart", "build", "surprise", "edit", "chat"].includes(body.operation) &&
+      Array.isArray(result.files) && result.files.length > 0;
+    if (reviewEnabled) {
+      try {
+        const candidatePaths = new Set(result.files!.map(file => file.path));
+        const reviewInput = {
+          operation: body.operation,
+          stagePath: body.stagePath || null,
+          projectKind,
+          plan: body.project?.plan || result.plan || null,
+          existingFiles: Object.fromEntries(Object.entries(body.project?.files || {}).filter(([path]) => isSafeProjectPath(path)).map(([path, content]) => [path, String(content).slice(0, 12_000)])),
+          candidateFiles: result.files!.map(file => ({ path: file.path, content: file.content.slice(0, 55_000) }))
+        };
+        const review = await runAlternateChain({
+          system: "You are GENE's independent code reviewer. Find concrete runtime, syntax, control, and contract bugs; do not redesign working code just for style. Specifically look for variables or arrays (for example hazards, enemies, bullets, particles) that are read before they are declared or initialised, undefined function calls, audio calls that are not guarded for suspended or unsupported audio, and loops that can throw. Return one JSON object: {reply:string,files:[{path:string,content:string}]}. If the candidate is sound or you cannot confidently fix it, return files:[] and summarize risks briefly. If you change code, return complete replacements only for paths already present in candidateFiles. Preserve the user's request, existing behavior, and no-watermark rule. No markdown.",
+          user: "Review this candidate before GENE validates/saves it. Return full replacement files only for high-confidence fixes.\n" + JSON.stringify(reviewInput),
+          maxTokens: body.operation === "buildPart" ? 6_000 : 8_000,
+          temperature: 0.1,
+          json: true,
+          deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 10_000),
+          perCallMs: 9_000,
+          maxAttempts: 2,
+          groqLimit: 1,
+          openrouterLimit: 2,
+          siteTitle: "GENE Builder Reviewer",
+          validate: text => extractJsonObjectText(text) !== null
+        });
+        if (review.ok) {
+          const reviewResult = JSON.parse(extractJsonObjectText(review.text) as string);
+          if (Array.isArray(reviewResult.files) && reviewResult.files.length > 0 &&
+              reviewResult.files.every((file: any) => file && candidatePaths.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
+            const replacements = new Map<string, string>(reviewResult.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
+            const reviewedFiles = result.files!.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
+            // Only accept reviewer output that still parses; a broken "fix" must never replace good code.
+            let reviewedSyntaxOk = true;
+            for (const file of reviewedFiles) {
+              if (/\.js$/i.test(file.path)) {
+                try { new Function(file.content); } catch { reviewedSyntaxOk = false; }
+              }
             }
+            if (reviewedSyntaxOk) {
+              result.files = reviewedFiles;
+              result.reply = result.reply + "\n\nA second AI reviewer checked the code and suggested targeted corrections before validation.";
+              reviewedBy = review.provider + "/" + review.model;
+            }
+          } else if (typeof reviewResult.reply === "string" && reviewResult.reply.trim()) {
+            reviewedBy = review.provider + "/" + review.model;
           }
-        } catch {
-          // Independent review is best-effort; it must never block an otherwise valid build.
         }
+      } catch {
+        // Independent review is best-effort; it must never block an otherwise valid build.
       }
     }
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];

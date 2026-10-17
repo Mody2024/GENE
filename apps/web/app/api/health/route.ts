@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getFreeOpenRouterModels } from "../../lib/providers";
 
 export const runtime = "nodejs";
 // This endpoint reports runtime environment state. Do not let Next.js statically
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
+  const freeOpenRouterModels = process.env.OPENROUTER_API_KEY?.trim() ? await getFreeOpenRouterModels(4).catch(() => [] as string[]) : [];
   const geminiKeys = [
     process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3,
     process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY_5,
@@ -28,7 +30,8 @@ export async function GET() {
     app: "gene-web",
     aiConfigured: hasGemini || hasGroq || hasOpenRouter,
     providers: { gemini: hasGemini, groq: hasGroq, openrouter: hasOpenRouter },
-    model: hasGemini ? (process.env.GENE_FAST_MODEL || "gemini-3.8-flash") : hasGroq ? (process.env.GENE_GROQ_MODEL || "llama-3.3-70b-versatile") : hasOpenRouter ? (process.env.GENE_OPENROUTER_MODEL || "qwen/qwen3-coder:free") : "No provider configured",
+    freeModels: { openrouter: freeOpenRouterModels },
+    model: hasGemini ? (process.env.GENE_FAST_MODEL || "gemini-3.8-flash") : hasGroq ? (process.env.GENE_GROQ_MODEL || "llama-3.3-70b-versatile") : hasOpenRouter ? (freeOpenRouterModels[0] || "auto-discovered free model") : "No provider configured",
     publishConfigured: hasPublishToken && hasPublishProject && hasPublishPassword,
     binaryBuildConfigured: buildConfigured,
     binaryBuildConfig: {

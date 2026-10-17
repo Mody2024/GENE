@@ -7,6 +7,10 @@ import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
 import SceneStudio from "./components/SceneStudio";
 import AudioStudio from "./components/AudioStudio";
+import ArtStudio from "./components/ArtStudio";
+import DesignDocPanel from "./components/DesignDocPanel";
+import InterviewCard from "./components/InterviewCard";
+import { buildDesignDoc } from "./lib/design-doc";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
@@ -46,13 +50,12 @@ function now() { return new Date().toISOString(); }
 function explainAgentError(error: unknown, code?: unknown): string {
   const rawMessage = error instanceof Error ? error.message : String(error || "Unknown error");
   const raw = (rawMessage + " " + String(code || "")).trim();
-  if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "The backup AI route needs credits or selected a paid model. GENE tried its configured backup after Gemini failed, but no project changes were applied. Use a model marked :free and remove any paid-model override, or add credits to that provider.";
+  if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "GENE only uses free AI models, and none of its free backups was available for this request. No project changes were applied. GENE re-discovers free models automatically, so just retry in a minute or add another free Gemini key.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
   if (/OPENROUTER_FALLBACK_FAILED/i.test(raw)) {
-    const detailMatch = raw.match(/(?:Detail|Provider detail):\s*([\s\S]+)/i);
-    const detail = (detailMatch?.[1] || "").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})\b/g, "[redacted]").slice(0, 280);
-    return "GENE tried Gemini and its OpenRouter fallback, but neither completed this request. Check provider key validity, free-model availability, and quota; project files were preserved." + (detail ? " Provider detail: " + detail : "");
+    // The server message already names the free models it tried and the provider detail; show it with keys redacted.
+    return rawMessage.replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,})\b/g, "[redacted]").slice(0, 700);
   }
   if (/GEMINI_CAPACITY_BUSY|overloaded|high demand|temporarily unavailable/i.test(raw)) return "The AI service is temporarily busy. GENE tried its configured fallback path but did not get a successful response. Retry shortly; your existing project files were preserved.";
   if (/timeout|timed out|aborted|ETIMEDOUT|GEMINI_TIMEOUT/i.test(raw)) return "The AI request timed out before it finished. Completed checkpoints and existing project files were preserved; retry with a smaller task.";
@@ -118,7 +121,14 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
   return mapped;
 }
 
-function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "") {
+/** Ordered exported paths of every project script except the main one, so extra modules load in exports too. */
+function moduleScriptPaths(files: Record<string, string>, kind: ProjectKind): string[] {
+  return Object.keys(files)
+    .filter(path => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
+    .sort((a, b) => a.localeCompare(b))
+    .map(path => exportProjectPath(path, kind));
+}
+function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "", modulePaths: string[] = []) {
   const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
   const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
   let body = bodyMatch ? bodyMatch[1] : source
@@ -131,7 +141,7 @@ function standaloneDocument(source: string, title: string, cssName: string, jsNa
     '<meta name="theme-color" content="#101411">\n<meta name="description" content="' + safeTitle + '">\n' +
     '<title>' + safeTitle + '</title>\n<link rel="manifest" href="manifest.webmanifest">\n' +
     '<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="stylesheet" href="' + cssName + '">\n' +
-    '</head>\n<body>\n' + body + '\n' + runtimeBootstrap + '\n<script src="' + jsName + '" defer></script>\n<script src="pwa-register.js" defer></script>\n</body>\n</html>';
+    '</head>\n<body>\n' + body + '\n' + runtimeBootstrap + '\n' + modulePaths.map(path => '<script src="' + path.replace(/"/g, "&quot;") + '" defer></script>').join("\n") + '\n<script src="' + jsName + '" defer></script>\n<script src="pwa-register.js" defer></script>\n</body>\n</html>';
 }
 
 
@@ -166,6 +176,8 @@ export default function Home() {
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
+  const [freeModels, setFreeModels] = useState<string[]>([]);
+  const researchedProjects = useRef<Set<string>>(new Set());
   const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
@@ -202,6 +214,7 @@ export default function Home() {
   const projectImportRef = useRef<HTMLInputElement>(null);
   const autoRepairAttempts = useRef(0);
   const runtimeRefreshAttempts = useRef(0);
+  const lastRuntimeError = useRef("");
 
   useEffect(() => {
     try {
@@ -225,6 +238,7 @@ export default function Home() {
       setPublishConfigured(Boolean(d.publishConfigured));
       setBinaryBuildConfigured(Boolean(d.binaryBuildConfigured));
       if (d.model) setAiModel(d.model);
+      if (Array.isArray(d.freeModels?.openrouter)) setFreeModels(d.freeModels.openrouter.slice(0, 4));
     }).catch(() => setApiReady(false));
   }, []);
 
@@ -331,6 +345,7 @@ export default function Home() {
         }
         if (state === "error") {
           const errorText = String(event.data.message || event.data.stack || "unknown runtime error").slice(0, 1200);
+          lastRuntimeError.current = errorText;
           // Browser previews can hit a transient iframe/context race. Retry the
           // actual preview once before invoking the AI repair path; never loop reloads.
           if (runtimeRefreshAttempts.current < 1) {
@@ -416,10 +431,72 @@ export default function Home() {
       "[250,650,1200,2000,3200,4300].forEach(function(ms){setTimeout(report,ms);});",
       "})();"
     ].join("\n");
-    const instrumentation = "(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
+    const instrumentation = "(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;var all=[];function Wrapped(a){var c=new AC(a);all.push(c);return c;}Wrapped.prototype=AC.prototype;try{window.AudioContext=Wrapped;window.webkitAudioContext=Wrapped;}catch(e){}function unlock(){all.forEach(function(c){if(c.state==='suspended'){try{c.resume();}catch(e){}}});}['pointerdown','touchstart','keydown','click'].forEach(function(t){window.addEventListener(t,unlock,true);});})();(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
     const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files);
     return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
+
+  const designDoc = useMemo(() => {
+    if (!project) return null;
+    const hasDecisions = Boolean(project.plan) || Object.keys(project.answers || {}).length > 0;
+    return hasDecisions ? buildDesignDoc(project) : null;
+    // The document is derived data; recompute only when the inputs it reads change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, project?.answers, project?.plan, project?.name, project?.initialPrompt, project?.kind]);
+
+  /** Merge files into the project with a functional update so batch saves never clobber each other. */
+  function addProjectFiles(entries: Record<string, string | null>, label: string, createVersion = true) {
+    setProject(prev => {
+      if (!prev) return prev;
+      const files = { ...prev.files };
+      for (const [path, content] of Object.entries(entries)) {
+        if (content === null) delete files[path];
+        else files[path] = content;
+      }
+      const version: BuildVersion = {
+        number: (prev.versions[0]?.number || 0) + 1,
+        label,
+        files: { ...files },
+        createdAt: now(),
+        testSummary: "Asset files saved. Integration into gameplay still needs verification in the preview."
+      };
+      return { ...prev, files, versions: createVersion ? [version, ...prev.versions].slice(0, 8) : prev.versions, updatedAt: now() };
+    });
+    setPreviewKey(n => n + 1);
+  }
+
+  function addResearchNote(topic: string, notes: string) {
+    setProject(prev => {
+      if (!prev) return prev;
+      const name = "research-notes.md";
+      const reference = { id: uid(), name, mimeType: "text/markdown", kind: "text" as const, textContent: notes.slice(0, 20_000), size: notes.length };
+      const others = (prev.references || []).filter(item => item.name !== name);
+      return { ...prev, references: [...others, reference], updatedAt: now() };
+    });
+    addActivity("Saved research notes for “" + topic.slice(0, 60) + "” as a builder reference.");
+  }
+
+  // Automatic free research: once a game/app plan exists, fetch real-world context and free CC0 model/library
+  // pointers once per project and attach them as a builder reference. Best effort and silent on failure.
+  useEffect(() => {
+    if (!project?.plan || researchedProjects.current.has(project.id)) return;
+    if ((project.references || []).some(item => item.name === "research-notes.md")) { researchedProjects.current.add(project.id); return; }
+    researchedProjects.current.add(project.id);
+    const query = [project.plan.title, project.answers?.fantasy, project.answers?.genre].filter(Boolean).join(" ");
+    const projectId = project.id;
+    void fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, kind: project.kind === "app" ? "app" : "game" }) })
+      .then(response => response.json().catch(() => null))
+      .then(data => {
+        if (!data?.ok || typeof data.notes !== "string") return;
+        setProject(prev => {
+          if (!prev || prev.id !== projectId || (prev.references || []).some(item => item.name === "research-notes.md")) return prev;
+          return { ...prev, references: [...(prev.references || []), { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(data.notes).slice(0, 20_000), size: String(data.notes).length }], updatedAt: now() };
+        });
+        addActivity("Free web research attached to the plan (" + (data.sources?.wikipedia || 0) + " Wikipedia, " + (data.sources?.polyhaven || 0) + " CC0 model matches).");
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.plan?.title, project?.id]);
 
   const savedAssets = useMemo(() => {
     if (!project) return [];
@@ -1124,13 +1201,13 @@ export default function Home() {
       setNotice("GENE detected a preview failure and is automatically diagnosing and repairing the source (attempt " + attempt + "/3). Your last saved files and versions are preserved.");
       addActivity("Automatic runtime repair started (attempt " + attempt + "/3); preserving the current checkpoint.");
       void runAgent(
-        "AUTOMATIC RUNTIME RECOVERY — attempt " + attempt + " of 3. The game/app preview failed to render or emitted a runtime error. Inspect the current source, HTML, CSS, spec and recent runtime error details in context. Identify the actual cause; make the smallest safe source repair, preserve existing mechanics and visual design, then let GENE refresh and re-check the preview. Do not merely explain the issue. Return only genuinely changed files. Runtime status: " + (notice || "no visible frame confirmed") + ".",
+        "AUTOMATIC RUNTIME RECOVERY — attempt " + attempt + " of 3. The game/app preview failed to render or emitted a runtime error. Inspect the current source, HTML, CSS, spec and recent runtime error details in context. Identify the actual cause; make the smallest safe source repair, preserve existing mechanics and visual design, then let GENE refresh and re-check the preview. Do not merely explain the issue. Return only genuinely changed files. Runtime status: " + (lastRuntimeError.current || "no visible frame confirmed") + ". If the error says a name is undefined, find its first use and make sure it is declared and initialised before any code runs that reads it.",
         "edit",
         true
       );
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, notice, runAgent]);
+  }, [runtimeState, busy, buildInProgress, project?.id, project?.files, runAgent]);
 
   async function verifyLocalAgent(url: string, token: string, announce = true): Promise<boolean> {
     const normalizedUrl = url.trim().replace(/\/+$/, "");
@@ -1769,7 +1846,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE project";
-      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
+      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
@@ -1830,7 +1907,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE Project";
-      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
+      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
@@ -1902,7 +1979,7 @@ export default function Home() {
     const jsName = projectKind === "app" ? "app.js" : "game.js";
     const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
     const projectTitle = project.plan?.title || project.name || "GENE project";
-    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files));
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
     Object.entries(project.files).forEach(([path, source]) => {
       if (path === "game.html") return;
       zip.file(exportProjectPath(path, projectKind), source);
@@ -1971,7 +2048,7 @@ export default function Home() {
         zip.file(prefix + exportProjectPath(path, projectKind), source);
       });
       zip.file(prefix + "source/game.html", version.files["game.html"] || "");
-      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files) + buildRuntimeSceneBootstrap(version.files)));
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files) + buildRuntimeSceneBootstrap(version.files), moduleScriptPaths(version.files, projectKind)));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({
@@ -2072,7 +2149,7 @@ export default function Home() {
         </details>
         <div className="sidebar-bottom">
           <div className="connection-row"><span className={"status-dot " + (apiReady ? "online" : "offline")} />{apiReady === null ? "Connecting…" : apiReady ? "AI configured" : "AI service unavailable"}</div>
-          <small>{apiReady ? "Provider response is checked per request" : "Check provider configuration"}</small>
+          <small>{apiReady ? (freeModels.length ? "Free backup models: " + freeModels.slice(0, 2).map(id => id.split("/").pop()).join(", ") : "Provider response is checked per request") : "Check provider configuration"}</small>
           <div className="agent-connection">
             <div className="connection-row"><span className={"status-dot " + (localAgentStatus === "connected" ? "online" : localAgentStatus === "error" ? "offline" : "")} />{localAgentStatus === "connected" ? "Local Agent connected" : localAgentStatus === "checking" ? "Checking Local Agent" : localAgentStatus === "error" ? "Local Agent error" : "Local Agent disconnected"}</div>
             {localAgentWorkspace && <small title={localAgentWorkspace}>{localAgentWorkspace}</small>}
@@ -2080,7 +2157,7 @@ export default function Home() {
             {hasGame && localAgentStatus === "connected" && <button className="agent-connect-button" onClick={syncToLocalAgent} disabled={busy}>{isSyncedToLocal ? "Resync project files" : "Write project to disk"}</button>}
             {isSyncedToLocal && <button className="agent-connect-button" onClick={openLocalAgentGame}>{project.kind === "app" ? "Open disk-backed app ↗" : "Open disk-backed game ↗"}</button>}
           </div>
-          <button className="about-link" onClick={() => setShowAbout(true)}><span>ⓘ</span> About GENE <span className="about-version">1.9</span></button>
+          <button className="about-link" onClick={() => setShowAbout(true)}><span>ⓘ</span> About GENE <span className="about-version">2.0</span></button>
         </div>
       </aside>
 
@@ -2160,14 +2237,14 @@ export default function Home() {
                     {msg.kind === "error" && <div className="inline-error">No verified changes were applied.</div>}
                   </div>
                 </div>)}
-                {project.question && <div className="question-card studio-question-card">
-                  <div className="question-progress-label"><span className="question-progress-dot" /> PROJECT INTERVIEW <span className="question-progress-step">ONE DECISION AT A TIME</span></div>
-                  <h3>{project.question.text}</h3>
-                  {project.question.why && <p>{project.question.why}</p>}
-                  <div className="choice-list">{(project.question.choices || []).map(choice => <button key={choice} onClick={() => void runAgent(choice)} disabled={busy}>{choice}<span>↗</span></button>)}</div>
-                  <button className="text-action" onClick={() => { if(project) void runAgent("Use your recommended smart default for this decision."); }}>Use smart default</button>
-                  <button className="text-action" onClick={startBuild}>Skip questions and build</button>
-                </div>}
+                {project.question && <InterviewCard
+                  key={project.question.id}
+                  question={project.question}
+                  busy={busy}
+                  onAnswer={answer => void runAgent(answer)}
+                  onDefault={() => { if (project) void runAgent("Use your recommended smart default for this decision."); }}
+                  onSkip={startBuild}
+                />}
                 {/* The plan lives in the pinned workspace header and Tasks view, never as a moving chat message. */}
                 {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
                 {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
@@ -2221,6 +2298,7 @@ export default function Home() {
 
             {section === "tasks" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
+              {designDoc && <DesignDocPanel doc={designDoc} isApp={isApp} />}
               {project.buildRun && <div className="build-check-panel">
                 <div className="build-check-head"><div><div className="eyebrow">GENE BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
                 <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
@@ -2257,7 +2335,9 @@ export default function Home() {
               onWireRuntime={prompt => { setSection("chat"); setDraft(prompt); setNotice("Prepared a request to integrate the scene manifest into the actual runtime. Review it in Chat and send it to apply."); }}
             />)}
 
-            {section === "assets" && <div className="tool-view forge-view">
+            {section === "assets" && <div className="g3-scroll">
+{designDoc ? <ArtStudio files={project.files} doc={designDoc} isApp={isApp} apiReady={apiReady} onAddFiles={addProjectFiles} onResearchNote={addResearchNote} onPrepareIntegration={prompt => { setSection("chat"); setDraft(prompt); setNotice("Prepared an integration request. Review it in Chat and send it to apply."); }} /> : <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">FREE ART STUDIO</div><h2>Illustrations, research and assets</h2><p>Finish the short project interview (or start a plan) first. GENE uses your answers to pick an art direction, then draws matching illustrations for free.</p></div></div>}
+<div className="tool-view forge-view">
   <div className="tool-view-heading">
     <div className="eyebrow">GENE FORGE · REAL MESH FILES</div>
     <h2>Asset workshop</h2>
@@ -2282,7 +2362,7 @@ export default function Home() {
       <div className="forge-asset-actions"><button className="primary-button" onClick={() => { setForgeTargetId(asset.id); setForgeKind((["character","vehicle","building","environment","prop","weapon"].includes(asset.kind) ? asset.kind : "prop") as typeof forgeKind); setForgePrompt(""); setForgeNotice("You are editing the same saved recipe. Describe the changes you want; GENE will generate a new version of this mesh."); }}>Edit with AI</button><button className="secondary-button" onClick={() => { setSection("chat"); setDraft("Integrate the saved 3D asset \""+asset.name.replace(/["\\]/g,"")+"\": use "+asset.objPath+" and "+asset.mtlPath+" from the project files. Load it into the actual playable scene at an appropriate scale and position, assign its material, add appropriate collision if needed, and connect its gameplay role. Preserve existing controls and features. Do not create a substitute primitive or claim integration until the asset is visibly present in the preview."); setNotice("Prepared a scene-integration request for "+asset.name+". Review it in Chat and send it to apply the change."); }}>Integrate into game</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.objPath)}>OBJ ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.mtlPath)}>MTL ↓</button></div>
     </article>)}
   </div>}
-</div>}{section === "versions" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">RECOVERY</div><h2>Versions</h2><p>Every successful source-changing response creates a local snapshot. Restoring creates another snapshot, so history stays intact.</p></div>{project.versions.length ? <div className="version-list">{project.versions.map(version => <div key={version.number} className="version-item"><div className="version-number">v{String(version.number).padStart(3, "0")}</div><div className="version-meta"><strong>{version.label}</strong><small>{new Date(version.createdAt).toLocaleString()} · {Object.keys(version.files).length} files</small><p>{version.testSummary}</p></div><button className="secondary-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}</div> : <div className="empty-state">No versions yet. A version is created when GENE returns files or you save a manual edit.</div>}</div>}
+</div></div>}{section === "versions" && <div className="tool-view"><div className="tool-view-heading"><div className="eyebrow">RECOVERY</div><h2>Versions</h2><p>Every successful source-changing response creates a local snapshot. Restoring creates another snapshot, so history stays intact.</p></div>{project.versions.length ? <div className="version-list">{project.versions.map(version => <div key={version.number} className="version-item"><div className="version-number">v{String(version.number).padStart(3, "0")}</div><div className="version-meta"><strong>{version.label}</strong><small>{new Date(version.createdAt).toLocaleString()} · {Object.keys(version.files).length} files</small><p>{version.testSummary}</p></div><button className="secondary-button" onClick={() => restoreVersion(version)}>Restore</button></div>)}</div> : <div className="empty-state">No versions yet. A version is created when GENE returns files or you save a manual edit.</div>}</div>}
           </section>
 
           {previewOpen ? <aside className={"preview-panel" + (expandedPreview ? " expanded" : "")}>
@@ -2312,7 +2392,7 @@ export default function Home() {
           <div className="create-project-key-hint"><kbd>Esc</kbd> to close <span>·</span> <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> to reopen</div>
         </section>
       </div>}
-      {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>1.9</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
+      {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>2.0</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./studio-redesign.css";
+import "./studio-v3.css";
 
 export const metadata: Metadata = {
   title: "GENE Studio — AI App & Game Builder",

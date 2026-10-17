@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runAlternateChain } from "../../lib/providers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -387,57 +388,27 @@ export async function POST(request: NextRequest) {
       lastDetail = error instanceof Error ? error.message : "Network timeout.";
     }
   }
-  if (!text && hasAlternateProvider && Date.now() - startedAt < 56_000) {
-    const providers: Array<{ name: string; key: string; endpoint: string; model: string; headers?: Record<string, string> }> = [];
-    if (process.env.GROQ_API_KEY?.trim()) providers.push({
-      name: "groq",
-      key: process.env.GROQ_API_KEY.trim(),
-      endpoint: "https://api.groq.com/openai/v1/chat/completions",
-      model: process.env.GENE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
+  if (!text && hasAlternateProvider && Date.now() - startedAt < 54_000) {
+    // Free-only router: verified-free OpenRouter models from the live catalog plus Groq.
+    const chain = await runAlternateChain({
+      system: system + "\n\nYou are an alternate provider in GENE Forge. Return one valid JSON object only. Do not use provider branding.",
+      user: user + "\n\nALTERNATE PROVIDER RECOVERY: Generate a compact, complete recipe from scratch using no more than 18 parts. Use only the declared shapes and surfaces. Preserve the main silhouette and functional details. No markdown, no commentary, valid JSON only.",
+      maxTokens: 3_600,
+      temperature: 0.2,
+      json: true,
+      deadline: startedAt + 58_000,
+      perCallMs: 12_000,
+      maxAttempts: 4,
+      siteTitle: "GENE Forge",
+      validate: candidate => { try { extractJson(candidate); return true; } catch { return false; } }
     });
-    if (process.env.OPENROUTER_API_KEY?.trim()) providers.push({
-      name: "openrouter",
-      key: process.env.OPENROUTER_API_KEY.trim(),
-      endpoint: "https://openrouter.ai/api/v1/chat/completions",
-      model: process.env.GENE_OPENROUTER_MODEL?.trim() || "qwen/qwen3-coder:free",
-      headers: { "HTTP-Referer": "https://gene-flash.vercel.app", "X-Title": "GENE Forge" }
-    });
-    for (const provider of providers) {
-      if (Date.now() - startedAt > 57_000) break;
-      try {
-        const remaining = Math.max(1_000, 58_000 - (Date.now() - startedAt));
-        const response = await fetch(provider.endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + provider.key, ...(provider.headers || {}) },
-          body: JSON.stringify({
-            model: provider.model,
-            messages: [
-              { role: "system", content: system + "\n\nYou are an alternate provider in GENE Forge. Return one valid JSON object only. Do not use provider branding." },
-              { role: "user", content: user + "\n\nALTERNATE PROVIDER RECOVERY: Generate a compact, complete recipe from scratch using no more than 18 parts. Use only the declared shapes and surfaces. Preserve the main silhouette and functional details. No markdown, no commentary, valid JSON only." }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.2,
-            max_tokens: 3_600
-          }),
-          signal: AbortSignal.timeout(Math.min(9_000, remaining))
-        });
-        const data: any = await response.json().catch(() => null);
-        const content = data?.choices?.[0]?.message?.content;
-        if (!response.ok || typeof content !== "string" || !content.trim()) {
-          lastDetail = provider.name + " fallback: " + String(data?.error?.message || "empty response");
-          continue;
-        }
-        try { extractJson(content); } catch {
-          lastDetail = provider.name + " returned incomplete or invalid JSON.";
-          continue;
-        }
-        text = content;
-        successfulModel = provider.model;
-        successfulProvider = provider.name;
-        break;
-      } catch (error) {
-        lastDetail = provider.name + " fallback failed: " + (error instanceof Error ? error.message : "network timeout");
-      }
+    if (chain.ok) {
+      text = chain.text;
+      successfulModel = chain.model;
+      successfulProvider = chain.provider;
+    } else {
+      lastDetail = chain.failure.detail;
+      if (chain.truncated) sawTruncation = true;
     }
   }
 
