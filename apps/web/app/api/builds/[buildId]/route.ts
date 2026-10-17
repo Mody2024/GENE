@@ -26,7 +26,7 @@ export async function GET(_request: NextRequest, context: { params: { buildId: s
       const entry = await resultResponse.json();
       let decoded: unknown;
       try {
-        decoded = JSON.parse(Buffer.from(String(entry.content || "").replace(/\\n/g, ""), "base64").toString("utf8"));
+        decoded = JSON.parse(Buffer.from(String(entry.content || "").replace(/\n/g, ""), "base64").toString("utf8"));
       } catch {
         return fail("The cloud build result is unreadable and cannot be trusted.", 502, "GENE_BUILD_RESULT_INVALID");
       }
