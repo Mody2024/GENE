@@ -319,3 +319,452 @@ GENE is ready for a major competitive release when a user can:
 10. Refresh or resume work without losing verified progress.
 
 The release is not done because a prompt was added, a file was generated, a new panel was designed, or a CI job passed once. It is done when representative end-to-end projects demonstrate the promised behavior.
+
+---
+
+# 13. Expanded GENE / Genie Master Plan — Reliability, Intelligence, Product Identity
+
+This addendum expands the roadmap into a cross-cutting engineering programme. It is broader than a feature list: every major capability needs an implementation owner, observable behavior, failure handling, tests, and a truthful capability label. The sections below are proposed work, not claims of current implementation.
+
+## 13.1 Product identity: the wish-to-working-product promise
+
+**Brand idea:** GENE is inspired by a genie that helps turn a wish into something real. The product should feel like a capable, friendly creative workshop—not fantasy role-play, a generic chatbot, or a neon sci-fi dashboard.
+
+### Product promise
+A user describes what they wish to make, clarifies only the details that materially change the result, watches GENE turn that intent into a plan, gets a working first version, refines it safely, sees what was actually tested, and exports the result.
+
+### Experience principles
+- Translate a wish into a concrete brief, acceptance criteria, milestones, and a visible preview.
+- Show progress as real work: understood → planned → building → running checks → repairing → ready / partial / blocked.
+- Make the first successful result arrive early, then expand it without discarding what already works.
+- Let users guide the direction without needing to become prompt engineers.
+- Celebrate real milestones only; never fabricate success, game quality, test results, user counts, or achievements.
+- Keep language warm, clear, concise, and respectful. Explain technical failures in plain language with a direct next action.
+- Preserve creative intent: genre, art direction, tone, audience, controls, platform, accessibility needs, and approved constraints.
+- Use a restrained genie-inspired motif: a small signature mark, a subtle swirl/flow motif, and a sense of transformation from wish to artifact. Avoid stereotypical caricatures, overused magic-lamp imagery, excessive sparkles, glowing gradients, or an unrelated futuristic aesthetic.
+- Keep the default interface light, clean, readable, and fast. Use motion sparingly and support reduced motion.
+- Design a coherent logo system, favicon, app icon, empty/loading/error states, documentation screenshots, and export branding. The logo must remain legible in monochrome and at small sizes.
+- Store brand colors, typography, radii, shadows, spacing, icon style, and motion timings as design tokens, not arbitrary values duplicated across components.
+
+### Product language
+- **Ready:** required checks for the declared scope passed.
+- **Partially ready:** some requirements passed, others are explicitly listed as incomplete.
+- **Blocked:** an external dependency, permission, unavailable provider, or required user decision prevents progress.
+- **Failed:** an attempted operation failed and has a diagnostic.
+- **Not verified:** the feature or artifact has not been tested sufficiently.
+Never use “done”, “perfect”, “production-ready”, “AAA”, “secure”, or “fully working” as decorative copy.
+
+## 13.2 Full codebase health and defect-prevention programme
+
+GENE needs a maintained defect ledger, not one-off debugging. Audit defects that exist today and plausible failure classes before large feature work.
+
+### Required audit passes
+1. **Repository map:** enumerate app routes, API routes, components, libraries, provider integrations, local-agent paths, storage layers, test suites, CI workflows, build/export paths, and environment variables.
+2. **Call-chain tracing:** trace each important user action from UI → state → API → provider/tool → validation → preview → persistence → export.
+3. **Contract consistency:** compare TypeScript types, runtime validation, API request/response schemas, prompts, UI states, capability matrix, docs, and tests. Identify duplicate or contradictory sources of truth.
+4. **Complexity and ownership:** flag giant components, circular dependencies, duplicated logic, hidden global state, unsafe casts, swallowed exceptions, broad catch blocks, stale comments, dead code, and implicit cross-module contracts.
+5. **Dependency audit:** inspect supported Node/package versions, lockfile consistency, abandoned or vulnerable dependencies, unnecessary bundle weight, transitive dependency risk, and license obligations. Upgrade incrementally with rollback points.
+6. **Error-path audit:** test empty inputs, malformed JSON, missing files, wrong file types, oversized inputs, timeouts, provider 429/5xx, offline mode, partial provider output, invalid model output, corrupted storage, quota exhaustion, cancellation, refresh, tab close, and retry.
+7. **Race and state audit:** concurrent generation and chat, rapid repeated clicks, stale responses, switching projects mid-build, editing files during generation, cancel/retry overlap, import during a task, and old preview versus new source.
+8. **Boundary audit:** browser/server separation, secrets, filesystem access, network access, URL handling, HTML/JS execution, uploaded files, generated code, ZIP paths, archive expansion, and artifact downloads.
+9. **UX failure audit:** inaccessible controls, misleading disabled states, lost unsaved work, focus loss, mobile overflow, blank screens, infinite loading, unclear provider errors, and controls that appear functional but do nothing.
+10. **Release audit:** clean install, lockfile reproducibility, lint/typecheck/build/unit/integration/browser tests, artifact inspection, deployment smoke tests, rollback readiness, and documentation accuracy.
+
+### Defect taxonomy
+Track every issue with ID, severity, reproducibility, affected version/route, root cause, evidence, user impact, regression test, fix commit, and verification status.
+
+- **S0 critical:** secret exposure, unauthorized data access, destructive data loss, arbitrary privileged execution, or release-blocking integrity failure. Stop rollout.
+- **S1 high:** core build/export unavailable, projects corrupted, authentication/ownership bypass, persistent crashes, or false-ready status on important flows. Fix before release.
+- **S2 medium:** major workflow broken with workaround, repeated state loss, severe accessibility/performance defect, or substantial visual regression.
+- **S3 low:** cosmetic issue, minor friction, or non-critical copy/layout defect.
+
+Do not downgrade severity to make a release look healthier. Security and data-loss findings need explicit closure evidence.
+
+### Preventing regressions
+- Every fixed bug should add the smallest stable regression test that reproduces it.
+- Prefer targeted patches and small pull requests over sweeping rewrites.
+- Require a before/after diff and impact summary for high-risk changes.
+- Preserve a known-good candidate; make rollback a normal workflow.
+- Run relevant tests after each logical change, then the full required suite before release.
+- When the environment cannot run a test, label it **not run** and explain why; never report it as passed.
+- Add static checks only where they provide a real guarantee; do not confuse source heuristics with runtime proof.
+- Keep known limitations and accepted technical debt visible, with owners and review dates.
+
+## 13.3 Upgrade GENE's brain: from prompt chain to engineering system
+
+The brain is the whole system around the model—not just a stronger model or a longer system prompt. Improve it in layers so reasoning, context, execution, memory, and verification reinforce each other.
+
+### A. Intent understanding and adaptive interview
+- Parse requests into project type, target platform, audience, core outcome, constraints, must-have features, visual direction, content scope, and delivery expectations.
+- Detect ambiguity that changes architecture or cost. Ask only high-impact questions; infer low-risk defaults and show them for correction.
+- Offer a compact editable brief and acceptance checklist before expensive generation.
+- Distinguish requirements from suggestions, assumptions, and future ideas.
+- Detect contradictions early, such as online multiplayer without a backend or native export without a toolchain.
+- Keep a project vocabulary/decision record so names, mechanics, routes, data models, and visual conventions stay consistent.
+- Do not ask users to repeat information already available in the current project context.
+
+### B. Planning and dependency reasoning
+- Decompose work into ordered tasks with explicit dependencies, acceptance checks, expected outputs, and risk.
+- Build a playable/usable vertical slice before broad content generation.
+- Separate prototype scope from full-product scope and label both honestly.
+- Estimate uncertainty as a range; never present model-generated time estimates as guarantees.
+- Resolve expensive-to-reverse architectural choices before generation.
+- Re-plan only affected tasks when requirements change; preserve completed verified work.
+- Use a dependency graph with cycle detection, blocked-task propagation, bounded retries, and cancellation semantics.
+
+### C. Repository/project understanding
+- Index files, exports, component relationships, routes, data models, tests, asset references, and runtime entry points.
+- Retrieve relevant code and conventions for each task; prioritize exact call sites and tests over dumping the entire repository into context.
+- Track source hashes/revisions so a model cannot unknowingly overwrite a newer edit.
+- Keep a concise living project summary, decisions, constraints, architecture map, known bugs, and current test status.
+- Use symbol-aware or AST-aware navigation when available; use bounded text search transparently otherwise.
+- Before editing, identify what must remain unchanged and which tests protect it.
+
+### D. Execution and patch discipline
+- Prefer minimal, typed, reviewable patches over rewriting whole files.
+- Validate paths and patch preconditions; reject stale or ambiguous patch application.
+- Apply changes transactionally to a candidate workspace, not directly to the last-known-good project.
+- Run formatting, parsing, type checks, relevant tests, and preview checks appropriate to the language and task.
+- Detect no-op edits, accidental duplicate code, unintended file deletion, broad formatting churn, and unrelated diffs.
+- Make generated files, dependencies, and external side effects explicit.
+- Use tool schemas and permission boundaries; never invent tool results or claim a command ran when it did not.
+
+### E. Evidence-based self-repair
+Implement a bounded diagnose → reproduce → hypothesize → patch → rerun loop:
+1. Capture the actual failure and its environment.
+2. Minimize the reproduction when practical.
+3. Classify the failure: syntax/type, dependency, runtime, UI flow, gameplay logic, asset loading, persistence, packaging, permissions, provider, or environment.
+4. Form a small number of testable hypotheses.
+5. Apply the smallest targeted change.
+6. Run the exact failing test plus related regression tests.
+7. Compare logs, screenshots, and behavior before and after.
+8. Accept the patch only if it resolves the issue without a new material regression.
+9. If repeated attempts fail, preserve the candidate, report what was tried, and ask for the one decision or dependency that unblocks progress.
+
+Safeguards:
+- Limit repair attempts per failure and per task.
+- Detect repeated identical stack traces and repeated ineffective patches.
+- Do not weaken, delete, or mock out tests merely to get green.
+- Do not silently remove a requested feature to pass a test.
+- Check suspicious tests for vacuous assertions or tests that always pass.
+- Separate test failure from environment/tool failure.
+- Use independent acceptance checks where possible so the same model does not solely author and approve its own success criteria.
+
+### F. Memory that helps without contaminating projects
+Use scoped memory layers:
+- **Conversation/task memory:** current request, decisions, open questions, and next actions.
+- **Project memory:** architecture, design system, APIs, file map, naming, requirements, test status, and known limitations.
+- **User preferences:** only explicitly useful preferences, editable and inspectable.
+- **Build evidence:** immutable test logs, artifact checksums, screenshots, runtime errors, and commit/revision IDs.
+- **Long-term knowledge:** general patterns and validated solutions with provenance.
+
+Every memory entry needs scope, timestamp/version, source, confidence, and invalidation rules. Newer project facts supersede stale summaries. Never mix secrets or one project's private source into another project. Let users inspect, correct, clear, and export project memory.
+
+### G. Model/provider routing
+- Route tasks by measured ability, latency, context needs, tool support, cost, privacy, and availability—not brand names alone.
+- Use deterministic fallback behavior for provider outages and malformed output.
+- Validate model output against typed schemas before applying it.
+- Track model/provider version, prompt/template revision, tool calls, retries, latency, and cost where available.
+- Avoid endless fallback chains, hidden quota exhaustion, or silent downgrade presented as equivalent quality.
+- Provide clear controls for speed/depth and explain when a selected mode cannot be honored.
+- Keep API keys server-side and support user-owned keys only through a safe, explicit configuration flow.
+
+## 13.4 QA Engine v2: test the product, not the appearance of success
+
+### Test layers
+- **Static:** path/schema checks, parser, formatter, lint, type checking, dependency checks, secret scanning, license/provenance checks.
+- **Unit:** isolated functions, state transitions, parsers, project memory, patch application, build coordinator, storage migrations.
+- **Integration:** provider adapters, API contracts, storage, asset pipelines, import/export, worker coordination.
+- **Browser E2E:** real user flows in supported browsers and viewport sizes; console/network capture; screenshots; keyboard navigation.
+- **Game E2E:** start/restart/pause, input, collision, objective progression, enemy/object behavior, death/failure, win/end state, saves/checkpoints, audio unlock/mute, scene transitions.
+- **Visual regression:** stable reference screenshots, layout bounds, text clipping, theme tokens, major component geometry, and responsive breakpoints. Use tolerances for legitimate rendering variation.
+- **Performance:** startup time, frame-time distribution, memory growth, long tasks, asset size, network requests, input latency, and cleanup after restart.
+- **Security:** authorization boundaries, untrusted content, path traversal, unsafe URL handling, secret leakage, generated-code isolation, dependency and archive safety.
+- **Recovery:** tab close, worker restart, cancellation, network drop, expired credentials, rate limit, corrupted checkpoint, partial artifact upload, and duplicate job delivery.
+
+### Test report contract
+Every report includes build/revision identifier and environment; acceptance criterion; status (passed / failed / blocked / not-run / inconclusive); exact command or interaction; relevant logs, screenshot, trace, or artifact checksum; concise diagnosis and linked repair attempt; timestamp and toolchain/provider version where available.
+
+### Quality gates
+- A file being present is not proof it loads.
+- A canvas being visible is not proof a game is playable.
+- A button being visible is not proof its action works.
+- A green unit-test suite is not proof of security, usability, or production readiness.
+- Promotion requires all mandatory gates for the declared target, or a clearly labelled partial result with missing gates listed.
+- Keep deterministic checks stable and fast; quarantine flaky tests with a tracked reason and owner rather than silently ignoring them.
+
+## 13.5 Game creation: raise depth, coherence, and playability
+
+### Genre-aware production contracts
+Create genre templates for platformer, action/adventure, puzzle, arena, strategy/tower defense, simulation, narrative, runner, racing, and supported 3D genres. Each template defines its core loop, input scheme, progression, failure/retry behavior, content units, enemy/obstacle patterns, accessibility options, performance budget, and required tests.
+
+### Required game production ladder
+1. **Design brief:** genre, audience, fantasy, mechanics, controls, art/audio direction, content scope, platform, and quality budget.
+2. **Greybox:** movement, camera, collision, input, one objective, one failure path, and one success path.
+3. **Playable vertical slice:** one polished representative section with functional UI, feedback, sound behavior, and restart.
+4. **Systems:** reusable entity/state model, input abstraction, collision/physics boundaries, justified event system, scene/state transitions, configuration, save/versioning, and pause/resume.
+5. **Content:** distinct levels/missions, meaningful progression, tuned difficulty, checkpoints, tutorialization, and an actual ending—not repeated copies presented as new content.
+6. **Presentation:** consistent art direction, legible typography, responsive HUD, animation timing, layered audio, particles/VFX, transitions, feedback, and accessible options.
+7. **QA and optimization:** playtest each level path, inspect collisions/spawns, test input edge cases, verify reset/save state, measure performance, and fix regressions.
+8. **Delivery:** complete source/assets/licenses, run instructions, supported target notes, and verified export artifacts.
+
+### Game systems that need explicit tests
+- Fixed/variable timestep behavior and pause-safe timers.
+- Input held/released state and focus loss.
+- Collision boundaries, tunneling, spawn safety, and stuck states.
+- Enemy state transitions, target selection, cooldowns, and cleanup.
+- Objective completion, failure, retry, checkpoints, and ending.
+- Seeded procedural generation when replay/debugging benefits from it.
+- Inventory/economy/progression consistency when those systems exist.
+- Save schema migration and corrupt-save recovery.
+- Audio unlock, mute, overlapping sound limits, and cleanup.
+- Scene transitions, resize, orientation, and low-performance fallbacks.
+
+### 3D honesty and engine strategy
+- Stabilize the existing Canvas 2D/WebGL browser pipeline first.
+- Treat each future engine as a real adapter with project scaffolding, dependency management, preview/run, asset import, input, packaging, error capture, tests, and docs—not a prompt that merely mentions the engine.
+- Add Phaser or Three.js only when the adapter passes a standard sample-project suite.
+- Godot/Unity/Unreal native projects are separate targets requiring the correct runtime/toolchain and platform-specific build infrastructure.
+- Distinguish greybox, procedural primitive, stylized generated asset, imported asset, and authored production asset.
+- Keep materials, scale, lighting, animation, camera, and art direction coherent across the whole game.
+- Do not promise large open worlds, AAA production, sophisticated physics, online multiplayer, or cinematic animation without supporting infrastructure and test evidence.
+
+## 13.6 App creation: complete user journeys, not static dashboards
+
+For every generated app:
+- Define the primary user journey, user roles, data model, routes, validation, permissions, empty/loading/error/success states, and responsive breakpoints.
+- Make every visible control functional or label it as a planned/non-functional mock.
+- Add form validation, useful inline errors, loading/retry behavior, optimistic-update rollback where used, and safe duplicate-submit prevention.
+- Model real authentication and authorization on the server; a client-side role flag or login screen is not security.
+- Define whether data is local, session-only, synced, or server-persistent. Never imply cross-device sync without a real backend.
+- Include accessible semantics, keyboard navigation, visible focus, contrast checks, reduced motion, and screen-reader labels.
+- Test browser back/forward, deep links, refresh, empty data, malformed input, expired session, denied access, and narrow screens.
+- Include seed/demo data only when labelled; do not invent real integrations or real customer records.
+- Provide setup instructions, environment-variable documentation, migrations, and safe deployment notes when relevant.
+
+## 13.7 UI and design system: coherent GENE identity
+
+### Foundation
+- Establish design tokens for color, typography, spacing, radii, elevation, focus rings, motion, z-index, and breakpoints.
+- Define a light-first core theme and optional dark theme only if it can be maintained accessibly.
+- Use a restrained palette with high contrast and one recognizable GENE accent. Avoid neon-heavy sci-fi, excessive gradients, excessive glass blur, and gratuitous animation.
+- Standardize buttons, inputs, menus, tabs, tooltips, dialogs, toasts, cards, status indicators, skeletons, code panels, logs, preview controls, and confirmation dialogs.
+- Use consistent icon semantics; no decorative icon should imply an action that is not present.
+- Design components for hover, focus, pressed, disabled, loading, error, success, and empty states.
+- Establish responsive rules for phone, tablet, and desktop; test long names, long prompts, huge logs, and narrow viewports.
+
+### Studio workspace
+- **Project rail:** projects, recent work, create/import, templates, and settings.
+- **Wish/chat panel:** natural-language brief, clarifying questions, decisions, and concise status.
+- **Plan/task view:** milestones, dependencies, completion evidence, blocked work, and next action.
+- **Live preview:** real runtime, device sizing, reload/restart, errors, and last-known-good switch.
+- **Inspector:** files, source diff, assets, project structure, console, tests, screenshots, and performance.
+- **Delivery panel:** export type, build environment, artifact size/checksum, run instructions, and verification status.
+- **Global state:** unsaved changes, active project, connection/provider state, background work, quota/cost when available, and recoverability.
+- Provide an uncluttered default view with progressive disclosure; advanced logs and code tools remain accessible without overwhelming new users.
+- Do not ship fake charts, fake activity, fake progress, or placeholder buttons.
+
+### Accessibility and usability gates
+- Keyboard-only completion of core flows.
+- Automated accessibility scan plus manual checks for core screens.
+- Visible focus, labelled controls, logical heading hierarchy, color contrast, reduced-motion support, and readable errors.
+- No important state communicated by color alone.
+- Verify touch targets and mobile overflow.
+- Measure time-to-first-success and task completion, not just screenshot attractiveness.
+
+## 13.8 Research, assets, and provenance
+
+- Define a research contract: question, required freshness, trusted source types, claims to verify, output format, and relevance to the project.
+- Keep source URL, title, retrieval time, relevant excerpt/claim, confidence, and license/attribution information with each research item.
+- Separate observed facts, source claims, model inference, and unresolved questions.
+- Resolve conflicts using source quality, recency, and direct evidence; show uncertainty where unresolved.
+- Treat page content and imported assets as untrusted inputs; never follow instructions embedded in a webpage that attempt to override user intent or expose secrets.
+- For generated or imported assets, track origin, license, creator/provider, modification, attribution, and redistribution restrictions.
+- Build an asset pipeline with dimension/type validation, size budgets, deduplication, compression, fallback handling, and broken-reference detection.
+- Do not fabricate citations, asset licenses, API behavior, package versions, or research findings.
+- If web or asset providers are unavailable, keep moving with clearly marked assumptions or ask for input.
+
+## 13.9 Storage, jobs, and delivery reliability
+
+- Choose a canonical project-state owner. Avoid divergent copies across browser storage, React state, worker state, and remote database.
+- Version project schemas and provide tested migrations, backups, export/import, and corruption recovery.
+- Separate ephemeral UI state from durable project content, task records, logs, and immutable artifacts.
+- If remote storage is used, enforce ownership and row-level access rules server-side; test cross-user isolation.
+- Use durable jobs with idempotency keys, leases, heartbeats, bounded retries, cancellation, timeouts, and resumable checkpoints.
+- Persist job state before/after important transitions and make duplicate delivery safe.
+- Make user edits conflict-aware: show diffs and reconcile rather than silently overwriting newer content.
+- Verify ZIP entries, paths, manifest, required files, size, checksum, and successful re-import.
+- For EXE/APK/native outputs, record target OS/architecture, toolchain version, build logs, signature status if relevant, checksum, and launch/smoke-test evidence.
+- Separate “source exported”, “package assembled”, “artifact uploaded”, “artifact verified”, and “launched successfully”.
+- Keep backup and restore paths documented and tested before any migration that could lose user projects.
+
+## 13.10 Security, privacy, and abuse resistance
+
+Threat-model GENE as both a web app and a system that handles generated/untrusted code.
+
+Required safeguards:
+- Server-side secret management and redaction.
+- Authorization on every project read/write/export and worker operation.
+- Strict path normalization and archive extraction limits.
+- File type, content, and size validation.
+- HTML/script preview isolation with restrictive sandboxing and least privilege.
+- Outbound network restrictions for generated code and tools where feasible.
+- Time, memory, CPU, request, output, and retry budgets.
+- Dependency provenance and vulnerability review.
+- Protection against prompt injection in web pages, uploaded files, source comments, and generated logs.
+- Safe Markdown/HTML rendering and URL schemes.
+- CSRF/CORS/session configuration review as applicable.
+- Audit events for sensitive actions without logging secrets or unnecessary personal data.
+- Deletion/export controls and clear retention policies.
+- Explicit confirmation for publishing, destructive edits, and external side effects.
+- Tests for cross-project access, malicious filenames, archive bombs, secrets in output, and unsafe URLs.
+
+Never run arbitrary generated code with the privileges of the application server. Use a disposable, permission-limited execution boundary when code execution is necessary. Document residual risks where complete isolation is unavailable.
+
+## 13.11 Performance, reliability, and low-resource operation
+
+- Set budgets for first render, time-to-first-preview, preview reload, memory growth, source bundle, asset payload, and background worker resource use.
+- Avoid rendering the entire project tree or huge logs on every keystroke; virtualize large lists and debounce expensive searches.
+- Keep the main UI responsive while generation, tests, asset processing, or exports run.
+- Lazy-load heavy editors and preview-only tools; avoid multiple always-running previews.
+- Add cancellation and cleanup for timers, event listeners, audio nodes, WebGL resources, workers, object URLs, and temporary files.
+- Test slow networks, small screens, low memory, browser refresh, provider latency, and degraded services.
+- Cache only with explicit invalidation rules; never serve stale project state as current.
+- Use bounded logs and checkpoint retention with a visible cleanup policy.
+- Prefer cloud execution for heavyweight native builds when configured, while keeping local authoring and preview lightweight.
+- Offer a clear fallback when browser APIs or hardware acceleration are unavailable.
+
+## 13.12 Observability and operations
+
+- Use structured, correlated events for project ID, build ID, task ID, revision, provider, and tool operation—without logging secrets or raw private content unnecessarily.
+- Measure first-preview time, end-to-end success, repair success, retries per task, regression rate, build cancellation, crash rate, export verification, and provider failure rate.
+- Separate user-visible diagnostics from internal debug traces.
+- Add error boundaries and meaningful recovery actions to the UI.
+- Alert on spikes in failed builds, data loss, authorization errors, queue delays, and provider outage.
+- Define incident response: stop rollout, preserve evidence, disable risky feature, restore last-known-good, communicate impact, fix, and add regression coverage.
+- Track latency and cost per successful verified task rather than optimizing raw generated-token volume.
+
+## 13.13 CI, release engineering, and repository hygiene
+
+For every meaningful PR, run applicable checks in increasing cost order:
+1. Formatting/lint and schema checks.
+2. Unit tests for touched modules.
+3. Typecheck.
+4. Integration tests.
+5. Production build.
+6. Browser smoke and representative end-to-end tests.
+7. Security/dependency and artifact checks where applicable.
+
+Additional rules:
+- Keep PRs focused and reviewable; avoid bundling brand redesign, storage migration, and runtime rewrite into one change.
+- Require an implementation note for capability-affecting changes.
+- Pin dependencies and keep lockfiles consistent.
+- Use preview deployments and test real flows, not just the homepage.
+- Never merge based only on green CI if checks do not exercise changed behavior.
+- Maintain release tags, migration notes, rollback instructions, and compatibility notes.
+- Compare main and draft PR #18 before cherry-picking or merging its work; resolve version/capability contradictions first.
+- Keep secrets out of source, issue comments, screenshots, logs, and generated fixtures.
+- Label each capability as implemented, experimental, planned, pipeline-dependent, or unsupported.
+
+## 13.14 Benchmarking and competitive improvement loop
+
+Maintain a versioned suite that tests the complete engineering loop, not just single-turn generation:
+- New app/game from a brief.
+- Continuing a multi-step project over multiple turns.
+- Targeted edit that must preserve unrelated features.
+- Reproduction and repair of a known bug.
+- Ambiguous request that needs a small interview.
+- Malformed model response/provider outage.
+- Stale concurrent response and cancellation.
+- Malicious imported content/prompt injection.
+- Broken asset or dependency.
+- Responsive UI/accessibility task.
+- Project export and re-import.
+- Interrupted task recovery.
+- Research with conflicting sources and provenance.
+- Unsupported engine/platform request that must be honestly scoped.
+
+Score each task with a fixed rubric: acceptance criteria, runtime evidence, visual quality, regression count, recovery success, time, cost, and contract compliance. Record exact GENE version, model/provider, prompt revision, test environment, and dataset version. Re-run after changing prompts, models, tools, schemas, or orchestration. Avoid tuning to a tiny benchmark; add unseen holdout tasks and human review of visual/gameplay quality.
+
+## 13.15 Expanded delivery phases and exit criteria
+
+### Phase 0 — Truth and inventory
+- Reconcile main, roadmap docs, draft PR #18, version labels, and capability claims.
+- Run or document baseline checks with exact outputs.
+- Publish the capability matrix, defect ledger, dependency map, and top-risk register.
+- **Exit:** the team knows what exists, what fails, and what is merely planned.
+
+### Phase 1 — Stop regressions and false success
+- Define typed build/test report contracts.
+- Enforce valid state transitions and distinguish partial/blocked/not-run.
+- Protect last-known-good builds and reject stale writes.
+- Add focused tests for cancellation, stale responses, storage failures, and success claims.
+- **Exit:** no critical path reports ready without required evidence.
+
+### Phase 2 — Runtime QA and self-repair
+- Instrument browser preview, console, network, screenshots, and interaction traces.
+- Add representative app/game end-to-end suites.
+- Feed structured diagnostics into bounded repair attempts.
+- **Exit:** seeded failures are detected, repaired when in scope, and regression-tested.
+
+### Phase 3 — Brain and repository understanding
+- Add project index, task ledger, requirement traceability, scoped memory, and minimal patches.
+- Add provider-routing telemetry and output schema validation.
+- **Exit:** multi-turn edits preserve approved requirements and avoid unrelated regressions on benchmark tasks.
+
+### Phase 4 — Game/app production depth
+- Stabilize genre templates, vertical-slice gates, reusable systems, content expansion, app flows, asset provenance, and performance budgets.
+- **Exit:** each supported template has a representative end-to-end sample with repeatable tests.
+
+### Phase 5 — Secure durable execution and export
+- Implement durable storage/worker only after the state contract is stable.
+- Add recovery, authorization, artifact integrity, export/import, and native packaging checks.
+- **Exit:** interrupted tasks recover and exported artifacts pass integrity and launch checks for declared targets.
+
+### Phase 6 — GENE visual identity and workspace redesign
+- Apply the tokenized light-first design system and genie-inspired identity to real working screens.
+- Replace misleading/unused controls and improve responsive/accessibility behavior.
+- **Exit:** core user tasks pass keyboard, mobile, and visual regression review.
+
+### Phase 7 — Broader engines and advanced capabilities
+- Add an engine/runtime only with a complete adapter, tests, docs, and sample project.
+- Evaluate multiplayer, cloud collaboration, advanced 3D assets, native packaging, and other major scope only when infrastructure and demand justify them.
+- **Exit:** new capability passes the same benchmark and reliability gates as existing capabilities.
+
+### Phase 8 — Ongoing quality operations
+- Run regression benchmarks continuously, track known issues, dependency updates, performance budgets, provider drift, and production incidents.
+- **Exit:** quality remains stable across releases, not merely on launch day.
+
+## 13.16 Release checklist — mandatory, not aspirational
+
+- [ ] Scope and capability labels match actual implementation.
+- [ ] All known S0 issues are closed and S1 issues are closed or release-blocked.
+- [ ] Project data is backed up and migration/rollback has been tested where applicable.
+- [ ] No false-ready status can occur on tested critical paths.
+- [ ] Required unit/integration/type/build/E2E checks have recorded outcomes.
+- [ ] Test reports distinguish failed, blocked, inconclusive, and not-run.
+- [ ] A representative app and game have been built, interacted with, and regression-tested.
+- [ ] Generated patches preserve unrelated working behavior on the benchmark.
+- [ ] Preview and generated-code boundaries have passed security checks.
+- [ ] Asset and research provenance are traceable.
+- [ ] Export artifacts pass integrity checks and are labelled according to actual verification.
+- [ ] Responsive UI, keyboard access, and core accessibility checks have been reviewed.
+- [ ] Performance budgets are measured on declared target environments.
+- [ ] Changelog, known limitations, and recovery instructions are accurate.
+- [ ] No test was weakened or removed solely to make the release pass.
+
+## 13.17 How to work the plan without creating a giant risky rewrite
+
+The roadmap is deliberately broad; implementation must remain incremental.
+- Begin with Phase 0, not a cosmetic rewrite or another giant prompt.
+- Select one measurable vertical slice at a time.
+- Read affected source and its callers before changing contracts.
+- Add a regression test before or alongside a bug fix.
+- Keep changes small enough to review and revert.
+- Run checks and report exact results honestly.
+- Do not implement every proposed system in parallel.
+- Promote only verified code; keep unfinished work in focused draft PRs.
+- Update the defect ledger, capability matrix, benchmark, and docs whenever behavior changes.
+- Revisit priorities using measured failures, user impact, reliability, cost, and implementation effort—not feature count.
+
+**Ultimate definition of success:** GENE behaves like a reliable creative engineer inspired by a genie: it understands the wish, plans the work, builds a real result, tests it in its actual environment, fixes evidenced failures safely, preserves the user's progress, explains limitations clearly, and delivers only what it can substantiate.
