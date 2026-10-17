@@ -78,6 +78,11 @@ const cloudReport = {
   note: "verified test fixture"
 };
 assert.equal(validateCloudBuildReport(cloudReport, cloudBuildId).ok, true, "valid report with artifact evidence is accepted");
+const extraFieldReport = validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), accessToken: "must-not-be-exposed" }, android: goodArtifact("android") } }, cloudBuildId);
+assert.equal(extraFieldReport.ok, true, "documented artifact evidence remains valid when unknown metadata is present");
+assert.equal(extraFieldReport.ok && Object.hasOwn(extraFieldReport.report.targets.windows, "accessToken"), false, "unknown artifact metadata is stripped before the report reaches the browser");
+assert.equal(validateCloudBuildReport({ ...cloudReport, runUrl: "https://github.com/Mody2024/GENE/issues/123" }, cloudBuildId).ok, false, "workflow evidence must link to an actual Actions run, not an arbitrary GitHub page");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure" }, android: goodArtifact("android") }, state: "partial" }, cloudBuildId).ok, false, "all target outcomes must use the expected artifact identity");
 assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: "87654321-1234-4234-9234-123456789abc" }, cloudBuildId).ok, false, "cross-build report substitution is rejected");
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), sha256: "bad" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "successful artifacts without valid SHA-256 are rejected");
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), url: "https://gene-builds.blob.vercel-storage.com/GENE-" + cloudBuildId + "-other.exe" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "download URL path must match the claimed artifact filename");

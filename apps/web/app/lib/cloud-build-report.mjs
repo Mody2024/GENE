@@ -20,11 +20,25 @@ function isHttpsUrl(value, allowedHost) {
   }
 }
 
-function validSuccessfulTarget(name, target, buildId) {
-  if (!isRecord(target) || target.status !== "success") return false;
-  const expectedFilename = name === "windows"
+function isWorkflowRunUrl(value) {
+  if (!isHttpsUrl(value, "github.com")) return false;
+  try {
+    const url = new URL(value);
+    return /^\\/[^/]+\\/[^/]+\\/actions\\/runs\\/\\d+\\/?$/.test(url.pathname) && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+function expectedArtifactFilename(name, buildId) {
+  return name === "windows"
     ? "GENE-" + buildId + "-Setup.exe"
     : "GENE-" + buildId + "-debug.apk";
+}
+
+function validSuccessfulTarget(name, target, buildId) {
+  if (!isRecord(target) || target.status !== "success") return false;
+  const expectedFilename = expectedArtifactFilename(name, buildId);
   if (target.filename !== expectedFilename) return false;
   if (!isHttpsUrl(target.url, "blob.vercel-storage.com")) return false;
   let linkedFilename = "";
@@ -58,10 +72,14 @@ export function validateCloudBuildReport(input, expectedBuildId) {
     return { ok: false, reason: "Build result contains invalid target names." };
   }
   const targets = input.targets;
+  const normalizedTargets = {};
   for (const name of names) {
     const target = targets[name];
     if (!isRecord(target) || !TARGET_STATES.has(target.status)) {
       return { ok: false, reason: "Build result contains an invalid " + name + " status." };
+    }
+    if (target.filename !== expectedArtifactFilename(name, expectedBuildId)) {
+      return { ok: false, reason: "Build result contains an unexpected " + name + " artifact filename." };
     }
     if (target.status === "success" && !validSuccessfulTarget(name, target, expectedBuildId)) {
       return { ok: false, reason: "Successful " + name + " output is missing valid artifact evidence." };
@@ -69,13 +87,25 @@ export function validateCloudBuildReport(input, expectedBuildId) {
     if (target.status !== "success" && target.url != null) {
       return { ok: false, reason: "A non-successful " + name + " target must not expose a download URL." };
     }
+    // Only return the documented fields. Never echo arbitrary worker metadata
+    // (which could accidentally contain secrets or unbounded attacker-controlled values).
+    normalizedTargets[name] = target.status === "success"
+      ? {
+          status: target.status,
+          filename: target.filename,
+          url: target.url,
+          sizeBytes: target.sizeBytes,
+          sha256: target.sha256,
+          ...(name === "android" ? { signing: target.signing } : {})
+        }
+      : { status: target.status, filename: target.filename };
   }
   const successes = names.filter(name => targets[name].status === "success" && validSuccessfulTarget(name, targets[name], expectedBuildId)).length;
   const expectedState = successes === names.length ? "success" : successes > 0 ? "partial" : "failed";
   if (input.state !== expectedState) {
     return { ok: false, reason: "Build result state conflicts with the target outcomes." };
   }
-  if (!isHttpsUrl(input.runUrl, "github.com") || !Number.isFinite(Date.parse(input.completedAt))) {
+  if (!isWorkflowRunUrl(input.runUrl) || typeof input.completedAt !== "string" || !Number.isFinite(Date.parse(input.completedAt))) {
     return { ok: false, reason: "Build result is missing a valid workflow link or completion timestamp." };
   }
   return {
@@ -83,7 +113,7 @@ export function validateCloudBuildReport(input, expectedBuildId) {
     report: {
       buildId: expectedBuildId,
       state: expectedState,
-      targets,
+      targets: normalizedTargets,
       runUrl: input.runUrl,
       completedAt: input.completedAt,
       ...(typeof input.note === "string" ? { note: input.note.slice(0, 500) } : {})
