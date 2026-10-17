@@ -879,6 +879,7 @@ export default function Home() {
                       try {
                         addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
                         const forgeResponse = await fetch("/api/forge", {
+                          signal: requestController.signal,
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
