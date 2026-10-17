@@ -26,6 +26,20 @@ export type BuildIntent = {
 const isoNow = (value?: string) => value ?? new Date().toISOString();
 
 export function createBuildRun(intent: BuildIntent): BuildRun {
+  if (!Array.isArray(intent.tasks) || intent.tasks.length === 0) {
+    throw new Error("A build run must contain at least one task.");
+  }
+  for (const task of intent.tasks) {
+    if (!task || typeof task.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/.test(task.id)) {
+      throw new Error("Build task IDs must be non-empty, stable identifiers using letters, numbers, underscore, dot, colon or hyphen.");
+    }
+    if (typeof task.title !== "string" || !task.title.trim()) {
+      throw new Error("Every build task needs a non-empty title.");
+    }
+    if (task.dependsOn != null && (!Array.isArray(task.dependsOn) || task.dependsOn.some((dependency) => typeof dependency !== "string" || !dependency.trim()))) {
+      throw new Error("Build task dependencies must be a list of non-empty task IDs.");
+    }
+  }
   const ids = new Set(intent.tasks.map((task) => task.id));
   if (ids.size !== intent.tasks.length) throw new Error("Build task IDs must be unique.");
   for (const task of intent.tasks) {

@@ -140,6 +140,9 @@ const orchestratorJs = ts.transpileModule(orchestratorSource, {
 }).outputText;
 const orchestratorUrl = "data:text/javascript;base64," + Buffer.from(orchestratorJs).toString("base64");
 const { createBuildRun, setTaskStatus, resumeBuild, getReadyTasks } = await import(orchestratorUrl);
+assert.throws(() => createBuildRun({ projectId: "empty", tasks: [] }), /at least one task/, "empty build plans are rejected instead of creating idle runs");
+assert.throws(() => createBuildRun({ projectId: "bad-id", tasks: [{ id: " ", title: "Bad ID", kind: "design", acceptance: [] }] }), /stable identifiers/, "blank task IDs are rejected before dependency scheduling");
+assert.throws(() => createBuildRun({ projectId: "bad-title", tasks: [{ id: "task-1", title: " ", kind: "design", acceptance: [] }] }), /non-empty title/, "tasks must have a meaningful visible title");
 const skippedRun = createBuildRun({
   projectId: "verification-test",
   now: "2026-10-17T12:00:00.000Z",
