@@ -203,7 +203,21 @@ export function queueUserChange(run: BuildRun, request: string, now?: string): B
 
 export function resumeBuild(run: BuildRun, now?: string): BuildRun {
   if (run.status === "completed") throw new Error("A completed build cannot be resumed; create a new run or revise its plan.");
-  const tasks = run.tasks.map((task) => task.status === "running" ? { ...task, status: "queued" as const } : task);
+  const blocked = run.tasks.filter((task) => task.status === "blocked");
+  if (blocked.length) {
+    throw new Error("This build has blocked tasks that need user input or checkpoint recovery before it can resume: " + blocked.map((task) => task.title).join(", ") + ".");
+  }
+  if (run.tasks.length > 0 && run.tasks.every((task) => task.status === "passed" || task.status === "skipped")) {
+    throw new Error("No unfinished work remains to resume. Revise the plan or start a new build.");
+  }
+  // A failed task is not runnable until it returns to the queue. Leaving it
+  // failed while marking the run active creates a build that appears resumed
+  // but has no ready work. Resume is the explicit retry action for failed work.
+  const tasks = run.tasks.map((task) =>
+    task.status === "running" || task.status === "failed"
+      ? { ...task, status: "queued" as const }
+      : task
+  );
   return {
     ...run,
     tasks,

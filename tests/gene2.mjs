@@ -139,7 +139,15 @@ const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-
 const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
 assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
 assert.throws(() => setTaskStatus(passedRun, "required-check", "failed", "2026-10-17T12:00:03.000Z"), /Invalid task status transition/, "a passed task cannot be retroactively marked failed in the same run");
-console.log("GENE build-orchestrator completion-state tests passed.");
+assert.throws(() => resumeBuild(passedRun), /No unfinished work remains/, "completed work cannot be reopened by the resume action");
+const retryStart = setTaskStatus(skippedRun, "required-check", "running", "2026-10-17T12:00:04.000Z");
+const failedAttempt = setTaskStatus(retryStart, "required-check", "failed", "2026-10-17T12:00:05.000Z", "temporary runtime error");
+const retried = resumeBuild(failedAttempt, "2026-10-17T12:00:06.000Z");
+assert.equal(retried.tasks[0].status, "queued", "resume requeues failed work instead of leaving an active run with no runnable task");
+assert.deepEqual(getReadyTasks(retried).map(task => task.id), ["required-check"], "retried failed work becomes ready again");
+const blockedStart = setTaskStatus(skippedRun, "required-check", "blocked", "2026-10-17T12:00:07.000Z", "missing user input");
+assert.throws(() => resumeBuild(blockedStart), /blocked tasks that need user input/, "resume does not silently bypass a blocked task");
+console.log("GENE build-orchestrator completion and recovery tests passed.");
 
 
 // GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
