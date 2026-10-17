@@ -656,16 +656,20 @@ export default function Home() {
           { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: ["game.js", "game.css"], acceptance: [nextProject.kind === "app" ? "Primary user flows have working interactions and failure states" : "Full-game content extends beyond the prototype with progression and a complete ending", "Existing working controls and mechanics are preserved"] },
           { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["final-content-pass"], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
         ];
-        activeBuildRun = recovery
-          ? {
-              ...resumeBuild(recovery.run),
-              tasks: resumeBuild(recovery.run).tasks.map(task =>
-                task.id === "final-content-pass" || task.id === "validate-assembled"
-                  ? { ...task, status: "queued" as const, lastError: undefined }
-                  : task
-              ),
-              status: "running"
-            }
+        // Requeue the final validation stages before resuming. This keeps the
+        // resume helper strict (it refuses idle all-passed runs) and avoids
+        // invoking it twice against the same stale checkpoint state.
+        const recoveryBuildRun = recovery ? {
+          ...recovery.run,
+          tasks: recovery.run.tasks.map(task =>
+            task.id === "final-content-pass" || task.id === "validate-assembled"
+              ? { ...task, status: "queued" as const, lastError: undefined }
+              : task
+          ),
+          status: "recovering" as const
+        } : null;
+        activeBuildRun = recoveryBuildRun
+          ? { ...resumeBuild(recoveryBuildRun), status: "running" }
           : createBuildRun({
               projectId: nextProject.id,
               tasks: buildTasks,
