@@ -746,6 +746,7 @@ export async function POST(request: NextRequest) {
       perCallMs: 7_000,
       maxAttempts: 7,
       siteTitle: "GENE Builder",
+      signal: request.signal,
       validate: text => {
         const json = extractJsonObjectText(text);
         if (!json) return false;
@@ -770,6 +771,7 @@ export async function POST(request: NextRequest) {
         } catch { return false; }
       }
     });
+    if (request.signal.aborted) return new Response(null, { status: 499, statusText: "Client Closed Request" });
     if (chain.ok) {
       payload = { candidates: [{ content: { parts: [{ text: extractJsonObjectText(chain.text) as string }] }, finishReason: "STOP" }] };
       successfulModel = chain.model;
@@ -861,6 +863,7 @@ export async function POST(request: NextRequest) {
           groqLimit: 1,
           openrouterLimit: 2,
           siteTitle: "GENE Builder Reviewer",
+          signal: request.signal,
           validate: text => extractJsonObjectText(text) !== null
         });
         if (review.ok) {
