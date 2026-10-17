@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateCloudBuildReport } from "../../../lib/cloud-build-report.mjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -16,8 +17,8 @@ async function gh(url: string, token: string) {
 export async function GET(_request: NextRequest, context: { params: { buildId: string } }) {
   const id = context.params.buildId;
   if (!/^[a-f0-9-]{36}$/.test(id)) return fail("Invalid build identifier.");
-  const token = process.env.GENE_BUILD_GITHUB_TOKEN?.trim();
-  if (!token || REPO.length !== 2) return fail("Cloud build status is not configured.", 503);
+  const token = (process.env.GENE_BUILD_GITHUB_TOKEN || process.env.GENE_BUILD_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "").trim();
+  if (!token || REPO.length !== 2 || REPO.some(part => !part)) return fail("Cloud build status is not configured.", 503);
   const base = "/repos/" + REPO[0] + "/" + REPO[1];
   try {
     const resultResponse = await gh(base + "/contents/.gene-builds/" + id + ".result.json?ref=gene-build-" + id, token);
