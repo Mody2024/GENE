@@ -394,7 +394,9 @@ try {
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
   assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "theme choice is persisted before reload");
+  const hydratedHealth = themePage.waitForResponse(response => response.url().endsWith("/api/health"), { timeout: 10_000 });
   await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  await hydratedHealth;
   // Verify the hydrated React state, not the server's light-first HTML shell.
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
