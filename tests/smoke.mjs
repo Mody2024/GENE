@@ -67,6 +67,9 @@ assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback 
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
 assert.ok(api.includes("AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time and abort immediately when the browser cancels");
 assert.ok(api.includes("if (request.signal.aborted) return new Response(null, { status: 499"), "cancelled browser requests stop before another model fallback is attempted");
+assert.ok(providers.includes("signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout"), "the free backup provider HTTP request is cancelled by the same user stop signal");
+assert.ok(providers.includes("options.signal?.aborted || attempts >="), "the fallback model loop stops instead of trying every remaining model after cancellation");
+assert.ok(api.includes("signal: request.signal") && api.includes("if (request.signal.aborted) return new Response(null, { status: 499"), "main and independent reviewer fallback calls respect cancellation");
 assert.ok(page.includes("function cancelAgentWork") && page.includes("activeAgentControllers") && page.includes("aria-label=\"Stop AI generation and clear queued requests\""), "the workspace exposes a stop control and tracks cancellable AI requests");
 assert.ok(page.includes("cancelAgentWork(\"Cancelled because you switched to a new project.\""), "starting a new project cancels in-flight work from the previous chat");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
