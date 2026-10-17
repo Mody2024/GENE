@@ -34,7 +34,7 @@ export type ChainFailure = { status: number; detail: string; provider: "Groq" | 
 
 export type ChainResult =
   | { ok: true; provider: string; model: string; text: string; finish: string; attempts: number }
-  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[] };
+  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[]; failureDetails?: string[] };
 
 import { classifyProviderFailure, extractJsonObjectText, parseFreeCatalog, scoreModel } from "./provider-utils.mjs";
 import type { CatalogEntry } from "./provider-utils.mjs";
@@ -207,6 +207,7 @@ export async function runAlternateChain(options: {
   let malformed = false;
   let attempts = 0;
   const tried: string[] = [];
+  const failureDetails: string[] = [];
   const skipProvider = new Set<string>();
   for (const candidate of candidates) {
     if (options.signal?.aborted || attempts >= (options.maxAttempts ?? 5)) break;
@@ -227,6 +228,7 @@ export async function runAlternateChain(options: {
     });
     if (!result.ok) {
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [" + (result.status || 502) + "]: " + String(result.detail || "empty response").slice(0, 220));
       const kind = classifyProviderFailure(result.status, result.detail);
       if (kind === "unavailable" || kind === "paid") markModelUnavailable(candidate.model);
       if (kind === "auth") skipProvider.add(candidate.name);
@@ -235,16 +237,18 @@ export async function runAlternateChain(options: {
     if (result.finish === "length") {
       truncated = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") reached its output limit before completing JSON.", provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [422]: output limit reached");
       continue;
     }
     if (options.validate && !options.validate(result.text)) {
       malformed = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") returned incomplete or invalid JSON.", provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [422]: invalid JSON response");
       continue;
     }
     return { ok: true, provider: candidate.name, model: candidate.model, text: result.text, finish: result.finish, attempts };
   }
-  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried };
+  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried, failureDetails: failureDetails.slice(-8) };
 }
 
 export function getGeminiKeys(): string[] {
