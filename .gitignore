@@ -12,3 +12,4 @@ coverage/
 gene-projects/
 data/projects/
 *.gene.json
+*.tsbuildinfo
