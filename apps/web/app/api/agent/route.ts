@@ -279,7 +279,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const js = byPath["game.js"];
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
     // Validate the complete assembled JavaScript project so valid modular controls are not rejected.
-    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
+    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.(?:m?js|cjs)$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
     if (projectKind === "game" && enforceAudioContract) {
       const audio = spec.audio;
       const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];

@@ -165,6 +165,7 @@ assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 assert.ok(agentRoute.includes("inspectProjectFilePaths(normalized.map(file => file.path))") && agentRoute.includes("normalizeProjectFilePath(value).ok"), "AI-generated files use the same portable path and collision policy as workspace QA and cloud packaging");
 assert.ok(agentRoute.includes("/\\.(?:m?js|cjs)$/i.test(file.path)") && safety.includes("/\\.(?:m?js|cjs)$/i.test(file.path)"), "server syntax checks and static identifier analysis include .js, .mjs and .cjs files");
+assert.ok(agentRoute.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.(?:m?js|cjs)$/i.test(path)"), "audio and gameplay-control contract checks inspect all executable module extensions");
 assert.ok(agentRoute.includes("path.normalize(\"NFC\").toLowerCase()"), "additionalFiles declarations reject case/Unicode-equivalent duplicate paths");
 assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
