@@ -18,6 +18,7 @@ import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
+import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -127,10 +128,7 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
 
 /** Ordered exported paths of every project script except the main one, so extra modules load in exports too. */
 function moduleScriptPaths(files: Record<string, string>, kind: ProjectKind): string[] {
-  return Object.keys(files)
-    .filter(path => path !== "game.js" && /\.(?:m?js|cjs)$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
-    .sort((a, b) => a.localeCompare(b))
-    .map(path => exportProjectPath(path, kind));
+  return orderRuntimeModulePaths(files).map(path => exportProjectPath(path, kind));
 }
 function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "", modulePaths: string[] = []) {
   const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
@@ -406,9 +404,8 @@ export default function Home() {
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
     // Load generated modules into the same sandboxed runtime as the core game/app.
-    const moduleScripts = Object.entries(project.files)
-      .filter(([path]) => path !== "game.js" && /\.(?:m?js|cjs)$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
-      .sort(([a], [b]) => a.localeCompare(b))
+    const moduleScripts = orderRuntimeModulePaths(project.files)
+      .map(path => [path, project.files[path]] as const)
       .map(([path, source]) => "/* GENE module: " + path + " */\n" + source.replace(/<\/script/gi, "<\\/script"))
       .join("\n;\n");
     if (project.kind === "app") {

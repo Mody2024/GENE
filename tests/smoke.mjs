@@ -560,7 +560,8 @@ assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || opera
 assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => item.id))"), "concurrent build/chat responses deduplicate and preserve conversation messages");
 assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
 
-assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(page.includes("orderRuntimeModulePaths(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(page.includes("return orderRuntimeModulePaths(files).map(path => exportProjectPath(path, kind))") && prompts.includes("List additionalFiles in dependency/load order"), "preview and export preserve the dependency-aware module order declared by the project spec");
 const appPreviewStart = page.indexOf('if (project.kind === "app")');
 const appPreviewReturn = page.indexOf('return "<!doctype html>', appPreviewStart);
 const appPreviewEnd = page.indexOf('";', appPreviewReturn) + 2;

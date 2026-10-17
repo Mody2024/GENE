@@ -4,6 +4,7 @@ import * as ts from "typescript";
 import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/app/lib/project-file-safety.mjs";
+import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-order.mjs";
 import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
@@ -49,6 +50,17 @@ assert.equal(unicodeCollision.ok, false, "canonically equivalent Unicode paths c
 assert.equal(inspectProjectFilePaths(["game/index.html", "assets/hero.png"]).ok, true);
 assert.equal(inspectProjectFilePaths(["assets", "assets/hero.png"]).ok, false, "file paths cannot also be directories");
 assert.equal(inspectProjectFilePaths(["assets/hero.png", "assets"]).ok, false, "file/directory conflicts are rejected regardless of source order");
+const orderedModules = orderRuntimeModulePaths({
+  "game.js": "startGame();",
+  "game-spec.json": JSON.stringify({ additionalFiles: ["src/core.mjs", "src/combat.cjs"] }),
+  "src/ui.js": "window.GeneModules.ui = {};",
+  "src/combat.cjs": "window.GeneModules.combat = {};",
+  "src/core.mjs": "window.GeneModules.core = {};",
+  "src/z-last.js": "window.GeneModules.last = {};",
+  "node_modules/ignored.js": "ignored();"
+});
+assert.deepEqual(orderedModules, ["src/core.mjs", "src/combat.cjs", "src/ui.js", "src/z-last.js"], "runtime module order follows declared dependencies, then deterministically sorts undeclared modules and excludes node_modules");
+assert.deepEqual(orderRuntimeModulePaths({ "game.js": "", "b.js": "", "a.js": "" }), ["a.js", "b.js"], "projects without a module manifest use deterministic alphabetical module order");
 
 // SVG sanitizer.
 const hostile = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script><image href="https://evil.test/x.png"/><rect width="4" height="4" fill="red"/><circle cx="5" cy="5" r="2"/></svg>';
