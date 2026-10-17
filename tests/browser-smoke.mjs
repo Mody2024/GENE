@@ -382,7 +382,9 @@ try {
 
   await page.keyboard.press("Control+k");
   await page.getByRole("dialog", { name: "What are we building?" }).waitFor({ timeout: 5000 });
-  assert.equal(await page.locator(".create-project-option").count(), 3, "project picker offers 2D, 3D and web app choices");
+  assert.equal(await page.locator(".create-project-option").count(), 4, "project picker offers separate 2D, 3D, website and web app targets");
+  await page.getByRole("button", { name: /Website/ }).waitFor({ state: "visible", timeout: 3000 });
+  await page.getByRole("button", { name: /Web app/ }).waitFor({ state: "visible", timeout: 3000 });
   await page.getByRole("button", { name: /2D game/ }).click();
   await page.locator('.rail button[title="Scene Studio"]').click();
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
