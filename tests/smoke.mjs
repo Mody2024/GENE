@@ -11,6 +11,7 @@ const rootPackage = JSON.parse(read("package.json"));
 const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
+const providers = read("apps/web/app/lib/providers.ts");
 const publishApi = read("apps/web/app/api/publish/route.ts");
 const buildApi = read("apps/web/app/api/builds/route.ts");
 const buildStatusApi = read("apps/web/app/api/builds/[buildId]/route.ts");
