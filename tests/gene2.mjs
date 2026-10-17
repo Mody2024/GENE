@@ -139,7 +139,7 @@ const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-
 const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
 assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
 assert.throws(() => setTaskStatus(passedRun, "required-check", "failed", "2026-10-17T12:00:03.000Z"), /Invalid task status transition/, "a passed task cannot be retroactively marked failed in the same run");
-assert.throws(() => resumeBuild(passedRun), /No unfinished work remains/, "completed work cannot be reopened by the resume action");
+assert.throws(() => resumeBuild(passedRun), /completed build cannot be resumed/, "completed work cannot be reopened by the resume action");
 const retryBase = createBuildRun({ projectId: "retry-test", now: "2026-10-17T12:00:03.000Z", tasks: [{ id: "retry-check", title: "Retry check", kind: "test", acceptance: ["must pass"] }] });
 const retryStart = setTaskStatus(retryBase, "retry-check", "running", "2026-10-17T12:00:04.000Z");
 const failedAttempt = setTaskStatus(retryStart, "retry-check", "failed", "2026-10-17T12:00:05.000Z", "temporary runtime error");
