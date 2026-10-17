@@ -103,10 +103,32 @@ export function makeAgentInput(input: {
     planTitle: p?.plan?.title,
     planEngine: selectedEngine === "webapp" ? undefined : selectedEngine
   }) : null;
+  const gameIntent = [
+    p?.initialPrompt || "",
+    input.message,
+    p?.plan?.title || "",
+    p?.plan?.summary || "",
+    ...(p?.plan?.mechanics || []),
+    ...Object.values(input.answers || p?.answers || {})
+  ].join(" ");
+  const gameArchetypeContract = /minecraft|voxel|block.?world|block.?craft/i.test(gameIntent)
+    ? "VOXEL SANDBOX CONTRACT: Design a bounded, data-driven voxel world, not a flat pile of blocks. Use stable integer world coordinates and a deterministic seed; represent blocks as compact data, not one heavy object per block. Build chunks/regions and update only dirty chunks; cap generation and mesh work per frame. Support a coherent minimum loop: explore, break/place blocks, collect resources, inventory, at least a small useful crafting chain, save/load, and a visible world objective. Prevent duplicate drops, out-of-range edits, invalid recipes, chunk seam/collision mismatches, and save corruption. Keep the initial world deliberately small and playable; expand chunk streaming and content only after that slice works. If the selected runtime cannot provide true 3D voxel rendering, state that boundary honestly and implement a clearly labeled 2D/isometric alternative rather than pretending it is full Minecraft-scale 3D."
+    : /geometry.?dash|rhythm|beat.?sync|music.?platform/i.test(gameIntent)
+    ? "RHYTHM GAME CONTRACT: Use one authoritative song/chart clock for obstacles and scoring; never derive beat timing solely from frame count. Keep chart events as data with timestamps, provide stable hit windows, immediate restart, readable upcoming hazards, and calibration for input/audio offset when feasible. Audio failure must not break gameplay. Use original or user-supplied music only; do not imitate or bundle copyrighted tracks. Test timing across variable frame deltas and ensure pause/resume handles the song clock and obstacle state consistently."
+    : /mario|platformer|precision.?jump|metroidvania/i.test(gameIntent)
+    ? "PRECISION PLATFORMER CONTRACT: Prioritize consistent acceleration, jump arcs, collision boxes, coyote time/jump buffering where appropriate, and clear separation between grounded and airborne state. Teach each hazard before combining it with another, ensure camera framing reveals the next challenge, and place checkpoints before high-cost sequences. Build distinct level beats, collectibles/rewards and a reachable finale; validate collision and restart paths rather than generating only a decorative scrolling scene."
+    : /open.?world|large world|exploration world|persistent world/i.test(gameIntent)
+    ? "OPEN-WORLD CONTRACT: Start with a compact, richly composed region that proves traversal, landmark navigation, interaction, discovery, and save/load. Partition content into bounded regions and load/unload incrementally; cap entities and avoid generating the entire world in one frame. Tie quests and rewards to landmarks and traversal abilities. Plan additional regions as explicit milestones; do not describe a small static map as a limitless open world."
+    : /survival|crafting|base.?building|resource gathering/i.test(gameIntent)
+    ? "SURVIVAL/CRAFTING CONTRACT: Model resources, inventory, recipes, health/needs, threats and progression as explicit state/data. Make each resource useful, show clear feedback for failed crafting, and guarantee a recoverable path so the player cannot soft-lock from one missed item. Add save/load only with versioned, validated data. Keep pressure fair and optional needs/difficulty settings readable."
+    : /story|narrative|dialogue|choice.?driven|adventure/i.test(gameIntent)
+    ? "STORY ADVENTURE CONTRACT: Represent quests, dialogue choices and scene transitions as explicit state/flags with stable IDs. Ensure every choice leads to a defined consequence, every mission can be entered/recovered, and save/load preserves the relevant flags. Build an opening, a meaningful choice, varied mission beats and a clear ending; never present disconnected placeholder dialogue as a complete branching story."
+    : "";
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
     ...(p?.preferredEngine ? ["USER-SELECTED ENGINE: " + p.preferredEngine + ". Respect this choice in the plan, game-spec.json, renderer and controls. Do not silently switch between 2D and 3D."] : []),
     ...(guide ? ["GENRE-SPECIFIC IMPLEMENTATION GUIDE AND ACCEPTANCE CHECKLIST:\\n" + formatGameGuide(guide)] : ["WEB APP ACCEPTANCE CHECKLIST: polished responsive layout; semantic HTML; keyboard-accessible controls; working navigation/actions/forms; useful visual hierarchy; proper loading/empty/success/error states; field-level validation and actionable error messages; guard duplicate submits; preserve user input on failure; handle offline/timeout/HTTP errors; no fake backend, no external CDN, no hard-coded credentials; avoid dead controls and placeholder-only screens. For every visible control, identify its action and state transition; never render inert buttons or fake success. If persistence or authentication is not wired, label the limitation honestly and do not simulate saved/server data."]),
+    ...(gameArchetypeContract ? [gameArchetypeContract] : []),
     buildStudioContract(projectKind, selectedEngine, input.operation),
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
