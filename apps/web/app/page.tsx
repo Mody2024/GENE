@@ -41,9 +41,11 @@ function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 function GeneMark({ className = "" }: { className?: string }) {
-  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE mark">
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE genie-inspired mark">
+    <path className="gene-logo-orbit" d="M7.8 10.5C13.2 3.4 23.7 2.1 30.4 7.4" fill="none" stroke="#cda75e" strokeWidth="1.2" strokeLinecap="round" />
     <path d="M30.2 12.1A13.1 13.1 0 1 0 32.9 22H21.2" fill="none" stroke="currentColor" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M20.5 20.5h9.8" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" opacity=".45" />
+    <path className="gene-logo-spark" d="M33 4.4l1.05 2.45 2.45 1.05-2.45 1.05L33 11.4l-1.05-2.45L29.5 7.9l2.45-1.05z" fill="#cda75e" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }

@@ -100,3 +100,10 @@
 /* GENE genie identity: restrained mint and warm-gold orbit, never a literal mascot. */
 .studio-v2.light .brand-orbit{background:linear-gradient(145deg,#f4f3dc,#a9d6b7);color:#21412f;box-shadow:0 5px 18px rgba(62,121,95,.18),inset 0 1px #ffffffc7}
 .studio-v2.light .brand-orbit:after{border-color:rgba(211,166,82,.48)}
+
+
+/* The GENE mark pairs its open ring with a restrained wish-star and orbit. */
+.studio-v2 .gene-logo-orbit{opacity:.88}
+.studio-v2 .gene-logo-spark{transform-origin:33px 7.9px;transition:transform .2s ease}
+.studio-v2 .brand:hover .gene-logo-spark{transform:rotate(18deg) scale(1.08)}
+.studio-v2 .brand:focus-visible{outline:2px solid var(--studio-accent);outline-offset:3px;border-radius:12px}
