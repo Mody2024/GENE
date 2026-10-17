@@ -44,16 +44,18 @@ function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 function GeneMark({ className = "" }: { className?: string }) {
-  return <svg className={"gene-logo-svg " + className} viewBox="0 0 40 40" role="img" aria-label="GENE genie-inspired mark">
-    <path className="gene-logo-orbit" d="M7.8 10.5C13.2 3.4 23.7 2.1 30.4 7.4" fill="none" stroke="#cda75e" strokeWidth="1.2" strokeLinecap="round" />
-    <path d="M30.2 12.1A13.1 13.1 0 1 0 32.9 22H21.2" fill="none" stroke="currentColor" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M20.5 20.5h9.8" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" opacity=".45" />
-    <path className="gene-logo-spark" d="M33 4.4l1.05 2.45 2.45 1.05-2.45 1.05L33 11.4l-1.05-2.45L29.5 7.9l2.45-1.05z" fill="#cda75e" />
+  return <svg className={"gene-logo-svg " + className} viewBox="0 0 48 48" role="img" aria-label="GENE genie lamp and wish spark mark">
+    <path className="gene-logo-orbit" d="M8 13C13 5.8 23 3.8 30.2 7.8" fill="none" stroke="#cda75e" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M24 22.5c-5.8-2.8-6.8-7.7-3.3-11.1 2.9-2.8 8.2-1.8 9.3 1.8.6 2-.4 3.7-2 4.7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+    <path d="M15 26.2 7.4 23.8l5.8 6.1M14 26.5c.4 6.1 5.1 10 11.2 10 6.2 0 10.5-3.8 10.8-9.4l-6.2-2.7-2.5 2.1H19.8l-4.8-1.9Z" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M18 39.2h14.2M34.8 27.2c3.8-.2 5.7 2.3 4.7 5.1-.7 1.9-2.5 2.7-4.1 2.1" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    <path className="gene-logo-spark" d="m37.2 7.2 1.5 3.7 3.7 1.5-3.7 1.5-1.5 3.7-1.5-3.7-3.7-1.5 3.7-1.5z" fill="#cda75e" />
+    <circle cx="9" cy="9" r="1.5" fill="#cda75e" />
   </svg>;
 }
 function now() { return new Date().toISOString(); }
 function explainAgentError(error: unknown, code?: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : String(error || "Unknown error");
+  const rawMessage = (error instanceof Error ? error.message : String(error || "Unknown error")).replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[redacted]").replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]").slice(0, 1800);
   const raw = (rawMessage + " " + String(code || "")).trim();
   if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "GENE only uses free AI models, and none of its free backups was available for this request. No project changes were applied. GENE re-discovers free models automatically, so just retry in a minute or add another free Gemini key.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
@@ -531,7 +533,14 @@ export default function Home() {
       });
   }, [project?.files, project?.id]);
 
-  const addActivity = (entry: string) => setActivity(prev => [new Date().toLocaleTimeString() + "  " + entry, ...prev].slice(0, 80));
+  const addActivity = (entry: string) => {
+    const safeEntry = entry
+      .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[redacted]")
+      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
+      .slice(0, 900);
+    const level = /failed|error|reject|timeout|unavailable|blocked/i.test(safeEntry) ? "ERROR" : /retry|recover|attempt|repair/i.test(safeEntry) ? "RETRY" : /passed|completed|saved|published|verified/i.test(safeEntry) ? "OK" : "WORK";
+    setActivity(prev => [new Date().toLocaleTimeString() + "  " + level + " · " + safeEntry, ...prev].slice(0, 100));
+  };
 
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
@@ -678,7 +687,7 @@ export default function Home() {
         activeBuildRun = { ...activeBuildRun, status: "running" };
         if (recovery) addActivity("Resuming from checkpoint " + (recovery.run.checkpoints[recovery.run.checkpoints.length - 1]?.id || "latest") + "; previously passed file stages will be preserved.");
         setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
-        addActivity("GENE 1.4 coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
+        addActivity("GENE 2.0 build coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
         const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
           activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
@@ -1030,18 +1039,32 @@ export default function Home() {
             setNotice("GENE is retrying with a shorter, complete response. Your current project files remain safe.");
             await new Promise(resolve => window.setTimeout(resolve, attempt === 1 ? 650 : 1300));
           }
-          const retryInstruction = attempt === 0 ? "" :
-            "\\n\\nAUTOMATIC RECOVERY RETRY " + (attempt + 1) + "/3: The previous model attempt did not finish successfully. Re-read the existing project context and complete the same request from the last saved state. Return one complete valid response, not a continuation fragment. Prefer a smaller but working result; preserve existing features and filenames. For edits, change only the necessary files. Do not claim changes were applied unless you return the complete validated result.";
-          const response = await fetch("/api/agent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...baseRequest,
-              operation,
-              message: prompt + retryInstruction,
-              project: nextProject
-            })
-          });
+          const retryInstruction = attempt === 0 ? "" : attempt === 1
+            ? "\n\nAUTOMATIC RECOVERY RETRY 2/3 — DIAGNOSE AND SIMPLIFY: Re-read the project files and failure context, identify the most likely cause, then retry with a smaller complete implementation. Preserve working behavior and established filenames; remove optional effects before removing the requested core. Return one valid complete response, never a fragment."
+            : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
+          let response: Response;
+          try {
+            response = await fetch("/api/agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...baseRequest,
+                operation,
+                message: prompt + retryInstruction,
+                project: nextProject
+              })
+            });
+          } catch (networkError) {
+            const detail = networkError instanceof Error ? networkError.message : "network connection lost";
+            addActivity("Network failure on request attempt " + (attempt + 1) + "/3: " + detail);
+            if (attempt < 2) {
+              setNotice("GENE lost the connection to its server. It will retry with a different recovery strategy; saved files remain untouched.");
+              continue;
+            }
+            payload = { ok: false, error: { code: "GENE_NETWORK_RETRY_EXHAUSTED", message: "The connection failed on all three request attempts. No unconfirmed changes were applied. Retry when the connection is stable." } };
+            responseOk = false;
+            break;
+          }
           payload = await response.json().catch(() => null);
           responseOk = response.ok;
           if (responseOk && payload?.ok) break;
@@ -2217,7 +2240,7 @@ export default function Home() {
       </aside>
 
       <aside className="project-sidebar">
-        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
+        <div className="sidebar-head"><div><div className="eyebrow">WORKSPACE</div><div className="sidebar-title">GENE 2.0 Studio</div></div><button className="icon-button" title="New project" onClick={createNewProject}>＋</button></div>
         <button className="new-project-entry" title="Start one unified project. GENE identifies whether you want a game, website, or app from your brief." onClick={createNewProject}><span className="new-project-plus">＋</span><span>New project</span><span className="new-project-entry-hint">Ctrl/⌘ K</span></button>
         <details className="sidebar-disclosure workspace-tools">
           <summary><span>Project tools</span><span className="menu-caret">⌄</span></summary>
@@ -2258,7 +2281,7 @@ export default function Home() {
 
       <section className="main-column">
         <header className="topbar studio-topbar">
-          <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><span className="project-target-chip" title="Selected target is used by the planner and generator">{targetLabel}</span><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
+          <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE 2.0</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><span className="project-target-chip" title="Selected target is used by the planner and generator">{targetLabel}</span><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             
             <button type="button" className="mobile-preview-button" title="Open live preview in a focused workspace" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}><span>▷</span><span>Live preview</span></button>
@@ -2348,9 +2371,12 @@ export default function Home() {
                 {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
                   <div className="real-progress-heading"><span>BUILD PROGRESS</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} steps verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
                   <div className="real-progress-track"><span style={{ width: (project.buildRun.tasks.length ? project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100 : 0) + "%" }} /></div>
-                  <div className="real-progress-current"><span className="real-progress-current-dot" /><div><small>{project.buildRun.tasks.some(task => task.status === "running") ? "IN PROGRESS" : project.buildRun.tasks.some(task => task.status === "failed") ? "NEEDS ATTENTION" : "NEXT STEP"}</small><strong>{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.title || "Finishing and validating the project"}</strong></div></div>
-                  <div className="real-progress-tasks">{project.buildRun.tasks.map(task => <div key={task.id} className={"real-progress-task " + task.status}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "↻" : task.status === "failed" ? "!" : task.status === "blocked" ? "×" : "·"}</span><strong>{task.title}</strong><small>{task.status}{task.files.length ? " · " + task.files.join(", ") : ""}</small></div>)}</div>
-                  <p>Progress reflects task states reported by GENE&apos;s build coordinator and validation. No token counter or simulated thinking stream is shown.</p>
+                  <div className="real-progress-current"><span className="real-progress-current-dot" /><div><small>{project.buildRun.tasks.some(task => task.status === "running") ? "WORKING NOW" : project.buildRun.tasks.some(task => task.status === "failed") ? "RECOVERY NEEDED" : "UP NEXT"}</small><strong>{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.title || "Finishing and validating the project"}</strong><small className="real-progress-current-files">{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.files?.join(" · ") || "Checking the assembled project"}</small></div></div>
+                  <details className="real-progress-details">
+                    <summary>Show all steps <span>{project.buildRun.tasks.filter(task => task.status === "passed").length} verified · {project.buildRun.tasks.filter(task => task.status === "queued" || task.status === "running").length} remaining</span></summary>
+                    <div className="real-progress-tasks">{project.buildRun.tasks.map(task => <div key={task.id} className={"real-progress-task " + task.status}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "↻" : task.status === "failed" ? "!" : task.status === "blocked" ? "×" : "·"}</span><strong>{task.title}</strong><small>{task.status}{task.files.length ? " · " + task.files.join(", ") : ""}{typeof task.attempts === "number" && task.attempts > 0 ? " · " + task.attempts + " attempt(s)" : ""}</small></div>)}</div>
+                  </details>
+                  <p>Live status from GENE&apos;s build coordinator. The current step stays visible; the rest remain hidden until you open the details.</p>
                 </div>}
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
@@ -2492,7 +2518,7 @@ export default function Home() {
           <div className="create-project-key-hint"><kbd>Esc</kbd> to close <span>·</span> <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> to reopen</div>
         </section>
       </div>}
-      {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>2.0</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
+      {showAbout && <div className="about-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowAbout(false); }}><section className="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-gene-title"><button className="about-close" aria-label="Close About GENE" onClick={() => setShowAbout(false)}>×</button><div className="about-brand"><span className="about-mark"><GeneMark /></span><div><div className="eyebrow">ABOUT THE WORKSPACE</div><h2 id="about-gene-title">GENE <span>2.0</span></h2></div></div><p className="about-lead">A focused AI workspace for turning ideas into real apps and playable browser games — with editable source, live preview, build checkpoints and recovery tools.</p><div className="about-detail-grid"><div><span>PRODUCT</span><strong>GENE 2.0 Studio</strong></div><div><span>BUILT BY</span><strong>Almuddaththir</strong></div><div><span>WORKFLOW</span><strong>Plan · Build · Test · Refine</strong></div><div><span>PRINCIPLE</span><strong>Real files. Honest status.</strong></div></div><div className="about-footer"><span>Made by <strong>Almuddaththir</strong></span><button className="primary-button" onClick={() => setShowAbout(false)}>Back to workspace</button></div></section></div>}
     </main>
   );
 }

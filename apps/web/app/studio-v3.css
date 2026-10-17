@@ -122,7 +122,7 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .studio-v2 .real-progress-current>div{display:grid;gap:2px;min-width:0}
 .studio-v2 .real-progress-current small{font-size:9px;letter-spacing:.08em;color:var(--studio-muted)}
 .studio-v2 .real-progress-current strong{font-size:11px;font-weight:600;overflow-wrap:anywhere}
-.studio-v2 .real-progress-tasks{max-height:100px;gap:3px}
+.studio-v2 .real-progress-tasks{max-height:none;overflow:visible;gap:3px}
 .studio-v2 .real-progress-task{border:1px solid transparent;background:transparent;border-radius:7px}
 .studio-v2 .real-progress-task.running{background:color-mix(in srgb,var(--studio-accent) 9%,var(--studio-panel));border-color:var(--studio-line)}
 .studio-v2 .real-progress-task.passed>span{color:var(--studio-accent)}
@@ -148,4 +148,24 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .studio-v2 .g3-doc,.studio-v2 .g3-card,.studio-v2 .plan-card,.studio-v2 .build-check-panel{box-shadow:none;border-radius:12px}
 .studio-v2 .g3-doc{background:var(--studio-panel)}
 @media(max-width:900px){.studio-v2 .create-project-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:560px){.studio-v2 .create-project-grid{grid-template-columns:1fr}.studio-v2 .create-project-option{min-height:132px}.studio-v2 .project-target-chip{display:none}.studio-v2 .g3-choice-grid{grid-template-columns:1fr}.studio-v2 .real-progress-tasks{max-height:76px}}
+@media(max-width:560px){.studio-v2 .create-project-grid{grid-template-columns:1fr}.studio-v2 .create-project-option{min-height:132px}.studio-v2 .project-target-chip{display:none}.studio-v2 .g3-choice-grid{grid-template-columns:1fr}.studio-v2 .real-progress-tasks{max-height:none;overflow:visible}}
+
+/* GENE 2.0 — live-first progress, compact identity, and genie-lamp mark */
+.studio-v2 .real-progress-panel{max-width:720px;padding:12px 14px;border-radius:12px;box-shadow:none}
+.studio-v2 .real-progress-current{align-items:flex-start;gap:10px}
+.studio-v2 .real-progress-current>div{min-width:0;display:grid;gap:4px}
+.studio-v2 .real-progress-current strong{font-size:12px;line-height:1.45;font-weight:620}
+.studio-v2 .real-progress-current-files{font-size:10px;color:var(--studio-muted);overflow-wrap:anywhere;line-height:1.4}
+.studio-v2 .real-progress-details{margin-top:9px;border-top:1px solid var(--studio-line);padding-top:7px}
+.studio-v2 .real-progress-details>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;color:var(--studio-muted);font-size:10px;padding:5px 0;user-select:none}
+.studio-v2 .real-progress-details>summary::-webkit-details-marker{display:none}
+.studio-v2 .real-progress-details>summary::after{content:"＋";font-size:13px;color:var(--studio-text)}
+.studio-v2 .real-progress-details[open]>summary::after{content:"−"}
+.studio-v2 .real-progress-details>summary span{margin-left:auto;font-size:9px;text-align:right}
+.studio-v2 .real-progress-tasks{max-height:none!important;overflow:visible!important;overscroll-behavior:auto;padding:4px 0 0;scrollbar-width:auto}
+.studio-v2 .real-progress-task{max-height:none;overflow:visible}
+.studio-v2 .studio-version-pill{display:inline-flex;align-items:center;border:1px solid var(--studio-line-strong);border-radius:5px;padding:3px 6px;font:650 9px/1 "DM Mono",monospace;letter-spacing:.04em;color:var(--studio-muted);background:var(--studio-panel)}
+.studio-v2 .sidebar-title{letter-spacing:-.025em}
+.gene-logo-svg{width:27px;height:27px;overflow:visible}
+.brand-orbit .gene-logo-svg{width:29px;height:29px}
+@media(max-width:700px){.studio-v2 .real-progress-details>summary{align-items:flex-start}.studio-v2 .real-progress-details>summary span{max-width:58%;line-height:1.4}}

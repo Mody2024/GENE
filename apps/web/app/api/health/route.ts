@@ -27,7 +27,8 @@ export async function GET() {
   const hasPublishPassword = Boolean(process.env.GENE_PUBLISH_PASSWORD?.trim());
   return NextResponse.json({
     ok: true,
-    app: "gene-web",
+    app: "gene-2-web",
+    version: "2.0.0",
     aiConfigured: hasGemini || hasGroq || hasOpenRouter,
     providers: { gemini: hasGemini, groq: hasGroq, openrouter: hasOpenRouter },
     freeModels: { openrouter: freeOpenRouterModels },
