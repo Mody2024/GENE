@@ -420,6 +420,8 @@ assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("must no
 
 assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
 assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
+const cloudWorker = read("scripts/cloud-build.mjs");
+assert.ok(cloudWorker.includes("inspectProjectFilePaths(payload.files.map(item=>item&&item.path))") && cloudWorker.includes("path.resolve(out,rel)"), "the cloud worker applies shared path/collision validation plus a final directory-containment check");
 
 assert.ok(api.includes("normalizeProjectFilePath(value).ok") && api.includes("inspectProjectFilePaths(normalized.map(file => file.path))"), "AI project path validation uses the shared portable path and collision policy");
 assert.ok(page.includes("inspectProjectFilePaths(allPaths)") && page.includes("additionalFiles"), "workspace QA and dynamic stage path validation use the shared safe relative-path policy");

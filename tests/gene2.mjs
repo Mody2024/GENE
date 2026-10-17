@@ -177,6 +177,8 @@ assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace an
 assert.ok(themePage.includes("const allJavaScript = fileEntries.filter(([path, source]) => /\\.(?:m?js|cjs)$/i.test(path)"), "external-runtime and inline-script checks inspect CommonJS modules too");
 const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
 assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()") && cloudBuildRoute.includes("inspectProjectFilePaths(files.map(file => file.path))"), "cloud build rejects unsafe, conflicting, case- and Unicode-colliding paths");
+const cloudWorkerSource = readFileSync(new URL("../scripts/cloud-build.mjs", import.meta.url), "utf8");
+assert.ok(cloudWorkerSource.includes("normalizeProjectFilePath(value)") && cloudWorkerSource.includes("inspectProjectFilePaths(payload.files.map(item=>item&&item.path))"), "the cloud worker revalidates path safety and collisions before writing decrypted files");
 assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html")'), "cloud builds require the exact canonical index.html entry point");
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 const codeSafetySource = readFileSync(new URL("../apps/web/app/lib/code-safety.mjs", import.meta.url), "utf8");
