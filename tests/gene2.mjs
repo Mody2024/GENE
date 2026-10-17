@@ -5,6 +5,7 @@ import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
 import { GENE_AUDIO_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
+import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report.mjs";
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
 assert.equal(classifyProviderFailure(400, "This model is unavailable for free. The paid version is available now - use this slug instead: qwen/qwen3-coder"), "unavailable");
@@ -54,3 +55,30 @@ for (const name of ["jump", "coin", "hit", "explosion", "win", "does-not-exist"]
 assert.doesNotThrow(() => { sandbox.GeneAudio.music.start("tense"); sandbox.GeneAudio.music.stop(); sandbox.GeneAudio.setMuted(true); });
 assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
 console.log("GENE 2.0 module tests passed (provider routing, code safety, SVG sanitizer, research, audio kit).");
+
+
+// Cloud-build result contract: successful artifacts need matching identity and verifiable metadata.
+const cloudBuildId = "12345678-1234-4234-9234-123456789abc";
+const goodArtifact = (name) => ({
+  status: "success",
+  url: "https://gene-builds.blob.vercel-storage.com/" + (name === "windows" ? "GENE-" + cloudBuildId + "-Setup.exe" : "GENE-" + cloudBuildId + "-debug.apk"),
+  filename: name === "windows" ? "GENE-" + cloudBuildId + "-Setup.exe" : "GENE-" + cloudBuildId + "-debug.apk",
+  sizeBytes: 250000,
+  sha256: "a".repeat(64),
+  ...(name === "android" ? { signing: "debug" } : {})
+});
+const cloudReport = {
+  buildId: cloudBuildId,
+  state: "success",
+  targets: { windows: goodArtifact("windows"), android: goodArtifact("android") },
+  runUrl: "https://github.com/Mody2024/GENE/actions/runs/12345",
+  completedAt: "2026-10-17T12:00:00.000Z",
+  note: "verified test fixture"
+};
+assert.equal(validateCloudBuildReport(cloudReport, cloudBuildId).ok, true, "valid report with artifact evidence is accepted");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: "87654321-1234-4234-9234-123456789abc" }, cloudBuildId).ok, false, "cross-build report substitution is rejected");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), sha256: "bad" }, android: goodArtifact("android") } }, cloudBuildId).ok, false, "successful artifacts without valid SHA-256 are rejected");
+assert.equal(validateCloudBuildReport({ ...cloudReport, state: "partial" }, cloudBuildId).ok, false, "state cannot contradict successful target outcomes");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure", url: "https://evil.test/file.exe" } }, state: "failed" }, cloudBuildId).ok, false, "failed targets cannot expose untrusted downloads");
+assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: goodArtifact("windows") }, state: "success", runUrl: "http://github.com/actions/run" }, cloudBuildId).ok, false, "workflow evidence must use HTTPS");
+console.log("GENE cloud-build report contract tests passed.");
