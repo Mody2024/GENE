@@ -70,12 +70,20 @@ export function buildStudioContract(kind: StudioProjectKind, engine: StudioEngin
     "3. Distinguish browser-local persistence from a remote database and a visual login from real authentication.",
     "4. Validate responsive layout, keyboard navigation, labels, focus states, and data ownership before claiming production readiness."
   ];
+  const specialistGates = kind === "game" ? [
+    "AUDIO IMPLEMENTATION GATE: Build a real event-driven audio layer and wire it to actual gameplay/UI state changes. Respect browser autoplay restrictions by initializing or resuming audio only after a user gesture; handle rejected or unsupported audio without blocking the game.",
+    "AUDIO MIXER CONTRACT: Provide independently adjustable buses for master, music, SFX, and ambience/UI where relevant. Persist user preferences when supported, prevent duplicate music loops, clean up nodes/timers on pause/restart/teardown, and keep mute/volume controls functional.",
+    "SOUND HONESTY: A mute button, AudioContext declaration, or disconnected sound function is not proof of sound. Use real playback or honest procedural synthesis, describe the actual source, and never let audio errors stop gameplay.",
+    "3D ASSET ACCEPTANCE: Verify imported or generated assets are actually loaded, drawn in the playable scene, placed at the intended scale, and connected to materials/collision where required. Set explicit triangle/material budgets, entity limits and fallback behavior for weak hardware. A saved mesh or scene manifest alone is not proof of visible integration.",
+    "3D capability honesty: distinguish real positional 3D audio from stereo panning, real rigged animation from static meshes, and native exports from browser packages. Do not claim positional 3D audio unless a spatial audio implementation is actually connected to scene positions."
+  ] : [];
   return [
     "GENE STUDIO CONTRACT (enforced design guidance; capability levels are not proof that a feature is implemented):",
     "Project kind: " + kind + ". Engine: " + engine + ". Operation: " + operation + ".",
     "CAPABILITY MATRIX:",
     capabilityLines,
     ...gameSpecific,
+    ...specialistGates,
     "PORTABLE FILE PATH CONTRACT:",
     "- Use project-relative paths with forward slashes only. Never emit absolute paths, drive letters, backslashes, empty segments, dot/parent segments, control characters, bidi overrides, or Windows-invalid characters.",
     "- Never use Windows-reserved device names (CON, PRN, AUX, NUL, COM/LPT device names), and never end a path segment with a dot or space.",
