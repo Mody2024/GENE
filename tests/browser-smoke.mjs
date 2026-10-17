@@ -382,13 +382,23 @@ try {
   await page.getByLabel("Interactive 2D scene viewport").waitFor({ state: "visible", timeout: 5000 });
   assert.equal(await page.locator(".scene-viewport").count(), 0, "2D projects do not mount the 3D WebGL viewport");
   const themePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
-  await themePage.addInitScript(() => { localStorage.setItem("gene.theme", "dark"); });
+  await themePage.addInitScript(() => {
+    if (localStorage.getItem("gene.theme-test-seeded") !== "1") {
+      localStorage.setItem("gene.theme", "dark");
+      localStorage.setItem("gene.theme-test-seeded", "1");
+    }
+  });
   await themePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
   assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "dark", "saved dark theme survives initial hydration");
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "theme choice is persisted before reload");
   await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  // Verify the hydrated React state, not the server's light-first HTML shell.
+  await themePage.getByTitle("Switch theme").click();
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
+  await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
   assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "a changed theme persists after reload");
   await themePage.close();
