@@ -116,12 +116,14 @@ export function setTaskStatus(
     attempts: status === "running" && task.status !== "running" ? task.attempts + 1 : task.attempts,
     lastError: status === "failed" || status === "blocked" ? error ?? task.lastError : undefined,
   }));
-  const allTerminal = tasks.every((task) => task.status === "passed" || task.status === "skipped");
+  // "skipped" is not proof of acceptance: until the task model explicitly marks
+  // optional work, every planned task must pass before the run can be completed.
+  const allPassed = tasks.length > 0 && tasks.every((task) => task.status === "passed");
   return {
     ...run,
     tasks,
     activeTaskId: status === "running" ? taskId : (run.activeTaskId === taskId ? undefined : run.activeTaskId),
-    status: allTerminal ? "completed" : status === "failed" ? "recovering" : status === "blocked" ? "needs-input" : "running",
+    status: allPassed ? "completed" : status === "failed" ? "recovering" : status === "blocked" || status === "skipped" ? "needs-input" : "running",
     updatedAt: isoNow(now),
     lastError: status === "failed" || status === "blocked" ? error ?? run.lastError : undefined,
   };
