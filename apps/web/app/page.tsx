@@ -57,6 +57,9 @@ function now() { return new Date().toISOString(); }
 function explainAgentError(error: unknown, code?: unknown): string {
   const rawMessage = (error instanceof Error ? error.message : String(error || "Unknown error")).replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[redacted]").replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]").slice(0, 1800);
   const raw = (rawMessage + " " + String(code || "")).trim();
+  if (/OPENROUTER_(?:FALLBACK_FAILED|KEY_REJECTED|RATE_LIMITED|CREDITS_OR_PAID_ROUTE)/i.test(raw) && rawMessage.includes("Provider diagnostics:")) {
+    return rawMessage.slice(0, 1_100);
+  }
   if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "GENE only uses free AI models, and none of its free backups was available for this request. No project changes were applied. GENE re-discovers free models automatically, so just retry in a minute or add another free Gemini key.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
