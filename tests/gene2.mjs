@@ -45,6 +45,8 @@ assert.equal(caseCollision.collisions.length, 1);
 const unicodeCollision = inspectProjectFilePaths(["caf\u00e9.txt", "cafe\u0301.txt"]);
 assert.equal(unicodeCollision.ok, false, "canonically equivalent Unicode paths cannot overwrite each other");
 assert.equal(inspectProjectFilePaths(["game/index.html", "assets/hero.png"]).ok, true);
+assert.equal(inspectProjectFilePaths(["assets", "assets/hero.png"]).ok, false, "file paths cannot also be directories");
+assert.equal(inspectProjectFilePaths(["assets/hero.png", "assets"]).ok, false, "file/directory conflicts are rejected regardless of source order");
 
 // SVG sanitizer.
 const hostile = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script><image href="https://evil.test/x.png"/><rect width="4" height="4" fill="red"/><circle cx="5" cy="5" r="2"/></svg>';
@@ -146,7 +148,7 @@ assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: 
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
 assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
 const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
-assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()"), "cloud build rejects unsafe and case/Unicode-colliding paths");
+assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()") && cloudBuildRoute.includes("inspectProjectFilePaths(files.map(file => file.path))"), "cloud build rejects unsafe, conflicting, case- and Unicode-colliding paths");
 assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
 const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");

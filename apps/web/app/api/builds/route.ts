@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID, createCipheriv, randomBytes, timingSafeEqual } from "node:crypto";
 import { deflateRawSync } from "node:zlib";
-import { normalizeProjectFilePath } from "../../lib/project-file-safety.mjs";
+import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +104,12 @@ export async function POST(request: NextRequest) {
       files.push({ path, content: file.content });
     }
   } catch (error) { return fail(error instanceof Error ? error.message : "Invalid project file."); }
+  const pathReport = inspectProjectFilePaths(files.map(file => file.path));
+  if (!pathReport.ok) {
+    const conflict = pathReport.collisions[0];
+    if (conflict) return fail("Conflicting project paths: " + conflict.path + " conflicts with " + conflict.duplicateOf + ".");
+    return fail("The project contains invalid paths that cannot be packaged safely.");
+  }
   if (!seen.has("index.html")) return fail("The project needs a standalone index.html before it can be packaged.");
   const buildId = randomUUID();
   const sourceRef = "gene-build-" + buildId;

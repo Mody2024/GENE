@@ -41,8 +41,21 @@ export function inspectProjectFilePaths(paths) {
       continue;
     }
     const key = checked.path.normalize("NFC").toLowerCase();
-    if (seen.has(key)) collisions.push({ path: checked.path, duplicateOf: seen.get(key) });
-    else seen.set(key, checked.path);
+    if (seen.has(key)) {
+      collisions.push({ path: checked.path, duplicateOf: seen.get(key) });
+      continue;
+    }
+    const ancestor = [...seen.entries()].find(([existingKey]) => key.startsWith(existingKey + "/"));
+    if (ancestor) {
+      collisions.push({ path: checked.path, duplicateOf: ancestor[1] + " (file/directory conflict)" });
+      continue;
+    }
+    const descendant = [...seen.entries()].find(([existingKey]) => existingKey.startsWith(key + "/"));
+    if (descendant) {
+      collisions.push({ path: checked.path, duplicateOf: descendant[1] + " (file/directory conflict)" });
+      continue;
+    }
+    seen.set(key, checked.path);
   }
   return { ok: invalid.length === 0 && collisions.length === 0, invalid, collisions };
 }
