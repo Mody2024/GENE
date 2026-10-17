@@ -1146,3 +1146,26 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px sol
  .studio-v2 .scene-vector{gap:4px}
  .studio-v2 .audio-level{grid-template-columns:58px minmax(0,1fr) 30px;gap:7px}
 }
+
+/* Compact, low-friction GENE composer: keep the prompt visible without letting it dominate the workspace. */
+.studio-v2 .composer.studio-composer{max-width:850px;margin-bottom:10px;border-radius:15px}
+.studio-v2 .composer-context-label{padding:9px 13px 0;font-size:10px}
+.studio-v2 .composer-toolbar{padding:7px 12px 0}
+.studio-v2 .composer-mode-switch{padding:2px;border-radius:9px}
+.studio-v2 .composer-mode-switch button{min-height:26px;padding-inline:10px;font-size:10px}
+.studio-v2 .composer textarea{min-height:46px;max-height:128px;padding:10px 13px 8px;font-size:13px;line-height:1.5;letter-spacing:0;overflow-y:auto}
+.studio-v2 .composer-bottom{padding:5px 9px 8px 12px}
+.studio-v2 .composer-context-hint{font-size:9px}
+.studio-v2 .composer-options summary{min-height:27px}
+.studio-v2 .composer .thinking-select{max-width:118px;min-height:29px;padding:5px 8px}
+.studio-v2 .composer .send-button{min-height:31px;padding-inline:12px}
+.studio-v2 .composer .key-hint{font-size:9px}
+@media(max-width:600px){
+  .studio-v2 .composer-context-label{gap:6px;padding:8px 10px 0}
+  .studio-v2 .composer-context-hint{display:none}
+  .studio-v2 .composer-toolbar{padding:6px 9px 0}
+  .studio-v2 .composer textarea{padding:9px 11px 7px;font-size:13px}
+  .studio-v2 .composer-bottom{gap:6px;padding:5px 7px 7px}
+  .studio-v2 .composer .key-hint{display:none}
+  .studio-v2 .composer .thinking-select{max-width:105px}
+}
