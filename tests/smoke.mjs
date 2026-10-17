@@ -421,8 +421,8 @@ assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("must no
 assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
 assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
 
-assert.ok(api.includes("value.includes(String.fromCharCode(92))") && api.includes("value.split(\"\").some(char => char.charCodeAt(0) < 32"), "project path validation rejects backslashes and control characters");
-assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includes("additionalFiles"), "dynamic stage path validation uses the same safe relative-path policy");
+assert.ok(api.includes("normalizeProjectFilePath(value).ok") && api.includes("inspectProjectFilePaths(normalized.map(file => file.path))"), "AI project path validation uses the shared portable path and collision policy");
+assert.ok(page.includes("inspectProjectFilePaths(allPaths)") && page.includes("additionalFiles"), "workspace QA and dynamic stage path validation use the shared safe relative-path policy");
 
 
 // GENE 1.4 executable utility tests (not only source-string assertions).
