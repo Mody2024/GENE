@@ -552,6 +552,10 @@ export default function Home() {
     setBuildInProgress(false);
     setCanQueueBuildRequests(false);
     setParallelChatInProgress(false);
+    setRuntimeState("idle");
+    autoRepairAttempts.current = 0;
+    runtimeRefreshAttempts.current = 0;
+    lastRuntimeError.current = "";
     if (showNotice) {
       setNotice(reason + " Any in-flight generation was cancelled; saved files remain unchanged unless already committed.");
       addActivity(reason);
@@ -1893,6 +1897,7 @@ export default function Home() {
     setShowNewProjectDialog(false);
     setPreviewOpen(true);
     setExpandedPreview(false);
+    setRuntimeState("idle");
   }
 
   function deleteProject(projectId: string) {
@@ -1916,6 +1921,7 @@ export default function Home() {
   }
 
   function loadPlayableDemo() {
+    cancelAgentWork("Cancelled because you loaded the built-in demo.", false);
     const files = playableDemoFiles();
     const stamp = now();
     const p: GeneProject = {
@@ -2422,7 +2428,7 @@ export default function Home() {
         {projects.filter(p => p.id !== project.id).length > 0 && <details className="sidebar-disclosure">
           <summary><span>Recent projects</span><span className="disclosure-count">{projects.filter(p => p.id !== project.id).length}</span></summary>
           <div className="sidebar-disclosure-content">
-            {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
+            {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { cancelAgentWork("Cancelled because you switched chats.", false); setProject(p); setSection("chat"); setRuntimeState("idle"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
           </div>
         </details>}
         <details className="sidebar-disclosure file-disclosure">
