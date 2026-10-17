@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import * as ts from "typescript";
 import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
+import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/app/lib/project-file-safety.mjs";
+import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-order.mjs";
 import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
@@ -26,7 +28,39 @@ assert.ok(/let hazards\s*=\s*\[\]/.test(fixed.source), "uninitialized collection
 const bad = analyzeProjectScripts([{ path: "game.js", content: "function tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
 assert.ok(bad.errors.length > 0, "undeclared identifiers used as objects are caught");
 const good = analyzeProjectScripts([{ path: "game.js", content: "const enemies = [];\nfunction tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
+const commonJs = analyzeProjectScripts([{ path: "systems/enemies.cjs", content: "const enemies = [];\nfunction tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
+assert.equal(commonJs.errors.length, 0, "CommonJS files receive the same identifier analysis as .js and .mjs");
 assert.equal(good.errors.length, 0);
+
+// Cross-platform project path contract: Windows installer paths and browser ZIPs
+// must agree on path validity and collisions before packaging.
+assert.equal(normalizeProjectFilePath("assets/hero-model.glb").ok, true);
+for (const invalidPath of [
+  "../outside.txt", "assets/../../secret", "/absolute/file.js", "C:/boot.ini",
+  "folder\\nested.js", "assets/CON.txt", "assets/NUL", "file.js.", "folder/trailing ",
+  "assets/bad:name.js", "assets/\u0007beep.js", "assets/\u202Eexe.js", "x".repeat(241)
+]) {
+  assert.equal(normalizeProjectFilePath(invalidPath).ok, false, "unsafe or non-portable path rejected: " + JSON.stringify(invalidPath));
+}
+const caseCollision = inspectProjectFilePaths(["Assets/Hero.png", "assets/hero.png"]);
+assert.equal(caseCollision.ok, false, "case-insensitive collisions are rejected for Windows compatibility");
+assert.equal(caseCollision.collisions.length, 1);
+const unicodeCollision = inspectProjectFilePaths(["caf\u00e9.txt", "cafe\u0301.txt"]);
+assert.equal(unicodeCollision.ok, false, "canonically equivalent Unicode paths cannot overwrite each other");
+assert.equal(inspectProjectFilePaths(["game/index.html", "assets/hero.png"]).ok, true);
+assert.equal(inspectProjectFilePaths(["assets", "assets/hero.png"]).ok, false, "file paths cannot also be directories");
+assert.equal(inspectProjectFilePaths(["assets/hero.png", "assets"]).ok, false, "file/directory conflicts are rejected regardless of source order");
+const orderedModules = orderRuntimeModulePaths({
+  "game.js": "startGame();",
+  "game-spec.json": JSON.stringify({ additionalFiles: ["src/core.mjs", "src/combat.cjs"] }),
+  "src/ui.js": "window.GeneModules.ui = {};",
+  "src/combat.cjs": "window.GeneModules.combat = {};",
+  "src/core.mjs": "window.GeneModules.core = {};",
+  "src/z-last.js": "window.GeneModules.last = {};",
+  "node_modules/ignored.js": "ignored();"
+});
+assert.deepEqual(orderedModules, ["src/core.mjs", "src/combat.cjs", "src/ui.js", "src/z-last.js"], "runtime module order follows declared dependencies, then deterministically sorts undeclared modules and excludes node_modules");
+assert.deepEqual(orderRuntimeModulePaths({ "game.js": "", "b.js": "", "a.js": "" }), ["a.js", "b.js"], "projects without a module manifest use deterministic alphabetical module order");
 
 // SVG sanitizer.
 const hostile = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script><image href="https://evil.test/x.png"/><rect width="4" height="4" fill="red"/><circle cx="5" cy="5" r="2"/></svg>';
@@ -105,7 +139,13 @@ const orchestratorJs = ts.transpileModule(orchestratorSource, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 const orchestratorUrl = "data:text/javascript;base64," + Buffer.from(orchestratorJs).toString("base64");
-const { createBuildRun, setTaskStatus } = await import(orchestratorUrl);
+const { createBuildRun, setTaskStatus, resumeBuild, getReadyTasks } = await import(orchestratorUrl);
+assert.throws(() => createBuildRun({ projectId: "empty", tasks: [] }), /at least one task/, "empty build plans are rejected instead of creating idle runs");
+assert.throws(() => createBuildRun({ projectId: "bad-id", tasks: [{ id: " ", title: "Bad ID", kind: "design", acceptance: [] }] }), /stable identifiers/, "blank task IDs are rejected before dependency scheduling");
+assert.throws(() => createBuildRun({ projectId: "bad-title", tasks: [{ id: "task-1", title: " ", kind: "design", acceptance: [] }] }), /non-empty title/, "tasks must have a meaningful visible title");
+assert.throws(() => createBuildRun({ projectId: " ", tasks: [{ id: "task-1", title: "Task", kind: "design", acceptance: [] }] }), /Build project IDs/, "blank project IDs are rejected");
+assert.throws(() => createBuildRun({ projectId: "bad-kind", tasks: [{ id: "task-1", title: "Task", kind: "invalid", acceptance: [] }] }), /kind is not supported/, "unsupported task kinds are rejected");
+assert.throws(() => createBuildRun({ projectId: "bad-acceptance", tasks: [{ id: "task-1", title: "Task", kind: "design", acceptance: [1] }] }), /acceptance criteria/, "malformed acceptance criteria are rejected before execution");
 const skippedRun = createBuildRun({
   projectId: "verification-test",
   now: "2026-10-17T12:00:00.000Z",
@@ -119,13 +159,37 @@ const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-
 const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
 assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
 assert.throws(() => setTaskStatus(passedRun, "required-check", "failed", "2026-10-17T12:00:03.000Z"), /Invalid task status transition/, "a passed task cannot be retroactively marked failed in the same run");
-console.log("GENE build-orchestrator completion-state tests passed.");
+assert.throws(() => resumeBuild(passedRun), /completed build cannot be resumed/, "completed work cannot be reopened by the resume action");
+const retryBase = createBuildRun({ projectId: "retry-test", now: "2026-10-17T12:00:03.000Z", tasks: [{ id: "retry-check", title: "Retry check", kind: "test", acceptance: ["must pass"] }] });
+const retryStart = setTaskStatus(retryBase, "retry-check", "running", "2026-10-17T12:00:04.000Z");
+const failedAttempt = setTaskStatus(retryStart, "retry-check", "failed", "2026-10-17T12:00:05.000Z", "temporary runtime error");
+const retried = resumeBuild(failedAttempt, "2026-10-17T12:00:06.000Z");
+assert.equal(retried.tasks[0].status, "queued", "resume requeues failed work instead of leaving an active run with no runnable task");
+assert.deepEqual(getReadyTasks(retried).map(task => task.id), ["retry-check"], "retried failed work becomes ready again");
+const blockedStart = setTaskStatus(skippedRun, "required-check", "blocked", "2026-10-17T12:00:07.000Z", "missing user input");
+assert.throws(() => resumeBuild(blockedStart), /blocked tasks that need user input/, "resume does not silently bypass a blocked task");
+console.log("GENE build-orchestrator completion and recovery tests passed.");
 
 
 // GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
 const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
+assert.ok(themePage.includes("/\\.(?:m?js|cjs)$/i.test(path)") && themePage.includes("syntaxFiles.length + \" JavaScript file(s) parse without executing them.\""), "workspace syntax QA checks every JavaScript module rather than only game.js");
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
+assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
+assert.ok(themePage.includes("const allJavaScript = fileEntries.filter(([path, source]) => /\\.(?:m?js|cjs)$/i.test(path)"), "external-runtime and inline-script checks inspect CommonJS modules too");
+const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
+assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()") && cloudBuildRoute.includes("inspectProjectFilePaths(files.map(file => file.path))"), "cloud build rejects unsafe, conflicting, case- and Unicode-colliding paths");
+const cloudWorkerSource = readFileSync(new URL("../scripts/cloud-build.mjs", import.meta.url), "utf8");
+assert.ok(cloudWorkerSource.includes("normalizeProjectFilePath(value)") && cloudWorkerSource.includes("inspectProjectFilePaths(payload.files.map(item=>item&&item.path))"), "the cloud worker revalidates path safety and collisions before writing decrypted files");
+assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html")'), "cloud builds require the exact canonical index.html entry point");
+const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
+const codeSafetySource = readFileSync(new URL("../apps/web/app/lib/code-safety.mjs", import.meta.url), "utf8");
+assert.ok(agentRoute.includes("inspectProjectFilePaths(normalized.map(file => file.path))") && agentRoute.includes("normalizeProjectFilePath(value).ok"), "AI-generated files use the same portable path and collision policy as workspace QA and cloud packaging");
+assert.ok(agentRoute.includes("/\\.(?:m?js|cjs)$/i.test(file.path)") && codeSafetySource.includes("/\\.(?:m?js|cjs)$/i.test(file.path)"), "server syntax checks and static identifier analysis include .js, .mjs and .cjs files");
+assert.ok(agentRoute.includes("const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\\.(?:m?js|cjs)$/i.test(path)"), "audio and gameplay-control contract checks inspect all executable module extensions");
+assert.ok(agentRoute.includes("path.normalize(\"NFC\").toLowerCase()"), "additionalFiles declarations reject case/Unicode-equivalent duplicate paths");
+assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
 const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");
 const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");

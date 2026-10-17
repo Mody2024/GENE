@@ -9,6 +9,19 @@
 
 ---
 
+## Implementation ledger — 2026-10-17
+
+This ledger distinguishes merged/production work from changes that are still under review. A completed CI run is evidence for the tested commit, not a claim that every roadmap phase is finished.
+
+- **Release A — Trust & Measurement foundation:** partially shipped on `main` via PR #33. It introduced the post-2.0 master roadmap, initial cloud-build result validation, workspace quality checks, and the first GENE identity/design pass.
+- **Release B — QA Engine and recovery hardening:** implemented in the draft PR #34 branch `feat/gene-cross-platform-file-integrity`. The current tested slice unifies portable file-path validation across AI output, workspace QA, the cloud build API and decrypted-source worker; validates every supported JavaScript module extension; preserves declared module load order; installs runtime error monitors before generated code; and repairs invalid/idle build recovery states. The tested head is `d73b3e30a373832722e7731c1bb2c997e5838bb9`, with passing GitHub Actions and a READY Vercel Preview. It is **not merged and not in Production**.
+- **Release C — Agent/project understanding:** still planned. It must improve durable task context, incremental edits, repair evidence and resume behavior beyond the current coordinator safeguards.
+- **Release D — Studio-grade games and app flows:** still planned. Real gameplay-depth, interaction, win/loss/restart/pause, and app-flow checks need automated evidence; static hooks and visible-render signals are not substitutes for full playtesting.
+- **Release E — Research, durable worker and delivery:** still planned beyond the current cloud-worker path-safety checks. Research must fetch/ground/cite sources; long jobs must resume safely; and artifacts must be verified before being called deliverable.
+- **Release F — Broader engines and workspace polish:** still planned. Do not advertise Phaser/Three.js/Godot/Unity/Unreal support until each adapter and its test/export pipeline actually exists.
+
+**Production promotion policy:** keep intermediate work on Preview while phases are implemented and tested. Promote only after the intended release batch is complete, required CI checks are green, Production configuration is confirmed, and post-deploy health/API/browser smoke checks pass. Never describe the whole master roadmap as complete while Releases C–F remain planned.
+
 ## 0. Baseline truth and release discipline
 
 The inspected repository is a Next.js 14 / React 18 / TypeScript application. GENE 2.0 documents free-tier provider routing, generated-source checks, procedural audio, SVG art generation, research references, adaptive game interviews/design documents, browser previews, project export, a local agent, primitive OBJ/MTL Forge output, and cloud packaging workflows.

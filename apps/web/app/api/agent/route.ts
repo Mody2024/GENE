@@ -5,6 +5,7 @@ import { applyPatchBatch } from "../../lib/patch-engine";
 import { ensurePlanMechanics, ensurePlanTasks } from "../../lib/plan-contract.mjs";
 import { extractJsonObjectText, hasAlternateProviderKeys, runAlternateChain } from "../../lib/providers";
 import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
+import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 import { nextInterviewQuestion } from "../../lib/design-doc";
 
 export const runtime = "nodejs";
@@ -13,10 +14,7 @@ export const maxDuration = 60;
 const CORE_FILES = new Set(["game.html", "game.css", "game.js", "game-spec.json"]);
 const MAX_PROJECT_FILES = 100;
 function isSafeProjectPath(value: unknown): value is string {
-  if (typeof value !== "string" || !value.trim() || value.length > 240 || value.includes(String.fromCharCode(92))) return false;
-  if (value.startsWith("/") || /^[a-zA-Z]:/.test(value) ||
-      value.split("/").some(part => !part || part === "." || part === "..") ||
-      value.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))) return false;
+  if (!normalizeProjectFilePath(value).ok || typeof value !== "string") return false;
   const extension = value.slice(value.lastIndexOf(".") + 1).toLowerCase();
   return new Set(["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
 }
@@ -220,8 +218,14 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (totalCharacters > 8_000_000) throw new Error("Project text exceeds the 8 MB safety budget. Keep large assets as files rather than embedding them into source.");
     normalized.push(file);
   }
+  const pathReport = inspectProjectFilePaths(normalized.map(file => file.path));
+  if (!pathReport.ok) {
+    const conflict = pathReport.collisions[0];
+    if (conflict) throw new Error("Generated project paths conflict: " + conflict.path + " conflicts with " + conflict.duplicateOf + ".");
+    throw new Error("Generated project contains an invalid or non-portable file path.");
+  }
   for (const file of normalized) {
-    if (/\.js$/i.test(file.path)) new Function(file.content);
+    if (/\.(?:m?js|cjs)$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
   // Generated-code safety pass. Repairs the most common runtime crash deterministically
@@ -255,10 +259,11 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       }
       const seenAdditional = new Set<string>();
       for (const path of spec.additionalFiles) {
-        if (!isSafeProjectPath(path) || CORE_FILES.has(path) || seenAdditional.has(path)) {
+        const canonicalPath = typeof path === "string" ? path.normalize("NFC").toLowerCase() : "";
+        if (!isSafeProjectPath(path) || CORE_FILES.has(path) || seenAdditional.has(canonicalPath)) {
           throw new Error("Build rejected: additionalFiles contains an unsafe, duplicate, or core path.");
         }
-        seenAdditional.add(path);
+        seenAdditional.add(canonicalPath);
         if (typeof byPath[path] !== "string" || byPath[path].trim().length < 8) {
           throw new Error("Build rejected: declared project module/asset " + path + " is missing from the assembled project.");
         }
@@ -274,7 +279,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const js = byPath["game.js"];
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
     // Validate the complete assembled JavaScript project so valid modular controls are not rejected.
-    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
+    const runtimeSource = Object.entries(byPath).filter(([path, content]) => /\.(?:m?js|cjs)$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
     if (projectKind === "game" && enforceAudioContract) {
       const audio = spec.audio;
       const buses = Array.isArray(audio?.buses) ? audio.buses.map((item: unknown) => String(item).toLowerCase()) : [];
@@ -452,7 +457,7 @@ export async function POST(request: NextRequest) {
         ok: true,
         aiMode: "validation",
         result: {
-          reply: "Assembled project passed GENE's server-side source and project-contract validation." + (normalizedFiles.some(file => /\.m?js$/i.test(file.path)) ? " Runtime-safety repairs were applied to generated JavaScript." : ""),
+          reply: "Assembled project passed GENE's server-side source and project-contract validation." + (normalizedFiles.some(file => /\.(?:m?js|cjs)$/i.test(file.path)) ? " Runtime-safety repairs were applied to generated JavaScript." : ""),
           files: normalizedFiles,
           plan: body.project?.plan || null,
           complete: true,

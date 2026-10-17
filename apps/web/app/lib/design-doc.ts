@@ -10,6 +10,64 @@ import type { DesignDoc, GeneProject, ProjectKind, Question } from "./types";
 
 type Answers = Record<string, string>;
 
+type GameArchetype = "precision-platformer" | "voxel-sandbox" | "rhythm-runner" | "open-world-adventure" | "story-adventure" | "survival-crafting" | "general";
+
+function detectGameArchetype(text: string): GameArchetype {
+  // Order matters: identify the most mechanically specific archetype before broad genre words.
+  if (/minecraft|voxel|block.?world|block.?craft|dig.?and.?build/i.test(text)) return "voxel-sandbox";
+  if (/geometry.?dash|rhythm|beat.?sync|music.?platform|beat.?runner/i.test(text)) return "rhythm-runner";
+  if (/mario|precision platform|metroidvania|platformer|jump.?and.?run/i.test(text)) return "precision-platformer";
+  if (/open.?world|sandbox|exploration world|large world|persistent world/i.test(text)) return "open-world-adventure";
+  if (/survival|crafting|hunger|resource gathering|base.?building/i.test(text)) return "survival-crafting";
+  if (/story|narrative|dialogue|cinematic|adventure|choice.?driven/i.test(text)) return "story-adventure";
+  return "general";
+}
+
+const ARCHETYPE_PLANS: Record<GameArchetype, { pillars: string[]; milestones: string[]; risks: string[]; research: string[] }> = {
+  "precision-platformer": {
+    pillars: ["Responsive movement with coyote time and jump buffering where appropriate", "Readable hazards and fair checkpoints", "Levels teach, combine and remix movement skills"],
+    milestones: ["Movement sandbox and jump-feel tuning", "One complete level with hazards, collectibles and restart", "Distinct level set with new mechanic combinations", "Boss or finale, accessibility options and polish"],
+    risks: ["Unfair collision boxes or inconsistent jump timing", "Camera framing hides upcoming hazards", "Difficulty spikes without teaching the mechanic"],
+    research: ["Platformer movement feel and input buffering", "Level pacing, hazard readability and checkpoint placement", "Animation readability and original visual identity"]
+  },
+  "voxel-sandbox": {
+    pillars: ["Editable voxel terrain with stable world coordinates", "Streaming/chunked world and deterministic generation", "Gathering, crafting and exploration that reinforce each other"],
+    milestones: ["Chunked terrain renderer with movement and collision", "Block break/place, inventory and deterministic world seed", "Save/load, chunk streaming and performance budgets", "Crafting/progression, creatures and world events in staged passes"],
+    risks: ["Generating an entire world in one frame", "Save corruption or chunk-coordinate seams", "Unbounded meshes, entities or memory growth"],
+    research: ["Voxel chunk meshing, greedy meshing and terrain LOD", "Seeded procedural generation and chunk persistence", "Inventory/crafting data models and world-save versioning"]
+  },
+  "rhythm-runner": {
+    pillars: ["Gameplay timing follows an authoritative beat clock", "Obstacles communicate rhythm before demanding precision", "Instant restart and consistent hit windows"],
+    milestones: ["Beat clock and fixed song/chart timeline", "One playable song section with hitboxes and restart", "Chart authoring format, difficulty variants and effects", "Calibration options, full menu flow and performance polish"],
+    risks: ["Frame-rate-dependent timing drift", "Audio latency makes inputs feel unfair", "Visual effects obscure hitboxes or beat cues"],
+    research: ["Audio-clock timing versus frame delta", "Input latency calibration and judgment windows", "Chart data formats and accessible rhythm cues"]
+  },
+  "open-world-adventure": {
+    pillars: ["Exploration is rewarded with clear landmarks and discoveries", "Streaming world regions keep memory and frame time bounded", "Quests and traversal systems support the setting"],
+    milestones: ["Small traversable region with landmarks and navigation", "World streaming, interactions and save/load", "Quest/data system and two distinct regions", "Progression, encounters and staged content expansion"],
+    risks: ["World scope grows before the traversal loop is fun", "Long-distance navigation lacks landmarks", "Unbounded asset loading or save data"],
+    research: ["World streaming and spatial partitioning", "Landmark-based navigation and exploration rewards", "Quest-state modeling and incremental save formats"]
+  },
+  "story-adventure": {
+    pillars: ["Player choices have clear, consistent consequences", "Dialogue and objectives remain understandable", "Scenes and pacing support the emotional arc"],
+    milestones: ["Opening scene, controls and first meaningful choice", "Dialogue/quest state system and save/load", "Branching missions with tested state transitions", "Finale, recap and narrative continuity pass"],
+    risks: ["Choice flags become inconsistent across scenes", "Story beats depend on unreachable states", "Cutscenes block controls without recovery"],
+    research: ["Branching narrative state graphs", "Dialogue presentation and accessibility", "Quest flags, save compatibility and scene transitions"]
+  },
+  "survival-crafting": {
+    pillars: ["Gathering feeds useful, legible crafting decisions", "Threat creates pressure without arbitrary punishment", "Resources and progression stay understandable"],
+    milestones: ["Gathering loop and inventory", "Crafting recipes, needs and readable feedback", "Threat cycle, shelter/upgrades and save/load", "Balance pass and optional difficulty settings"],
+    risks: ["Resource grind overwhelms exploration", "Needs systems become busywork", "Progress can soft-lock without recovery"],
+    research: ["Resource economy and recipe graph design", "Survival pacing and fair threat escalation", "Save-safe crafting transactions and inventory invariants"]
+  },
+  general: {
+    pillars: ["One recognizable signature mechanic", "Clear objectives and feedback", "A coherent visual and audio identity"],
+    milestones: ["Playable core loop and controls", "Complete win/loss/restart flow", "Distinct content and progression", "Polish, accessibility and acceptance review"],
+    risks: ["Scope exceeds the selected runtime", "Features look connected but do not share state", "Visual effects hide gameplay information"],
+    research: ["Comparable genre mechanics and player expectations", "Performance constraints for the target platform", "Asset licenses and integration requirements"]
+  }
+};
+
 const GENRE_PATTERNS: Array<[string, RegExp]> = [
   ["platformer", /platform|mario|jump|metroidvania|side.?scroll/i],
   ["runner", /runner|subway|endless|lane|dash|rhythm/i],
@@ -186,18 +244,23 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
         { id: "pickup", kind: "icon" as const, prompt: "collectible pickup icon for " + title + ", glowing, simple shape" },
         { id: "backdrop", kind: "background" as const, prompt: "layered background scene for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", depth with foreground, midground and sky" }
       ];
+  const referenceContext = (project.references || []).map(reference => {
+    const label = reference.name || reference.id || "Untitled reference";
+    const kind = reference.kind === "image" ? "visual reference" : "text reference";
+    const excerpt = typeof reference.textContent === "string" ? reference.textContent.replace(/\\s+/g, " ").trim().slice(0, 360) : "";
+    return label + " (" + kind + ")" + (excerpt ? ": " + excerpt : "");
+  }).slice(0, 8);
+  const archetype = isApp ? "general" : detectGameArchetype([
+    idea, plan?.title, plan?.summary, answers.genre, answers.fantasy, answers.art, answers.scope,
+    ...Object.values(answers), ...referenceContext
+  ].filter(Boolean).join(" "));
+  const archetypePlan = ARCHETYPE_PLANS[archetype];
   const milestones = isApp
     ? ["Core layout and navigation", "Primary user flow end to end", "Validation, empty and error states", "Accessibility and responsive polish"]
-    : [
-        "M1: boots, renders, player controls work",
-        "M2: core loop with win, lose and restart",
-        "M3: " + Math.max(2, targets.levels) + " distinct levels or missions with escalating challenge",
-        "M4: art, audio and juice pass (GeneAudio music + effects, illustrations)",
-        targets.full >= 60 ? "M5: progression, unlocks and a full ending (staged build)" : "M5: polish, balance and final QA"
-      ];
+    : archetypePlan.milestones;
   const risks = isApp
     ? ["Dead controls or fake success states", "Missing validation and error recovery", "Layout breaking at phone width"]
-    : ["Variable used before it exists (runtime crash)", "Audio blocked until a user gesture", "Scope too large for one pass — build in stages", "Controls unclear in the first ten seconds"];
+    : archetypePlan.risks;
   return {
     version: 1,
     title,
@@ -207,11 +270,9 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     platform: pick(answers, "platform", "Desktop and mobile browsers"),
     camera: isApp ? "n/a" : pick(answers, "camera", plan?.engine === "webgl3d" ? "3D" : "2D"),
     controls: pick(answers, "controls", isApp ? "Mouse, touch and keyboard" : "Keyboard, touch, and controller"),
-    pillars: [
-      pick(answers, "genre", isApp ? "One job done well" : "A clear, satisfying core loop"),
-      pick(answers, "fantasy", isApp ? "Clear hierarchy" : "A world with identity"),
-      pick(answers, "challenge", isApp ? "Every control works" : "Fair, escalating challenge")
-    ],
+    pillars: isApp
+      ? [pick(answers, "goal", "One job done well"), pick(answers, "look", "Clear hierarchy"), "Every control works"]
+      : archetypePlan.pillars,
     coreLoop: (plan?.mechanics || []).slice(0, 8),
     content: {
       scope: pick(answers, "scope", "Medium game"),
@@ -226,14 +287,39 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     scope: { prototypeMinutes: targets.prototype, fullMinutes: targets.full },
     milestones,
     risks,
+    researchBrief: (isApp
+      ? ["Primary user workflow and accessibility", "Responsive interaction patterns", "Data persistence and authorization requirements"]
+      : archetypePlan.research
+    ).concat(referenceContext.length
+      ? ["USER-SUPPLIED REFERENCES (treat as evidence/context, not as permission to copy protected content):", ...referenceContext]
+      : []),
     assetPlan,
     createdAt: new Date().toISOString()
   };
 }
 
-/** Compact JSON for model context. */
+/** Compact, valid JSON for model context. Never truncate serialized JSON mid-token. */
 export function formatDesignDoc(doc: DesignDoc | null | undefined): string {
   if (!doc) return "No approved design document yet.";
-  const { createdAt: _createdAt, ...rest } = doc;
-  return JSON.stringify(rest).slice(0, 3800);
+  const compact = {
+    version: doc.version,
+    title: doc.title.slice(0, 120),
+    pitch: doc.pitch.slice(0, 320),
+    genre: doc.genre,
+    audience: doc.audience.slice(0, 120),
+    platform: doc.platform.slice(0, 100),
+    camera: doc.camera,
+    controls: doc.controls.slice(0, 180),
+    pillars: doc.pillars.slice(0, 5).map(item => item.slice(0, 180)),
+    coreLoop: doc.coreLoop.slice(0, 8).map(item => item.slice(0, 180)),
+    content: doc.content,
+    art: { style: doc.art.style.slice(0, 100), palette: doc.art.palette.slice(0, 6) },
+    audio: { mood: doc.audio.mood.slice(0, 80), notes: doc.audio.notes.slice(0, 220) },
+    scope: doc.scope,
+    milestones: doc.milestones.slice(0, 8).map(item => item.slice(0, 180)),
+    risks: doc.risks.slice(0, 6).map(item => item.slice(0, 180)),
+    researchBrief: doc.researchBrief.slice(0, 10).map(item => item.slice(0, 240)),
+    assetPlan: doc.assetPlan.slice(0, 6).map(item => ({ id: item.id, kind: item.kind, prompt: item.prompt.slice(0, 180) }))
+  };
+  return JSON.stringify(compact);
 }

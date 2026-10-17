@@ -26,6 +26,32 @@ export type BuildIntent = {
 const isoNow = (value?: string) => value ?? new Date().toISOString();
 
 export function createBuildRun(intent: BuildIntent): BuildRun {
+  if (!intent || typeof intent.projectId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/.test(intent.projectId)) {
+    throw new Error("Build project IDs must be non-empty, stable identifiers using letters, numbers, underscore, dot, colon or hyphen.");
+  }
+  if (!Array.isArray(intent.tasks) || intent.tasks.length === 0) {
+    throw new Error("A build run must contain at least one task.");
+  }
+  for (const task of intent.tasks) {
+    if (!task || typeof task.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/.test(task.id)) {
+      throw new Error("Build task IDs must be non-empty, stable identifiers using letters, numbers, underscore, dot, colon or hyphen.");
+    }
+    if (typeof task.title !== "string" || !task.title.trim()) {
+      throw new Error("Every build task needs a non-empty title.");
+    }
+    if (!["research", "design", "scaffold", "implement", "integrate", "test", "repair", "package"].includes(task.kind)) {
+      throw new Error("Build task kind is not supported.");
+    }
+    if (!Array.isArray(task.acceptance) || task.acceptance.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new Error("Build task acceptance criteria must be a list of non-empty strings.");
+    }
+    if (task.files != null && (!Array.isArray(task.files) || task.files.some((file) => typeof file !== "string" || !file.trim()))) {
+      throw new Error("Build task file references must be a list of non-empty paths.");
+    }
+    if (task.dependsOn != null && (!Array.isArray(task.dependsOn) || task.dependsOn.some((dependency) => typeof dependency !== "string" || !dependency.trim()))) {
+      throw new Error("Build task dependencies must be a list of non-empty task IDs.");
+    }
+  }
   const ids = new Set(intent.tasks.map((task) => task.id));
   if (ids.size !== intent.tasks.length) throw new Error("Build task IDs must be unique.");
   for (const task of intent.tasks) {
@@ -203,7 +229,21 @@ export function queueUserChange(run: BuildRun, request: string, now?: string): B
 
 export function resumeBuild(run: BuildRun, now?: string): BuildRun {
   if (run.status === "completed") throw new Error("A completed build cannot be resumed; create a new run or revise its plan.");
-  const tasks = run.tasks.map((task) => task.status === "running" ? { ...task, status: "queued" as const } : task);
+  const blocked = run.tasks.filter((task) => task.status === "blocked");
+  if (blocked.length) {
+    throw new Error("This build has blocked tasks that need user input or checkpoint recovery before it can resume: " + blocked.map((task) => task.title).join(", ") + ".");
+  }
+  if (run.tasks.length > 0 && run.tasks.every((task) => task.status === "passed" || task.status === "skipped")) {
+    throw new Error("No unfinished work remains to resume. Revise the plan or start a new build.");
+  }
+  // A failed task is not runnable until it returns to the queue. Leaving it
+  // failed while marking the run active creates a build that appears resumed
+  // but has no ready work. Resume is the explicit retry action for failed work.
+  const tasks = run.tasks.map((task) =>
+    task.status === "running" || task.status === "failed"
+      ? { ...task, status: "queued" as const }
+      : task
+  );
   return {
     ...run,
     tasks,

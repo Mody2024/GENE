@@ -420,9 +420,11 @@ assert.ok(prompts.includes("DYNAMIC FILE MANIFEST") && prompts.includes("must no
 
 assert.ok(api.includes("Project exceeds \" + MAX_PROJECT_FILES + \" files") && api.includes("8 MB safety budget"), "API enforces project-wide file and source budgets");
 assert.ok(api.includes("additionalFiles must be a bounded array") && api.includes("seenAdditional"), "dynamic file manifests are validated for safe unique paths");
+const cloudWorker = read("scripts/cloud-build.mjs");
+assert.ok(cloudWorker.includes("inspectProjectFilePaths(payload.files.map(item=>item&&item.path))") && cloudWorker.includes("path.resolve(out,rel)"), "the cloud worker applies shared path/collision validation plus a final directory-containment check");
 
-assert.ok(api.includes("value.includes(String.fromCharCode(92))") && api.includes("value.split(\"\").some(char => char.charCodeAt(0) < 32"), "project path validation rejects backslashes and control characters");
-assert.ok(page.includes("path.includes(String.fromCharCode(92))") && page.includes("additionalFiles"), "dynamic stage path validation uses the same safe relative-path policy");
+assert.ok(api.includes("normalizeProjectFilePath(value).ok") && api.includes("inspectProjectFilePaths(normalized.map(file => file.path))"), "AI project path validation uses the shared portable path and collision policy");
+assert.ok(page.includes("inspectProjectFilePaths(allPaths)") && page.includes("additionalFiles"), "workspace QA and dynamic stage path validation use the shared safe relative-path policy");
 
 
 // GENE 1.4 executable utility tests (not only source-string assertions).
@@ -560,7 +562,19 @@ assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || opera
 assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => item.id))"), "concurrent build/chat responses deduplicate and preserve conversation messages");
 assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
 
-assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(page.includes("orderRuntimeModulePaths(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(page.includes("return orderRuntimeModulePaths(files).map(path => exportProjectPath(path, kind))") && prompts.includes("List additionalFiles in dependency/load order"), "preview and export preserve the dependency-aware module order declared by the project spec");
+const appPreviewStart = page.indexOf('if (project.kind === "app")');
+const appPreviewReturn = page.indexOf('return "<!doctype html>', appPreviewStart);
+const appPreviewEnd = page.indexOf('";', appPreviewReturn) + 2;
+const appPreviewMarkup = page.slice(appPreviewReturn, appPreviewEnd);
+const gamePreviewStart = page.indexOf('const instrumentation =');
+const gamePreviewReturn = page.indexOf('return "<!doctype html>', gamePreviewStart);
+const gamePreviewEnd = page.indexOf('";', gamePreviewReturn) + 2;
+const gamePreviewMarkup = page.slice(gamePreviewReturn, gamePreviewEnd);
+assert.ok(appPreviewMarkup.indexOf('+ html + "<script>" + monitor') < appPreviewMarkup.indexOf('+ js +'), "app runtime error listeners are installed before generated JavaScript executes");
+assert.ok(gamePreviewMarkup.indexOf('+ assetBootstrap + html + "<script>" + monitor') < gamePreviewMarkup.indexOf('+ js +'), "game runtime error listeners are installed before generated JavaScript executes");
+assert.ok(page.includes("/\\.(?:m?js|cjs)$/i.test(path)") && page.includes("/\\.(?:m?js|cjs)$/i.test(stagePath)") && page.includes("replace(/\\.(?:m?js|cjs)$/i"), "preview, export and staged module paths share the supported JavaScript extension contract");
 assert.ok(prompts.includes("must not use import/export syntax") && prompts.includes("window.GeneModules"), "generated modules follow the live preview's script-loading contract");
 assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/script>" : "")'), "generated modules are injected before the core runtime in both app and game previews");
 
@@ -571,6 +585,7 @@ assert.ok(page.includes('project.mode === "plan") operation = planIntent === "up
 assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
 assert.ok(page.includes('new Set(["json","js","svg"') && page.includes("test(stagePath)"), "JavaScript modules are accepted and scheduled as real generation stages");
 assert.ok(page.includes("recoverFromCheckpoint(nextProject.buildRun)") && page.includes("Checkpoint recovery: kept completed stage"), "failed builds restore the latest checkpoint and skip already-passed stages");
+assert.ok(page.includes("const recoveryBuildRun = recovery ?") && page.includes("resumeBuild(recoveryBuildRun)") && !page.includes("resumeBuild(recovery.run).tasks.map"), "checkpoint recovery requeues final validation before one strict resume call");
 assert.ok(page.includes("Resume from checkpoint") && page.includes('finalAttempt <= 3'), "users can resume a failed build and final expansion retries length/provider failures");
 assert.ok(page.includes("MUST integrate the already generated modules"), "the final full-game pass must connect generated modules rather than leave them orphaned");
 
@@ -598,7 +613,7 @@ assert.ok(api.includes("const recoveredControls: string[] = []") && api.includes
 assert.ok(page.includes("Add app modules only when the actual requested feature scope needs them") && page.includes("A module is justified by a feature, not by a fixed template"), "additional modules are selected from project scope instead of a fixed file template");
 
 assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
-assert.ok(api.includes(String.raw`if (/\.js$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
+assert.ok(api.includes(String.raw`if (/\.(?:m?js|cjs)$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
 
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
 assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\"") && page.includes("messages: [...current.messages, ...appendedMessages]"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
@@ -620,6 +635,7 @@ assert.ok(page.includes("Integrate into game") && page.includes("Load it into th
 const studioContract = read("apps/web/app/lib/studio-contract.ts");
 const capabilitiesApi = read("apps/web/app/api/capabilities/route.ts");
 assert.ok(studioContract.includes("getStudioCapabilities") && studioContract.includes("buildStudioContract"), "GENE exposes a reusable studio capability registry and production contract");
+assert.ok(studioContract.includes("PORTABLE FILE PATH CONTRACT") && studioContract.includes("Unicode-normalization collisions") && studioContract.includes("exactly lowercase: game.html"), "the generation brain follows the same portable path policy enforced by server validation");
 assert.ok(studioContract.includes("pipeline-dependent") && studioContract.includes("not equivalent to a native game") && studioContract.includes("online multiplayer"), "capability registry honestly distinguishes conditional native builds and real networking");
 assert.ok(studioContract.includes("event-driven audio layer") && studioContract.includes("autoplay restrictions") && studioContract.includes("independently adjustable buses"), "game production contract requires robust event-driven audio with browser-safe startup and separate buses");
 assert.ok(studioContract.includes("SOUND HONESTY") && studioContract.includes("positional 3D audio") && studioContract.includes("never let audio errors stop gameplay"), "audio capability guidance distinguishes real spatial audio and non-blocking fallbacks");

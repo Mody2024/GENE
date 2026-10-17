@@ -17,6 +17,8 @@ import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
+import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
+import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -126,10 +128,7 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
 
 /** Ordered exported paths of every project script except the main one, so extra modules load in exports too. */
 function moduleScriptPaths(files: Record<string, string>, kind: ProjectKind): string[] {
-  return Object.keys(files)
-    .filter(path => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
-    .sort((a, b) => a.localeCompare(b))
-    .map(path => exportProjectPath(path, kind));
+  return orderRuntimeModulePaths(files).map(path => exportProjectPath(path, kind));
 }
 function standaloneDocument(source: string, title: string, cssName: string, jsName: string, runtimeBootstrap = "", modulePaths: string[] = []) {
   const safeTitle = title.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char] || char));
@@ -405,9 +404,8 @@ export default function Home() {
   const previewDoc = useMemo(() => {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
     // Load generated modules into the same sandboxed runtime as the core game/app.
-    const moduleScripts = Object.entries(project.files)
-      .filter(([path]) => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
-      .sort(([a], [b]) => a.localeCompare(b))
+    const moduleScripts = orderRuntimeModulePaths(project.files)
+      .map(path => [path, project.files[path]] as const)
       .map(([path, source]) => "/* GENE module: " + path + " */\n" + source.replace(/<\/script/gi, "<\\/script"))
       .join("\n;\n");
     if (project.kind === "app") {
@@ -422,7 +420,7 @@ export default function Home() {
         "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',report);else report();[250,600,1100,1900,3000,4200].forEach(function(ms){setTimeout(report,ms);});",
         "})();"
       ].join("\n");
-      return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;min-height:100%;width:100%;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-project-kind='app'>" + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+      return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;min-height:100%;width:100%;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-project-kind='app'>" + html + "<script>" + monitor + "<\/script>" + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script></body></html>";
     }
     const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
     const css = (project.files["game.css"] || "").replace(/<\/style/gi, "<\\/style");
@@ -441,7 +439,7 @@ export default function Home() {
     ].join("\n");
     const instrumentation = "(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;var all=[];function Wrapped(a){var c=new AC(a);all.push(c);return c;}Wrapped.prototype=AC.prototype;try{window.AudioContext=Wrapped;window.webkitAudioContext=Wrapped;}catch(e){}function unlock(){all.forEach(function(c){if(c.state==='suspended'){try{c.resume();}catch(e){}}});}['pointerdown','touchstart','keydown','click'].forEach(function(t){window.addEventListener(t,unlock,true);});})();(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
     const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files);
-    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script><script>" + monitor + "<\/script></body></html>";
+    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + "<script>" + monitor + "<\/script>" + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
   const designDoc = useMemo(() => {
@@ -655,16 +653,20 @@ export default function Home() {
           { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement" as const, dependsOn: ["stage-" + (stagePaths.length - 1)], files: ["game.js", "game.css"], acceptance: [nextProject.kind === "app" ? "Primary user flows have working interactions and failure states" : "Full-game content extends beyond the prototype with progression and a complete ending", "Existing working controls and mechanics are preserved"] },
           { id: "validate-assembled", title: "Validate assembled playable project", kind: "test" as const, dependsOn: ["final-content-pass"], files: stagePaths, acceptance: ["Required files are present", "Project contract and JavaScript syntax pass"] }
         ];
-        activeBuildRun = recovery
-          ? {
-              ...resumeBuild(recovery.run),
-              tasks: resumeBuild(recovery.run).tasks.map(task =>
-                task.id === "final-content-pass" || task.id === "validate-assembled"
-                  ? { ...task, status: "queued" as const, lastError: undefined }
-                  : task
-              ),
-              status: "running"
-            }
+        // Requeue the final validation stages before resuming. This keeps the
+        // resume helper strict (it refuses idle all-passed runs) and avoids
+        // invoking it twice against the same stale checkpoint state.
+        const recoveryBuildRun = recovery ? {
+          ...recovery.run,
+          tasks: recovery.run.tasks.map(task =>
+            task.id === "final-content-pass" || task.id === "validate-assembled"
+              ? { ...task, status: "queued" as const, lastError: undefined }
+              : task
+          ),
+          status: "recovering" as const
+        } : null;
+        activeBuildRun = recoveryBuildRun
+          ? { ...resumeBuild(recoveryBuildRun), status: "running" }
           : createBuildRun({
               projectId: nextProject.id,
               tasks: buildTasks,
@@ -697,8 +699,8 @@ export default function Home() {
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
-                : /\.js$/i.test(stagePath) && stagePath !== "game.js"
-                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.js$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
+                : /\.(?:m?js|cjs)$/i.test(stagePath) && stagePath !== "game.js"
+                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.(?:m?js|cjs)$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
@@ -783,7 +785,7 @@ export default function Home() {
                     return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
                   const isRuntimeLoadablePath = (path: string) =>
-                    /\.js$/i.test(path) ||
+                    /\.(?:m?js|cjs)$/i.test(path) ||
                     /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
                   const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
                     safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
@@ -1738,12 +1740,14 @@ export default function Home() {
     const missing = required.filter(path => !files[path] || !files[path].trim());
     add("Required source files", missing.length ? "fail" : "pass", missing.length ? "Missing: " + missing.join(", ") : "HTML, CSS, JavaScript and game specification are present.");
     const allPaths = Object.keys(files);
-    const unsafePaths = allPaths.filter(path =>
-      !path.trim() || path.length > 240 || path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
-      path.includes(String.fromCharCode(92)) || path.split("/").some(part => !part || part === "." || part === "..") ||
-      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))
-    );
-    add("Project file paths", unsafePaths.length ? "fail" : "pass", unsafePaths.length ? "Unsafe relative paths: " + unsafePaths.slice(0, 5).join(", ") : allPaths.length + " project paths are relative and traversal-free.");
+    const pathReport = inspectProjectFilePaths(allPaths);
+    const pathProblems = [
+      ...pathReport.invalid.slice(0, 5).map(item => String(item.path) + " (" + item.error + ")"),
+      ...pathReport.collisions.slice(0, 5).map(item => item.path + " conflicts with " + item.duplicateOf)
+    ];
+    add("Project file paths", pathProblems.length ? "fail" : "pass", pathProblems.length
+      ? "Fix unsafe or cross-platform-conflicting paths: " + pathProblems.join(" | ")
+      : allPaths.length + " project paths are relative, portable and collision-free.");
     const fileEntries = Object.entries(files);
     const oversizedFiles = fileEntries.filter(([, source]) => typeof source !== "string" || source.length > 500_000);
     const totalSourceChars = fileEntries.reduce((total, [, source]) => total + (typeof source === "string" ? source.length : 0), 0);
@@ -1754,7 +1758,7 @@ export default function Home() {
     const html = files["game.html"] || "";
     const js = files["game.js"] || "";
     const combined = html + "\n" + js;
-    const allJavaScript = fileEntries.filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
+    const allJavaScript = fileEntries.filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
     const hasExecutableInlineScript = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])/i.test(html);
     const hasExternalRuntime = /<script\b[^>]*\bsrc\s*=\s*["']https?:|<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*\bhref\s*=\s*["']https?:/i.test(html) ||
       /\bimport\s*\(|\bfrom\s*["']https?:|\bfetch\s*\(\s*["']https?:/i.test(allJavaScript);
@@ -1771,13 +1775,23 @@ export default function Home() {
         ? spec.engine === "webapp" && typeof spec.summary === "string" && Boolean(spec.summary.trim()) && ["features", "routes", "userFlows"].every((key: string) => Array.isArray(spec[key]) && spec[key].length > 0)
         : typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim()));
     add(isAppSpec ? "App specification" : "Game specification", specValid ? "pass" : "fail", specValid ? (isAppSpec ? "Title, app engine, summary, features, routes and user flows are declared." : "Title, engine, mechanics, controls, objective and end states are declared.") : "The JSON or required project-spec fields are missing or malformed.");
-    let syntaxValid = false;
-    let syntaxError = "";
-    try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
-    catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
-    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
+    const syntaxFiles = Object.entries(files)
+      .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string");
+    const syntaxFailures: string[] = [];
+    for (const [path, source] of syntaxFiles) {
+      try {
+        if (source.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget.");
+        new Function(source);
+      } catch (error) {
+        syntaxFailures.push(path + ": " + (error instanceof Error ? error.message : "Unknown JavaScript syntax error."));
+      }
+    }
+    const syntaxValid = syntaxFiles.length > 0 && syntaxFailures.length === 0;
+    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid
+      ? syntaxFiles.length + " JavaScript file(s) parse without executing them."
+      : syntaxFailures.slice(0, 5).join(" | ") || "No JavaScript source files were found.");
     const safetyFiles = Object.entries(files)
-      .filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string")
+      .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string")
       .map(([path, content]) => ({ path, content }));
     const safety = analyzeProjectScripts(safetyFiles, { scopeChecks: true });
     const safetyDetails = [
@@ -2340,7 +2354,7 @@ export default function Home() {
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
                 </div>}
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 180) : 50) + "px"; }} placeholder={interactionMode === "chat" ? "Ask anything. Talk through ideas, get explanations, or explore options…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe what you want to create and we'll plan it together…") : hasGame ? "Describe the change you want GENE to make…" : "Describe the app or game to build…"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 128) : 46) + "px"; }} placeholder={interactionMode === "chat" ? "Ask anything. Talk through ideas, get explanations, or explore options…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe what you want to create and we'll plan it together…") : hasGame ? "Describe the change you want GENE to make…" : "Describe the app or game to build…"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools">
                     <button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID, createCipheriv, randomBytes, timingSafeEqual } from "node:crypto";
 import { deflateRawSync } from "node:zlib";
+import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,11 +47,9 @@ async function gh(url: string, token: string, init?: RequestInit) {
   });
 }
 function safePath(value: unknown): string {
-  const path = String(value || "").replace(/\\/g, "/");
-  if (!path || path.startsWith("/") || /^[a-zA-Z]:/.test(path) || path.split("/").some(p => !p || p === "." || p === ".." || /[:*?"<>|]/.test(p) || /[\u0000-\u001f]/.test(p)) || path.includes("\0")) {
-    throw new Error("The project contains an unsafe file path.");
-  }
-  return path;
+  const checked = normalizeProjectFilePath(value);
+  if (!checked.ok) throw new Error(checked.error);
+  return checked.path;
 }
 function encrypt(value: unknown, key: Buffer) {
   const plain = deflateRawSync(Buffer.from(JSON.stringify(value), "utf8"));
@@ -96,15 +95,22 @@ export async function POST(request: NextRequest) {
   try {
     for (const file of body.files) {
       const path = safePath(file?.path);
-      if (seen.has(path)) return fail("Duplicate project path: " + path);
-      seen.add(path);
+      const portableKey = path.normalize("NFC").toLowerCase();
+      if (seen.has(portableKey)) return fail("Duplicate or cross-platform-conflicting project path: " + path);
+      seen.add(portableKey);
       if (typeof file?.content !== "string") return fail("Invalid source content for " + path);
       bytes += Buffer.byteLength(file.content, "utf8");
       if (bytes > MAX_BYTES) return fail("This cloud build is limited to 3 MB of source. Remove large embedded assets and try again.");
       files.push({ path, content: file.content });
     }
   } catch (error) { return fail(error instanceof Error ? error.message : "Invalid project file."); }
-  if (!seen.has("index.html")) return fail("The project needs a standalone index.html before it can be packaged.");
+  const pathReport = inspectProjectFilePaths(files.map(file => file.path));
+  if (!pathReport.ok) {
+    const conflict = pathReport.collisions[0];
+    if (conflict) return fail("Conflicting project paths: " + conflict.path + " conflicts with " + conflict.duplicateOf + ".");
+    return fail("The project contains invalid paths that cannot be packaged safely.");
+  }
+  if (!files.some(file => file.path === "index.html")) return fail("The project needs a standalone lowercase index.html before it can be packaged.");
   const buildId = randomUUID();
   const sourceRef = "gene-build-" + buildId;
   const encrypted = encrypt({
@@ -139,7 +145,10 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ ref: "main", inputs: { build_id: buildId, source_ref: sourceRef, targets } })
     });
     if (!dispatch.ok) {
-      return fail("GitHub received the encrypted project, but could not start the cloud build. Enable Actions and grant the token Actions: write permission.", 502, "GENE_BUILD_DISPATCH_ERROR");
+      // The worker never accepted the dispatch, so remove the temporary branch
+      // containing the encrypted source instead of leaving an orphaned workspace.
+      await gh(apiBase + "/git/refs/heads/" + sourceRef, cfg.token, { method: "DELETE" }).catch(() => null);
+      return fail("GitHub received the encrypted project, but could not start the cloud build. The temporary source branch was cleaned up when possible. Enable Actions and grant the token Actions: write permission.", 502, "GENE_BUILD_DISPATCH_ERROR");
     }
     return NextResponse.json({
       ok: true, buildId, state: "queued", targets,
