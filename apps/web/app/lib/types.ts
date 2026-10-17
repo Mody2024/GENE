@@ -34,6 +34,8 @@ export type DesignDoc = {
   scope: { prototypeMinutes: number; fullMinutes: number };
   milestones: string[];
   risks: string[];
+  /** Genre-specific research checklist included in the approved plan sent to the model. */
+  researchBrief: string[];
   assetPlan: ArtAssetPlanItem[];
   createdAt: string;
 };
