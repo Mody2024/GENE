@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import * as ts from "typescript";
 import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
 import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
@@ -82,3 +84,24 @@ assert.equal(validateCloudBuildReport({ ...cloudReport, state: "partial" }, clou
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure", url: "https://evil.test/file.exe" } }, state: "failed" }, cloudBuildId).ok, false, "failed targets cannot expose untrusted downloads");
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: goodArtifact("windows") }, state: "success", runUrl: "http://github.com/actions/run" }, cloudBuildId).ok, false, "workflow evidence must use HTTPS");
 console.log("GENE cloud-build report contract tests passed.");
+
+
+// Build orchestration: skipped required work must never be mistaken for a successful build.
+const orchestratorSource = readFileSync(new URL("../apps/web/app/lib/build-orchestrator.ts", import.meta.url), "utf8");
+const orchestratorJs = ts.transpileModule(orchestratorSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText;
+const orchestratorUrl = "data:text/javascript;base64," + Buffer.from(orchestratorJs).toString("base64");
+const { createBuildRun, setTaskStatus } = await import(orchestratorUrl);
+const skippedRun = createBuildRun({
+  projectId: "verification-test",
+  now: "2026-10-17T12:00:00.000Z",
+  tasks: [{ id: "required-check", title: "Required check", kind: "test", acceptance: ["must pass"] }]
+});
+const skippedResult = setTaskStatus(skippedRun, "required-check", "skipped", "2026-10-17T12:00:01.000Z");
+assert.notEqual(skippedResult.status, "completed", "a skipped required task must not produce completed status");
+assert.equal(skippedResult.status, "needs-input", "skipped work should require an explicit decision");
+const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-10-17T12:00:01.000Z");
+const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
+assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
+console.log("GENE build-orchestrator completion-state tests passed.");
