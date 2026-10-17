@@ -20,6 +20,8 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
   const choices = question.choices || [];
 
   const toggle = (choice: string) => setPicked(current => current.includes(choice) ? current.filter(item => item !== choice) : [...current, choice]);
+  const choose = (choice: string) => question.multi ? toggle(choice) : setPicked([choice]);
+  const submitPicked = () => { if (busy || picked.length === 0) return; onAnswer(question.multi ? picked.join("; ") : picked[0]); };
   const submitCustom = () => {
     const value = custom.trim();
     if (!value || busy) return;
@@ -28,10 +30,10 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
   };
 
   return (
-    <div className="g3-interview" role="group" aria-label="Project interview question">
+    <div className="g3-interview" role="group" aria-label={step > 0 ? "Project decision " + step + " of " + total : "Project interview question"}>
       <div className="g3-interview-head">
-        <span className="g3-interview-tag"><i /> PROJECT INTERVIEW</span>
-        {step > 0 && <span className="g3-interview-step">Question {step} of {total}</span>}
+        <span className="g3-interview-tag">PROJECT SETUP</span>
+        {step > 0 && <span className="g3-interview-step">{step} / {total} decisions</span>}
       </div>
       {step > 0 && <div className="g3-interview-track" aria-hidden="true"><span style={{ width: Math.min(100, Math.round(step / total * 100)) + "%" }} /></div>}
       <h3>{question.text}</h3>
@@ -44,9 +46,9 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
               key={choice}
               type="button"
               className={"g3-choice" + (selected ? " selected" : "") + (question.recommended === choice ? " recommended" : "")}
-              aria-pressed={question.multi ? selected : undefined}
+              aria-pressed={selected}
               disabled={busy}
-              onClick={() => question.multi ? toggle(choice) : onAnswer(choice)}
+              onClick={() => choose(choice)}
             >
               <span>{choice}</span>
               {question.recommended === choice && <em>Recommended</em>}
@@ -54,22 +56,22 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
           );
         })}
       </div>
-      {question.multi && <button type="button" className="g3-primary" disabled={busy || picked.length === 0} onClick={() => onAnswer(picked.join("; "))}>Continue with {picked.length || "…"} selected</button>}
+      {picked.length > 0 && <div className="g3-interview-continue-row"><span>{question.multi ? picked.length + " selected" : "Selected: " + picked[0]}</span><button type="button" className="g3-primary" disabled={busy} onClick={submitPicked}>{busy ? "Saving…" : "Continue"}</button></div>}
       <div className="g3-custom-answer">
         <input
           value={custom}
           maxLength={400}
           onChange={event => setCustom(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); submitCustom(); } }}
-          placeholder="Or type your own answer…"
+          placeholder="Or describe your preference…"
           aria-label="Type your own answer"
           disabled={busy}
         />
-        <button type="button" disabled={busy || !custom.trim()} onClick={submitCustom}>Answer</button>
+        <button type="button" disabled={busy || !custom.trim()} onClick={submitCustom}>Use answer</button>
       </div>
       <div className="g3-interview-actions">
-        <button type="button" className="text-action" onClick={onDefault} disabled={busy}>Use smart default</button>
-        <button type="button" className="text-action" onClick={onSkip} disabled={busy}>Skip questions and build</button>
+        <button type="button" className="text-action" onClick={onDefault} disabled={busy}>Use recommended default</button>
+        <button type="button" className="text-action" onClick={onSkip} disabled={busy}>Skip interview and build</button>
       </div>
     </div>
   );

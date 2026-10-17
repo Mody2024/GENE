@@ -72,16 +72,18 @@ function explainAgentError(error: unknown, code?: unknown): string {
 function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error", retry?: { prompt: string; operation: string }) {
   return { id: uid(), role, content, createdAt: now(), kind, ...(retry ? { retry } : {}) };
 }
-function newProject(kind: ProjectKind = "game", preferredEngine?: GeneProject["preferredEngine"]): GeneProject {
+function newProject(kind: ProjectKind = "game", preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]): GeneProject {
+  const targetIntent = projectIntent || (kind === "app" ? "webapp" : preferredEngine === "webgl3d" ? "game-3d" : preferredEngine === "canvas2d" ? "game-2d" : "auto");
   return {
     id: uid(),
     name: "New project",
     kind,
     preferredEngine,
+    projectIntent: targetIntent,
     initialPrompt: "",
     mode: "plan",
     thinking: "balanced",
-    messages: [message("assistant", preferredEngine === "canvas2d" ? "Your 2D game workspace is ready. Describe the core loop, camera and controls. GENE will keep this on Canvas 2D unless you change that choice." : preferredEngine === "webgl3d" ? "Your 3D game workspace is ready. Describe the world, camera, controls and gameplay loop. GENE will keep this on WebGL 3D unless you change that choice." : preferredEngine === "webapp" ? "Your web app workspace is ready. Describe the main workflow, users and screens. GENE will build a responsive web app rather than a game." : "Hey, I'm GENE. Tell me what you want to create — a game, web app, website, tool, or something else. I'll help shape the plan, then build the actual project files here so we can preview and refine them together.")],
+    messages: [message("assistant", targetIntent === "game-2d" ? "Your 2D game workspace is ready. GENE will keep the Canvas 2D target through planning and generation." : targetIntent === "game-3d" ? "Your 3D game workspace is ready. GENE will keep the WebGL 3D target through planning and generation." : targetIntent === "website" ? "Your website workspace is ready. GENE will prioritize content hierarchy, responsive pages, navigation and accessible interactions." : targetIntent === "webapp" ? "Your web app workspace is ready. GENE will prioritize user workflows, application states and working interactions." : "Hey, I'm GENE. Choose a target or describe what you want to create. I'll help plan it, build the actual project files and refine them in the workspace.")],
     answers: {},
     question: null,
     plan: null,
@@ -1691,8 +1693,8 @@ export default function Home() {
     setShowNewProjectDialog(true);
   }
 
-  function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"]) {
-    const p = newProject(kind, preferredEngine);
+  function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]) {
+    const p = newProject(kind, preferredEngine, projectIntent);
     setProject(p);
     setSection("chat");
     setNotice("");
@@ -2188,6 +2190,7 @@ export default function Home() {
 
   const hasGame = Boolean(project.files["game.html"] && project.files["game.js"]);
   const isApp = project.kind === "app";
+  const targetLabel = project.projectIntent === "website" ? "Website" : project.projectIntent === "webapp" || project.preferredEngine === "webapp" ? "Web app" : project.projectIntent === "game-3d" || project.preferredEngine === "webgl3d" ? "3D game" : project.projectIntent === "game-2d" || project.preferredEngine === "canvas2d" ? "2D game" : project.kind === "app" ? "Web app" : "Auto target";
   const isSyncedToLocal = Boolean(localAgentStatus === "connected" && lastSyncedUpdatedAt && lastSyncedUpdatedAt === project.updatedAt);
   const reportIsCurrent = Boolean(buildReport && buildReport.projectUpdatedAt === project.updatedAt && (buildReport.checkedDirty ? fileDirty && buildReport.checkedFile === project.activeFile && buildReport.checkedEditorContent === editedFile : !fileDirty));
   const activeMessages = project.messages;
@@ -2202,7 +2205,7 @@ export default function Home() {
   ];
 
   return (
-    <main className={"gene-app studio-v2 " + theme + (sidebarOpen ? "" : " sidebar-collapsed")} data-theme={theme}>
+    <main className={"gene-app studio-v2 " + theme + (sidebarOpen ? "" : " sidebar-collapsed")} data-theme={theme} data-project-target={project.projectIntent || project.preferredEngine || "auto"}>
       <aside className="rail">
         <button className="brand" title="GENE home" onClick={() => setSection("chat")}><span className="brand-orbit"><GeneMark /></span></button>
         <button className="rail-item sidebar-toggle" title={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-label={sidebarOpen ? "Collapse project sidebar" : "Expand project sidebar"} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><span>{sidebarOpen ? "◧" : "☷"}</span></button>
@@ -2255,7 +2258,7 @@ export default function Home() {
 
       <section className="main-column">
         <header className="topbar studio-topbar">
-          <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
+          <div className="breadcrumb studio-breadcrumb"><span className="studio-breadcrumb-brand">GENE</span><span className="crumb-slash">/</span><span className="studio-breadcrumb-section">Studio</span><span className="crumb-slash">/</span><strong title={project.name}>{project.name}</strong><span className="project-target-chip" title="Selected target is used by the planner and generator">{targetLabel}</span><button className="rename-project" title="Rename project" aria-label="Rename project" onClick={renameProject}>✎</button><span className="saved-pill"><span className="status-dot online" /> Saved locally</span></div>
           <div className="top-actions">
             
             <button type="button" className="mobile-preview-button" title="Open live preview in a focused workspace" onClick={() => { setPreviewOpen(true); setExpandedPreview(true); }} disabled={!hasGame}><span>▷</span><span>Live preview</span></button>
@@ -2343,8 +2346,9 @@ export default function Home() {
                 {/* The plan lives in the pinned workspace header and Tasks view, never as a moving chat message. */}
                 {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
                 {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
-                  <div className="real-progress-heading"><span>BUILD RECORD</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} tasks verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
+                  <div className="real-progress-heading"><span>BUILD PROGRESS</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} steps verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
                   <div className="real-progress-track"><span style={{ width: (project.buildRun.tasks.length ? project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100 : 0) + "%" }} /></div>
+                  <div className="real-progress-current"><span className="real-progress-current-dot" /><div><small>{project.buildRun.tasks.some(task => task.status === "running") ? "IN PROGRESS" : project.buildRun.tasks.some(task => task.status === "failed") ? "NEEDS ATTENTION" : "NEXT STEP"}</small><strong>{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.title || "Finishing and validating the project"}</strong></div></div>
                   <div className="real-progress-tasks">{project.buildRun.tasks.map(task => <div key={task.id} className={"real-progress-task " + task.status}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "↻" : task.status === "failed" ? "!" : task.status === "blocked" ? "×" : "·"}</span><strong>{task.title}</strong><small>{task.status}{task.files.length ? " · " + task.files.join(", ") : ""}</small></div>)}</div>
                   <p>Progress reflects task states reported by GENE&apos;s build coordinator and validation. No token counter or simulated thinking stream is shown.</p>
                 </div>}
@@ -2479,11 +2483,12 @@ export default function Home() {
           <button type="button" className="create-project-close" aria-label="Close new project dialog" onClick={() => setShowNewProjectDialog(false)}>×</button>
           <div className="create-project-heading"><span className="create-project-mark"><GeneMark /></span><div><div className="eyebrow">NEW WORKSPACE</div><h2 id="create-project-title">What are we building?</h2><p>Choose the starting engine. GENE will carry it into planning, code generation and the editor.</p></div></div>
           <div className="create-project-grid">
-            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "canvas2d")}><span className="create-project-option-icon">2D</span><strong>2D game</strong><small>Canvas · platformers, top-down games, arcade and local multiplayer.</small><span className="create-project-option-footer">LIGHTWEIGHT · CANVAS 2D <b>→</b></span></button>
-            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "webgl3d")}><span className="create-project-option-icon">3D</span><strong>3D game</strong><small>WebGL · 3D worlds, camera movement, depth and spatial scenes.</small><span className="create-project-option-footer">3D WORLD · WEBGL <b>→</b></span></button>
-            <button type="button" className="create-project-option" onClick={() => startNewProject("app", "webapp")}><span className="create-project-option-icon">UI</span><strong>Web app / website</strong><small>Responsive interfaces, dashboards, tools and interactive flows.</small><span className="create-project-option-footer">SEMANTIC WEB UI <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "canvas2d", "game-2d")}><span className="create-project-option-icon">2D</span><strong>2D game</strong><small>Platformers, top-down adventures, arcade and local co-op.</small><span className="create-project-option-footer">CANVAS 2D <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("game", "webgl3d", "game-3d")}><span className="create-project-option-icon">3D</span><strong>3D game</strong><small>Spatial worlds, camera movement, lighting and depth.</small><span className="create-project-option-footer">WEBGL 3D <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("app", "webapp", "website")}><span className="create-project-option-icon">WEB</span><strong>Website</strong><small>Landing pages, portfolios, content sites and storefronts.</small><span className="create-project-option-footer">CONTENT-LED WEB <b>→</b></span></button>
+            <button type="button" className="create-project-option" onClick={() => startNewProject("app", "webapp", "webapp")}><span className="create-project-option-icon">APP</span><strong>Web app</strong><small>Tools, dashboards, data entry and multi-step user workflows.</small><span className="create-project-option-footer">INTERACTIVE PRODUCT <b>→</b></span></button>
           </div>
-          <button type="button" className="create-project-auto" onClick={() => startNewProject("game")}>Let GENE decide from my description <span>Start with a blank brief →</span></button>
+          <button type="button" className="create-project-auto" onClick={() => startNewProject("game", undefined, "auto")}>Let GENE decide from my description <span>Start with a blank brief →</span></button>
           <div className="create-project-key-hint"><kbd>Esc</kbd> to close <span>·</span> <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> to reopen</div>
         </section>
       </div>}

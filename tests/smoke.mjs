@@ -766,3 +766,18 @@ assert.equal(storageCandidates[2].projects[0].files["game.js"], "keep-current-so
 assert.equal(storageCandidates[2].projects[0].references[0].dataBase64, undefined, "storage fallback removes large image payloads while retaining reference metadata");
 assert.equal(storageCandidates[3].projects[0].versions.length, 0, "last fallback drops duplicate version snapshots before current source");
 assert.equal(storageCandidates[3].projects[0].buildRun.checkpoints.length, 0, "last fallback removes checkpoint snapshots only after smaller options fail");
+
+
+// Regression coverage for explicit targets, interview selection and compact build progress.
+const targetIntentRegressionTypes = read("apps/web/app/lib/types.ts");
+const targetIntentRegressionPrompts = read("apps/web/app/lib/prompts.ts");
+const targetIntentRegressionInterview = read("apps/web/app/components/InterviewCard.tsx");
+const targetIntentRegressionStyles = read("apps/web/app/studio-v3.css");
+const targetIntentRegressionPage = read("apps/web/app/page.tsx");
+assert.ok(targetIntentRegressionTypes.includes('ProjectIntent = "game-2d" | "game-3d" | "website" | "webapp" | "auto"'), "project target intent is a typed persisted field");
+assert.ok(targetIntentRegressionPrompts.includes("USER-SELECTED PROJECT TARGET") && targetIntentRegressionPrompts.includes("Never silently flatten this into 2D"), "selected target constrains actual model planning and generation");
+assert.ok(targetIntentRegressionPage.includes('startNewProject("app", "webapp", "website")') && targetIntentRegressionPage.includes('startNewProject("app", "webapp", "webapp")'), "website and web app start as distinct intents");
+assert.ok(targetIntentRegressionPage.includes("project-target-chip") && targetIntentRegressionPage.includes("data-project-target"), "the active target remains visible in the workspace");
+assert.ok(targetIntentRegressionInterview.includes("submitPicked") && targetIntentRegressionInterview.includes("aria-pressed={selected}"), "interview answers can be selected and reviewed before continuing");
+assert.ok(targetIntentRegressionInterview.includes("Skip interview and build") && targetIntentRegressionInterview.includes("Use recommended default"), "interview keeps clear skip and recommended-default actions");
+assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interface system") && targetIntentRegressionStyles.includes("real-progress-current") && targetIntentRegressionStyles.includes("grid-template-columns:repeat(4,minmax(0,1fr))"), "clean surfaces, four explicit project targets and compact current-step progress are styled");

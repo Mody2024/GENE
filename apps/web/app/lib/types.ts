@@ -1,4 +1,5 @@
 export type ProjectKind = "game" | "app";
+export type ProjectIntent = "game-2d" | "game-3d" | "website" | "webapp" | "auto";
 export type Mode = "plan" | "build";
 export type Thinking = "fast" | "balanced" | "deep";
 export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error"; retry?: { prompt: string; operation: string } };
@@ -46,6 +47,8 @@ export type GeneProject = {
   id: string;
   name: string;
   kind?: ProjectKind;
+  /** Explicit product target chosen in the new-project flow; used by planning and generation. */
+  projectIntent?: ProjectIntent;
   /** User-selected engine for a new project; reused by planning, generation and the scene editor. */
   preferredEngine?: GamePlan["engine"];
   initialPrompt: string;
