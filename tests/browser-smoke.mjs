@@ -175,6 +175,9 @@ try {
   await page.getByText("Project file paths", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("Source size budget", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("Self-contained runtime", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Win / loss state hooks", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Restart / reset hooks", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Pause / resume hooks", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Scene Studio"]').click();
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });

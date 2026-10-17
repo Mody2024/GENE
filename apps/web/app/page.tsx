@@ -1810,6 +1810,21 @@ export default function Home() {
     }
     add("Live preview", runtimeState === "rendered" ? "pass" : runtimeState === "error" ? "fail" : "warn", runtimeState === "rendered" ? "The sandbox reported a visible render signal." : runtimeState === "error" ? "The preview reported an error or did not render in time." : "Refresh or start the preview to collect runtime evidence.");
     add("Gameplay playtest", "warn", "These checks do not simulate collisions, progression, difficulty or win/loss behavior. Play the game and verify those mechanics yourself.");
+    if (!isAppSpec) {
+      const gameRuntime = allJavaScript + "\n" + html;
+      const hasOutcomeHooks = /\b(?:gameOver|gameover|victory|defeat|winState|lossState|isWon|isLost|isGameOver|onWin|onLose|finishGame|endGame|won|lost)\b/i.test(gameRuntime);
+      const hasRestartHooks = /\b(?:restart|resetGame|startOver|playAgain|newGame)\b/i.test(gameRuntime);
+      const hasPauseHooks = /\b(?:pause|paused|resume|isPaused|togglePause)\b/i.test(gameRuntime);
+      add("Win / loss state hooks", hasOutcomeHooks ? "pass" : "warn", hasOutcomeHooks
+        ? "Recognizable outcome-state code exists; actual win/loss behavior still needs playtesting."
+        : "No obvious win/loss transition identifiers were found. Verify the declared outcome conditions in a real playthrough.");
+      add("Restart / reset hooks", hasRestartHooks ? "pass" : "warn", hasRestartHooks
+        ? "A recognizable restart/reset path exists; confirm it restores all relevant state."
+        : "No obvious restart/reset path was found. Confirm the player can recover after winning or losing.");
+      add("Pause / resume hooks", hasPauseHooks ? "pass" : "warn", hasPauseHooks
+        ? "Recognizable pause/resume code exists; verify timers, audio and input stop/resume correctly."
+        : "No obvious pause/resume path was found. Add one when it fits the game's design.");
+    }
     setBuildReport({ checkedAt: now(), projectUpdatedAt: project.updatedAt, checkedDirty: fileDirty, checkedFile: project.activeFile, checkedEditorContent: editedFile, checks });
     addActivity("Build checks finished: " + checks.filter(check => check.status === "pass").length + " passed, " + checks.filter(check => check.status === "warn").length + " warnings, " + checks.filter(check => check.status === "fail").length + " failed.");
   }
