@@ -1778,13 +1778,23 @@ export default function Home() {
         ? spec.engine === "webapp" && typeof spec.summary === "string" && Boolean(spec.summary.trim()) && ["features", "routes", "userFlows"].every((key: string) => Array.isArray(spec[key]) && spec[key].length > 0)
         : typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim()));
     add(isAppSpec ? "App specification" : "Game specification", specValid ? "pass" : "fail", specValid ? (isAppSpec ? "Title, app engine, summary, features, routes and user flows are declared." : "Title, engine, mechanics, controls, objective and end states are declared.") : "The JSON or required project-spec fields are missing or malformed.");
-    let syntaxValid = false;
-    let syntaxError = "";
-    try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
-    catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
-    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
+    const syntaxFiles = Object.entries(files)
+      .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string");
+    const syntaxFailures: string[] = [];
+    for (const [path, source] of syntaxFiles) {
+      try {
+        if (source.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget.");
+        new Function(source);
+      } catch (error) {
+        syntaxFailures.push(path + ": " + (error instanceof Error ? error.message : "Unknown JavaScript syntax error."));
+      }
+    }
+    const syntaxValid = syntaxFiles.length > 0 && syntaxFailures.length === 0;
+    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid
+      ? syntaxFiles.length + " JavaScript file(s) parse without executing them."
+      : syntaxFailures.slice(0, 5).join(" | ") || "No JavaScript source files were found.");
     const safetyFiles = Object.entries(files)
-      .filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string")
+      .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string")
       .map(([path, content]) => ({ path, content }));
     const safety = analyzeProjectScripts(safetyFiles, { scopeChecks: true });
     const safetyDetails = [

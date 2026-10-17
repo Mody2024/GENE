@@ -27,6 +27,8 @@ assert.ok(/let hazards\s*=\s*\[\]/.test(fixed.source), "uninitialized collection
 const bad = analyzeProjectScripts([{ path: "game.js", content: "function tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
 assert.ok(bad.errors.length > 0, "undeclared identifiers used as objects are caught");
 const good = analyzeProjectScripts([{ path: "game.js", content: "const enemies = [];\nfunction tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
+const commonJs = analyzeProjectScripts([{ path: "systems/enemies.cjs", content: "const enemies = [];\nfunction tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
+assert.equal(commonJs.errors.length, 0, "CommonJS files receive the same identifier analysis as .js and .mjs");
 assert.equal(good.errors.length, 0);
 
 // Cross-platform project path contract: Windows installer paths and browser ZIPs
@@ -154,6 +156,7 @@ console.log("GENE build-orchestrator completion and recovery tests passed.");
 // GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
 const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
+assert.ok(themePage.includes("/\\.(?:m?js|cjs)$/i.test(path)") && themePage.includes("syntaxFiles.length + \" JavaScript file(s) parse without executing them.\""), "workspace syntax QA checks every JavaScript module rather than only game.js");
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
 assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
 const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
@@ -161,6 +164,7 @@ assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBu
 assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html")'), "cloud builds require the exact canonical index.html entry point");
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 assert.ok(agentRoute.includes("inspectProjectFilePaths(normalized.map(file => file.path))") && agentRoute.includes("normalizeProjectFilePath(value).ok"), "AI-generated files use the same portable path and collision policy as workspace QA and cloud packaging");
+assert.ok(agentRoute.includes("/\\.(?:m?js|cjs)$/i.test(file.path)") && safety.includes("/\\.(?:m?js|cjs)$/i.test(file.path)"), "server syntax checks and static identifier analysis include .js, .mjs and .cjs files");
 assert.ok(agentRoute.includes("path.normalize(\"NFC\").toLowerCase()"), "additionalFiles declarations reject case/Unicode-equivalent duplicate paths");
 assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");

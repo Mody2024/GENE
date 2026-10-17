@@ -225,7 +225,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     throw new Error("Generated project contains an invalid or non-portable file path.");
   }
   for (const file of normalized) {
-    if (/\.js$/i.test(file.path)) new Function(file.content);
+    if (/\.(?:m?js|cjs)$/i.test(file.path)) new Function(file.content);
     if (file.path === "game-spec.json") JSON.parse(file.content);
   }
   // Generated-code safety pass. Repairs the most common runtime crash deterministically
@@ -457,7 +457,7 @@ export async function POST(request: NextRequest) {
         ok: true,
         aiMode: "validation",
         result: {
-          reply: "Assembled project passed GENE's server-side source and project-contract validation." + (normalizedFiles.some(file => /\.m?js$/i.test(file.path)) ? " Runtime-safety repairs were applied to generated JavaScript." : ""),
+          reply: "Assembled project passed GENE's server-side source and project-contract validation." + (normalizedFiles.some(file => /\.(?:m?js|cjs)$/i.test(file.path)) ? " Runtime-safety repairs were applied to generated JavaScript." : ""),
           files: normalizedFiles,
           plan: body.project?.plan || null,
           complete: true,

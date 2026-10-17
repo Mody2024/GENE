@@ -381,7 +381,7 @@ function analyzeFile(path, src) {
  * a partial file list would make cross-file globals look undeclared.
  */
 export function analyzeProjectScripts(files, options = {}) {
-  const jsFiles = files.filter(file => /\.m?js$/i.test(file.path) && typeof file.content === "string");
+  const jsFiles = files.filter(file => /\.(?:m?js|cjs)$/i.test(file.path) && typeof file.content === "string");
   const repaired = [];
   const fixes = [];
   for (const file of jsFiles) {
