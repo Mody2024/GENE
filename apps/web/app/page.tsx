@@ -626,7 +626,9 @@ export default function Home() {
       updatedAt: now()
     };
     setProject(current => {
-      if (parallelReadOnlyRequest && current && current.id === nextProject.id) {
+      // A cancelled or stale request must never replace the project the user is now viewing.
+      if (requestController.signal.aborted || !current || current.id !== nextProject.id) return current;
+      if (parallelReadOnlyRequest) {
         const latestUserMessage = nextProject.messages[nextProject.messages.length - 1];
         return { ...current, messages: latestUserMessage ? [...current.messages, latestUserMessage] : current.messages, updatedAt: now() };
       }
