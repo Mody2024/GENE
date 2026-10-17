@@ -76,6 +76,7 @@ assert.ok(page.includes("function cancelAgentWork") && page.includes("activeAgen
 assert.ok(page.includes("cancelAgentWork(\"Cancelled because you switched to a new project.\""), "starting a new project cancels in-flight work from the previous chat");
 assert.ok(page.includes('fetch("/api/forge", {\n                          signal: requestController.signal'), "asset generation is also aborted when the user stops or switches chats");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
+assert.ok(page.includes('rawMessage.includes("Provider diagnostics:")') && page.includes("rawMessage.slice(0, 1_100)"), "the UI keeps per-model diagnostics visible for auth, quota, and fallback failures");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
 assert.ok(api.includes("attempts < 8"), "fallback attempts remain bounded");
