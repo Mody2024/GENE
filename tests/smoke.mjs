@@ -561,6 +561,16 @@ assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => i
 assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
 
 assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+const appPreviewStart = page.indexOf('if (project.kind === "app")');
+const appPreviewReturn = page.indexOf('return "<!doctype html>', appPreviewStart);
+const appPreviewEnd = page.indexOf('";', appPreviewReturn) + 2;
+const appPreviewMarkup = page.slice(appPreviewReturn, appPreviewEnd);
+const gamePreviewStart = page.indexOf('const instrumentation =');
+const gamePreviewReturn = page.indexOf('return "<!doctype html>', gamePreviewStart);
+const gamePreviewEnd = page.indexOf('";', gamePreviewReturn) + 2;
+const gamePreviewMarkup = page.slice(gamePreviewReturn, gamePreviewEnd);
+assert.ok(appPreviewMarkup.indexOf('+ html + "<script>" + monitor') < appPreviewMarkup.indexOf('+ js +'), "app runtime error listeners are installed before generated JavaScript executes");
+assert.ok(gamePreviewMarkup.indexOf('+ assetBootstrap + html + "<script>" + monitor') < gamePreviewMarkup.indexOf('+ js +'), "game runtime error listeners are installed before generated JavaScript executes");
 assert.ok(page.includes("/\\.(?:m?js|cjs)$/i.test(path)") && page.includes("/\\.(?:m?js|cjs)$/i.test(stagePath)") && page.includes("replace(/\\.(?:m?js|cjs)$/i"), "preview, export and staged module paths share the supported JavaScript extension contract");
 assert.ok(prompts.includes("must not use import/export syntax") && prompts.includes("window.GeneModules"), "generated modules follow the live preview's script-loading contract");
 assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/script>" : "")'), "generated modules are injected before the core runtime in both app and game previews");
