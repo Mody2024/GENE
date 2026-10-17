@@ -78,6 +78,8 @@ const cloudReport = {
   note: "verified test fixture"
 };
 assert.equal(validateCloudBuildReport(cloudReport, cloudBuildId).ok, true, "valid report with artifact evidence is accepted");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: "----1234----1234----1234----1234" }, cloudBuildId).ok, false, "malformed build identifiers are rejected even when they have 36 characters");
+assert.equal(validateCloudBuildReport({ ...cloudReport, buildId: cloudBuildId }, "----1234----1234----1234----1234").ok, false, "a malformed requested build identifier cannot validate a report");
 const extraFieldReport = validateCloudBuildReport({ ...cloudReport, targets: { windows: { ...goodArtifact("windows"), accessToken: "must-not-be-exposed" }, android: goodArtifact("android") } }, cloudBuildId);
 assert.equal(extraFieldReport.ok, true, "documented artifact evidence remains valid when unknown metadata is present");
 assert.equal(extraFieldReport.ok && Object.hasOwn(extraFieldReport.report.targets.windows, "accessToken"), false, "unknown artifact metadata is stripped before the report reaches the browser");

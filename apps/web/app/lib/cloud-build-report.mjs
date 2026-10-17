@@ -6,6 +6,10 @@
 const STATES = new Set(["success", "partial", "failed"]);
 const TARGET_STATES = new Set(["success", "failure", "cancelled", "skipped"]);
 
+function isBuildId(value) {
+  return typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
+}
+
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -62,7 +66,7 @@ function validSuccessfulTarget(name, target, buildId) {
  */
 export function validateCloudBuildReport(input, expectedBuildId) {
   if (!isRecord(input)) return { ok: false, reason: "Build result must be a JSON object." };
-  if (typeof expectedBuildId !== "string" || !/^[a-f0-9-]{36}$/i.test(expectedBuildId) || input.buildId !== expectedBuildId) {
+  if (!isBuildId(expectedBuildId) || input.buildId !== expectedBuildId) {
     return { ok: false, reason: "Build result ID does not match the requested build." };
   }
   if (!STATES.has(input.state)) return { ok: false, reason: "Build result has an unsupported state." };

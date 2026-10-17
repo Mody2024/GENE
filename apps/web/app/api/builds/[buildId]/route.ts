@@ -16,7 +16,7 @@ async function gh(url: string, token: string) {
 }
 export async function GET(_request: NextRequest, context: { params: { buildId: string } }) {
   const id = context.params.buildId;
-  if (!/^[a-f0-9-]{36}$/.test(id)) return fail("Invalid build identifier.");
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id)) return fail("Invalid build identifier.");
   const token = (process.env.GENE_BUILD_GITHUB_TOKEN || process.env.GENE_BUILD_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "").trim();
   if (!token || REPO.length !== 2 || REPO.some(part => !part)) return fail("Cloud build status is not configured.", 503);
   const base = "/repos/" + REPO[0] + "/" + REPO[1];
@@ -36,14 +36,18 @@ export async function GET(_request: NextRequest, context: { params: { buildId: s
       }
       return NextResponse.json({ ok: true, ...checked.report }, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resultResponse.status !== 404) {
+      return fail("Could not verify the cloud build result with GitHub. Retry shortly.", resultResponse.status === 401 || resultResponse.status === 403 ? 503 : 502, "GENE_BUILD_STATUS_UNAVAILABLE");
+    }
     const runsResponse = await gh(base + "/actions/workflows/cloud-build.yml/runs?event=workflow_dispatch&per_page=100", token);
-    if (runsResponse.ok) {
-      const runs = await runsResponse.json();
-      const run = (runs.workflow_runs || []).find((item: any) => String(item.display_title || "").includes(id));
-      if (run) {
-        if (run.status === "completed") return NextResponse.json({ ok: true, buildId: id, state: "failed", runUrl: run.html_url, message: "The workflow finished without publishing a build result. Open the build log to inspect the finalization or compiler error." }, { headers: { "Cache-Control": "no-store" } });
-        return NextResponse.json({ ok: true, buildId: id, state: run.status === "in_progress" ? "building" : "queued", runUrl: run.html_url, message: "Cloud workers are compiling your project." }, { headers: { "Cache-Control": "no-store" } });
-      }
+    if (!runsResponse.ok) {
+      return fail("Could not verify the cloud build worker status with GitHub. Retry shortly.", runsResponse.status === 401 || runsResponse.status === 403 ? 503 : 502, "GENE_BUILD_STATUS_UNAVAILABLE");
+    }
+    const runs = await runsResponse.json();
+    const run = (runs.workflow_runs || []).find((item: any) => String(item.display_title || "").includes(id));
+    if (run) {
+      if (run.status === "completed") return NextResponse.json({ ok: true, buildId: id, state: "failed", runUrl: run.html_url, message: "The workflow finished without publishing a build result. Open the build log to inspect the finalization or compiler error." }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ ok: true, buildId: id, state: run.status === "in_progress" ? "building" : "queued", runUrl: run.html_url, message: "Cloud workers are compiling your project." }, { headers: { "Cache-Control": "no-store" } });
     }
     return NextResponse.json({ ok: true, buildId: id, state: "queued", message: "Waiting for the cloud build worker to start." }, { headers: { "Cache-Control": "no-store" } });
   } catch {
