@@ -621,6 +621,7 @@ assert.ok(page.includes("Integrate into game") && page.includes("Load it into th
 const studioContract = read("apps/web/app/lib/studio-contract.ts");
 const capabilitiesApi = read("apps/web/app/api/capabilities/route.ts");
 assert.ok(studioContract.includes("getStudioCapabilities") && studioContract.includes("buildStudioContract"), "GENE exposes a reusable studio capability registry and production contract");
+assert.ok(studioContract.includes("PORTABLE FILE PATH CONTRACT") && studioContract.includes("Unicode-normalization collisions") && studioContract.includes("exactly lowercase: game.html"), "the generation brain follows the same portable path policy enforced by server validation");
 assert.ok(studioContract.includes("pipeline-dependent") && studioContract.includes("not equivalent to a native game") && studioContract.includes("online multiplayer"), "capability registry honestly distinguishes conditional native builds and real networking");
 assert.ok(studioContract.includes("event-driven audio layer") && studioContract.includes("autoplay restrictions") && studioContract.includes("independently adjustable buses"), "game production contract requires robust event-driven audio with browser-safe startup and separate buses");
 assert.ok(studioContract.includes("SOUND HONESTY") && studioContract.includes("positional 3D audio") && studioContract.includes("never let audio errors stop gameplay"), "audio capability guidance distinguishes real spatial audio and non-blocking fallbacks");
