@@ -243,18 +243,14 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
         { id: "pickup", kind: "icon" as const, prompt: "collectible pickup icon for " + title + ", glowing, simple shape" },
         { id: "backdrop", kind: "background" as const, prompt: "layered background scene for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", depth with foreground, midground and sky" }
       ];
+  const archetype = isApp ? "general" : detectGameArchetype([idea, answers.genre, answers.fantasy, answers.art, answers.scope].filter(Boolean).join(" "));
+  const archetypePlan = ARCHETYPE_PLANS[archetype];
   const milestones = isApp
     ? ["Core layout and navigation", "Primary user flow end to end", "Validation, empty and error states", "Accessibility and responsive polish"]
-    : [
-        "M1: boots, renders, player controls work",
-        "M2: core loop with win, lose and restart",
-        "M3: " + Math.max(2, targets.levels) + " distinct levels or missions with escalating challenge",
-        "M4: art, audio and juice pass (GeneAudio music + effects, illustrations)",
-        targets.full >= 60 ? "M5: progression, unlocks and a full ending (staged build)" : "M5: polish, balance and final QA"
-      ];
+    : archetypePlan.milestones;
   const risks = isApp
     ? ["Dead controls or fake success states", "Missing validation and error recovery", "Layout breaking at phone width"]
-    : ["Variable used before it exists (runtime crash)", "Audio blocked until a user gesture", "Scope too large for one pass — build in stages", "Controls unclear in the first ten seconds"];
+    : archetypePlan.risks;
   return {
     version: 1,
     title,
@@ -264,11 +260,9 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     platform: pick(answers, "platform", "Desktop and mobile browsers"),
     camera: isApp ? "n/a" : pick(answers, "camera", plan?.engine === "webgl3d" ? "3D" : "2D"),
     controls: pick(answers, "controls", isApp ? "Mouse, touch and keyboard" : "Keyboard, touch, and controller"),
-    pillars: [
-      pick(answers, "genre", isApp ? "One job done well" : "A clear, satisfying core loop"),
-      pick(answers, "fantasy", isApp ? "Clear hierarchy" : "A world with identity"),
-      pick(answers, "challenge", isApp ? "Every control works" : "Fair, escalating challenge")
-    ],
+    pillars: isApp
+      ? [pick(answers, "goal", "One job done well"), pick(answers, "look", "Clear hierarchy"), "Every control works"]
+      : archetypePlan.pillars,
     coreLoop: (plan?.mechanics || []).slice(0, 8),
     content: {
       scope: pick(answers, "scope", "Medium game"),
@@ -283,6 +277,7 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     scope: { prototypeMinutes: targets.prototype, fullMinutes: targets.full },
     milestones,
     risks,
+    researchBrief: isApp ? ["Primary user workflow and accessibility", "Responsive interaction patterns", "Data persistence and authorization requirements"] : archetypePlan.research,
     assetPlan,
     createdAt: new Date().toISOString()
   };
