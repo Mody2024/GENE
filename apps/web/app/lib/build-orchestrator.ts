@@ -26,6 +26,9 @@ export type BuildIntent = {
 const isoNow = (value?: string) => value ?? new Date().toISOString();
 
 export function createBuildRun(intent: BuildIntent): BuildRun {
+  if (!intent || typeof intent.projectId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/.test(intent.projectId)) {
+    throw new Error("Build project IDs must be non-empty, stable identifiers using letters, numbers, underscore, dot, colon or hyphen.");
+  }
   if (!Array.isArray(intent.tasks) || intent.tasks.length === 0) {
     throw new Error("A build run must contain at least one task.");
   }
@@ -35,6 +38,15 @@ export function createBuildRun(intent: BuildIntent): BuildRun {
     }
     if (typeof task.title !== "string" || !task.title.trim()) {
       throw new Error("Every build task needs a non-empty title.");
+    }
+    if (!["research", "design", "scaffold", "implement", "integrate", "test", "repair", "package"].includes(task.kind)) {
+      throw new Error("Build task kind is not supported.");
+    }
+    if (!Array.isArray(task.acceptance) || task.acceptance.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new Error("Build task acceptance criteria must be a list of non-empty strings.");
+    }
+    if (task.files != null && (!Array.isArray(task.files) || task.files.some((file) => typeof file !== "string" || !file.trim()))) {
+      throw new Error("Build task file references must be a list of non-empty paths.");
     }
     if (task.dependsOn != null && (!Array.isArray(task.dependsOn) || task.dependsOn.some((dependency) => typeof dependency !== "string" || !dependency.trim()))) {
       throw new Error("Build task dependencies must be a list of non-empty task IDs.");
