@@ -171,6 +171,7 @@ try {
   await page.getByRole("heading", { name: "Plan & tasks" }).waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: "Run build checks" }).click();
   await page.getByText("JavaScript syntax", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByText("Runtime identifier safety", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByText("A visible render signal does not prove every mechanic works. Play the game and test movement, collisions, objectives, and restart behavior before sharing it.", { exact: true }).waitFor({ timeout: 5000 });
   await page.locator('.rail button[title="Scene Studio"]').click();
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });

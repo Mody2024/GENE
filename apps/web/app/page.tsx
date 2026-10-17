@@ -16,6 +16,7 @@ import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
+import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -1753,6 +1754,22 @@ export default function Home() {
     try { if (js.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget."); new Function(js); syntaxValid = true; }
     catch (error) { syntaxError = error instanceof Error ? error.message : "Unknown JavaScript syntax error."; }
     add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid ? "The game script parses without executing it." : syntaxError);
+    const safetyFiles = Object.entries(files)
+      .filter(([path, source]) => /\.m?js$/i.test(path) && typeof source === "string")
+      .map(([path, content]) => ({ path, content }));
+    const safety = analyzeProjectScripts(safetyFiles, { scopeChecks: true });
+    const safetyDetails = [
+      ...safety.errors.slice(0, 3).map(error => error.message),
+      ...safety.fixes.slice(0, 2).map(fix => "Potential deterministic repair: " + fix)
+    ];
+    const safetyStatus = safety.errors.length ? "fail" : safety.repaired.length ? "warn" : "pass";
+    add(
+      "Runtime identifier safety",
+      safetyStatus,
+      safetyDetails.length
+        ? safetyDetails.join(" | ")
+        : "No obvious undeclared identifiers or uninitialized collections were detected by conservative static analysis. Runtime behavior still requires live testing."
+    );
     if (isAppSpec) {
       const hasUI = /<(?:main|header|nav|section|form|button|h1|h2|article|input|label)\b/i.test(html);
       add("App interface", hasUI ? "pass" : "fail", hasUI ? "Semantic UI elements are present in the app source." : "No recognizable user interface elements were found.");
