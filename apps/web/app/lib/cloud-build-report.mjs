@@ -14,7 +14,7 @@ function isHttpsUrl(value, allowedHost) {
   if (typeof value !== "string" || value.length > 2048) return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && (!allowedHost || url.hostname === allowedHost || url.hostname.endsWith("." + allowedHost));
+    return url.protocol === "https:" && !url.username && !url.password && (!allowedHost || url.hostname === allowedHost || url.hostname.endsWith("." + allowedHost));
   } catch {
     return false;
   }
@@ -27,6 +27,13 @@ function validSuccessfulTarget(name, target, buildId) {
     : "GENE-" + buildId + "-debug.apk";
   if (target.filename !== expectedFilename) return false;
   if (!isHttpsUrl(target.url, "blob.vercel-storage.com")) return false;
+  let linkedFilename = "";
+  try {
+    linkedFilename = decodeURIComponent(new URL(target.url).pathname.split("/").pop() || "");
+  } catch {
+    return false;
+  }
+  if (linkedFilename !== expectedFilename) return false;
   if (!Number.isSafeInteger(target.sizeBytes) || target.sizeBytes <= 0) return false;
   if (typeof target.sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(target.sha256)) return false;
   if (name === "android" && target.signing !== "debug") return false;
