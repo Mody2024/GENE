@@ -92,6 +92,10 @@ assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { ..
 assert.equal(validateCloudBuildReport({ ...cloudReport, state: "partial" }, cloudBuildId).ok, false, "state cannot contradict successful target outcomes");
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: { status: "failure", url: "https://evil.test/file.exe" } }, state: "failed" }, cloudBuildId).ok, false, "failed targets cannot expose untrusted downloads");
 assert.equal(validateCloudBuildReport({ ...cloudReport, targets: { windows: goodArtifact("windows") }, state: "success", runUrl: "http://github.com/actions/run" }, cloudBuildId).ok, false, "workflow evidence must use HTTPS");
+const buildRouteSource = readFileSync(new URL("../apps/web/app/api/builds/[buildId]/route.ts", import.meta.url), "utf8");
+assert.ok(buildRouteSource.includes('String(item.display_title || "") === id'), "cloud build status must match the exact requested workflow run ID");
+assert.ok(buildRouteSource.includes("GENE_BUILD_STATUS_UNAVAILABLE"), "GitHub API errors must be reported as unavailable rather than a fabricated queued state");
+assert.ok(buildRouteSource.includes("Could not verify the cloud build result with GitHub"), "status lookup failures must be visible to the user");
 console.log("GENE cloud-build report contract tests passed.");
 
 
