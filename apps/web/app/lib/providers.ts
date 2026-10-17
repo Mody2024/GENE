@@ -142,7 +142,7 @@ export async function listAlternateProviders(siteTitle: string, options: { openr
 
 export async function callChatProvider(
   provider: AltProvider,
-  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number }
+  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number; signal?: AbortSignal }
 ): Promise<ChatResult> {
   const started = Date.now();
   const attempt = async (useJsonMode: boolean, timeoutMs: number): Promise<ChatResult> => {
@@ -157,7 +157,7 @@ export async function callChatProvider(
           temperature: options.temperature,
           max_tokens: options.maxTokens
         }),
-        signal: AbortSignal.timeout(Math.max(1_000, timeoutMs))
+        signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(Math.max(1_000, timeoutMs))]) : AbortSignal.timeout(Math.max(1_000, timeoutMs))
       });
       const data: any = await response.json().catch(() => null);
       const content = data?.choices?.[0]?.message?.content;
@@ -170,13 +170,14 @@ export async function callChatProvider(
         detail
       };
     } catch (error) {
-      return { ok: false, status: 504, text: "", finish: "", detail: error instanceof Error ? error.message : "network error" };
+      return { ok: false, status: options.signal?.aborted ? 499 : 504, text: "", finish: "", detail: options.signal?.aborted ? "request cancelled by the user" : error instanceof Error ? error.message : "network error" };
     }
   };
+  if (options.signal?.aborted) return { ok: false, status: 499, text: "", finish: "", detail: "request cancelled by the user" };
   let result = await attempt(options.json, options.timeoutMs);
   // Some free models reject response_format. Retry once as plain text; the
   // caller extracts JSON tolerantly.
-  if (!result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
+  if (!options.signal?.aborted && !result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
     const remaining = options.timeoutMs - (Date.now() - started);
     if (remaining > 2_000) result = await attempt(false, remaining);
   }
@@ -198,6 +199,7 @@ export async function runAlternateChain(options: {
   validate?: (text: string) => boolean;
   openrouterLimit?: number;
   groqLimit?: number;
+  signal?: AbortSignal;
 }): Promise<ChainResult> {
   const candidates = await listAlternateProviders(options.siteTitle, { openrouterLimit: options.openrouterLimit, groqLimit: options.groqLimit });
   let failure: ChainFailure = { status: 502, detail: "No alternate free provider is configured.", provider: "none" };
@@ -207,7 +209,7 @@ export async function runAlternateChain(options: {
   const tried: string[] = [];
   const skipProvider = new Set<string>();
   for (const candidate of candidates) {
-    if (attempts >= (options.maxAttempts ?? 5)) break;
+    if (options.signal?.aborted || attempts >= (options.maxAttempts ?? 5)) break;
     if (skipProvider.has(candidate.name)) continue;
     const remaining = options.deadline - Date.now();
     if (remaining < 2_500) break;
@@ -220,7 +222,8 @@ export async function runAlternateChain(options: {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       json: options.json,
-      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500)
+      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500),
+      signal: options.signal
     });
     if (!result.ok) {
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
