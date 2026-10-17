@@ -381,6 +381,18 @@ try {
   await page.getByRole("heading", { name: "Scene Studio" }).waitFor({ timeout: 5000 });
   await page.getByLabel("Interactive 2D scene viewport").waitFor({ state: "visible", timeout: 5000 });
   assert.equal(await page.locator(".scene-viewport").count(), 0, "2D projects do not mount the 3D WebGL viewport");
+  const themePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  await themePage.addInitScript(() => { localStorage.setItem("gene.theme", "dark"); });
+  await themePage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "dark", "saved dark theme survives initial hydration");
+  await themePage.getByTitle("Switch theme").click();
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "a changed theme persists after reload");
+  await themePage.close();
+
   console.log("Playwright browser smoke passed: 2D render + keyboard gameplay, app DOM rendering and working form, UI/theme + build checks, WebGL rendering, built-in playable starter, and mobile preview access.");
 } finally {
   await browser.close();

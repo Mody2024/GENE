@@ -207,6 +207,7 @@ export default function Home() {
   const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
   const [forgeNotice, setForgeNotice] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -235,6 +236,7 @@ export default function Home() {
       setProject(fresh);
       setProjects([fresh]);
     }
+    setThemeReady(true);
     fetch("/api/health").then(r => r.json()).then(d => {
       setApiReady(Boolean(d.aiConfigured));
       setPublishConfigured(Boolean(d.publishConfigured));
@@ -287,9 +289,12 @@ export default function Home() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [project?.messages.length, busy]);
 
   useEffect(() => {
+    // Do not overwrite a saved theme with the SSR-safe default before hydration
+    // has read the user's preference from localStorage.
+    if (!themeReady) return;
     localStorage.setItem("gene.theme", theme);
     document.documentElement.dataset.theme = theme;
-  }, [theme]);
+  }, [theme, themeReady]);
 
   useEffect(() => {
     const handleWorkspaceKeys = (event: KeyboardEvent) => {
@@ -2215,7 +2220,7 @@ export default function Home() {
               <div className="conversation-scroll">
                 {!project.initialPrompt && project.messages.length < 2 && <div className="welcome-block studio-welcome">
                   <div className="welcome-orbit"><GeneMark /><i /><b /></div>
-                  <div className="eyebrow welcome-eyebrow"><span className="welcome-eyebrow-dot" /> YOUR AI CREATION STUDIO</div>
+                  <div className="eyebrow welcome-eyebrow"><span className="welcome-eyebrow-dot" /> IDEAS, BROUGHT TO LIFE</div>
                   {project.kind === "app" ? <h1>From idea<br /><em>to something real.</em></h1> : <h1>Make your next<br /><em>great game.</em></h1>}
                   <p className="welcome-description">{project.kind === "app" ? "Describe the product you have in mind. Shape the experience together, build real source files, and refine the result in the live workspace." : "Bring a game idea. GENE helps shape the design, builds the actual project files, and gives you a live place to test and refine."}</p>
                   <div className="starter-grid studio-starter-grid">

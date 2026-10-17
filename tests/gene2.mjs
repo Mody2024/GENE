@@ -128,6 +128,8 @@ const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.me
 const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");
 assert.ok(themePage.includes('useState<"light" | "dark">("light")'), "new workspaces default to the light theme");
 assert.ok(themePage.includes('localStorage.getItem("gene.theme")') && themePage.includes('localStorage.setItem("gene.theme", theme)'), "user theme choice remains persisted");
+assert.ok(themePage.includes("if (!themeReady) return") && themePage.includes("[theme, themeReady]"), "saved theme is read before the default theme can overwrite it");
+assert.ok(themePage.includes("IDEAS, BROUGHT TO LIFE"), "GENE welcome screen carries its own concise creation-focused identity");
 assert.ok(themeLayout.includes('data-theme="light"'), "the document starts light to avoid a dark first-paint flash");
 assert.ok(themeCss.includes("--studio-accent:#3e795f") && themeCss.includes("rgba(211,166,82,.07)"), "GENE light theme uses restrained green and warm-gold identity tokens");
 assert.ok(themePage.includes("GENE genie-inspired mark") && themePage.includes("gene-logo-spark") && themePage.includes("gene-logo-orbit"), "GENE brand mark uses a restrained wish-star and orbit rather than a generic letter alone");
