@@ -48,9 +48,13 @@ assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lit
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
 assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter key, rate-limit and exhaustion failures are reported distinctly");
 assert.ok(api.includes("runAlternateChain") && !api.includes("GENE_OPENROUTER_MODEL"), "OpenRouter fallback uses the free-model router, not a hard-coded model override");
+assert.ok(api.includes("perCallMs: 7_000") && api.includes("maxAttempts: 7"), "fallback chain uses shorter bounded calls to try more free models within the serverless budget");
 assert.ok(page.includes("GENE only uses free AI models") && page.includes("OPENROUTER_FALLBACK_FAILED"), "provider failures are explained in plain language and stay free-only");
+assert.ok(page.includes("AUTOMATIC RECOVERY RETRY") && page.includes("retryableCodes") && page.includes("Retry request"), "transient failures receive bounded automatic retries and failed messages expose a manual retry action");
+assert.ok(page.includes("msg.retry!.prompt") && page.includes("Your last saved files are preserved"), "manual retry reuses the failed request context without discarding the current project");
 assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
+assert.ok(css.includes(".retry-message-button") && css.includes(".real-progress-tasks{max-height:84px"), "retry actions and processing details stay visually compact");
 assert.ok(prompts.includes("You are GENE 2.0"), "system prompt uses the current GENE release identity");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");

@@ -742,8 +742,8 @@ export async function POST(request: NextRequest) {
       temperature: body.operation === "interview" ? 0.35 : 0.2,
       json: true,
       deadline: startedAt + totalBudgetMs,
-      perCallMs: 15_000,
-      maxAttempts: 5,
+      perCallMs: 7_000,
+      maxAttempts: 7,
       siteTitle: "GENE Builder",
       validate: text => extractJsonObjectText(text) !== null
     });
@@ -833,7 +833,7 @@ export async function POST(request: NextRequest) {
           temperature: 0.1,
           json: true,
           deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 10_000),
-          perCallMs: 9_000,
+          perCallMs: 6_000,
           maxAttempts: 2,
           groqLimit: 1,
           openrouterLimit: 2,

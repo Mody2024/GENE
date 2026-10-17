@@ -69,8 +69,8 @@ function explainAgentError(error: unknown, code?: unknown): string {
   if (/GEMINI_OUTPUT_TRUNCATED|GEMINI_OUTPUT_INVALID|output limit|malformed JSON/i.test(raw)) return "The AI response was incomplete or could not be validated. GENE preserved the current project and can retry this stage with a smaller implementation.";
   return raw.slice(0, 900) || "GENE encountered an unexpected error. Your last saved project version was preserved; inspect the activity log and retry.";
 }
-function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error") {
-  return { id: uid(), role, content, createdAt: now(), kind };
+function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error", retry?: { prompt: string; operation: string }) {
+  return { id: uid(), role, content, createdAt: now(), kind, ...(retry ? { retry } : {}) };
 }
 function newProject(kind: ProjectKind = "game", preferredEngine?: GeneProject["preferredEngine"]): GeneProject {
   return {
@@ -1019,24 +1019,41 @@ export default function Home() {
           }
         }
       } else {
-        const response = await fetch("/api/agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...baseRequest,
-            operation,
-            message: prompt,
-            project: nextProject
-          })
-        });
-        payload = await response.json().catch(() => null);
-        responseOk = response.ok;
+        // Retry transient provider failures and incomplete model outputs automatically.
+        // Keep this bounded: one initial request plus two compact retries.
+        const retryableCodes = /OPENROUTER_FALLBACK_FAILED|OPENROUTER_RATE_LIMITED|GEMINI_TIMEOUT|GEMINI_OUTPUT_TRUNCATED|GEMINI_OUTPUT_INVALID|GEMINI_CAPACITY_BUSY|GEMINI_API_ERROR|GENE_VALIDATION_FAILED|GENE_STAGED_BUILD_VALIDATION_FAILED/i;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) {
+            addActivity("Automatic recovery retry " + (attempt + 1) + "/3 after a provider or output failure");
+            setNotice("GENE is retrying with a shorter, complete response. Your current project files remain safe.");
+            await new Promise(resolve => window.setTimeout(resolve, attempt === 1 ? 650 : 1300));
+          }
+          const retryInstruction = attempt === 0 ? "" :
+            "\\n\\nAUTOMATIC RECOVERY RETRY " + (attempt + 1) + "/3: The previous model attempt did not finish successfully. Re-read the existing project context and complete the same request from the last saved state. Return one complete valid response, not a continuation fragment. Prefer a smaller but working result; preserve existing features and filenames. For edits, change only the necessary files. Do not claim changes were applied unless you return the complete validated result.";
+          const response = await fetch("/api/agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...baseRequest,
+              operation,
+              message: prompt + retryInstruction,
+              project: nextProject
+            })
+          });
+          payload = await response.json().catch(() => null);
+          responseOk = response.ok;
+          if (responseOk && payload?.ok) break;
+          const code = String(payload?.error?.code || "");
+          const status = response.status;
+          const retryable = retryableCodes.test(code) || ((status >= 500 || status === 429) && !/KEY_REJECTED|NOT_CONFIGURED|GENE_REQUEST_ERROR/.test(code));
+          if (!retryable || attempt >= 2) break;
+        }
       }
       if (!responseOk || !payload?.ok) {
         const rawError = payload?.error?.message || "GENE could not complete the request.";
         const error = explainAgentError(rawError, payload?.error?.code);
         addActivity("Request failed: " + rawError);
-        const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error")], updatedAt: now() };
+        const failed = { ...nextProject, buildRun: activeBuildRun || nextProject.buildRun || null, livingPreview: activeBuildRun ? { status: "error" as const, lastKnownGoodVersion: nextProject.versions[0]?.number, updatedAt: now(), runtimeErrors: [error], currentObjectives: [], canContinuePlaying: false } : nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", error, "error", { prompt, operation })], updatedAt: now() };
         setProject(current => {
           if (!current || current.id !== failed.id) return current;
           const knownIds = new Set(current.messages.map(item => item.id));
@@ -1167,7 +1184,7 @@ export default function Home() {
       }
     } catch (error) {
       const text = explainAgentError(error);
-      const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error")] };
+      const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error", { prompt, operation })] };
       setProject(current => {
         if (!current || current.id !== failed.id) return current;
         const knownIds = new Set(current.messages.map(item => item.id));
@@ -2309,7 +2326,10 @@ export default function Home() {
                   {msg.role !== "user" && <div className="message-avatar">{msg.role === "system" ? "•" : "G"}</div>}
                   <div className="message-content">
                     {msg.role === "user" ? <div className="user-bubble">{msg.content}</div> : <div className="assistant-copy">{msg.content}</div>}
-                    {msg.kind === "error" && <div className="inline-error">No verified changes were applied.</div>}
+                    {msg.kind === "error" && <div className="message-recovery">
+                      <div className="inline-error">Your last saved files are preserved.</div>
+                      {msg.retry && <button className="retry-message-button" onClick={() => void runAgent(msg.retry!.prompt, msg.retry!.operation)} disabled={busy || buildInProgress || parallelChatInProgress} title="Retry this request using the latest saved project and build checkpoint"><span aria-hidden="true">↻</span> Retry request</button>}
+                    </div>}
                   </div>
                 </div>)}
                 {project.question && <InterviewCard

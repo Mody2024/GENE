@@ -1,7 +1,7 @@
 export type ProjectKind = "game" | "app";
 export type Mode = "plan" | "build";
 export type Thinking = "fast" | "balanced" | "deep";
-export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error" };
+export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error"; retry?: { prompt: string; operation: string } };
 export type Question = {
   id: string;
   text: string;
