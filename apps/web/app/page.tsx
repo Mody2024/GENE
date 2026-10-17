@@ -825,7 +825,7 @@ export default function Home() {
                   const isRuntimeLoadablePath = (path: string) =>
                     /\.(?:m?js|cjs)$/i.test(path) ||
                     /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
-                  let safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
+                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
                     safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
                   ))].slice(0, 96);
                   const omittedUnsupportedAssets = candidates.filter((path: unknown) =>
@@ -893,7 +893,7 @@ export default function Home() {
                     spec.modelingNotes = generatedModels.length
                       ? "These are actual generated OBJ meshes with MTL materials from GENE Forge; they are not Blender sculpt files, rigged characters, UV texture sets or baked PBR maps."
                       : "No Forge mesh was returned for this build. Use honest procedural geometry and do not claim external models were generated.";
-                    safeManifest = [...new Set(safeManifest)].slice(0, 96);
+                    safeManifest.splice(0, safeManifest.length, ...[...new Set(safeManifest)].slice(0, 96));
                   }
                   spec.additionalFiles = safeManifest;
                   stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
