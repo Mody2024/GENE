@@ -1,0 +1,57 @@
+name: GENE Game Playground
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * *"
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: gene-game-playground-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  playground:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run contract and agent tests
+        run: npm test
+      - name: Build GENE
+        run: npm run build
+      - name: Start GENE web workspace
+        run: |
+          npm run start > /tmp/gene-web.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "GENE is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/gene-web.log
+          exit 1
+      - name: Run interactive game and app playground
+        run: node tests/playground.mjs
+      - name: Run full browser regression suite
+        run: npm run test:browser
+      - name: Upload playground evidence and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gene-playground-${{ github.run_id }}
+          path: |
+            artifacts/gene-playground/
+            /tmp/gene-web.log
+          if-no-files-found: warn
+          retention-days: 21
