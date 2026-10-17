@@ -786,3 +786,10 @@ assert.ok(targetIntentRegressionPage.includes("project-target-chip") && targetIn
 assert.ok(targetIntentRegressionInterview.includes("submitPicked") && targetIntentRegressionInterview.includes("aria-pressed={selected}"), "interview answers can be selected and reviewed before continuing");
 assert.ok(targetIntentRegressionInterview.includes("Skip interview and build") && targetIntentRegressionInterview.includes("Use recommended default"), "interview keeps clear skip and recommended-default actions");
 assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interface system") && targetIntentRegressionStyles.includes("real-progress-current") && targetIntentRegressionStyles.includes("grid-template-columns:repeat(4,minmax(0,1fr))"), "clean surfaces, four explicit project targets and compact current-step progress are styled");
+
+const researchRouteSource = read("apps/web/app/api/research/route.ts");
+assert.ok(researchRouteSource.includes("Promise.all([wikipedia(wikiQuery), polyHavenCatalog()])"), "research route collects CC0 model catalogue results for game builds too");
+assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelling") && page.includes("generatedModels"), "3D build pipeline requests real Forge meshes and records actual generated asset paths");
+assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
+assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");
+assert.ok(prompts.includes("INTERVIEW COMPLETION GATE") && prompts.includes("DETAILED EDIT PRESERVATION"), "interview completion and targeted-edit requirements are explicit in the model contract");

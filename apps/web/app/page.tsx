@@ -491,8 +491,7 @@ export default function Home() {
   useEffect(() => {
     if (!project?.plan || researchedProjects.current.has(project.id)) return;
     if ((project.references || []).some(item => item.name === "research-notes.md")) { researchedProjects.current.add(project.id); return; }
-    researchedProjects.current.add(project.id);
-    const query = [project.plan.title, project.answers?.fantasy, project.answers?.genre].filter(Boolean).join(" ");
+    const query = [project.initialPrompt, project.plan.title, project.plan.summary, project.answers?.fantasy, project.answers?.genre, ...(project.plan.mechanics || [])].filter(Boolean).join(" ");
     const projectId = project.id;
     void fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, kind: project.kind === "app" ? "app" : "game" }) })
       .then(response => response.json().catch(() => null))
@@ -502,9 +501,10 @@ export default function Home() {
           if (!prev || prev.id !== projectId || (prev.references || []).some(item => item.name === "research-notes.md")) return prev;
           return { ...prev, references: [...(prev.references || []), { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(data.notes).slice(0, 20_000), size: String(data.notes).length }], updatedAt: now() };
         });
+        researchedProjects.current.add(projectId);
         addActivity("Free web research attached to the plan (" + (data.sources?.wikipedia || 0) + " Wikipedia, " + (data.sources?.polyhaven || 0) + " CC0 model matches).");
       })
-      .catch(() => undefined);
+      .catch(() => { researchedProjects.current.delete(projectId); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.plan?.title, project?.id]);
 
@@ -571,17 +571,25 @@ export default function Home() {
     const nextAnswers = answerKey ? { ...project.answers, [answerKey]: prompt } : project.answers;
     let operation = operationOverride || "chat";
     if (!operationOverride) {
+      const hasSource = Object.keys(project.files).length > 0;
+      const asksForChange = /\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|modify|adjust|remap|integrate|repair|polish)\b/i.test(prompt);
       if (searchMode) operation = "research";
-      else if (interactionMode === "chat" || isConversationOnly(prompt)) operation = "chat";
+      else if (isConversationOnly(prompt)) operation = "chat";
+      else if (hasSource && asksForChange) operation = "edit";
+      else if (interactionMode === "chat") operation = "chat";
       else if (interactionMode === "plan" || project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
-      else if (!Object.keys(project.files).length) operation = "build";
+      else if (!hasSource) operation = "build";
       else operation = "edit";
+    }
+    if (!operationOverride && operation === "build" && !project.plan && !Object.keys(project.files).length && !project.question &&
+        !/\b(skip (?:the )?interview|no questions|without (?:an? )?interview|build immediately|just build|use sensible defaults|don't ask|do not ask)\b/i.test(prompt)) {
+      operation = "interview";
     }
     if (operation === "research") setSearchMode(false);
     if (operation === "surprise") {
       operation = "surprise";
     }
-    const nextProject: GeneProject = {
+    let nextProject: GeneProject = {
       ...project,
       // Automatic runtime repair is a source mutation and must never be blocked
       // merely because the user last left the workspace in read-only Plan mode.
@@ -620,6 +628,24 @@ export default function Home() {
     addActivity("Request accepted: " + operation);
     setSection("chat");
     try {
+      if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
+        try {
+          const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
+          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchData = await researchResponse.json().catch(() => null);
+          if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
+            const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
+            nextProject = { ...nextProject, references: [...(nextProject.references || []).filter(item => item.name !== note.name), note] };
+            setProject(current => current && current.id === nextProject.id ? { ...current, references: nextProject.references, updatedAt: now() } : current);
+            researchedProjects.current.add(nextProject.id);
+            addActivity("Attached real research before generation (" + (researchData.sources?.wikipedia || 0) + " Wikipedia results, " + (researchData.sources?.polyhaven || 0) + " CC0 model matches).");
+          } else {
+            addActivity("Research was unavailable or incomplete; GENE will mark assumptions and continue without inventing sources.");
+          }
+        } catch {
+          addActivity("Research request failed; preserving the project and continuing with explicitly labeled assumptions.");
+        }
+      }
       if (operation === "interview") addActivity("Preparing the next interview decision");
       if (operation === "plan") addActivity("Generating an implementation plan");
       if (operation === "build" || operation === "surprise") addActivity("Requesting " + (nextProject.kind === "app" ? "web app" : "game") + " source files from the model");
@@ -693,6 +719,7 @@ export default function Home() {
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
         };
         let finalContentPassSucceeded = false;
+        let autoSplitGameJs = false;
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
           if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") {
@@ -709,11 +736,11 @@ export default function Home() {
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
-                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
+                ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. For webgl3d, include up to two useful modelRequests with stable id, kind, prompt and quality fields so GENE can generate real OBJ/MTL meshes through Forge; describe exact game-specific silhouettes and use performance for low-poly requests, high for explicit high-detail requests. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
                 : /\.(?:m?js|cjs)$/i.test(stagePath) && stagePath !== "game.js"
                   ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.(?:m?js|cjs)$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
-              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
+              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
               const stageResponse = await fetch("/api/agent", {
                 method: "POST",
@@ -804,6 +831,72 @@ export default function Home() {
                   const omittedUnsupportedAssets = candidates.filter((path: unknown) =>
                     typeof path === "string" && safe(path) && !core.has(path) && !isRuntimeLoadablePath(path)
                   );
+                  if (spec.engine === "webgl3d") {
+                    const modelRequests = Array.isArray(spec.modelRequests) && spec.modelRequests.length
+                      ? spec.modelRequests.slice(0, 2)
+                      : [
+                          { id: "hero", kind: "character", prompt: "Create the main playable character/avatar for this exact 3D game: " + (nextProject.initialPrompt || spec.title) + ". Strong readable silhouette, coherent proportions, layered primary/secondary forms, distinctive palette, grounded pivot and a design readable from the gameplay camera." },
+                          { id: "landmark", kind: "environment", prompt: "Create one signature environment landmark or gameplay prop for this exact 3D game: " + (nextProject.initialPrompt || spec.title) + ". Clear silhouette, functional geometry, coherent materials, layered detail and scale readable from the gameplay camera." }
+                        ];
+                    const generatedModels: Array<{ id: string; role: string; name: string; quality: string; files: { obj: string; mtl: string; manifest: string } }> = [];
+                    for (const request of modelRequests) {
+                      const rawId = String(request?.id || request?.name || "game-asset").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "game-asset";
+                      const assetId = rawId.startsWith("asset-") ? rawId : "asset-" + rawId;
+                      const prefix = "assets/" + assetId + "/";
+                      const quality = ["performance", "standard", "high"].includes(String(request?.quality)) ? String(request.quality)
+                        : /low.?poly|stylized|low.?end|performance/i.test([nextProject.initialPrompt, prompt, String(request?.prompt || "")].join(" ")) ? "performance"
+                        : /photoreal|ultra.?detail|high.?detail|high.?quality|realistic/i.test([nextProject.initialPrompt, prompt, String(request?.prompt || "")].join(" ")) ? "high" : "standard";
+                      if (stagedFiles[prefix + "model.obj"] && stagedFiles[prefix + "model.mtl"] && stagedFiles[prefix + "asset.json"]) {
+                        generatedModels.push({ id: assetId, role: String(request?.role || request?.kind || "asset"), name: assetId, quality, files: { obj: prefix + "model.obj", mtl: prefix + "model.mtl", manifest: prefix + "asset.json" } });
+                        continue;
+                      }
+                      try {
+                        addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
+                        const forgeResponse = await fetch("/api/forge", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
+                            kind: ["character", "vehicle", "building", "environment", "prop", "weapon"].includes(String(request?.kind)) ? String(request.kind) : "prop",
+                            quality,
+                            projectStyle: [nextProject.initialPrompt, nextProject.plan?.summary, spec.artDirection, spec.visualStyle].filter(Boolean).join("\n").slice(0, 1600),
+                            references: (nextProject.references || []).filter(ref => ref.kind === "text").slice(0, 2)
+                          })
+                        });
+                        const forgeData = await forgeResponse.json().catch(() => null);
+                        const meshFiles = forgeData?.asset?.files;
+                        if (!forgeResponse.ok || !forgeData?.ok || typeof meshFiles?.["model.obj"] !== "string" || typeof meshFiles?.["model.mtl"] !== "string" || typeof meshFiles?.["asset.json"] !== "string") {
+                          addActivity("Forge could not produce " + assetId + ": " + String(forgeData?.error?.message || "no validated mesh returned") + ". No placeholder model was written.");
+                          continue;
+                        }
+                        const manifest = JSON.parse(meshFiles["asset.json"]);
+                        manifest.assetId = assetId;
+                        manifest.name = String(forgeData.asset.name || assetId);
+                        manifest.kind = String(forgeData.asset.kind || request?.kind || "prop");
+                        manifest.style = String(forgeData.asset.style || quality);
+                        manifest.partCount = Number(forgeData.asset.partCount || manifest.partCount || 0);
+                        manifest.triangleCount = Number(forgeData.asset.triangleCount || manifest.triangleCount || 0);
+                        manifest.vertexCount = Number(forgeData.asset.vertexCount || manifest.vertexCount || 0);
+                        manifest.qualityProfile = quality;
+                        manifest.files = { obj: prefix + "model.obj", mtl: prefix + "model.mtl" };
+                        stagedFiles[prefix + "model.obj"] = String(meshFiles["model.obj"]);
+                        stagedFiles[prefix + "model.mtl"] = String(meshFiles["model.mtl"]);
+                        stagedFiles[prefix + "asset.json"] = JSON.stringify(manifest, null, 2);
+                        safeManifest.push(prefix + "model.obj", prefix + "model.mtl", prefix + "asset.json");
+                        generatedModels.push({ id: assetId, role: String(request?.role || request?.kind || "asset"), name: manifest.name, quality, files: { obj: prefix + "model.obj", mtl: prefix + "model.mtl", manifest: prefix + "asset.json" } });
+                        addActivity("Forge produced actual OBJ/MTL geometry for " + assetId + " (" + Number(forgeData.asset.triangleCount || 0) + " triangles).");
+                      } catch (modelError) {
+                        addActivity("Forge request failed for " + assetId + ": " + (modelError instanceof Error ? modelError.message : "unknown modelling error") + ". No fake asset was added.");
+                      }
+                    }
+                    spec.generatedModels = generatedModels;
+                    spec.modelingStatus = generatedModels.length ? "forge-generated-obj-mtl" : "forge-unavailable-procedural-fallback";
+                    spec.modelingNotes = generatedModels.length
+                      ? "These are actual generated OBJ meshes with MTL materials from GENE Forge; they are not Blender sculpt files, rigged characters, UV texture sets or baked PBR maps."
+                      : "No Forge mesh was returned for this build. Use honest procedural geometry and do not claim external models were generated.";
+                    safeManifest = [...new Set(safeManifest)].slice(0, 96);
+                  }
+                  spec.additionalFiles = safeManifest;
+                  stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
                   if (omittedUnsupportedAssets.length) addActivity("Skipped " + omittedUnsupportedAssets.length + " unsupported asset placeholder path(s); only browser modules and the supported Forge OBJ/MTL asset paths are staged here.");
                   spec.additionalFiles = safeManifest;
                   stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
@@ -863,6 +956,53 @@ export default function Home() {
             }
           }
           if (!stageSucceeded) {
+            const shouldSplitLongGameTask = !autoSplitGameJs && stagePath === "game.js" &&
+              /truncat|MAX_TOKENS|output.?limit|malformed|invalid json|did not return the requested file|response.*incomplete|too large/i.test(stageError);
+            if (shouldSplitLongGameTask) {
+              autoSplitGameJs = true;
+              const coreModule = "src/systems/gameplay-core.js";
+              const presentationModule = "src/systems/gameplay-ui.js";
+              try {
+                const spec = JSON.parse(stagedFiles["game-spec.json"] || "{}");
+                spec.additionalFiles = [...new Set([...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []), coreModule, presentationModule])].slice(0, 96);
+                spec.autoSplitRecovery = { source: "game.js", modules: [coreModule, presentationModule], reason: stageError.slice(0, 500) };
+                stagedFiles["game-spec.json"] = JSON.stringify(spec, null, 2);
+                const before = stagePaths.slice(0, index);
+                const after = stagePaths.slice(index + 1);
+                stagePaths = [...before, coreModule, presentationModule, "game.js", ...after];
+                const previousByPath = new Map(activeBuildRun.tasks.filter(task => task.id.startsWith("stage-") && task.files[0]).map(task => [task.files[0], task]));
+                const splitTasks = stagePaths.map((path, stageIndex) => {
+                  const previous = previousByPath.get(path);
+                  const passed = path !== "game.js" && previous?.status === "passed";
+                  return {
+                    id: "stage-" + stageIndex,
+                    title: "Generate " + path,
+                    kind: (stageIndex === 0 ? "design" : stageIndex === 1 ? "scaffold" : "implement") as "design" | "scaffold" | "implement",
+                    status: passed ? "passed" as const : "queued" as const,
+                    dependsOn: stageIndex ? ["stage-" + (stageIndex - 1)] : [],
+                    attempts: previous?.attempts || 0,
+                    files: [path],
+                    acceptance: ["Return the requested complete file", "Pass server-side source validation"]
+                  };
+                });
+                activeBuildRun = {
+                  ...activeBuildRun,
+                  tasks: [...splitTasks,
+                    { id: "final-content-pass", title: nextProject.kind === "app" ? "Polish app interactions and error states" : "Expand the prototype into the full game", kind: "implement", status: "queued", dependsOn: ["stage-" + (stagePaths.length - 1)], attempts: 0, files: ["game.js", "game.css"], acceptance: ["Preserve the core feature set", "Pass source and runtime-contract validation"] },
+                    { id: "validate-assembled", title: "Validate assembled playable project", kind: "test", status: "queued", dependsOn: ["final-content-pass"], attempts: 0, files: [...stagePaths], acceptance: ["Required project files are present", "Project contract and JavaScript syntax pass"] }
+                  ],
+                  activeTaskId: undefined,
+                  status: "running",
+                  lastError: undefined
+                };
+                persistRun(activeBuildRun, "booting", stagedFiles, ["Automatically split oversized game.js into two cohesive modules"], [stageError]);
+                addActivity("Automatic task decomposition: split oversized game.js into " + coreModule + " and " + presentationModule + "; GENE will regenerate both and retry the integration file.");
+                index -= 1;
+                continue;
+              } catch (splitError) {
+                addActivity("Automatic task split could not be prepared: " + (splitError instanceof Error ? splitError.message : "unknown split error"));
+              }
+            }
             activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "failed", undefined, stageError);
             persistRun(activeBuildRun, "error", stagedFiles, [], [stagePath + ": " + stageError], "repair-failed");
             payload = { ok: false, error: { code: "GENE_BUILD_STAGE_FAILED", message: "GENE could not complete " + stagePath + " after three compact attempts. " + stageError + " The project keeps a recovery checkpoint for the next attempt." } };

@@ -51,12 +51,12 @@ export async function POST(request: NextRequest) {
 
   const words = keywords(topic);
   const wikiQuery = words.slice(0, 4).join(" ") || topic;
-  const [wiki, catalog] = await Promise.all([wikipedia(wikiQuery), body?.kind === "game" ? Promise.resolve(null) : polyHavenCatalog()]);
+  const [wiki, catalog] = await Promise.all([wikipedia(wikiQuery), polyHavenCatalog()]);
   const models = filterPolyHaven(catalog, topic, 6);
   const links = buildSearchLinks(words.slice(0, 3).join(" ") || topic);
   const unreachable: string[] = [];
   if (!wiki.length) unreachable.push("Wikipedia returned nothing for this topic or could not be reached");
-  if (body?.kind !== "game" && !catalog) unreachable.push("the Poly Haven catalog could not be reached");
+  if (!catalog) unreachable.push("the Poly Haven model catalog could not be reached");
   const notes = formatResearchNotes({
     topic,
     wiki,
