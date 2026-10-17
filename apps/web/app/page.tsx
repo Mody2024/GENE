@@ -1737,9 +1737,31 @@ export default function Home() {
     const required = ["game.html", "game.css", "game.js", "game-spec.json"];
     const missing = required.filter(path => !files[path] || !files[path].trim());
     add("Required source files", missing.length ? "fail" : "pass", missing.length ? "Missing: " + missing.join(", ") : "HTML, CSS, JavaScript and game specification are present.");
+    const allPaths = Object.keys(files);
+    const unsafePaths = allPaths.filter(path =>
+      !path.trim() || path.length > 240 || path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
+      path.includes(String.fromCharCode(92)) || path.split("/").some(part => !part || part === "." || part === "..") ||
+      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))
+    );
+    add("Project file paths", unsafePaths.length ? "fail" : "pass", unsafePaths.length ? "Unsafe relative paths: " + unsafePaths.slice(0, 5).join(", ") : allPaths.length + " project paths are relative and traversal-free.");
+    const fileEntries = Object.entries(files);
+    const oversizedFiles = fileEntries.filter(([, source]) => typeof source !== "string" || source.length > 500_000);
+    const totalSourceChars = fileEntries.reduce((total, [, source]) => total + (typeof source === "string" ? source.length : 0), 0);
+    const withinSourceBudget = allPaths.length <= 100 && oversizedFiles.length === 0 && totalSourceChars <= 8_000_000;
+    add("Source size budget", withinSourceBudget ? "pass" : "fail", withinSourceBudget
+      ? allPaths.length + " files · " + totalSourceChars.toLocaleString() + " source characters; file and project budgets are respected."
+      : "Project limit is 100 files, 500,000 characters per file, and 8,000,000 total characters. Oversized: " + oversizedFiles.slice(0, 5).map(([path]) => path).join(", "));
     const html = files["game.html"] || "";
     const js = files["game.js"] || "";
     const combined = html + "\n" + js;
+    const allJavaScript = fileEntries.filter(([path, source]) => /\\.m?js$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
+    const hasExecutableInlineScript = /<script\\b(?![^>]*\\btype\\s*=\\s*["'](?:application\\/json|application\\/ld\\+json)["'])/i.test(html);
+    const hasExternalRuntime = /<script\\b[^>]*\\bsrc\\s*=\\s*["']https?:|<link\\b[^>]*\\brel\\s*=\\s*["']stylesheet["'][^>]*\\bhref\\s*=\\s*["']https?:/i.test(html) ||
+      /\\bimport\\s*\\(|\\bfrom\\s*["']https?:|\\bfetch\\s*\\(\\s*["']https?:/i.test(allJavaScript);
+    const runtimeSelfContained = !hasExecutableInlineScript && !hasExternalRuntime;
+    add("Self-contained runtime", runtimeSelfContained ? "pass" : "fail", runtimeSelfContained
+      ? "No executable inline script tags or obvious external CDN/runtime dependencies were detected."
+      : "Move executable code to project JavaScript files and remove external scripts, stylesheets, dynamic imports, or hard-coded external fetch dependencies.");
     let spec: any = null;
     let specParsed = false;
     try { spec = JSON.parse(files["game-spec.json"] || ""); specParsed = Boolean(spec && typeof spec === "object" && !Array.isArray(spec)); } catch {}

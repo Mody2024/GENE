@@ -125,6 +125,7 @@ console.log("GENE build-orchestrator completion-state tests passed.");
 // GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
 const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
+assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
 const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");
 const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");
 assert.ok(themePage.includes('useState<"light" | "dark">("light")'), "new workspaces default to the light theme");
