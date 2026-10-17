@@ -13,12 +13,13 @@ type Answers = Record<string, string>;
 type GameArchetype = "precision-platformer" | "voxel-sandbox" | "rhythm-runner" | "open-world-adventure" | "story-adventure" | "survival-crafting" | "general";
 
 function detectGameArchetype(text: string): GameArchetype {
-  if (/minecraft|voxel|block.?world|block.?craft/i.test(text)) return "voxel-sandbox";
-  if (/geometry.?dash|rhythm|beat.?sync|music.?platform/i.test(text)) return "rhythm-runner";
-  if (/mario|precision platform|metroidvania|platformer/i.test(text)) return "precision-platformer";
-  if (/open.?world|sandbox|exploration world|large world/i.test(text)) return "open-world-adventure";
-  if (/story|narrative|dialogue|cinematic|adventure/i.test(text)) return "story-adventure";
-  if (/survival|crafting|hunger|resource gathering/i.test(text)) return "survival-crafting";
+  // Order matters: identify the most mechanically specific archetype before broad genre words.
+  if (/minecraft|voxel|block.?world|block.?craft|dig.?and.?build/i.test(text)) return "voxel-sandbox";
+  if (/geometry.?dash|rhythm|beat.?sync|music.?platform|beat.?runner/i.test(text)) return "rhythm-runner";
+  if (/mario|precision platform|metroidvania|platformer|jump.?and.?run/i.test(text)) return "precision-platformer";
+  if (/open.?world|sandbox|exploration world|large world|persistent world/i.test(text)) return "open-world-adventure";
+  if (/survival|crafting|hunger|resource gathering|base.?building/i.test(text)) return "survival-crafting";
+  if (/story|narrative|dialogue|cinematic|adventure|choice.?driven/i.test(text)) return "story-adventure";
   return "general";
 }
 
@@ -243,7 +244,16 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
         { id: "pickup", kind: "icon" as const, prompt: "collectible pickup icon for " + title + ", glowing, simple shape" },
         { id: "backdrop", kind: "background" as const, prompt: "layered background scene for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", depth with foreground, midground and sky" }
       ];
-  const archetype = isApp ? "general" : detectGameArchetype([idea, answers.genre, answers.fantasy, answers.art, answers.scope].filter(Boolean).join(" "));
+  const referenceContext = (project.references || []).map(reference => {
+    const label = reference.name || reference.id || "Untitled reference";
+    const kind = reference.kind === "image" ? "visual reference" : "text reference";
+    const excerpt = typeof reference.textContent === "string" ? reference.textContent.replace(/\\s+/g, " ").trim().slice(0, 360) : "";
+    return label + " (" + kind + ")" + (excerpt ? ": " + excerpt : "");
+  }).slice(0, 8);
+  const archetype = isApp ? "general" : detectGameArchetype([
+    idea, plan?.title, plan?.summary, answers.genre, answers.fantasy, answers.art, answers.scope,
+    ...Object.values(answers), ...referenceContext
+  ].filter(Boolean).join(" "));
   const archetypePlan = ARCHETYPE_PLANS[archetype];
   const milestones = isApp
     ? ["Core layout and navigation", "Primary user flow end to end", "Validation, empty and error states", "Accessibility and responsive polish"]
@@ -277,7 +287,12 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     scope: { prototypeMinutes: targets.prototype, fullMinutes: targets.full },
     milestones,
     risks,
-    researchBrief: isApp ? ["Primary user workflow and accessibility", "Responsive interaction patterns", "Data persistence and authorization requirements"] : archetypePlan.research,
+    researchBrief: (isApp
+      ? ["Primary user workflow and accessibility", "Responsive interaction patterns", "Data persistence and authorization requirements"]
+      : archetypePlan.research
+    ).concat(referenceContext.length
+      ? ["USER-SUPPLIED REFERENCES (treat as evidence/context, not as permission to copy protected content):", ...referenceContext]
+      : []),
     assetPlan,
     createdAt: new Date().toISOString()
   };
