@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import * as ts from "typescript";
 import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
+import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/app/lib/project-file-safety.mjs";
 import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
@@ -27,6 +28,23 @@ const bad = analyzeProjectScripts([{ path: "game.js", content: "function tick(){
 assert.ok(bad.errors.length > 0, "undeclared identifiers used as objects are caught");
 const good = analyzeProjectScripts([{ path: "game.js", content: "const enemies = [];\nfunction tick(){ enemies.push(1); }\ntick();" }], { scopeChecks: true });
 assert.equal(good.errors.length, 0);
+
+// Cross-platform project path contract: Windows installer paths and browser ZIPs
+// must agree on path validity and collisions before packaging.
+assert.equal(normalizeProjectFilePath("assets/hero-model.glb").ok, true);
+for (const invalidPath of [
+  "../outside.txt", "assets/../../secret", "/absolute/file.js", "C:/boot.ini",
+  "folder\\nested.js", "assets/CON.txt", "assets/NUL", "file.js.", "folder/trailing ",
+  "assets/bad:name.js", "assets/\u0007beep.js", "assets/\u202Eexe.js", "x".repeat(241)
+]) {
+  assert.equal(normalizeProjectFilePath(invalidPath).ok, false, "unsafe or non-portable path rejected: " + JSON.stringify(invalidPath));
+}
+const caseCollision = inspectProjectFilePaths(["Assets/Hero.png", "assets/hero.png"]);
+assert.equal(caseCollision.ok, false, "case-insensitive collisions are rejected for Windows compatibility");
+assert.equal(caseCollision.collisions.length, 1);
+const unicodeCollision = inspectProjectFilePaths(["caf\u00e9.txt", "cafe\u0301.txt"]);
+assert.equal(unicodeCollision.ok, false, "canonically equivalent Unicode paths cannot overwrite each other");
+assert.equal(inspectProjectFilePaths(["game/index.html", "assets/hero.png"]).ok, true);
 
 // SVG sanitizer.
 const hostile = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script><image href="https://evil.test/x.png"/><rect width="4" height="4" fill="red"/><circle cx="5" cy="5" r="2"/></svg>';
@@ -126,6 +144,10 @@ console.log("GENE build-orchestrator completion-state tests passed.");
 const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
+assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
+const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
+assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()"), "cloud build rejects unsafe and case/Unicode-colliding paths");
+assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
 const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");
 const themeCss = readFileSync(new URL("../apps/web/app/studio-redesign.css", import.meta.url), "utf8");

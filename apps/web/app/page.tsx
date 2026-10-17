@@ -17,6 +17,7 @@ import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
+import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -1738,12 +1739,14 @@ export default function Home() {
     const missing = required.filter(path => !files[path] || !files[path].trim());
     add("Required source files", missing.length ? "fail" : "pass", missing.length ? "Missing: " + missing.join(", ") : "HTML, CSS, JavaScript and game specification are present.");
     const allPaths = Object.keys(files);
-    const unsafePaths = allPaths.filter(path =>
-      !path.trim() || path.length > 240 || path.startsWith("/") || /^[a-zA-Z]:/.test(path) ||
-      path.includes(String.fromCharCode(92)) || path.split("/").some(part => !part || part === "." || part === "..") ||
-      path.split("").some(char => char.charCodeAt(0) < 32 || '<>:"|?*'.includes(char))
-    );
-    add("Project file paths", unsafePaths.length ? "fail" : "pass", unsafePaths.length ? "Unsafe relative paths: " + unsafePaths.slice(0, 5).join(", ") : allPaths.length + " project paths are relative and traversal-free.");
+    const pathReport = inspectProjectFilePaths(allPaths);
+    const pathProblems = [
+      ...pathReport.invalid.slice(0, 5).map(item => String(item.path) + " (" + item.error + ")"),
+      ...pathReport.collisions.slice(0, 5).map(item => item.path + " conflicts with " + item.duplicateOf)
+    ];
+    add("Project file paths", pathProblems.length ? "fail" : "pass", pathProblems.length
+      ? "Fix unsafe or cross-platform-conflicting paths: " + pathProblems.join(" | ")
+      : allPaths.length + " project paths are relative, portable and collision-free.");
     const fileEntries = Object.entries(files);
     const oversizedFiles = fileEntries.filter(([, source]) => typeof source !== "string" || source.length > 500_000);
     const totalSourceChars = fileEntries.reduce((total, [, source]) => total + (typeof source === "string" ? source.length : 0), 0);
