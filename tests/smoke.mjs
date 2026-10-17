@@ -199,7 +199,7 @@ assert.ok(page.includes("JSZip.loadAsync(file)"), "project ZIP import is impleme
 assert.ok(page.includes('zip.file("references/" + safeName'), "export preserves reference files");
 assert.ok(page.includes("referenceInputRef.current?.click()"), "reference uploads are wired");
 assert.ok(page.includes("setSearchMode(value => !value)") && page.includes("Research the web"), "grounded search mode is toggleable from the composer tools menu");
-assert.ok(page.includes("InterviewCard") && read("apps/web/app/components/InterviewCard.tsx").includes("PROJECT INTERVIEW"), "sequential interview UI is present");
+assert.ok(page.includes("InterviewCard") && read("apps/web/app/components/InterviewCard.tsx").includes("PROJECT SETUP") && read("apps/web/app/components/InterviewCard.tsx").includes("submitPicked"), "sequential interview UI supports explicit selection and confirmation");
 assert.ok(page.includes("autoRepairAttempts") && page.includes("runtimeRefreshAttempts") && page.includes("gene-runtime"), "preview failures trigger bounded runtime recovery and repair");
 assert.ok(page.includes('if (state === "rendered") {\n          // A confirmed successful render ends the previous recovery streak.') && page.includes("autoRepairAttempts.current = 0;\n        runtimeRefreshAttempts.current = 0;"), "a successful render or source change resets the repair budget for future independent failures");
 
