@@ -24,8 +24,17 @@ export async function GET(_request: NextRequest, context: { params: { buildId: s
     const resultResponse = await gh(base + "/contents/.gene-builds/" + id + ".result.json?ref=gene-build-" + id, token);
     if (resultResponse.ok) {
       const entry = await resultResponse.json();
-      const report = JSON.parse(Buffer.from(String(entry.content || "").replace(/\n/g, ""), "base64").toString("utf8"));
-      return NextResponse.json({ ok: true, ...report }, { headers: { "Cache-Control": "no-store" } });
+      let decoded: unknown;
+      try {
+        decoded = JSON.parse(Buffer.from(String(entry.content || "").replace(/\\n/g, ""), "base64").toString("utf8"));
+      } catch {
+        return fail("The cloud build result is unreadable and cannot be trusted.", 502, "GENE_BUILD_RESULT_INVALID");
+      }
+      const checked = validateCloudBuildReport(decoded, id);
+      if (!checked.ok) {
+        return fail("The cloud build result failed verification: " + checked.reason, 502, "GENE_BUILD_RESULT_INVALID");
+      }
+      return NextResponse.json({ ok: true, ...checked.report }, { headers: { "Cache-Control": "no-store" } });
     }
     const runsResponse = await gh(base + "/actions/workflows/cloud-build.yml/runs?event=workflow_dispatch&per_page=100", token);
     if (runsResponse.ok) {
