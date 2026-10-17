@@ -34,7 +34,7 @@ export type ChainFailure = { status: number; detail: string; provider: "Groq" | 
 
 export type ChainResult =
   | { ok: true; provider: string; model: string; text: string; finish: string; attempts: number }
-  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[] };
+  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[]; failureDetails?: string[] };
 
 import { classifyProviderFailure, extractJsonObjectText, parseFreeCatalog, scoreModel } from "./provider-utils.mjs";
 import type { CatalogEntry } from "./provider-utils.mjs";
@@ -142,7 +142,7 @@ export async function listAlternateProviders(siteTitle: string, options: { openr
 
 export async function callChatProvider(
   provider: AltProvider,
-  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number }
+  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number; signal?: AbortSignal }
 ): Promise<ChatResult> {
   const started = Date.now();
   const attempt = async (useJsonMode: boolean, timeoutMs: number): Promise<ChatResult> => {
@@ -157,7 +157,7 @@ export async function callChatProvider(
           temperature: options.temperature,
           max_tokens: options.maxTokens
         }),
-        signal: AbortSignal.timeout(Math.max(1_000, timeoutMs))
+        signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(Math.max(1_000, timeoutMs))]) : AbortSignal.timeout(Math.max(1_000, timeoutMs))
       });
       const data: any = await response.json().catch(() => null);
       const content = data?.choices?.[0]?.message?.content;
@@ -170,13 +170,14 @@ export async function callChatProvider(
         detail
       };
     } catch (error) {
-      return { ok: false, status: 504, text: "", finish: "", detail: error instanceof Error ? error.message : "network error" };
+      return { ok: false, status: options.signal?.aborted ? 499 : 504, text: "", finish: "", detail: options.signal?.aborted ? "request cancelled by the user" : error instanceof Error ? error.message : "network error" };
     }
   };
+  if (options.signal?.aborted) return { ok: false, status: 499, text: "", finish: "", detail: "request cancelled by the user" };
   let result = await attempt(options.json, options.timeoutMs);
   // Some free models reject response_format. Retry once as plain text; the
   // caller extracts JSON tolerantly.
-  if (!result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
+  if (!options.signal?.aborted && !result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
     const remaining = options.timeoutMs - (Date.now() - started);
     if (remaining > 2_000) result = await attempt(false, remaining);
   }
@@ -198,6 +199,7 @@ export async function runAlternateChain(options: {
   validate?: (text: string) => boolean;
   openrouterLimit?: number;
   groqLimit?: number;
+  signal?: AbortSignal;
 }): Promise<ChainResult> {
   const candidates = await listAlternateProviders(options.siteTitle, { openrouterLimit: options.openrouterLimit, groqLimit: options.groqLimit });
   let failure: ChainFailure = { status: 502, detail: "No alternate free provider is configured.", provider: "none" };
@@ -205,9 +207,10 @@ export async function runAlternateChain(options: {
   let malformed = false;
   let attempts = 0;
   const tried: string[] = [];
+  const failureDetails: string[] = [];
   const skipProvider = new Set<string>();
   for (const candidate of candidates) {
-    if (attempts >= (options.maxAttempts ?? 5)) break;
+    if (options.signal?.aborted || attempts >= (options.maxAttempts ?? 5)) break;
     if (skipProvider.has(candidate.name)) continue;
     const remaining = options.deadline - Date.now();
     if (remaining < 2_500) break;
@@ -220,10 +223,12 @@ export async function runAlternateChain(options: {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       json: options.json,
-      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500)
+      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500),
+      signal: options.signal
     });
     if (!result.ok) {
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [" + (result.status || 502) + "]: " + String(result.detail || "empty response").slice(0, 220));
       const kind = classifyProviderFailure(result.status, result.detail);
       if (kind === "unavailable" || kind === "paid") markModelUnavailable(candidate.model);
       if (kind === "auth") skipProvider.add(candidate.name);
@@ -232,16 +237,18 @@ export async function runAlternateChain(options: {
     if (result.finish === "length") {
       truncated = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") reached its output limit before completing JSON.", provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [422]: output limit reached");
       continue;
     }
     if (options.validate && !options.validate(result.text)) {
       malformed = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") returned incomplete or invalid JSON.", provider: label };
+      failureDetails.push(candidate.name + "/" + candidate.model + " [422]: invalid JSON response");
       continue;
     }
     return { ok: true, provider: candidate.name, model: candidate.model, text: result.text, finish: result.finish, attempts };
   }
-  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried };
+  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried, failureDetails: failureDetails.slice(-8) };
 }
 
 export function getGeminiKeys(): string[] {

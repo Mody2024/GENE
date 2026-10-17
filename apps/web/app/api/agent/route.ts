@@ -629,6 +629,7 @@ export async function POST(request: NextRequest) {
   const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
+    if (request.signal.aborted) return new Response(null, { status: 499, statusText: "Client Closed Request" });
     const attempt = queued.shift()!;
     const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
@@ -662,7 +663,7 @@ export async function POST(request: NextRequest) {
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
-        signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))])
       });
       const candidatePayload = await candidate.json().catch(() => null);
       const candidateText = candidatePayload?.candidates?.[0]?.content?.parts
@@ -732,7 +733,10 @@ export async function POST(request: NextRequest) {
   // prices are zero, and rotates through Groq plus those free models. It never calls a model
   // that is not verified free, to avoid unexpected provider charges.
   let chainTried: string[] = [];
+  let chainFailureDetails: string[] = [];
+  let geminiFailureSummary = "";
   if (!payload && hasAlternateProviderKeys()) {
+    geminiFailureSummary = "Gemini last failure [" + lastFailure.status + "]: " + String(lastFailure.detail || "unknown error").slice(0, 260);
     const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
     const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
     const chain = await runAlternateChain({
@@ -745,6 +749,7 @@ export async function POST(request: NextRequest) {
       perCallMs: 7_000,
       maxAttempts: 7,
       siteTitle: "GENE Builder",
+      signal: request.signal,
       validate: text => {
         const json = extractJsonObjectText(text);
         if (!json) return false;
@@ -769,6 +774,7 @@ export async function POST(request: NextRequest) {
         } catch { return false; }
       }
     });
+    if (request.signal.aborted) return new Response(null, { status: 499, statusText: "Client Closed Request" });
     if (chain.ok) {
       payload = { candidates: [{ content: { parts: [{ text: extractJsonObjectText(chain.text) as string }] }, finishReason: "STOP" }] };
       successfulModel = chain.model;
@@ -778,6 +784,7 @@ export async function POST(request: NextRequest) {
       lastFailure = { status: chain.failure.status, detail: chain.failure.detail };
       if (chain.failure.provider !== "none") lastFailureProvider = chain.failure.provider;
       chainTried = chain.triedModels;
+      chainFailureDetails = chain.failureDetails || [];
       if (chain.truncated) outputFailure = "truncated";
       else if (chain.malformed) outputFailure = "malformed";
     }
@@ -786,7 +793,8 @@ export async function POST(request: NextRequest) {
   if (!payload) {
     if (chainTried.length) {
       const detail = lastFailure.detail || "No additional provider detail was returned.";
-      const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). ";
+      const diagnostics = [geminiFailureSummary, ...chainFailureDetails].filter(Boolean).join(" | ").slice(0, 2_200);
+      const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). " + (diagnostics ? "Provider diagnostics: " + diagnostics + ". " : "");
       if (lastFailure.status === 401 || lastFailure.status === 403) {
         return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
       }
@@ -860,6 +868,7 @@ export async function POST(request: NextRequest) {
           groqLimit: 1,
           openrouterLimit: 2,
           siteTitle: "GENE Builder Reviewer",
+          signal: request.signal,
           validate: text => extractJsonObjectText(text) !== null
         });
         if (review.ok) {

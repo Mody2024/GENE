@@ -57,6 +57,9 @@ function now() { return new Date().toISOString(); }
 function explainAgentError(error: unknown, code?: unknown): string {
   const rawMessage = (error instanceof Error ? error.message : String(error || "Unknown error")).replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[redacted]").replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]").slice(0, 1800);
   const raw = (rawMessage + " " + String(code || "")).trim();
+  if (/OPENROUTER_(?:FALLBACK_FAILED|KEY_REJECTED|RATE_LIMITED|CREDITS_OR_PAID_ROUTE)/i.test(raw) && rawMessage.includes("Provider diagnostics:")) {
+    return rawMessage.slice(0, 1_100);
+  }
   if (/OPENROUTER_CREDITS_OR_PAID_ROUTE|insufficient credits|not enough credits|payment required|paid route/i.test(raw)) return "GENE only uses free AI models, and none of its free backups was available for this request. No project changes were applied. GENE re-discovers free models automatically, so just retry in a minute or add another free Gemini key.";
   if (/OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|invalid api key|unauthorized|\b401\b|\b403\b/i.test(raw)) return "An AI provider rejected its API key or account access. Check the relevant secret in your deployment settings, then redeploy. Your existing project files were preserved.";
   if (/OPENROUTER_RATE_LIMITED|rate.?limit|resource_exhausted|quota exceeded|\b429\b/i.test(raw)) return "An AI provider quota or rate limit was reached. This does not necessarily mean the model is paid. Wait for capacity to return or configure another available model/key. Your existing project files were preserved.";
@@ -170,6 +173,7 @@ export default function Home() {
   const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
   const [queuedRequestCount, setQueuedRequestCount] = useState(0);
   const pendingBuildRequests = useRef<string[]>([]);
+  const activeAgentControllers = useRef<Map<string, { controller: AbortController; projectId: string }>>(new Map());
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -542,6 +546,25 @@ export default function Home() {
     setActivity(prev => [new Date().toLocaleTimeString() + "  " + level + " · " + safeEntry, ...prev].slice(0, 100));
   };
 
+  function cancelAgentWork(reason = "Stopped by you.", showNotice = true) {
+    for (const entry of activeAgentControllers.current.values()) entry.controller.abort();
+    activeAgentControllers.current.clear();
+    pendingBuildRequests.current = [];
+    setQueuedRequestCount(0);
+    setBusy(false);
+    setBuildInProgress(false);
+    setCanQueueBuildRequests(false);
+    setParallelChatInProgress(false);
+    setRuntimeState("idle");
+    autoRepairAttempts.current = 0;
+    runtimeRefreshAttempts.current = 0;
+    lastRuntimeError.current = "";
+    if (showNotice) {
+      setNotice(reason + " Any in-flight generation was cancelled; saved files remain unchanged unless already committed.");
+      addActivity(reason);
+    }
+  }
+
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
     const prompt = text.trim();
@@ -565,6 +588,10 @@ export default function Home() {
     if (busy && !canChatDuringBuild) return;
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
+    const requestId = uid();
+    const requestController = new AbortController();
+    const requestProjectId = project.id;
+    activeAgentControllers.current.set(requestId, { controller: requestController, projectId: requestProjectId });
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -606,7 +633,9 @@ export default function Home() {
       updatedAt: now()
     };
     setProject(current => {
-      if (parallelReadOnlyRequest && current && current.id === nextProject.id) {
+      // A cancelled or stale request must never replace the project the user is now viewing.
+      if (requestController.signal.aborted || !current || current.id !== nextProject.id) return current;
+      if (parallelReadOnlyRequest) {
         const latestUserMessage = nextProject.messages[nextProject.messages.length - 1];
         return { ...current, messages: latestUserMessage ? [...current.messages, latestUserMessage] : current.messages, updatedAt: now() };
       }
@@ -631,7 +660,7 @@ export default function Home() {
       if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
         try {
           const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
-          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await fetch("/api/research", { signal: requestController.signal, method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
@@ -742,7 +771,7 @@ export default function Home() {
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
-              const stageResponse = await fetch("/api/agent", {
+              const stageResponse = await fetch("/api/agent", { signal: requestController.signal,
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -853,6 +882,7 @@ export default function Home() {
                       try {
                         addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
                         const forgeResponse = await fetch("/api/forge", {
+                          signal: requestController.signal,
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
@@ -1020,7 +1050,7 @@ export default function Home() {
           for (let finalAttempt = 1; finalAttempt <= 3 && !finalContentPassSucceeded; finalAttempt++) {
             try {
               const retryNote = finalAttempt === 1 ? "" : " RETRY " + finalAttempt + "/3. The previous final pass failed: " + finalPassError.slice(0, 700) + ". Return a smaller complete file. Do not repeat the whole design description; preserve current controls, remove verbose data/tables, and ensure the entire response is valid and closed.";
-              const finalPassResponse = await fetch("/api/agent", {
+              const finalPassResponse = await fetch("/api/agent", { signal: requestController.signal,
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1058,7 +1088,7 @@ export default function Home() {
           let validationPayload: any = null;
           let validationOk = false;
           for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
-            const validateResponse = await fetch("/api/agent", {
+            const validateResponse = await fetch("/api/agent", { signal: requestController.signal,
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1106,7 +1136,7 @@ export default function Home() {
                     ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
                     : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
                   : "";
-                const repairResponse = await fetch("/api/agent", {
+                const repairResponse = await fetch("/api/agent", { signal: requestController.signal,
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1184,7 +1214,7 @@ export default function Home() {
             : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
           let response: Response;
           try {
-            response = await fetch("/api/agent", {
+            response = await fetch("/api/agent", { signal: requestController.signal,
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1348,6 +1378,7 @@ export default function Home() {
         }
       }
     } catch (error) {
+      if (requestController.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error", { prompt, operation })] };
       setProject(current => {
@@ -1367,11 +1398,14 @@ export default function Home() {
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
-      else setBusy(false);
-      if (operation === "build" || operation === "surprise") {
-        setBuildInProgress(false);
-        setCanQueueBuildRequests(false);
+      const requestWasActive = activeAgentControllers.current.delete(requestId);
+      if (requestWasActive) {
+        if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+        else setBusy(false);
+        if (operation === "build" || operation === "surprise") {
+          setBuildInProgress(false);
+          setCanQueueBuildRequests(false);
+        }
       }
     }
   }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, interactionMode, extendedPlanning, localAgentStatus, localAgentToken, localAgentUrl]);
@@ -1857,6 +1891,7 @@ export default function Home() {
   }
 
   function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]) {
+    cancelAgentWork("Cancelled because you switched to a new project.", false);
     const p = newProject(kind, preferredEngine, projectIntent);
     setProject(p);
     setSection("chat");
@@ -1866,6 +1901,7 @@ export default function Home() {
     setShowNewProjectDialog(false);
     setPreviewOpen(true);
     setExpandedPreview(false);
+    setRuntimeState("idle");
   }
 
   function deleteProject(projectId: string) {
@@ -1889,6 +1925,7 @@ export default function Home() {
   }
 
   function loadPlayableDemo() {
+    cancelAgentWork("Cancelled because you loaded the built-in demo.", false);
     const files = playableDemoFiles();
     const stamp = now();
     const p: GeneProject = {
@@ -2395,7 +2432,7 @@ export default function Home() {
         {projects.filter(p => p.id !== project.id).length > 0 && <details className="sidebar-disclosure">
           <summary><span>Recent projects</span><span className="disclosure-count">{projects.filter(p => p.id !== project.id).length}</span></summary>
           <div className="sidebar-disclosure-content">
-            {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { setProject(p); setSection("chat"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
+            {projects.filter(p => p.id !== project.id).slice(0, 5).map(p => <div key={p.id} className="recent-project-row"><button className="file-row" onClick={() => { cancelAgentWork("Cancelled because you switched chats.", false); setProject(p); setSection("chat"); setRuntimeState("idle"); setNotice(""); }}><span className="file-icon">◌</span><span>{p.name}</span></button><button className="recent-delete" title={"Delete " + p.name} onClick={() => deleteProject(p.id)}>×</button></div>)}
           </div>
         </details>}
         <details className="sidebar-disclosure file-disclosure">
@@ -2552,7 +2589,7 @@ export default function Home() {
                       <option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
-                  </div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                  </div>{(busy || buildInProgress || parallelChatInProgress || queuedRequestCount > 0) && <button type="button" className="stop-button" onClick={() => cancelAgentWork()} aria-label="Stop AI generation and clear queued requests">Stop</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
