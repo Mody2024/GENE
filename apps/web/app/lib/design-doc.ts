@@ -10,6 +10,63 @@ import type { DesignDoc, GeneProject, ProjectKind, Question } from "./types";
 
 type Answers = Record<string, string>;
 
+type GameArchetype = "precision-platformer" | "voxel-sandbox" | "rhythm-runner" | "open-world-adventure" | "story-adventure" | "survival-crafting" | "general";
+
+function detectGameArchetype(text: string): GameArchetype {
+  if (/minecraft|voxel|block.?world|block.?craft/i.test(text)) return "voxel-sandbox";
+  if (/geometry.?dash|rhythm|beat.?sync|music.?platform/i.test(text)) return "rhythm-runner";
+  if (/mario|precision platform|metroidvania|platformer/i.test(text)) return "precision-platformer";
+  if (/open.?world|sandbox|exploration world|large world/i.test(text)) return "open-world-adventure";
+  if (/story|narrative|dialogue|cinematic|adventure/i.test(text)) return "story-adventure";
+  if (/survival|crafting|hunger|resource gathering/i.test(text)) return "survival-crafting";
+  return "general";
+}
+
+const ARCHETYPE_PLANS: Record<GameArchetype, { pillars: string[]; milestones: string[]; risks: string[]; research: string[] }> = {
+  "precision-platformer": {
+    pillars: ["Responsive movement with coyote time and jump buffering where appropriate", "Readable hazards and fair checkpoints", "Levels teach, combine and remix movement skills"],
+    milestones: ["Movement sandbox and jump-feel tuning", "One complete level with hazards, collectibles and restart", "Distinct level set with new mechanic combinations", "Boss or finale, accessibility options and polish"],
+    risks: ["Unfair collision boxes or inconsistent jump timing", "Camera framing hides upcoming hazards", "Difficulty spikes without teaching the mechanic"],
+    research: ["Platformer movement feel and input buffering", "Level pacing, hazard readability and checkpoint placement", "Animation readability and original visual identity"]
+  },
+  "voxel-sandbox": {
+    pillars: ["Editable voxel terrain with stable world coordinates", "Streaming/chunked world and deterministic generation", "Gathering, crafting and exploration that reinforce each other"],
+    milestones: ["Chunked terrain renderer with movement and collision", "Block break/place, inventory and deterministic world seed", "Save/load, chunk streaming and performance budgets", "Crafting/progression, creatures and world events in staged passes"],
+    risks: ["Generating an entire world in one frame", "Save corruption or chunk-coordinate seams", "Unbounded meshes, entities or memory growth"],
+    research: ["Voxel chunk meshing, greedy meshing and terrain LOD", "Seeded procedural generation and chunk persistence", "Inventory/crafting data models and world-save versioning"]
+  },
+  "rhythm-runner": {
+    pillars: ["Gameplay timing follows an authoritative beat clock", "Obstacles communicate rhythm before demanding precision", "Instant restart and consistent hit windows"],
+    milestones: ["Beat clock and fixed song/chart timeline", "One playable song section with hitboxes and restart", "Chart authoring format, difficulty variants and effects", "Calibration options, full menu flow and performance polish"],
+    risks: ["Frame-rate-dependent timing drift", "Audio latency makes inputs feel unfair", "Visual effects obscure hitboxes or beat cues"],
+    research: ["Audio-clock timing versus frame delta", "Input latency calibration and judgment windows", "Chart data formats and accessible rhythm cues"]
+  },
+  "open-world-adventure": {
+    pillars: ["Exploration is rewarded with clear landmarks and discoveries", "Streaming world regions keep memory and frame time bounded", "Quests and traversal systems support the setting"],
+    milestones: ["Small traversable region with landmarks and navigation", "World streaming, interactions and save/load", "Quest/data system and two distinct regions", "Progression, encounters and staged content expansion"],
+    risks: ["World scope grows before the traversal loop is fun", "Long-distance navigation lacks landmarks", "Unbounded asset loading or save data"],
+    research: ["World streaming and spatial partitioning", "Landmark-based navigation and exploration rewards", "Quest-state modeling and incremental save formats"]
+  },
+  "story-adventure": {
+    pillars: ["Player choices have clear, consistent consequences", "Dialogue and objectives remain understandable", "Scenes and pacing support the emotional arc"],
+    milestones: ["Opening scene, controls and first meaningful choice", "Dialogue/quest state system and save/load", "Branching missions with tested state transitions", "Finale, recap and narrative continuity pass"],
+    risks: ["Choice flags become inconsistent across scenes", "Story beats depend on unreachable states", "Cutscenes block controls without recovery"],
+    research: ["Branching narrative state graphs", "Dialogue presentation and accessibility", "Quest flags, save compatibility and scene transitions"]
+  },
+  "survival-crafting": {
+    pillars: ["Gathering feeds useful, legible crafting decisions", "Threat creates pressure without arbitrary punishment", "Resources and progression stay understandable"],
+    milestones: ["Gathering loop and inventory", "Crafting recipes, needs and readable feedback", "Threat cycle, shelter/upgrades and save/load", "Balance pass and optional difficulty settings"],
+    risks: ["Resource grind overwhelms exploration", "Needs systems become busywork", "Progress can soft-lock without recovery"],
+    research: ["Resource economy and recipe graph design", "Survival pacing and fair threat escalation", "Save-safe crafting transactions and inventory invariants"]
+  },
+  general: {
+    pillars: ["One recognizable signature mechanic", "Clear objectives and feedback", "A coherent visual and audio identity"],
+    milestones: ["Playable core loop and controls", "Complete win/loss/restart flow", "Distinct content and progression", "Polish, accessibility and acceptance review"],
+    risks: ["Scope exceeds the selected runtime", "Features look connected but do not share state", "Visual effects hide gameplay information"],
+    research: ["Comparable genre mechanics and player expectations", "Performance constraints for the target platform", "Asset licenses and integration requirements"]
+  }
+};
+
 const GENRE_PATTERNS: Array<[string, RegExp]> = [
   ["platformer", /platform|mario|jump|metroidvania|side.?scroll/i],
   ["runner", /runner|subway|endless|lane|dash|rhythm/i],
