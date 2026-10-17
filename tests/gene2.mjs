@@ -149,6 +149,7 @@ assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"]
 assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
 const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
 assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()") && cloudBuildRoute.includes("inspectProjectFilePaths(files.map(file => file.path))"), "cloud build rejects unsafe, conflicting, case- and Unicode-colliding paths");
+assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html")'), "cloud builds require the exact canonical index.html entry point");
 assert.ok(cloudBuildRoute.includes('method: "DELETE" }).catch(() => null);') && cloudBuildRoute.includes("temporary source branch was cleaned up"), "failed build dispatch attempts to remove the temporary encrypted source branch");
 assert.ok(["Win / loss state hooks", "Restart / reset hooks", "Pause / resume hooks"].every(label => themePage.includes('add("' + label + '"')), "game QA reports recognizable outcome, restart and pause paths without claiming they are playtested");
 const themeLayout = readFileSync(new URL("../apps/web/app/layout.tsx", import.meta.url), "utf8");

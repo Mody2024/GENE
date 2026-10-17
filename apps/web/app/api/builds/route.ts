@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (conflict) return fail("Conflicting project paths: " + conflict.path + " conflicts with " + conflict.duplicateOf + ".");
     return fail("The project contains invalid paths that cannot be packaged safely.");
   }
-  if (!seen.has("index.html")) return fail("The project needs a standalone index.html before it can be packaged.");
+  if (!files.some(file => file.path === "index.html")) return fail("The project needs a standalone lowercase index.html before it can be packaged.");
   const buildId = randomUUID();
   const sourceRef = "gene-build-" + buildId;
   const encrypted = encrypt({
