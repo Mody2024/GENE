@@ -200,6 +200,6 @@ assert.ok(themePage.includes("IDEAS, BROUGHT TO LIFE"), "GENE welcome screen car
 assert.ok(themeLayout.includes('data-theme="light"'), "the document starts light to avoid a dark first-paint flash");
 assert.ok(themeCss.includes("--studio-accent:#3e795f") && themeCss.includes("rgba(211,166,82,.07)"), "GENE light theme uses restrained green and warm-gold identity tokens");
 assert.ok(themeCss.includes("--studio-accent:#b7d9c2") && themeCss.includes("rgba(211,166,82,.055)") && !themeCss.includes("#bbb2ff"), "dark theme uses muted forest-green and warm-gold tokens instead of the old purple accent");
-assert.ok(themePage.includes("GENE genie-inspired mark") && themePage.includes("gene-logo-spark") && themePage.includes("gene-logo-orbit"), "GENE brand mark uses a restrained wish-star and orbit rather than a generic letter alone");
+assert.ok(themePage.includes("GENE genie lamp and wish spark mark") && themePage.includes("gene-logo-spark") && themePage.includes("gene-logo-orbit") && themePage.includes("viewBox=\"0 0 48 48\""), "GENE brand mark uses a custom genie lamp, wish spark and orbit");
 assert.ok(themeCss.includes(".studio-v2 .brand:focus-visible"), "the brand home control has a visible keyboard focus state");
 console.log("GENE light-first genie identity tests passed.");
