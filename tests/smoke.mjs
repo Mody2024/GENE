@@ -73,6 +73,7 @@ assert.ok(providers.includes("options.signal?.aborted || attempts >="), "the fal
 assert.ok(api.includes("signal: request.signal") && api.includes("if (request.signal.aborted) return new Response(null, { status: 499"), "main and independent reviewer fallback calls respect cancellation");
 assert.ok(page.includes("function cancelAgentWork") && page.includes("activeAgentControllers") && page.includes("aria-label=\"Stop AI generation and clear queued requests\""), "the workspace exposes a stop control and tracks cancellable AI requests");
 assert.ok(page.includes("cancelAgentWork(\"Cancelled because you switched to a new project.\""), "starting a new project cancels in-flight work from the previous chat");
+assert.ok(page.includes('fetch("/api/forge", {\n                          signal: requestController.signal'), "asset generation is also aborted when the user stops or switches chats");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
