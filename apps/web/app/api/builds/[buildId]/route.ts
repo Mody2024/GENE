@@ -5,8 +5,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 const API = "https://api.github.com";
 const REPO = (process.env.GENE_BUILD_REPOSITORY || "Mody2024/GENE").split("/");
-function fail(message: string, status = 400) {
-  return NextResponse.json({ ok: false, error: { message } }, { status, headers: { "Cache-Control": "no-store" } });
+function fail(message: string, status = 400, code?: string) {
+  return NextResponse.json({ ok: false, error: { ...(code ? { code } : {}), message } }, { status, headers: { "Cache-Control": "no-store" } });
 }
 async function gh(url: string, token: string) {
   return fetch(API + url, {
