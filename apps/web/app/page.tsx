@@ -170,6 +170,7 @@ export default function Home() {
   const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
   const [queuedRequestCount, setQueuedRequestCount] = useState(0);
   const pendingBuildRequests = useRef<string[]>([]);
+  const activeAgentControllers = useRef<Map<string, { controller: AbortController; projectId: string }>>(new Map());
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -542,6 +543,21 @@ export default function Home() {
     setActivity(prev => [new Date().toLocaleTimeString() + "  " + level + " · " + safeEntry, ...prev].slice(0, 100));
   };
 
+  function cancelAgentWork(reason = "Stopped by you.", showNotice = true) {
+    for (const entry of activeAgentControllers.current.values()) entry.controller.abort();
+    activeAgentControllers.current.clear();
+    pendingBuildRequests.current = [];
+    setQueuedRequestCount(0);
+    setBusy(false);
+    setBuildInProgress(false);
+    setCanQueueBuildRequests(false);
+    setParallelChatInProgress(false);
+    if (showNotice) {
+      setNotice(reason + " Any in-flight generation was cancelled; saved files remain unchanged unless already committed.");
+      addActivity(reason);
+    }
+  }
+
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
     const prompt = text.trim();
@@ -565,6 +581,10 @@ export default function Home() {
     if (busy && !canChatDuringBuild) return;
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
+    const requestId = uid();
+    const requestController = new AbortController();
+    const requestProjectId = project.id;
+    activeAgentControllers.current.set(requestId, { controller: requestController, projectId: requestProjectId });
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -631,7 +651,7 @@ export default function Home() {
       if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
         try {
           const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
-          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await fetch("/api/research", { signal: requestController.signal, method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
@@ -742,7 +762,7 @@ export default function Home() {
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
-              const stageResponse = await fetch("/api/agent", {
+              const stageResponse = await fetch("/api/agent", { signal: requestController.signal,
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1020,7 +1040,7 @@ export default function Home() {
           for (let finalAttempt = 1; finalAttempt <= 3 && !finalContentPassSucceeded; finalAttempt++) {
             try {
               const retryNote = finalAttempt === 1 ? "" : " RETRY " + finalAttempt + "/3. The previous final pass failed: " + finalPassError.slice(0, 700) + ". Return a smaller complete file. Do not repeat the whole design description; preserve current controls, remove verbose data/tables, and ensure the entire response is valid and closed.";
-              const finalPassResponse = await fetch("/api/agent", {
+              const finalPassResponse = await fetch("/api/agent", { signal: requestController.signal,
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1058,7 +1078,7 @@ export default function Home() {
           let validationPayload: any = null;
           let validationOk = false;
           for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
-            const validateResponse = await fetch("/api/agent", {
+            const validateResponse = await fetch("/api/agent", { signal: requestController.signal,
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1106,7 +1126,7 @@ export default function Home() {
                     ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
                     : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
                   : "";
-                const repairResponse = await fetch("/api/agent", {
+                const repairResponse = await fetch("/api/agent", { signal: requestController.signal,
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1184,7 +1204,7 @@ export default function Home() {
             : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
           let response: Response;
           try {
-            response = await fetch("/api/agent", {
+            response = await fetch("/api/agent", { signal: requestController.signal,
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1348,6 +1368,7 @@ export default function Home() {
         }
       }
     } catch (error) {
+      if (requestController.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error", { prompt, operation })] };
       setProject(current => {
@@ -1367,11 +1388,14 @@ export default function Home() {
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
-      else setBusy(false);
-      if (operation === "build" || operation === "surprise") {
-        setBuildInProgress(false);
-        setCanQueueBuildRequests(false);
+      const requestWasActive = activeAgentControllers.current.delete(requestId);
+      if (requestWasActive) {
+        if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+        else setBusy(false);
+        if (operation === "build" || operation === "surprise") {
+          setBuildInProgress(false);
+          setCanQueueBuildRequests(false);
+        }
       }
     }
   }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, interactionMode, extendedPlanning, localAgentStatus, localAgentToken, localAgentUrl]);
@@ -1857,6 +1881,7 @@ export default function Home() {
   }
 
   function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]) {
+    cancelAgentWork("Cancelled because you switched to a new project.", false);
     const p = newProject(kind, preferredEngine, projectIntent);
     setProject(p);
     setSection("chat");
@@ -2552,7 +2577,7 @@ export default function Home() {
                       <option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
-                  </div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                  </div>{(busy || buildInProgress || parallelChatInProgress || queuedRequestCount > 0) && <button type="button" className="stop-button" onClick={() => cancelAgentWork()} aria-label="Stop AI generation and clear queued requests">Stop</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
