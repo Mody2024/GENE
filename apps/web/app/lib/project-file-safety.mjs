@@ -4,15 +4,15 @@
  * thing in the browser, ZIP, Windows installer and Android packaging pipeline.
  */
 const MAX_PATH_LENGTH = 240;
-const INVALID_CONTROL = /[\\u0000-\\u001f\\u007f-\\u009f\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]/u;
-const WINDOWS_RESERVED = /^(?:CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|COM[1-9¹²³]|LPT[1-9¹²³])$/u;
+const INVALID_CONTROL = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+const WINDOWS_RESERVED = /^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])$/u;
 
 export function normalizeProjectFilePath(value) {
   if (typeof value !== "string") return { ok: false, error: "File path must be a string." };
   const path = value;
   if (!path || !path.trim()) return { ok: false, error: "File path cannot be empty." };
   if (path.length > MAX_PATH_LENGTH) return { ok: false, error: "File path exceeds the portable 240-character limit." };
-  if (path.includes("\\\\")) return { ok: false, error: "Use forward slashes in project paths; backslashes are not portable." };
+  if (path.includes("\\")) return { ok: false, error: "Use forward slashes in project paths; backslashes are not portable." };
   if (path.startsWith("/") || /^[a-zA-Z]:/.test(path)) return { ok: false, error: "Absolute paths are not allowed; use a project-relative path." };
   if (INVALID_CONTROL.test(path)) return { ok: false, error: "File path contains a control or bidirectional override character." };
 
