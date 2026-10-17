@@ -99,11 +99,13 @@ const skippedRun = createBuildRun({
   tasks: [{ id: "required-check", title: "Required check", kind: "test", acceptance: ["must pass"] }]
 });
 const skippedResult = setTaskStatus(skippedRun, "required-check", "skipped", "2026-10-17T12:00:01.000Z");
+assert.throws(() => setTaskStatus(skippedRun, "required-check", "passed", "2026-10-17T12:00:01.000Z"), /Invalid task status transition/, "queued tasks cannot be marked passed without running");
 assert.notEqual(skippedResult.status, "completed", "a skipped required task must not produce completed status");
 assert.equal(skippedResult.status, "needs-input", "skipped work should require an explicit decision");
 const startedRun = setTaskStatus(skippedRun, "required-check", "running", "2026-10-17T12:00:01.000Z");
 const passedRun = setTaskStatus(startedRun, "required-check", "passed", "2026-10-17T12:00:02.000Z");
 assert.equal(passedRun.status, "completed", "a task that actually passes may complete the build");
+assert.throws(() => setTaskStatus(passedRun, "required-check", "failed", "2026-10-17T12:00:03.000Z"), /Invalid task status transition/, "a passed task cannot be retroactively marked failed in the same run");
 console.log("GENE build-orchestrator completion-state tests passed.");
 
 

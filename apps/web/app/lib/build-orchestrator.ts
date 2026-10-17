@@ -107,6 +107,19 @@ export function setTaskStatus(
 ): BuildRun {
   const target = run.tasks.find((task) => task.id === taskId);
   if (!target) throw new Error(`Unknown build task "${taskId}".`);
+  if (target.status !== status) {
+    const allowedNext: Record<BuildTask["status"], BuildTask["status"][]> = {
+      queued: ["running", "blocked", "skipped"],
+      running: ["queued", "passed", "failed", "blocked"],
+      passed: [],
+      failed: ["queued"],
+      blocked: ["queued"],
+      skipped: [],
+    };
+    if (!allowedNext[target.status].includes(status)) {
+      throw new Error(`Invalid task status transition for "${taskId}": ${target.status} → ${status}.`);
+    }
+  }
   if (status === "running" && !getReadyTasks(run).some((task) => task.id === taskId) && target.status !== "running") {
     throw new Error(`Task "${taskId}" is not ready; its dependencies must pass first.`);
   }
