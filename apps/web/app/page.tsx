@@ -825,7 +825,7 @@ export default function Home() {
                   const isRuntimeLoadablePath = (path: string) =>
                     /\.(?:m?js|cjs)$/i.test(path) ||
                     /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
-                  const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
+                  let safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
                     safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
                   ))].slice(0, 96);
                   const omittedUnsupportedAssets = candidates.filter((path: unknown) =>
