@@ -174,6 +174,7 @@ assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: 
 assert.ok(themePage.includes("/\\.(?:m?js|cjs)$/i.test(path)") && themePage.includes("syntaxFiles.length + \" JavaScript file(s) parse without executing them.\""), "workspace syntax QA checks every JavaScript module rather than only game.js");
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
 assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
+assert.ok(themePage.includes("const allJavaScript = fileEntries.filter(([path, source]) => /\\.(?:m?js|cjs)$/i.test(path)"), "external-runtime and inline-script checks inspect CommonJS modules too");
 const cloudBuildRoute = readFileSync(new URL("../apps/web/app/api/builds/route.ts", import.meta.url), "utf8");
 assert.ok(cloudBuildRoute.includes("normalizeProjectFilePath(value)") && cloudBuildRoute.includes("path.normalize(\"NFC\").toLowerCase()") && cloudBuildRoute.includes("inspectProjectFilePaths(files.map(file => file.path))"), "cloud build rejects unsafe, conflicting, case- and Unicode-colliding paths");
 assert.ok(cloudBuildRoute.includes('files.some(file => file.path === "index.html")'), "cloud builds require the exact canonical index.html entry point");
