@@ -298,9 +298,28 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
   };
 }
 
-/** Compact JSON for model context. */
+/** Compact, valid JSON for model context. Never truncate serialized JSON mid-token. */
 export function formatDesignDoc(doc: DesignDoc | null | undefined): string {
   if (!doc) return "No approved design document yet.";
-  const { createdAt: _createdAt, ...rest } = doc;
-  return JSON.stringify(rest).slice(0, 3800);
+  const compact = {
+    version: doc.version,
+    title: doc.title.slice(0, 120),
+    pitch: doc.pitch.slice(0, 320),
+    genre: doc.genre,
+    audience: doc.audience.slice(0, 120),
+    platform: doc.platform.slice(0, 100),
+    camera: doc.camera,
+    controls: doc.controls.slice(0, 180),
+    pillars: doc.pillars.slice(0, 5).map(item => item.slice(0, 180)),
+    coreLoop: doc.coreLoop.slice(0, 8).map(item => item.slice(0, 180)),
+    content: doc.content,
+    art: { style: doc.art.style.slice(0, 100), palette: doc.art.palette.slice(0, 6) },
+    audio: { mood: doc.audio.mood.slice(0, 80), notes: doc.audio.notes.slice(0, 220) },
+    scope: doc.scope,
+    milestones: doc.milestones.slice(0, 8).map(item => item.slice(0, 180)),
+    risks: doc.risks.slice(0, 6).map(item => item.slice(0, 180)),
+    researchBrief: doc.researchBrief.slice(0, 10).map(item => item.slice(0, 240)),
+    assetPlan: doc.assetPlan.slice(0, 6).map(item => ({ id: item.id, kind: item.kind, prompt: item.prompt.slice(0, 180) }))
+  };
+  return JSON.stringify(compact);
 }
