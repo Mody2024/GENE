@@ -25,10 +25,14 @@ function isHttpsUrl(value, allowedHost) {
 }
 
 function isWorkflowRunUrl(value) {
-  if (!isHttpsUrl(value, "github.com")) return false;
+  if (typeof value !== "string" || value.length > 2048) return false;
   try {
     const url = new URL(value);
-    return /^\\/[^/]+\\/[^/]+\\/actions\\/runs\\/\\d+\\/?$/.test(url.pathname) && !url.search && !url.hash;
+    if (url.protocol !== "https:" || url.hostname !== "github.com" || url.username || url.password || url.search || url.hash) return false;
+    const parts = url.pathname.split("/").filter(Boolean);
+    return parts.length === 5 && /^[A-Za-z0-9-]+$/.test(parts[0]) &&
+      /^[A-Za-z0-9_.-]+$/.test(parts[1]) && parts[2] === "actions" &&
+      parts[3] === "runs" && /^\d+$/.test(parts[4]);
   } catch {
     return false;
   }
