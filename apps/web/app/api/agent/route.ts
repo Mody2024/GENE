@@ -626,7 +626,7 @@ export async function POST(request: NextRequest) {
   };
   const startedAt = Date.now();
   const totalBudgetMs = 52_000;
-  const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 34_000 : totalBudgetMs;
+  const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
     const attempt = queued.shift()!;
@@ -745,7 +745,29 @@ export async function POST(request: NextRequest) {
       perCallMs: 7_000,
       maxAttempts: 7,
       siteTitle: "GENE Builder",
-      validate: text => extractJsonObjectText(text) !== null
+      validate: text => {
+        const json = extractJsonObjectText(text);
+        if (!json) return false;
+        try {
+          const value = JSON.parse(json);
+          if (!value || typeof value !== "object" || typeof value.reply !== "string" || !value.reply.trim()) return false;
+          if (body.operation === "plan" && (!value.plan || typeof value.plan !== "object")) return false;
+          if (body.operation === "interview" && !value.question && !value.plan) return false;
+          if (["build", "surprise"].includes(body.operation)) {
+            if (!value.plan || !Array.isArray(value.files)) return false;
+            const paths = new Set(value.files.map((file: any) => file?.path));
+            if (!["game.html", "game.css", "game.js", "game-spec.json"].every(path => paths.has(path))) return false;
+          }
+          if (body.operation === "buildPart") {
+            return Array.isArray(value.files) && value.files.length === 1 &&
+              value.files[0]?.path === body.stagePath && typeof value.files[0]?.content === "string" &&
+              value.files[0].content.trim().length > 40;
+          }
+          if (body.operation === "edit" && (!Array.isArray(value.files) || value.files.length === 0)) return false;
+          if (["chat", "research", "enhancePrompt"].includes(body.operation) && typeof value.reply !== "string") return false;
+          return true;
+        } catch { return false; }
+      }
     });
     if (chain.ok) {
       payload = { candidates: [{ content: { parts: [{ text: extractJsonObjectText(chain.text) as string }] }, finishReason: "STOP" }] };

@@ -49,6 +49,8 @@ assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACIT
 assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter key, rate-limit and exhaustion failures are reported distinctly");
 assert.ok(api.includes("runAlternateChain") && !api.includes("GENE_OPENROUTER_MODEL"), "OpenRouter fallback uses the free-model router, not a hard-coded model override");
 assert.ok(api.includes("perCallMs: 7_000") && api.includes("maxAttempts: 7"), "fallback chain uses shorter bounded calls to try more free models within the serverless budget");
+assert.ok(api.includes("? 25_000 : totalBudgetMs"), "Gemini primary attempts leave a larger reserved window for backup providers");
+assert.ok(api.includes("value.files[0]?.path === body.stagePath") && api.includes("paths.has(path)"), "alternate model candidates are rejected and retried unless they satisfy the requested file contract");
 assert.ok(page.includes("GENE only uses free AI models") && page.includes("OPENROUTER_FALLBACK_FAILED"), "provider failures are explained in plain language and stay free-only");
 assert.ok(page.includes("AUTOMATIC RECOVERY RETRY") && page.includes("retryableCodes") && page.includes("Retry request"), "transient failures receive bounded automatic retries and failed messages expose a manual retry action");
 assert.ok(page.includes("msg.retry!.prompt") && page.includes("Your last saved files are preserved"), "manual retry reuses the failed request context without discarding the current project");
