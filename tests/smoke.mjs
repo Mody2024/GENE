@@ -561,6 +561,7 @@ assert.ok(page.includes("const knownIds = new Set(current.messages.map(item => i
 assert.ok(page.includes("finalContentPassSucceeded ? \"completed\" : \"failed\""), "build status cannot report full completion when the final expansion pass failed");
 
 assert.ok(page.includes("const moduleScripts = Object.entries(project.files)") && page.includes("window.GeneModules"), "generated browser modules are loaded in the live preview and have a documented shared namespace");
+assert.ok(page.includes("/\\.(?:m?js|cjs)$/i.test(path)") && page.includes("/\\.(?:m?js|cjs)$/i.test(stagePath)") && page.includes("replace(/\\.(?:m?js|cjs)$/i, \"\" )") === false, "preview, export and staged module paths share the supported JavaScript extension contract");
 assert.ok(prompts.includes("must not use import/export syntax") && prompts.includes("window.GeneModules"), "generated modules follow the live preview's script-loading contract");
 assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/script>" : "")'), "generated modules are injected before the core runtime in both app and game previews");
 

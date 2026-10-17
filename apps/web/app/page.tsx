@@ -128,7 +128,7 @@ function importProjectPaths(files: Record<string, string>, kind: ProjectKind) {
 /** Ordered exported paths of every project script except the main one, so extra modules load in exports too. */
 function moduleScriptPaths(files: Record<string, string>, kind: ProjectKind): string[] {
   return Object.keys(files)
-    .filter(path => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
+    .filter(path => path !== "game.js" && /\.(?:m?js|cjs)$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
     .sort((a, b) => a.localeCompare(b))
     .map(path => exportProjectPath(path, kind));
 }
@@ -407,7 +407,7 @@ export default function Home() {
     if (!project || !project.files["game.html"] || !project.files["game.js"]) return "";
     // Load generated modules into the same sandboxed runtime as the core game/app.
     const moduleScripts = Object.entries(project.files)
-      .filter(([path]) => path !== "game.js" && /\.js$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
+      .filter(([path]) => path !== "game.js" && /\.(?:m?js|cjs)$/i.test(path) && !/(^|\/)node_modules\//i.test(path))
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([path, source]) => "/* GENE module: " + path + " */\n" + source.replace(/<\/script/gi, "<\\/script"))
       .join("\n;\n");
@@ -702,8 +702,8 @@ export default function Home() {
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features."
-                : /\.js$/i.test(stagePath) && stagePath !== "game.js"
-                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.js$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
+                : /\.(?:m?js|cjs)$/i.test(stagePath) && stagePath !== "game.js"
+                  ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.(?:m?js|cjs)$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs."
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". Return a smaller complete replacement file from scratch. Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
@@ -788,7 +788,7 @@ export default function Home() {
                     return new Set(["json","js","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"]).has(extension);
                   };
                   const isRuntimeLoadablePath = (path: string) =>
-                    /\.js$/i.test(path) ||
+                    /\.(?:m?js|cjs)$/i.test(path) ||
                     /^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json)$/i.test(path);
                   const safeManifest = [...new Set(candidates.filter((path: unknown): path is string =>
                     safe(path) && !core.has(path) && isRuntimeLoadablePath(path)
