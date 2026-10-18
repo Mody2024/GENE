@@ -29,7 +29,7 @@ export function parseFreeCatalog(payload) {
   for (const raw of data) {
     const item = raw;
     if (typeof item?.id !== "string" || !item.id) continue;
-    if (item.id === "openrouter/auto" || item.id.startsWith("openrouter/")) continue;
+    if (item.id !== "openrouter/free" && (item.id === "openrouter/auto" || item.id.startsWith("openrouter/"))) continue;
     if (!isZeroPrice(item.pricing?.prompt) || !isZeroPrice(item.pricing?.completion)) continue;
     if (item.pricing?.request !== undefined && item.pricing?.request !== null && !isZeroPrice(item.pricing.request)) continue;
     const outputs = item.architecture?.output_modalities;
