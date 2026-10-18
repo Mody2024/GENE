@@ -734,6 +734,7 @@ export async function POST(request: NextRequest) {
   // prices are zero, and rotates through Groq plus those free models. It never calls a model
   // that is not verified free, to avoid unexpected provider charges.
   let chainTried: string[] = [];
+  let chainDiagnostics: string[] = [];
   if (!payload && hasAlternateProviderKeys()) {
     const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
     const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
@@ -781,6 +782,7 @@ export async function POST(request: NextRequest) {
       lastFailure = { status: chain.failure.status, detail: chain.failure.detail };
       if (chain.failure.provider !== "none") lastFailureProvider = chain.failure.provider;
       chainTried = chain.triedModels;
+      chainDiagnostics = chain.attemptDetails || [];
       if (chain.truncated) outputFailure = "truncated";
       else if (chain.malformed) outputFailure = "malformed";
     }
@@ -788,7 +790,10 @@ export async function POST(request: NextRequest) {
 
   if (!payload) {
     if (chainTried.length) {
-      const detail = lastFailure.detail || "No additional provider detail was returned.";
+      const detail = [
+        lastFailure.detail || "No additional provider detail was returned.",
+        chainDiagnostics.length ? "Per-model diagnostics: " + chainDiagnostics.join(" | ") : ""
+      ].filter(Boolean).join(" | ").slice(0, 1_600);
       const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). ";
       if (lastFailure.status === 401 || lastFailure.status === 403) {
         return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
