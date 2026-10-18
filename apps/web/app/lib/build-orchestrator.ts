@@ -62,16 +62,26 @@ export function createBuildRun(intent: BuildIntent): BuildRun {
   }
   assertAcyclic(intent.tasks.map((task) => ({ id: task.id, dependsOn: task.dependsOn ?? [] })));
   const now = isoNow(intent.now);
-  const tasks: BuildTask[] = intent.tasks.map((task) => ({
-    id: task.id,
-    title: task.title,
-    kind: task.kind,
-    status: "queued",
-    dependsOn: task.dependsOn ?? [],
-    attempts: 0,
-    files: task.files ?? [],
-    acceptance: task.acceptance,
-  }));
+  // Task titles are human-readable process names shown in the project UI.
+  // Keep them unique per run even when an AI planner repeats a generic label.
+  const titleCounts = new Map<string, number>();
+  const tasks: BuildTask[] = intent.tasks.map((task) => {
+    const baseTitle = task.title.trim();
+    const key = baseTitle.toLocaleLowerCase();
+    const count = (titleCounts.get(key) ?? 0) + 1;
+    titleCounts.set(key, count);
+    const title = count === 1 ? baseTitle : baseTitle + " (" + count + ")";
+    return {
+      id: task.id,
+      title,
+      kind: task.kind,
+      status: "queued",
+      dependsOn: task.dependsOn ?? [],
+      attempts: 0,
+      files: task.files ?? [],
+      acceptance: task.acceptance,
+    };
+  });
   return {
     id: `build-${intent.projectId}-${Date.parse(now).toString(36)}`,
     status: "planning",
@@ -135,7 +145,9 @@ export function setTaskStatus(
   if (!target) throw new Error(`Unknown build task "${taskId}".`);
   if (target.status !== status) {
     const allowedNext: Record<BuildTask["status"], BuildTask["status"][]> = {
-      queued: ["running", "blocked", "skipped"],
+      // Validation can reject a queued task before the coordinator starts it.
+      // Record that failure directly instead of throwing a second transition error.
+      queued: ["running", "failed", "blocked", "skipped"],
       running: ["queued", "passed", "failed", "blocked"],
       passed: [],
       failed: ["queued"],

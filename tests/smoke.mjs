@@ -546,6 +546,19 @@ const baseRun = coordinator.createBuildRun({
   fullGameContent: ["Extra missions", "Distinct ending"]
 });
 assert.deepEqual(coordinator.getReadyTasks(baseRun).map(task => task.id), ["design"], "only dependency-ready tasks may start");
+const duplicateNameRun = coordinator.createBuildRun({
+  projectId: "unique-process-names",
+  tasks: [
+    { id: "design-a", title: "Generate level", kind: "design", acceptance: ["Level plan exists"] },
+    { id: "design-b", title: "Generate level", kind: "design", acceptance: ["Second level plan exists"] },
+    { id: "design-c", title: "generate LEVEL", kind: "design", acceptance: ["Third level plan exists"] }
+  ]
+});
+assert.deepEqual(duplicateNameRun.tasks.map(task => task.title), ["Generate level", "Generate level (2)", "generate LEVEL (3)"], "repeated build process names are made unique case-insensitively within a project run");
+const queuedValidationFailure = coordinator.setTaskStatus(baseRun, "design", "failed", undefined, "Preflight validation rejected assembled files");
+assert.equal(queuedValidationFailure.tasks.find(task => task.id === "design").status, "failed", "queued preflight validation failures are recorded without throwing a second transition error");
+assert.match(queuedValidationFailure.tasks.find(task => task.id === "design").lastError, /Preflight validation rejected/, "preflight failure keeps the original diagnostic");
+
 assert.throws(() => coordinator.createBuildRun({ projectId: "cycle", tasks: [
   { id: "a", title: "A", kind: "design", dependsOn: ["b"], acceptance: [] },
   { id: "b", title: "B", kind: "implement", dependsOn: ["a"], acceptance: [] }
@@ -649,8 +662,11 @@ assert.ok(api.includes("const original = String(body.message || body.project?.in
 
 assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
 
-assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
+assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Include only neighboring source needed for integration"), "staged generation may return manifest paths and receives the source needed to integrate modules");
 assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
+assert.ok(prompts.includes("TEXT-BASED GAME CONTRACT") && prompts.includes("multiple endings") && prompts.includes("player agency"), "text-first games require meaningful branching, persistent choices and endings");
+assert.ok(prompts.includes("GENE PROCESS NAMING CONTRACT") && prompts.includes("unique within a project/run") && prompts.includes("project process/module registry"), "generated process titles and modules must remain uniquely named and tracked");
+assert.ok(prompts.includes("ADAPTIVE GAME SOUND AND VOICE-OVER CONTRACT") && prompts.includes("SpeechSynthesis") && prompts.includes("cancel previous utterances"), "game narration supports optional browser voice-over with lifecycle cleanup and safe fallbacks");
 assert.ok(prompts.includes("audio metadata to game-spec.json") && prompts.includes("implementation=procedural-web-audio or asset-backed") && prompts.includes("buses master/music/sfx/ambience/ui") && prompts.includes("uiConfirm/playSfx") && prompts.includes("outcome/playSfx"), "audio metadata prompt describes the implementation, buses and named events without fragile quote escaping");
 assert.ok(prompts.includes("AudioContext") && prompts.includes("setMusicVolume") && prompts.includes("setSfxVolume") && prompts.includes("playSfx(eventName, options)"), "game prompts require an integrated audio manager with real music, SFX and volume controls");
 assert.ok(prompts.includes("read and honor its enabled flag, bus names, volume defaults, and event map") && prompts.includes("preserve user-edited audio settings across regeneration"), "generated games must consume and preserve settings authored in Audio Studio");
@@ -834,3 +850,7 @@ assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelli
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");
 assert.ok(prompts.includes("INTERVIEW COMPLETION GATE") && prompts.includes("DETAILED EDIT PRESERVATION"), "interview completion and targeted-edit requirements are explicit in the model contract");
+assert.ok(prompts.includes("STAGE_CONTEXT_BUDGET = 14_000"), "staged generation has a strict total context budget so large projects do not overflow free models");
+assert.ok(prompts.includes("stageContextUsed") && prompts.includes("middle omitted to fit staged context budget"), "oversized neighboring source files are compacted deterministically while preserving declarations and exports");
+assert.ok(prompts.includes('path === stagePath ? -1') && prompts.includes('path === "game-spec.json" ? 0'), "stage prompts prioritize the target file and required spec before neighboring source");
+
