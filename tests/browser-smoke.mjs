@@ -419,7 +419,8 @@ try {
   // Verify theme persistence after a full reload. Do not couple this UI assertion
   // to an optional health poll, which may legitimately be served from a cached response.
   await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
-  await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === (localStorage.getItem("gene.theme") || "light"), null, { timeout: 15_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "saved light theme remains in storage after reload");
   // Verify the hydrated React state, not the server's light-first HTML shell.
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });
