@@ -549,6 +549,22 @@ const recovered = coordinator.recoverFromCheckpoint(checkpointRun, checkpointRun
 assert.equal(recovered.files["game.js"], "known-good", "recovery restores the checkpoint source snapshot");
 assert.equal(recovered.run.tasks.find(task => task.id === "design").status, "passed", "recovery preserves completed tasks");
 assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queued", "recovery requeues unfinished tasks");
+let retainedCheckpointRun = checkpointRun;
+for (let index = 0; index < 12; index += 1) {
+  retainedCheckpointRun = coordinator.checkpointBuild(
+    retainedCheckpointRun,
+    { "game.js": "snapshot-" + index },
+    { passed: ["design"], failed: [] },
+    "task-complete",
+    "checkpoint " + index,
+    "2026-01-01T00:00:" + String(index + 1).padStart(2, "0") + ".000Z"
+  );
+}
+const retainedIds = retainedCheckpointRun.checkpoints.map((checkpoint) => checkpoint.id);
+assert.equal(retainedIds.length, 8, "checkpoint history remains bounded");
+assert.equal(new Set(retainedIds).size, retainedIds.length, "checkpoint IDs stay unique after old snapshots are pruned");
+assert.ok(Number(retainedIds.at(-1).match(/-(\d+)$/)?.[1]) > 8, "checkpoint sequence keeps increasing beyond the retention window");
+
 assert.equal(baseRun.prototype.targetMinutes, undefined, "prototype duration stays project-specific when no estimate is supplied");
 assert.equal(baseRun.fullGame.targetMinutes, undefined, "full-game duration stays project-specific when no estimate is supplied");
 console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");
