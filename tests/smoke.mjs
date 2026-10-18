@@ -11,6 +11,8 @@ const rootPackage = JSON.parse(read("package.json"));
 const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
+const providers = read("apps/web/app/lib/providers.ts");
+const providerUtils = read("apps/web/app/lib/provider-utils.mjs");
 const publishApi = read("apps/web/app/api/publish/route.ts");
 const buildApi = read("apps/web/app/api/builds/route.ts");
 const buildStatusApi = read("apps/web/app/api/builds/[buildId]/route.ts");
@@ -70,6 +72,9 @@ assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit an
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
 assert.ok(api.includes("attempts < 8"), "fallback attempts remain bounded");
+assert.ok(providerUtils.includes("lyria|audio|music") && providerUtils.includes("outputs.some(modality => modality !== \"text\")"), "free music/audio endpoints cannot enter the chat/code fallback pool");
+assert.ok(providers.includes("attemptDetails.push") && api.includes("Per-model diagnostics:"), "fallback failures expose per-model reasons instead of only the final error");
+
 
 assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
