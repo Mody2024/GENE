@@ -1041,6 +1041,61 @@ export async function POST(request: NextRequest) {
     const titleCandidates = [result.plan?.title, body.project?.plan?.title, body.project?.name, body.project?.initialPrompt, body.message];
     result.files = ensureProjectSpecTitle(result.files || [], titleCandidates);
     const enforceAudioForThisResponse = !["edit", "chat", "buildPart", "interview", "plan", "research"].includes(body.operation);
+    // If the full-game lexical analyzer catches cross-module globals or out-of-scope names,
+    // give a backup model one bounded repair pass before rejecting the whole generated project.
+    // Accept changes only when every executable module parses and the complete project passes again.
+    if (projectKind === "game" && ["build", "surprise"].includes(body.operation) &&
+        Array.isArray(result.files) && hasAlternateProviderKeys() &&
+        Date.now() - startedAt < totalBudgetMs - 9_000) {
+      const scopeAudit = analyzeProjectScripts(result.files, { scopeChecks: true });
+      if (scopeAudit.errors.length) {
+        try {
+          const affectedPaths = [...new Set(scopeAudit.errors.map(issue => issue.path))];
+          const repairableFiles = result.files.filter(file => affectedPaths.includes(file.path) && /\.(?:m?js|cjs)$/i.test(file.path));
+          const projectMap = Object.fromEntries(result.files.map(file => [file.path, file.content]));
+          const scopeRepair = await runAlternateChain({
+            system: "You are GENE's cross-module integration repair tool. Fix only the reported undeclared/out-of-scope JavaScript identifiers and module API wiring. Files load as separate classic scripts: a local const/let inside game.js or an IIFE is NOT visible inside src/*.js. Do not depend on another file's private variables. Use the documented window.GeneModules APIs or define state locally in the owning module and expose a small explicit API. Preserve the requested game, genre, mechanics, controls and visual design. Return one JSON object {reply:string,files:[{path:string,content:string}]}, with complete replacements only for the affected paths. No markdown.",
+            user: "Repair these full-project static safety findings before GENE saves this game. Findings:\n" +
+              JSON.stringify(scopeAudit.errors.map(issue => ({ path: issue.path, name: issue.name, kind: issue.kind, message: issue.message }))) +
+              "\nProject file paths and module contracts:\n" +
+              JSON.stringify({ files: Object.keys(projectMap), architecture: (() => { try { return JSON.parse(projectMap["game-spec.json"] || "{}").architecture || null; } catch { return null; } })() }) +
+              "\nAffected source files:\n" +
+              JSON.stringify(repairableFiles.map(file => ({ path: file.path, content: file.content.slice(0, 42000) }))),
+            maxTokens: 7_000,
+            temperature: 0,
+            json: true,
+            deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 8_000),
+            signal: request.signal,
+            perCallMs: 4_000,
+            maxAttempts: 2,
+            groqLimit: 1,
+            openrouterLimit: 2,
+            siteTitle: "GENE Module Integration Repair",
+            validate: text => extractJsonObjectText(text) !== null
+          });
+          if (scopeRepair.ok) {
+            const repairResult = JSON.parse(extractJsonObjectText(scopeRepair.text) as string);
+            const allowedPaths = new Set(affectedPaths);
+            if (Array.isArray(repairResult.files) && repairResult.files.length > 0 &&
+                repairResult.files.every((file: any) => file && allowedPaths.has(file.path) &&
+                  /\.(?:m?js|cjs)$/i.test(file.path) && typeof file.content === "string" && file.content.length > 0)) {
+              const replacements = new Map<string, string>(repairResult.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
+              const candidates = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
+              const syntaxOk = candidates.filter(file => /\.(?:m?js|cjs)$/i.test(file.path)).every(file => {
+                try { new Function(file.content); return true; } catch { return false; }
+              });
+              const reAudit = syntaxOk ? analyzeProjectScripts(candidates, { scopeChecks: true }) : null;
+              if (reAudit && reAudit.errors.length === 0) {
+                result.files = candidates;
+                result.reply += "\n\nGENE repaired cross-module identifier/API wiring and re-ran the full project safety audit successfully.";
+              }
+            }
+          }
+        } catch {
+          if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+        }
+      }
+    }
     const files = validateFiles(result.files || [], body.operation, result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind, enforceAudioForThisResponse);
     if (body.operation === "buildPart") {
       const requestedPath = body.stagePath;
