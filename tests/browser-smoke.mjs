@@ -39,7 +39,8 @@ const fixture = {
       winCondition: "All four orbs are collected.",
       lossCondition: "This smoke fixture has no damage/loss state; press restart by reloading the page.",
       performanceBudget: { targetFps: 60, maxEnemies: 0, maxObjects: 40, maxParticles: 8 }
-    }, null, 2)
+    }, null, 2),
+    "src/levels/level-1.js": "export const level = 1;"
   },
   versions: [],
   activeFile: "game.js",
@@ -204,6 +205,18 @@ try {
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
   assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
+  await page.getByText("src", { exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('.project-file-tree-file[title="src/levels/level-1.js"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept("src/levels/smoke.txt"));
+  await page.getByRole("button", { name: /New file/ }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke.txt"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept("src/levels/smoke-moved.txt"));
+  await page.getByRole("button", { name: "Move / rename" }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke-moved.txt"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Delete file" }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke-moved.txt"]').waitFor({ state: "detached", timeout: 5000 });
+  assert.ok(await page.locator(".project-file-tree-folder-label").filter({ hasText: "levels" }).count(), "nested folders remain visible after file operations");
   await page.locator('.rail button[title="Audio Studio"]').click();
   await page.getByRole("heading", { name: "Audio Studio" }).waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: /UI confirm/ }).click();
