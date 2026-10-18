@@ -100,12 +100,32 @@ export function makeAgentInput(input: {
     if (path === "game-spec.json") return true;
     if ((stagePath === "game.js" || stagePath === "game.css") && path === "game.html") return true;
     if (stagePath === "game.js" && path === "game.css") return true;
-    // Give staged modules enough neighboring source to integrate against, without
-    // dumping every large asset into the model context.
+    // Include only neighboring source needed for integration, never the entire project.
     if (/\.js$/i.test(path) && (stagePath === "game.js" || /\.js$/i.test(stagePath))) return true;
     return false;
+  }).sort(([a], [b]) => {
+    const priority = (path: string) => path === stagePath ? -1 : path === "game-spec.json" ? 0
+      : path === "game.html" ? 1 : path === "game.css" ? 2 : /\.js$/i.test(path) ? 3 : 4;
+    return priority(a) - priority(b) || a.localeCompare(b);
   }).slice(0, 18);
-  const stageFiles = Object.fromEntries(stageEntries.map(([path, content]) => [path, String(content).slice(0, fileBudget[path] || 3000)]));
+  // Hard cap the context sent for every staged build step. The old per-file limits
+  // allowed 18 files x 3,000 chars (~54k chars) plus the system prompt, which exceeds
+  // many free models' context windows and caused every fallback to fail identically.
+  // Keep a total budget and preserve both ends of larger files for declarations and exports.
+  const STAGE_CONTEXT_BUDGET = 14_000;
+  let stageContextUsed = 0;
+  const stageFiles: Record<string, string> = {};
+  for (const [path, rawContent] of stageEntries) {
+    const remaining = STAGE_CONTEXT_BUDGET - stageContextUsed;
+    if (remaining <= 0) break;
+    const perFileBudget = Math.min(fileBudget[path] || 1800, path === "game-spec.json" ? 2800 : 2200, remaining);
+    const content = String(rawContent);
+    const excerpt = content.length <= perFileBudget
+      ? content
+      : content.slice(0, Math.ceil(perFileBudget * 0.65)) + "\\n/* … middle omitted to fit staged context budget … */\\n" + content.slice(-Math.floor(perFileBudget * 0.35));
+    stageFiles[path] = excerpt;
+    stageContextUsed += excerpt.length;
+  }
   const guide = projectKind === "game" ? selectGameGuide({
     message: input.message,
     initialPrompt: p?.initialPrompt,
