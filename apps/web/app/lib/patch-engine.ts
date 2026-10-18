@@ -144,6 +144,9 @@ export function applyPatchBatch(
       }
       if (BufferSize(next) > MAX_FILE_BYTES) throw new Error("Patched file exceeds the 500 KB safety limit: " + path);
       if (next !== original) {
+        totalBytes += BufferSize(next) - BufferSize(original);
+        if (BufferSize(next) > MAX_FILE_BYTES) throw new Error("Patched file exceeds the 500 KB safety limit: " + path);
+        if (totalBytes > MAX_PROJECT_BYTES) throw new Error("Project exceeds the 50 MB safety limit.");
         files[path] = next;
         changed.add(path);
       }
