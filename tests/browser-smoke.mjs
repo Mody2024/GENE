@@ -205,7 +205,7 @@ try {
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
   assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
-  await page.getByText("src", { exact: true }).waitFor({ timeout: 5000 });
+  await page.locator(".project-file-tree-folder-label").filter({ hasText: "src" }).first().waitFor({ timeout: 5000 });
   await page.locator('.project-file-tree-file[title="src/levels/README.md"]').waitFor({ timeout: 5000 });
   page.once("dialog", dialog => dialog.accept("src/levels/smoke.txt"));
   await page.getByRole("button", { name: /New file/ }).click();
