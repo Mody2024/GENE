@@ -640,6 +640,7 @@ export async function POST(request: NextRequest) {
         : parts;
       const candidate = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
         method: "POST",
+        signal: request.signal,
         headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
@@ -721,6 +722,7 @@ export async function POST(request: NextRequest) {
         break;
       }
     } catch (error) {
+      if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
       const message = error instanceof Error ? error.message : "Network request failed.";
       lastFailure = { status: 504, detail: "Gemini request timed out or the connection stalled (" + message + ")" };
       for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
@@ -742,6 +744,7 @@ export async function POST(request: NextRequest) {
       temperature: body.operation === "interview" ? 0.35 : 0.2,
       json: true,
       deadline: startedAt + totalBudgetMs,
+      signal: request.signal,
       perCallMs: 7_000,
       maxAttempts: 7,
       siteTitle: "GENE Builder",
@@ -855,6 +858,7 @@ export async function POST(request: NextRequest) {
           temperature: 0.1,
           json: true,
           deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 10_000),
+          signal: request.signal,
           perCallMs: 6_000,
           maxAttempts: 2,
           groqLimit: 1,
