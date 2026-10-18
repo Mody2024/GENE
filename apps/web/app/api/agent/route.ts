@@ -82,7 +82,7 @@ function parseModelJson(text: string): AgentResponse {
   return value as AgentResponse;
 }
 
-function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"], projectKind: "game" | "app" = "game"): AgentResponse {
+function normalizeAgentResult(input: AgentResponse, operation: string, existingPlan?: AgentResponse["plan"], projectKind: "game" | "app" = "game", fallbackTitle = "Untitled Project", fallbackEngine: "canvas2d" | "webgl3d" | "webapp" = projectKind === "app" ? "webapp" : "canvas2d"): AgentResponse {
   if (typeof input.reply !== "string" || !input.reply.trim()) throw new Error("GENE response needs a non-empty user-facing reply.");
   const result: AgentResponse = {
     reply: input.reply.trim(),
@@ -113,8 +113,21 @@ function normalizeAgentResult(input: AgentResponse, operation: string, existingP
   if (input.plan != null) {
     const plan = input.plan as any;
     if (!plan || typeof plan !== "object") throw new Error("The implementation plan was malformed.");
-    if (typeof plan.title !== "string" || !plan.title.trim()) throw new Error("The implementation plan is missing a title.");
-    if (typeof plan.summary !== "string" || !plan.summary.trim()) throw new Error("The implementation plan is missing its summary.");
+    // Repair recoverable omissions from trusted project context instead of rejecting
+    // an otherwise useful build before the source can reach validation.
+    if (typeof plan.title !== "string" || !plan.title.trim()) {
+      plan.title = typeof existingPlan?.title === "string" && existingPlan.title.trim()
+        ? existingPlan.title.trim()
+        : fallbackTitle.trim().slice(0, 100) || "Untitled Project";
+    }
+    if (typeof plan.summary !== "string" || !plan.summary.trim()) {
+      plan.summary = typeof plan.description === "string" && plan.description.trim()
+        ? plan.description.trim()
+        : input.reply.trim().slice(0, 600);
+    }
+    if (!["canvas2d", "webgl3d", "webapp"].includes(plan.engine)) {
+      plan.engine = existingPlan?.engine || fallbackEngine;
+    }
     const validEngine = projectKind === "app" ? plan.engine === "webapp" : (plan.engine === "canvas2d" || plan.engine === "webgl3d");
     if (!validEngine) throw new Error(projectKind === "app" ? "Web app plans must use the webapp engine." : "Game plans must use canvas2d or webgl3d.");
     if (plan.kind && plan.kind !== projectKind) throw new Error("The plan project kind does not match the current project.");
@@ -836,7 +849,14 @@ export async function POST(request: NextRequest) {
     } else {
       result = parseModelJson(text);
     }
-    result = normalizeAgentResult(result, body.operation, body.project?.plan || undefined, projectKind);
+    result = normalizeAgentResult(
+      result,
+      body.operation,
+      body.project?.plan || undefined,
+      projectKind,
+      body.project?.name || body.project?.plan?.title || "Untitled Project",
+      projectKind === "app" ? "webapp" : body.project?.preferredEngine === "webgl3d" ? "webgl3d" : "canvas2d"
+    );
     if (result.plan) result.plan.engine = projectKind === "app" ? "webapp" : body.project?.preferredEngine === "canvas2d" || body.project?.preferredEngine === "webgl3d" ? body.project.preferredEngine : result.plan.engine;
     // Independent second-opinion review is ON by default whenever a free backup provider key is
     // configured and enough time budget remains. Set GENE_AI_REVIEW=false to disable it.
