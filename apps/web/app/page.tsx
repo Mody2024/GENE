@@ -170,6 +170,7 @@ export default function Home() {
   const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
   const [queuedRequestCount, setQueuedRequestCount] = useState(0);
   const pendingBuildRequests = useRef<string[]>([]);
+  const activeRunControllers = useRef(new Set<AbortController>());
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -542,6 +543,21 @@ export default function Home() {
     setActivity(prev => [new Date().toLocaleTimeString() + "  " + level + " · " + safeEntry, ...prev].slice(0, 100));
   };
 
+  const stopActiveRun = useCallback(() => {
+    const active = [...activeRunControllers.current];
+    if (!active.length && !pendingBuildRequests.current.length) return;
+    for (const controller of active) controller.abort();
+    activeRunControllers.current.clear();
+    pendingBuildRequests.current = [];
+    setQueuedRequestCount(0);
+    setBusy(false);
+    setParallelChatInProgress(false);
+    setBuildInProgress(false);
+    setCanQueueBuildRequests(false);
+    setNotice("Stopped. No new AI stages will be scheduled. The last saved project version is preserved.");
+    addActivity("Stopped the active run and cleared queued requests.");
+  }, []);
+  
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
     const prompt = text.trim();
@@ -565,6 +581,8 @@ export default function Home() {
     if (busy && !canChatDuringBuild) return;
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
+    const runController = new AbortController();
+    activeRunControllers.current.add(runController);
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -628,10 +646,12 @@ export default function Home() {
     addActivity("Request accepted: " + operation);
     setSection("chat");
     try {
+      if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
       if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
         try {
           const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
-          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" },
+                signal: runController.signal, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
@@ -745,6 +765,7 @@ export default function Home() {
               const stageResponse = await fetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
                 body: JSON.stringify({
                   ...baseRequest,
                   operation: "buildPart",
@@ -854,6 +875,7 @@ export default function Home() {
                         addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
                         const forgeResponse = await fetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
                           body: JSON.stringify({
                             prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
                             kind: ["character", "vehicle", "building", "environment", "prop", "weapon"].includes(String(request?.kind)) ? String(request.kind) : "prop",
@@ -1023,6 +1045,7 @@ export default function Home() {
               const finalPassResponse = await fetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
                 body: JSON.stringify({
                   ...baseRequest,
                   operation: "buildPart",
@@ -1061,6 +1084,7 @@ export default function Home() {
             const validateResponse = await fetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
               body: JSON.stringify({
                 ...baseRequest,
                 operation: "validateBuild",
@@ -1109,6 +1133,7 @@ export default function Home() {
                 const repairResponse = await fetch("/api/agent", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
                   body: JSON.stringify({
                     ...baseRequest,
                     operation: "buildPart",
@@ -1187,6 +1212,7 @@ export default function Home() {
             response = await fetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+                signal: runController.signal,
               body: JSON.stringify({
                 ...baseRequest,
                 operation,
@@ -1348,6 +1374,7 @@ export default function Home() {
         }
       }
     } catch (error) {
+      if (runController.signal.aborted) return;
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error", { prompt, operation })] };
       setProject(current => {
@@ -1367,12 +1394,15 @@ export default function Home() {
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
-      else setBusy(false);
-      if (operation === "build" || operation === "surprise") {
-        setBuildInProgress(false);
-        setCanQueueBuildRequests(false);
-      }
+      activeRunControllers.current.delete(runController);
+      if (activeRunControllers.current.size === 0) {
+        if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+        else setBusy(false);
+        if (operation === "build" || operation === "surprise") {
+          setBuildInProgress(false);
+          setCanQueueBuildRequests(false);
+        }
+      } else if (parallelReadOnlyRequest) setParallelChatInProgress(false);
     }
   }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, interactionMode, extendedPlanning, localAgentStatus, localAgentToken, localAgentUrl]);
 
@@ -1857,6 +1887,7 @@ export default function Home() {
   }
 
   function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]) {
+    stopActiveRun();
     const p = newProject(kind, preferredEngine, projectIntent);
     setProject(p);
     setSection("chat");
@@ -2552,7 +2583,7 @@ export default function Home() {
                       <option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
-                  </div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                  </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
