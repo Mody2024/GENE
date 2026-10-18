@@ -875,6 +875,21 @@ export default function Home() {
                     if (/3d|third.person|first.person|open.world|driving|vehicle|world.exploration/.test(scopeText)) plannedModules.push("src/systems/world.js", "src/systems/camera.js");
                     if (/co.op|local.multiplayer|two.player|split.screen|controller|gamepad/.test(scopeText)) plannedModules.push("src/systems/multiplayer.js");
                     if (/puzzle|craft|build|upgrade|skill.tree|resource|economy/.test(scopeText)) plannedModules.push("src/systems/economy.js");
+                    // Genre-first architecture: add a coherent set of systems for the actual game,
+                    // rather than relying only on broad keyword-triggered generic modules.
+                    const genreArchitectures: Array<{ pattern: RegExp; modules: string[] }> = [
+                      { pattern: /psychological horror|survival horror|horror mystery|horror game|haunted|detective mystery|investigation game|mystery adventure/, modules: ["src/world/exploration.js", "src/systems/interactions.js", "src/systems/evidence.js", "src/systems/atmosphere-audio.js", "src/systems/narrative.js", "src/systems/save-system.js"] },
+                      { pattern: /subway surfer|endless runner|runner game|infinite runner/, modules: ["src/systems/runner-movement.js", "src/systems/obstacles.js", "src/systems/collectibles.js", "src/systems/progression.js"] },
+                      { pattern: /minecraft|voxel sandbox|sandbox survival|crafting survival|open.?world survival/, modules: ["src/world/world-generator.js", "src/world/voxel-system.js", "src/systems/inventory.js", "src/systems/crafting.js", "src/systems/building.js", "src/systems/save-system.js"] },
+                      { pattern: /base.?building strategy|real.?time strategy|\brts\b|city builder|colony sim|tower defense/, modules: ["src/world/grid-map.js", "src/systems/building.js", "src/systems/resource-economy.js", "src/systems/unit-control.js", "src/systems/pathfinding.js", "src/systems/save-system.js"] },
+                      { pattern: /metroidvania|2d platformer|platform adventure|precision platformer/, modules: ["src/player/platformer-controller.js", "src/world/level-geometry.js", "src/systems/checkpoints.js", "src/systems/abilities.js", "src/systems/enemy-ai.js", "src/systems/save-system.js"] },
+                      { pattern: /role.?playing game|\brpg\b|action rpg|jrpg/, modules: ["src/player/character-stats.js", "src/systems/quests.js", "src/systems/dialogue.js", "src/systems/inventory.js", "src/systems/equipment.js", "src/systems/save-system.js"] },
+                      { pattern: /first.?person shooter|\bfps\b|arena shooter|tactical shooter/, modules: ["src/systems/weapons.js", "src/systems/enemy-ai.js", "src/systems/combat.js", "src/systems/aim-camera.js", "src/systems/wave-director.js"] },
+                      { pattern: /racing game|car racing|driving simulator|vehicle game/, modules: ["src/vehicle/vehicle-controller.js", "src/world/track-layout.js", "src/systems/race-director.js", "src/systems/vehicle-camera.js"] },
+                      { pattern: /puzzle game|logic puzzle|escape room|brain teaser/, modules: ["src/systems/puzzle-state.js", "src/systems/level-content.js", "src/systems/hint-system.js", "src/systems/progression.js"] }
+                    ];
+                    const matchedGenre = genreArchitectures.find(genre => genre.pattern.test(scopeText));
+                    if (matchedGenre) plannedModules.push(...matchedGenre.modules);
                   }
                   const modelCandidates = [
                     ...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []),
