@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const baseURL = (process.env.GENE_TEST_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 if (process.env.GENE_LIVE_GENERATION !== "1") {
@@ -15,7 +17,40 @@ if (!health.aiConfigured) {
   process.exit(0);
 }
 
-const prompt = "Build a compact original 2D browser game called Signal Garden. Move with arrow keys or WASD, collect five glowing seeds, avoid moving shadow-orbs, show a score, win/lose states and restart. Use simple original Canvas 2D art, responsive controls, no external assets or network, and keep the complete source compact and runnable.";
+const scenarios = {
+  "signal-garden": {
+    name: scenario.name,
+    prompt: "Build a compact original 2D browser game called Signal Garden. Move with arrow keys or WASD, collect five glowing seeds, avoid moving shadow-orbs, show a score, win/lose states and restart."
+  },
+  "tiny-platformer": {
+    name: "Tiny Platformer",
+    prompt: "Build a compact original 2D platformer called Tiny Platformer. Use arrow keys or WASD to move and jump across three platforms, collect five coins, avoid two moving hazards, reach a finish flag, and include score, win/lose states and restart."
+  },
+  "orbit-puzzle": {
+    name: "Orbit Puzzle",
+    prompt: "Build a compact original 2D puzzle game called Orbit Puzzle. Use arrow keys to rotate a small orbital maze, guide a glowing core to its goal, avoid timed blockers, show clear instructions, moves counter, success state and restart."
+  }
+};
+
+if (process.env.GENE_PLAYGROUND_ALL === "1") {
+  const scriptPath = fileURLToPath(import.meta.url);
+  for (const scenario of Object.keys(scenarios)) {
+    console.log("\\n=== GENE playground scenario: " + scenario + " ===");
+    const child = spawnSync(process.execPath, [scriptPath], {
+      stdio: "inherit",
+      env: { ...process.env, GENE_PLAYGROUND_ALL: "0", GENE_LIVE_SCENARIO: scenario }
+    });
+    if (child.error) throw child.error;
+    if (child.status !== 0) process.exit(child.status ?? 1);
+  }
+  console.log("\\nGENE live playground passed all three generation scenarios.");
+  process.exit(0);
+}
+
+const scenarioName = process.env.GENE_LIVE_SCENARIO || "signal-garden";
+const scenario = scenarios[scenarioName];
+if (!scenario) throw new Error("Unknown GENE_LIVE_SCENARIO: " + scenarioName);
+const prompt = scenario.prompt + " Use original Canvas 2D art, responsive controls, no external assets or network, and keep the complete source compact and runnable.";
 const response = await fetch(baseURL + "/api/agent", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -26,7 +61,7 @@ const response = await fetch(baseURL + "/api/agent", {
     thinking: "fast",
     message: prompt,
     project: {
-      id: "gene-live-generation-smoke",
+      id: "gene-live-generation-" + scenarioName,
       kind: "game",
       mode: "build",
       preferredEngine: "canvas2d",
@@ -106,6 +141,7 @@ try {
     ok: true,
     provider: payload.aiMode,
     model: payload.model,
+    scenario: scenarioName,
     title: spec.title,
     files: Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.length])),
     browserEvidence: evidence,
