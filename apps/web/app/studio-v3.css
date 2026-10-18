@@ -313,3 +313,16 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .studio-v2 .project-file-tree-file>span:first-child{flex:0 0 auto;color:var(--studio-accent);font-family:"DM Mono",monospace;font-size:9px}
 .studio-v2 .project-file-tree-file:hover{background:color-mix(in srgb,var(--studio-accent) 7%,var(--studio-panel));color:var(--studio-ink)}
 .studio-v2 .project-file-tree-file.active{border-color:color-mix(in srgb,var(--studio-accent) 20%,var(--studio-line));background:color-mix(in srgb,var(--studio-accent) 10%,var(--studio-panel));color:var(--studio-ink)}
+
+/* Source editor hierarchy and honest saved/dirty state. */
+.studio-v2 .file-editor-main{min-width:0;overflow:hidden;border:1px solid var(--studio-line);border-radius:12px;background:var(--studio-panel)}
+.studio-v2 .file-editor-header{min-height:39px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 11px;border-bottom:1px solid var(--studio-line);background:var(--studio-raised)}
+.studio-v2 .file-editor-path{display:flex;align-items:center;gap:9px;min-width:0;color:var(--studio-ink);font-size:10px;font-weight:620}
+.studio-v2 .file-editor-path>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-v2 .file-editor-type{display:grid;place-items:center;min-width:25px;height:23px;padding:0 4px;border:1px solid var(--studio-line);border-radius:6px;background:var(--studio-soft);color:var(--studio-accent);font:8px "DM Mono",monospace}
+.studio-v2 .file-editor-state{display:flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--studio-muted);font-size:9px}
+.studio-v2 .file-editor-dot{width:6px;height:6px;border-radius:50%;background:var(--studio-accent)}
+.studio-v2 .file-editor-dot.dirty{background:#b97836}
+.studio-v2 .file-editor-main .code-editor{display:block;width:100%;min-height:350px;border:0;border-radius:0;background:var(--studio-panel);color:var(--studio-ink);line-height:1.7}
+.studio-v2 .file-editor-main .editor-footer{border-top:1px solid var(--studio-line);background:var(--studio-raised)}
+@media(max-width:600px){.studio-v2 .file-editor-header{padding-inline:8px}.studio-v2 .file-editor-main .code-editor{min-height:280px}}
