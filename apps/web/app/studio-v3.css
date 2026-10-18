@@ -326,3 +326,7 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .studio-v2 .file-editor-main .code-editor{display:block;width:100%;min-height:350px;border:0;border-radius:0;background:var(--studio-panel);color:var(--studio-ink);line-height:1.7}
 .studio-v2 .file-editor-main .editor-footer{border-top:1px solid var(--studio-line);background:var(--studio-raised)}
 @media(max-width:600px){.studio-v2 .file-editor-header{padding-inline:8px}.studio-v2 .file-editor-main .code-editor{min-height:280px}}
+
+/* Mobile users keep direct access to the main creation action when the sidebar collapses. */
+.studio-v2 .mobile-new-project{display:none;width:32px;height:32px;flex:0 0 32px;align-items:center;justify-content:center;border:1px solid var(--studio-line-strong);border-radius:9px;background:var(--studio-panel);color:var(--studio-accent);font-size:19px;font-weight:500}
+@media(max-width:600px){.studio-v2 .mobile-new-project{display:flex}.studio-v2 .studio-breadcrumb .project-target-chip{display:none}.studio-v2 .studio-breadcrumb .rename-project{display:none}}
