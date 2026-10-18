@@ -35,7 +35,7 @@ const scenarios = {
 if (process.env.GENE_PLAYGROUND_ALL === "1") {
   const scriptPath = fileURLToPath(import.meta.url);
   for (const scenario of Object.keys(scenarios)) {
-    console.log("\\n=== GENE playground scenario: " + scenario + " ===");
+    console.log("\n=== GENE playground scenario: " + scenario + " ===");
     const child = spawnSync(process.execPath, [scriptPath], {
       stdio: "inherit",
       env: { ...process.env, GENE_PLAYGROUND_ALL: "0", GENE_LIVE_SCENARIO: scenario }
@@ -43,7 +43,7 @@ if (process.env.GENE_PLAYGROUND_ALL === "1") {
     if (child.error) throw child.error;
     if (child.status !== 0) process.exit(child.status ?? 1);
   }
-  console.log("\\nGENE live playground passed all three generation scenarios.");
+  console.log("\nGENE live playground passed all three generation scenarios.");
   process.exit(0);
 }
 
