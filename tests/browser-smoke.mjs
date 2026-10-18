@@ -40,7 +40,7 @@ const fixture = {
       lossCondition: "This smoke fixture has no damage/loss state; press restart by reloading the page.",
       performanceBudget: { targetFps: 60, maxEnemies: 0, maxObjects: 40, maxParticles: 8 }
     }, null, 2),
-    "src/levels/level-1.js": "export const level = 1;"
+    "src/levels/README.md": "Level notes for the smoke fixture."
   },
   versions: [],
   activeFile: "game.js",
@@ -206,7 +206,7 @@ try {
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
   assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
   await page.getByText("src", { exact: true }).waitFor({ timeout: 5000 });
-  await page.locator('.project-file-tree-file[title="src/levels/level-1.js"]').waitFor({ timeout: 5000 });
+  await page.locator('.project-file-tree-file[title="src/levels/README.md"]').waitFor({ timeout: 5000 });
   page.once("dialog", dialog => dialog.accept("src/levels/smoke.txt"));
   await page.getByRole("button", { name: /New file/ }).click();
   await page.locator('.project-file-tree-file[title="src/levels/smoke.txt"]').waitFor({ timeout: 5000 });
