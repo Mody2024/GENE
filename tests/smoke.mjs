@@ -33,6 +33,7 @@ const css = read("apps/web/app/globals.css");
 const studioDesignCss = read("apps/web/app/studio-redesign.css");
 const planContract = await import("../apps/web/app/lib/plan-contract.mjs");
 const browserSmoke = read("tests/browser-smoke.mjs");
+const liveGenerationSmoke = read("tests/live-generation-smoke.mjs");
 
 const repairedAppTasks = planContract.ensurePlanTasks(["Build the dashboard", "", "Build the dashboard"], "app");
 assert.equal(repairedAppTasks.length, 3, "sparse model plans are repaired to three distinct tasks");
@@ -43,6 +44,8 @@ assert.equal(planContract.ensurePlanMechanics([], "app").length, 1, "missing app
 assert.ok(api.includes("ensurePlanTasks(plan.tasks, projectKind)"), "API repairs sparse plans instead of rejecting them");
 
 assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
+assert.ok(rootPackage.scripts["test:live-generation"] === "node tests/live-generation-smoke.mjs", "live generation playground has a discoverable command");
+assert.ok(liveGenerationSmoke.includes("GENE_PLAYGROUND_ALL") && liveGenerationSmoke.includes("signal-garden") && liveGenerationSmoke.includes("tiny-platformer") && liveGenerationSmoke.includes("orbit-puzzle"), "opt-in live playground covers multiple distinct game scenarios");
 assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned Next version");
 assert.equal(webPackage.dependencies.jszip, "3.10.1", "project ZIP packaging is installed");
 assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
