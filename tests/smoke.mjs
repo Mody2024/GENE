@@ -662,7 +662,7 @@ assert.ok(api.includes("const original = String(body.message || body.project?.in
 
 assert.ok(api.includes("const answersSummary = Object.entries(answers)") && api.includes("plan: starterPlan") && api.includes("AI-powered planning and code generation still require a configured provider key."), "fallback interview ends with an answer-informed starter plan and honestly discloses missing AI configuration");
 
-assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Give staged modules enough neighboring source"), "staged generation may return manifest paths and receives the source needed to integrate modules");
+assert.ok(prompts.includes("CORE RUNTIME CONTRACT:") && prompts.includes("Include only neighboring source needed for integration"), "staged generation may return manifest paths and receives the source needed to integrate modules");
 assert.ok(prompts.includes("DEFAULT GAME AUDIO IS REQUIRED") && prompts.includes("unless the user explicitly requests silence"), "new games require working audio by default while honoring explicit silent-game requests");
 assert.ok(prompts.includes("TEXT-BASED GAME CONTRACT") && prompts.includes("multiple endings") && prompts.includes("player agency"), "text-first games require meaningful branching, persistent choices and endings");
 assert.ok(prompts.includes("GENE PROCESS NAMING CONTRACT") && prompts.includes("unique within a project/run") && prompts.includes("project process/module registry"), "generated process titles and modules must remain uniquely named and tracked");
