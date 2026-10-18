@@ -790,12 +790,11 @@ export default function Home() {
         };
         let finalContentPassSucceeded = false;
         let autoSplitGameJs = false;
+        const resumedStages = stagePaths.filter((_, stageIndex) => activeBuildRun?.tasks.find(task => task.id === "stage-" + stageIndex)?.status === "passed");
+        if (resumedStages.length) addActivity("Checkpoint recovery: kept completed stage" + (resumedStages.length === 1 ? "" : "s") + " unchanged (" + resumedStages.join(", ") + ").");
         for (let index = 0; index < stagePaths.length; index++) {
           const stagePath = stagePaths[index];
-          if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") {
-            addActivity("Checkpoint recovery: kept completed stage " + stagePath + " unchanged.");
-            continue;
-          }
+          if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") continue;
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
@@ -2628,7 +2627,7 @@ export default function Home() {
           </div>
         </header>
 
-        {notice && <div className="notice"><span>{notice}{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span>{(runtimeState === "error" || /preview.*runtime error|could not confirm a visible game frame/i.test(notice)) && hasGame && <button onClick={() => { runtimeRefreshAttempts.current = 0; setPreviewOpen(true); setPreviewKey(value => value + 1); setRuntimeState("loaded"); setNotice("Refreshing live preview…"); }}>Refresh preview ↻</button>}<button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
+        {notice && <div className={"notice " + noticeTone(notice)} role={noticeTone(notice) === "notice-error" ? "alert" : "status"}><span><NoticeText text={notice} />{publishedUrl && <> <a href={publishedUrl} target="_blank" rel="noreferrer">Open published site ↗</a><button className="copy-publish-link" onClick={() => { if (!navigator.clipboard) { setNotice("Clipboard is unavailable here. Copy this link: " + publishedUrl); return; } void navigator.clipboard.writeText(publishedUrl).then(() => setNotice("Published link copied to clipboard.")).catch(() => setNotice("Could not access the clipboard. Copy this link: " + publishedUrl)); }}>Copy link</button></>}</span>{(runtimeState === "error" || /preview.*runtime error|could not confirm a visible game frame/i.test(notice)) && hasGame && <button onClick={() => { runtimeRefreshAttempts.current = 0; setPreviewOpen(true); setPreviewKey(value => value + 1); setRuntimeState("loaded"); setNotice("Refreshing live preview…"); }}>Refresh preview ↻</button>}<button onClick={() => { setNotice(""); setPublishedUrl(""); }}>Dismiss</button></div>}
         {persistenceWarning && <div className="notice persistence-warning" role="status" aria-live="polite"><span>{persistenceWarning}</span><button onClick={() => setPersistenceWarning("")}>Dismiss</button></div>}
 
         {binaryBuildLinks && <div className="binary-build-result" role="status">
@@ -2859,6 +2858,25 @@ function operationText(mode: Mode, hasGame: boolean) {
   if (mode === "plan") return "Checking the idea and next design decision…";
   return hasGame ? "Reading and editing existing source…" : "Generating a complete first playable slice…";
 }
+function NoticeText({ text }: { text: string }) {
+  // Split long machine-generated errors into a short headline plus collapsible technical details.
+  const clean = text.replace(/\s*GENE_[A-Z_]{6,}\.?\s*$/, "").trim();
+  const detailAt = clean.search(/\sDetails:\s/);
+  const sentenceEnd = clean.search(/[.!?](\s|$)/);
+  let head = clean;
+  let rest = "";
+  if (detailAt > 0) { head = clean.slice(0, detailAt).trim(); rest = clean.slice(detailAt).replace(/^\s*Details:\s*/, "").trim(); }
+  else if (clean.length > 220 && sentenceEnd > 0 && sentenceEnd < clean.length - 1) { head = clean.slice(0, sentenceEnd + 1).trim(); rest = clean.slice(sentenceEnd + 1).trim(); }
+  if (!rest) return <>{head}</>;
+  return <>{head} <details className="notice-details"><summary>Show details</summary><p>{rest}</p></details></>;
+}
+
+function noticeTone(text: string) {
+  if (/rejected|failed|could not|error|unavailable|blocked|invalid/i.test(text)) return "notice-error";
+  if (/copied|published|saved|passed|complete|restored|refreshing/i.test(text)) return "notice-ok";
+  return "notice-info";
+}
+
 function runtimeLabel(state: "idle" | "loaded" | "rendered" | "error") {
   if (state === "rendered") return "Visible render signal";
   if (state === "loaded") return "Runtime loaded · render not yet confirmed";

@@ -381,7 +381,36 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         const kitSfxCalls = (runtimeSource.match(/GeneAudio\s*\.\s*(?:sfx|play|playSfx)\s*\(/g) || []).length;
         const kitControls = /GeneAudio\s*\.\s*(?:createSettingsPanel|setMasterVolume|setMusicVolume|setSfxVolume|setVolume|toggleMute|setMuted)\b/.test(runtimeSource);
         if (!kitMusic || kitSfxCalls < 2 || !kitControls) {
-          throw new Error("Build rejected: the game uses GeneAudio but is incomplete. Call GeneAudio.music.start(mood) when play begins, call GeneAudio.sfx(name) from at least two real gameplay/UI events, and expose audio settings with GeneAudio.createSettingsPanel(container) (or a volume/mute control wired to GeneAudio.setMasterVolume / toggleMute). No files were saved.");
+          // Deterministic repair instead of rejecting the whole build: append idempotent wiring to game.js
+          // for whatever the model left out (music start on first input, UI/action SFX on real input events,
+          // and a collapsible settings panel). The checks below then pass without another model round-trip.
+          const moodGuess = String(spec.audio?.mood || spec.mood || "action").toLowerCase();
+          const wiring = [
+            "",
+            "/* GENE audio auto-wiring (added because the audio contract was incomplete) */",
+            "(function geneAudioAutoWire() {",
+            "  var GA = window.GeneAudio; if (!GA || window.__geneAudioWired) return; window.__geneAudioWired = true;",
+            kitMusic ? "" : "  var startedMusic = false; function ensureMusic() { if (startedMusic) return; startedMusic = true; window.GeneAudio.music.start(" + JSON.stringify(moodGuess) + "); }",
+            kitMusic ? "" : "  ['pointerdown', 'keydown', 'touchstart'].forEach(function (name) { window.addEventListener(name, ensureMusic, { once: true, passive: true }); });",
+            kitSfxCalls >= 2 ? "" : "  var lastSfx = 0; function sfxReady() { var now = Date.now(); if (now - lastSfx < 140) return false; lastSfx = now; return true; }",
+            kitSfxCalls >= 2 ? "" : "  window.addEventListener('pointerdown', function () { if (sfxReady()) window.GeneAudio.sfx('ui'); }, { passive: true });",
+            kitSfxCalls >= 2 ? "" : "  window.addEventListener('keydown', function (e) { if (!e.repeat && sfxReady()) window.GeneAudio.sfx('hit'); }, { passive: true });",
+            kitControls ? "" : "  function mountAudioPanel() {",
+            kitControls ? "" : "    var host = document.createElement('div'); host.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:50;font:12px system-ui,sans-serif';",
+            kitControls ? "" : "    var toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = 'Audio'; toggle.setAttribute('aria-label', 'Audio settings');",
+            kitControls ? "" : "    toggle.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,20,.8);color:#eaf2f7;cursor:pointer';",
+            kitControls ? "" : "    var slot = document.createElement('div'); slot.style.cssText = 'display:none;margin-bottom:6px'; window.GeneAudio.createSettingsPanel(slot);",
+            kitControls ? "" : "    toggle.addEventListener('click', function () { slot.style.display = slot.style.display === 'none' ? 'block' : 'none'; });",
+            kitControls ? "" : "    host.appendChild(slot); host.appendChild(toggle); document.body.appendChild(host);",
+            kitControls ? "" : "  }",
+            kitControls ? "" : "  if (document.body) mountAudioPanel(); else window.addEventListener('DOMContentLoaded', mountAudioPanel);",
+            "})();",
+            ""
+          ].filter(line => line !== "").join("\n");
+          const gameFile = normalized.find(file => file.path === "game.js");
+          if (!gameFile) throw new Error("Build rejected: the game uses GeneAudio but game.js is missing, so audio wiring could not be repaired. No files were saved.");
+          gameFile.content = gameFile.content.replace(/\s*$/, "\n") + wiring + "\n";
+          byPath["game.js"] = gameFile.content;
         }
         const events: Record<string, string> = { ...(audio?.events && typeof audio.events === "object" && !Array.isArray(audio.events) ? audio.events : {}) };
         for (const name of kitSfxNames) if (!(name in events)) events[name] = name;
