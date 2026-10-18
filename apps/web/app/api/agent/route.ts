@@ -278,12 +278,51 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
   }
   if (operation === "build" || operation === "surprise") {
     const byPath = Object.fromEntries(normalized.map(f => [f.path, f.content]));
+    // Self-heal: a missing/empty stylesheet is cosmetic, so supply a minimal full-viewport default instead of rejecting the build.
+    if (projectKind === "game" && (!byPath["game.css"] || byPath["game.css"].trim().length < 8) && byPath["game.html"] && byPath["game.js"]) {
+      const defaultCss = "html, body { margin: 0; height: 100%; background: #0b0b0c; color: #ededee; font-family: system-ui, sans-serif; overflow: hidden; }\n#game-canvas, canvas { display: block; width: 100%; height: 100%; touch-action: none; }\n";
+      const cssFile = normalized.find(file => file.path === "game.css");
+      if (cssFile) cssFile.content = defaultCss; else normalized.push({ path: "game.css", content: defaultCss });
+      byPath["game.css"] = defaultCss;
+    }
     for (const path of ["game.html", "game.css", "game.js", "game-spec.json"]) {
       if (!byPath[path] || byPath[path].trim().length < 8) throw new Error("Build rejected: required project file " + path + " is missing or empty.");
     }
     new Function(byPath["game.js"]);
     const spec = JSON.parse(byPath["game-spec.json"]);
     if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: project spec must be a JSON object.");
+    // Self-heal a declared-but-missing module instead of discarding an otherwise good build.
+    // A model often lists src/systems/renderer.js in the blueprint but never emits it. We register a safe,
+    // empty placeholder under window.GeneModules so load order and references stay valid; runtime repair can fill it in.
+    if (projectKind === "game") {
+      const declaredModules: string[] = [];
+      const archModules = spec.architecture && typeof spec.architecture === "object" && Array.isArray(spec.architecture.modules) ? spec.architecture.modules : [];
+      for (const entry of archModules) {
+        const candidate = typeof entry === "string" ? entry : entry && typeof entry === "object" ? entry.path : "";
+        if (typeof candidate === "string") declaredModules.push(candidate.trim());
+      }
+      if (Array.isArray(spec.additionalFiles)) for (const candidate of spec.additionalFiles) if (typeof candidate === "string") declaredModules.push(candidate.trim());
+      const healed: string[] = [];
+      for (const modulePath of declaredModules) {
+        if (!/\.(?:m?js|cjs)$/i.test(modulePath) || CORE_FILES.has(modulePath) || !isSafeProjectPath(modulePath)) continue;
+        if (typeof byPath[modulePath] === "string" && byPath[modulePath].trim().length >= 8) continue;
+        if (normalized.length >= MAX_PROJECT_FILES) break;
+        const moduleKey = modulePath.replace(/^.*\//, "").replace(/\.[^.]+$/, "");
+        const stub = "/* GENE auto-placeholder: " + modulePath + " was declared but not generated. */\n(function (root) {\n  root.GeneModules = root.GeneModules || {};\n  root.GeneModules[" + JSON.stringify(moduleKey) + "] = root.GeneModules[" + JSON.stringify(moduleKey) + "] || {};\n})(typeof window !== \"undefined\" ? window : this);\n";
+        const existingFile = normalized.find(file => file.path === modulePath);
+        if (existingFile) existingFile.content = stub; else normalized.push({ path: modulePath, content: stub });
+        byPath[modulePath] = stub;
+        healed.push(modulePath);
+      }
+      if (healed.length) {
+        const known = new Set<string>(Array.isArray(spec.additionalFiles) ? spec.additionalFiles.filter((item: unknown) => typeof item === "string") : []);
+        spec.additionalFiles = [...(Array.isArray(spec.additionalFiles) ? spec.additionalFiles : []), ...healed.filter(path => !known.has(path))];
+        spec.healedModules = healed;
+        byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+        const healedSpecFile = normalized.find(file => file.path === "game-spec.json");
+        if (healedSpecFile) healedSpecFile.content = byPath["game-spec.json"];
+      }
+    }
     // Treat the architecture blueprint as an executable contract, not documentation:
     // validate module paths and merge them into the runtime manifest in blueprint order.
     if (spec.architecture !== undefined) {
@@ -380,7 +419,17 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       // instead of hand-writing Web Audio. Using it satisfies the audio contract; spec metadata is filled in.
       const kitSfxNames = Array.from(runtimeSource.matchAll(/GeneAudio\s*\.\s*(?:sfx|play|playSfx)\s*\(\s*["']([\w-]+)["']/g)).map(match => match[1]);
       const usesKit = /\bGeneAudio\s*\.\s*(?:sfx|play|playSfx|music|startMusic|playMusic)\b/.test(runtimeSource);
-      if (usesKit) {
+      // No audio at all (or only decorative audio) is self-healed with the built-in GeneAudio kit, so every game ships with music + effects.
+      const customAudioIncomplete = (audio?.enabled !== true ||
+          !["procedural-web-audio", "asset-backed"].includes(String(audio?.implementation)) ||
+          !["master", "music", "sfx"].every(bus => buses.includes(bus)) ||
+          events.length < 3 ||
+          !hasPlaybackApi ||
+          !hasSoundOutput ||
+          !hasConnectedSoundEvents ||
+          !hasMusicPlayback ||
+          !hasAudioControls);
+      if (usesKit || customAudioIncomplete) {
         const kitMusic = /GeneAudio\s*\.\s*(?:music\s*\.\s*(?:start|setMood)|startMusic|playMusic)\s*\(/.test(runtimeSource);
         const kitSfxCalls = (runtimeSource.match(/GeneAudio\s*\.\s*(?:sfx|play|playSfx)\s*\(/g) || []).length;
         const kitControls = /GeneAudio\s*\.\s*(?:createSettingsPanel|setMasterVolume|setMusicVolume|setSfxVolume|setVolume|toggleMute|setMuted)\b/.test(runtimeSource);

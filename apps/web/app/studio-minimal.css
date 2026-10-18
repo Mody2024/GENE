@@ -286,3 +286,39 @@ body { font-family: Inter, "DM Sans", system-ui, "Segoe UI", sans-serif;
 .gene-app.studio-v2 .mode-switch button[aria-selected="true"] { background: var(--studio-soft); color: var(--studio-ink); }
 .gene-app.studio-v2 .starter-icon { background: var(--studio-soft) !important; color: var(--studio-muted) !important; }
 .gene-app.studio-v2 .rail-item.selected { background: var(--studio-soft); color: var(--studio-ink); }
+
+/* ---- Sleek chat composer ---- */
+.gene-app.studio-v2 .composer.studio-composer {
+  background: var(--studio-panel); border: 1px solid var(--studio-line-strong); border-radius: 16px;
+  padding: 8px 10px 8px; gap: 2px; transition: border-color .12s;
+}
+.gene-app.studio-v2 .composer.studio-composer:focus-within { border-color: color-mix(in srgb, var(--studio-ink) 40%, transparent); }
+.gene-app.studio-v2 .composer-context-label,
+.gene-app.studio-v2 .key-hint { display: none; }
+.gene-app.studio-v2 .composer-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0; margin: 0; }
+.gene-app.studio-v2 .composer-mode-switch { display: inline-flex; gap: 2px; background: transparent; border: 0; padding: 0; }
+.gene-app.studio-v2 .composer-mode-switch button {
+  width: auto; height: 24px; padding: 0 9px; border: 0; border-radius: 99px; background: transparent;
+  color: var(--studio-faint); font-size: 11.5px; font-weight: 500; display: inline-flex; align-items: center;
+}
+.gene-app.studio-v2 .composer-mode-switch button span { display: none; }
+.gene-app.studio-v2 .composer-mode-switch button:hover { color: var(--studio-ink); }
+.gene-app.studio-v2 .composer-mode-switch button.active { background: var(--studio-soft); color: var(--studio-ink); }
+.gene-app.studio-v2 .composer-tools-menu > summary { list-style: none; width: 24px; height: 24px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 99px; color: var(--studio-faint); cursor: pointer; }
+.gene-app.studio-v2 .composer-tools-menu > summary:hover { background: var(--studio-soft); color: var(--studio-ink); }
+.gene-app.studio-v2 .composer textarea { border: 0; background: transparent; padding: 8px 4px 4px; min-height: 44px; font-size: 13.5px; resize: none; box-shadow: none; }
+.gene-app.studio-v2 .composer textarea:focus { outline: none; }
+.gene-app.studio-v2 .composer-bottom { border-top: 0; padding: 0; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gene-app.studio-v2 .composer-quick-tools { display: flex; align-items: center; gap: 4px; }
+.gene-app.studio-v2 .composer .icon-only-tool { width: 28px; height: 28px; border: 0; background: transparent; border-radius: 99px; color: var(--studio-muted); display: grid; place-items: center; }
+.gene-app.studio-v2 .composer .icon-only-tool:hover { background: var(--studio-soft); color: var(--studio-ink); }
+.gene-app.studio-v2 .composer .composer-thinking { height: 26px; padding: 0 22px 0 8px; border: 0; background: transparent; color: var(--studio-faint); font-size: 11.5px; border-radius: 99px; }
+.gene-app.studio-v2 .composer .composer-thinking:hover { background: var(--studio-soft); color: var(--studio-ink); }
+.gene-app.studio-v2 .composer .send-button {
+  width: 30px; height: 30px; min-width: 30px; padding: 0; border-radius: 50%; font-size: 0; line-height: 0;
+  display: grid; place-items: center; background: var(--studio-ink); color: var(--studio-bg);
+}
+.gene-app.studio-v2 .composer .send-button > * { font-size: 15px; line-height: 1; margin: 0; }
+.gene-app.studio-v2 .composer .send-button:disabled { background: var(--studio-soft); color: var(--studio-faint); opacity: 1; }
+.gene-app.studio-v2 .composer-tools-menu-panel { border-radius: 12px; border: 1px solid var(--studio-line-strong); background: var(--studio-panel); }
+.gene-app.studio-v2 .reference-chip { border-radius: 99px; background: var(--studio-soft); border: 0; }

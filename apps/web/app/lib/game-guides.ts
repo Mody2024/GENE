@@ -14,6 +14,7 @@ const GUIDES: Record<string, GameGuide> = {
     engine: "canvas2d",
     implementation: [
       "Use a world coordinate system and camera follow, not a single static screen.",
+      "MODELS AND MUSIC: render the player with GeneModels.drawCharacter (state idle/run/jump/fall from real physics), enemies with GeneModels.drawEnemy, coins with GeneModels.drawCoin, bricks/question blocks/ground with GeneModels.drawBlock and the sky with GeneModels.drawBackdrop so the game looks polished and animated from the first frame; start GeneAudio.music.start('action') when play begins, play jump/coin/hit/win sfx on the matching events and set mood 'triumph' at the finish.",
       "ART DIRECTION: choose a specific visual identity and limited palette before drawing. Build layered parallax backgrounds, authored silhouettes, grounded contact shadows, highlights, readable character poses, animated feedback and environmental storytelling; avoid default flat rectangles and repeated placeholder shapes.",
       "Implement horizontal acceleration/friction, gravity, ground/platform collision, coyote time and jump buffering.",
       "Allow variable jump height by cutting upward velocity when the jump button is released.",
@@ -54,6 +55,7 @@ const GUIDES: Record<string, GameGuide> = {
     title: "2D Endless Runner",
     engine: "canvas2d",
     implementation: [
+      "MODELS AND MUSIC: draw the runner with GeneModels.drawCharacter (run/jump/slide), obstacles with GeneModels.drawTrainCar/drawEnemy/drawBlock, coins with GeneModels.drawCoin and the scrolling background with GeneModels.drawBackdrop; start GeneAudio.music.start('action') when the run begins and play sfx on jump, coin, hit and game over.",
       "Keep player position and obstacles in world coordinates; recycle off-screen obstacles rather than growing the entity list forever.",
       "Implement jump, obstacles, collectible pickups, score/speed progression and game over/restart.",
       "At least three distinct obstacle silhouettes and two parallax environment layers are required."
@@ -110,6 +112,7 @@ const GUIDES: Record<string, GameGuide> = {
     implementation: [
       "Use an actual WebGL renderer: compile vertex/fragment shaders, link a program, upload vertex/index buffers, set projection/view/model transforms, and call drawArrays or drawElements every frame.",
       "PROFESSIONAL MODELING PASS: establish a clear silhouette, primary/secondary/tertiary forms, deliberate proportions, bevel/chamfer highlights, trim, layered materials, consistent face normals and distinct surface colors. Build recognizable authored models from reusable mesh helpers; avoid a world made only of generic cubes, spheres and flat-colored primitives. Use atmospheric depth, purposeful key/fill lighting and ground contact cues while respecting the object budget.",
+      "MODELS AND MUSIC: use GeneModels.rig3D.character() and GeneModels.bake(rig, state, t, rootMatrix) each frame so the runner visibly runs, jumps and slides with swinging limbs; build trains with GeneModels.props3D.train(color), obstacles with props3D.barrier()/crate(), pickups with props3D.coin() (spin them) and scenery with props3D.tree(); upload each mesh to a vertex/index buffer and draw with a simple lit shader. Start GeneAudio.music.start('action') on play, sfx coin/jump/hit/lose on the matching events and expose GeneAudio.createSettingsPanel.",
       "Render real perspective geometry with a ground plane, three lanes, a chase camera, environment structures, a visible runner, obstacles and coins. Do not draw the whole scene as a 2D HUD.",
       "Implement left/right lane switching, jump, slide, forward world movement, collision, coins, score, increasing difficulty and game-over/restart.",
       "Use chunk recycling/object pooling for the endless track and environment; keep meshes/objects within the budget.",

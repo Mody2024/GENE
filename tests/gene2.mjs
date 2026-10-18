@@ -8,7 +8,7 @@ import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-orde
 import { classifyProviderFailure, describeProviderError, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
-import { GENE_AUDIO_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
+import { GENE_AUDIO_SOURCE, GENE_MODELS_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
 import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report.mjs";
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
@@ -108,6 +108,37 @@ assert.ok(sandbox.GeneAudio && typeof sandbox.GeneAudio.sfx === "function", "Gen
 for (const name of ["jump", "coin", "hit", "explosion", "win", "does-not-exist"]) assert.doesNotThrow(() => sandbox.GeneAudio.sfx(name));
 assert.doesNotThrow(() => { sandbox.GeneAudio.music.start("tense"); sandbox.GeneAudio.music.stop(); sandbox.GeneAudio.setMuted(true); });
 assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
+
+// GeneModels: animated 2D models + rigged low-poly 3D models must be valid, finite and always safe to call.
+{
+  const calls = [];
+  const ctx = new Proxy({}, { get: (_t, prop) => prop === "createLinearGradient" ? () => ({ addColorStop() {} }) : (...args) => { calls.push(String(prop)); }, set: () => true });
+  const modelSandbox = vm.createContext({ Math, Float32Array, Uint16Array, Uint32Array, parseInt, isFinite, String, Number, console });
+  modelSandbox.window = modelSandbox;
+  vm.runInContext(GENE_MODELS_SOURCE, modelSandbox);
+  const GM = modelSandbox.GeneModels;
+  assert.ok(GM && GM.__ready, "GeneModels installs itself on window");
+  for (const state of ["idle", "walk", "run", "jump", "fall", "slide"]) assert.equal(GM.drawCharacter(ctx, 100, 200, 48, { state, t: 1.3, style: "runner" }), true, "2D character draws in state " + state);
+  for (const kind of ["walker", "slime", "flyer"]) assert.equal(GM.drawEnemy(ctx, 50, 50, 40, 0.7, { kind }), true);
+  for (const kind of ["brick", "question", "ground"]) assert.equal(GM.drawBlock(ctx, 0, 0, 32, kind, 1), true);
+  for (const theme of ["day", "dusk", "night", "city"]) assert.equal(GM.drawBackdrop(ctx, 640, 360, 2, theme), true);
+  assert.equal(GM.drawCoin(ctx, 10, 10, 10, 0.5), true);
+  assert.equal(GM.drawTrainCar(ctx, 0, 0, 120, 70, 1, "#2e86de"), true);
+  assert.ok(calls.length > 100, "2D models issue real draw calls");
+  const rig = GM.rig3D.character("hero");
+  const checkMesh = (mesh, label) => {
+    const vertices = mesh.positions.length / 3;
+    assert.ok(vertices > 0 && mesh.normals.length === mesh.positions.length && mesh.colors.length === mesh.positions.length, label + " has matching attribute arrays");
+    assert.ok(mesh.indices.length % 3 === 0 && mesh.indices.every(index => index < vertices), label + " indices stay in range");
+    assert.ok(Array.from(mesh.positions).every(Number.isFinite) && Array.from(mesh.normals).every(Number.isFinite), label + " has finite geometry");
+  };
+  for (const state of ["idle", "walk", "run", "jump", "fall", "slide", "hit"]) checkMesh(GM.bake(rig, state, 0.9, GM.mat4.translate(1, 0, -3)), "baked " + state);
+  const runA = GM.bake(rig, "run", 0.0), runB = GM.bake(rig, "run", 0.13);
+  assert.ok(Array.from(runA.positions).some((value, index) => Math.abs(value - runB.positions[index]) > 0.01), "run animation actually moves the limbs over time");
+  for (const prop of ["train", "coin", "barrier", "crate", "tree"]) checkMesh(GM.props3D[prop](), "prop " + prop);
+  assert.ok(buildRuntimeKitScript().includes("GeneModels") && buildRuntimeKitScript().includes("GeneAudio"), "runtime bootstrap injects both kits");
+}
+
 console.log("GENE 2.0 module tests passed (provider routing, code safety, SVG sanitizer, research, audio kit).");
 
 

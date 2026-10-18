@@ -11,6 +11,10 @@
  * The source is a plain string (no template literals, no closing script tags) so it can be inlined.
  */
 
+import { GENE_MODELS_SOURCE } from "./runtime-models.mjs";
+
+export { GENE_MODELS_SOURCE };
+
 export const GENE_AUDIO_SOURCE = [
 "(function (root) {",
 "  'use strict';",
@@ -281,5 +285,5 @@ export const GENE_AUDIO_SOURCE = [
 
 /** Script tag injected into every game runtime document. */
 export function buildRuntimeKitScript() {
-  return "<script>" + GENE_AUDIO_SOURCE + "</script>";
+  return "<script>" + GENE_AUDIO_SOURCE + "</script><script>" + GENE_MODELS_SOURCE + "</script>";
 }
