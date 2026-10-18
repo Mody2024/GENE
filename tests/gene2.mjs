@@ -221,6 +221,7 @@ assert.ok(agentRouteSource.includes("fallbackTitle") && agentRouteSource.include
 assert.ok(agentRouteSource.includes("GeneAudio.music.start") && agentRouteSource.includes("GeneAudio.createSettingsPanel"), "fallback game builders receive the runtime audio contract required by build validation");
 assert.ok(agentRouteSource.includes("FINAL GAME BUILD CONTRACT") && agentRouteSource.includes("plan.title, plan.summary and plan.engine"), "primary and fallback build requests repeat required plan and playable-game deliverables");
 assert.ok(agentRouteSource.includes("GENE Syntax Repair") && agentRouteSource.includes("parse errors only"), "generated JavaScript syntax errors get a bounded repair attempt before final validation");
+assert.ok(agentRouteSource.includes("Salvage a common model formatting mistake") && agentRouteSource.includes("inlineScripts.join"), "inline executable scripts are moved into game.js before strict project validation");
 assert.ok(agentRouteSource.includes("perCallMs: isBuild ? 12_000 : 7_000") && agentRouteSource.includes("maxAttempts: isBuild ? 4 : 7"), "whole-game fallback attempts get a realistic generation window within the overall request deadline");
 assert.ok(agentRouteSource.includes("plan.description") && agentRouteSource.includes("input.reply.trim().slice(0, 600)"), "agent normalizer fills a missing plan summary without discarding an otherwise usable game build");
 const researchRouteSource = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
