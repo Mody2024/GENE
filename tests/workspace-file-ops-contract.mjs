@@ -8,4 +8,6 @@ assert.match(page, /function moveOrRenameProjectFile\([\s\S]*?delete nextFiles\[
 assert.match(page, /function deleteProjectFile\([\s\S]*?Required core runtime files cannot be deleted/, "required runtime files must be protected from deletion");
 assert.match(page, /label,\n      files: \{ \.\.\.nextFiles \},\n      createdAt: now\(\)/, "file operations must create a recoverable version snapshot");
 assert.match(page, /className="file-ops-toolbar"/, "file operations must be reachable from the workspace");
+assert.match(page, /function buildProjectFileTree\([\s\S]*?function ProjectFileTree\(/, "nested paths must be represented as an actual expandable-style folder tree");
+assert.match(page, /className="file-tree-layout"/, "file tree and source editor must have a dedicated responsive layout");
 console.log("GENE workspace file-operation contract tests passed (create, move/rename, delete protection, safe paths, version checkpoints).");
