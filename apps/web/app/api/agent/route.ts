@@ -284,6 +284,39 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     new Function(byPath["game.js"]);
     const spec = JSON.parse(byPath["game-spec.json"]);
     if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("Build rejected: project spec must be a JSON object.");
+    // Treat the architecture blueprint as an executable contract, not documentation:
+    // validate module paths and merge them into the runtime manifest in blueprint order.
+    if (spec.architecture !== undefined) {
+      if (!spec.architecture || typeof spec.architecture !== "object" || Array.isArray(spec.architecture)) {
+        throw new Error("Build rejected: architecture must be an object.");
+      }
+      const modules = spec.architecture.modules;
+      if (modules !== undefined) {
+        if (!Array.isArray(modules) || modules.length > MAX_PROJECT_FILES - CORE_FILES.size) {
+          throw new Error("Build rejected: architecture.modules must be a bounded ordered array.");
+        }
+        const modulePaths: string[] = [];
+        const seenModules = new Set<string>();
+        for (const entry of modules) {
+          const modulePath = typeof entry === "string" ? entry : entry && typeof entry === "object" ? entry.path : "";
+          if (typeof modulePath !== "string" || !/\\.(?:m?js|cjs)$/i.test(modulePath) || !isSafeProjectPath(modulePath) || CORE_FILES.has(modulePath)) {
+            throw new Error("Build rejected: every architecture module must have a safe relative JavaScript path.");
+          }
+          const canonicalPath = modulePath.normalize("NFC").toLowerCase();
+          if (seenModules.has(canonicalPath)) throw new Error("Build rejected: architecture.modules contains duplicate paths: " + modulePath);
+          seenModules.add(canonicalPath);
+          if (typeof byPath[modulePath] !== "string" || byPath[modulePath].trim().length < 8) {
+            throw new Error("Build rejected: architecture module " + modulePath + " is missing from the assembled project.");
+          }
+          modulePaths.push(modulePath);
+        }
+        const existing = Array.isArray(spec.additionalFiles) ? spec.additionalFiles : [];
+        spec.additionalFiles = [...modulePaths, ...existing.filter((path: unknown) => typeof path === "string" && !seenModules.has(String(path).normalize("NFC").toLowerCase()))];
+        byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+        const normalizedSpecFile = normalized.find(file => file.path === "game-spec.json");
+        if (normalizedSpecFile) normalizedSpecFile.content = byPath["game-spec.json"];
+      }
+    }
     if (spec.additionalFiles !== undefined) {
       if (!Array.isArray(spec.additionalFiles) || spec.additionalFiles.length > MAX_PROJECT_FILES - CORE_FILES.size) {
         throw new Error("Build rejected: additionalFiles must be a bounded array of relative project paths.");
