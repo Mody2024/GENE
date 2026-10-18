@@ -68,6 +68,16 @@ export function extractJsonObjectText(text) {
   }
 }
 
+/** Preserve useful upstream diagnostics when a gateway returns a generic error message. */
+export function describeProviderError(data) {
+  const error = data?.error;
+  const parts = [error?.message, error?.metadata?.raw, error?.metadata?.provider_name]
+    .filter(value => typeof value === "string" && value.trim())
+    .map(value => value.trim());
+  const unique = [...new Set(parts)];
+  return (unique.join(" | ") || "empty response").slice(0, 500);
+}
+
 export function classifyProviderFailure(status, detail) {
   if (/unavailable for free|paid version|use this slug|no endpoints found|model.*not found|not a valid model|no longer available|deprecated|decommissioned/i.test(detail)) return "unavailable";
   if (status === 402 || /payment required|insufficient credits|not enough credits|requires credits|balance too low/i.test(detail)) return "paid";
