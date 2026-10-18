@@ -5,7 +5,7 @@ import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/app/lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-order.mjs";
-import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
+import { classifyProviderFailure, describeProviderError, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
 import { GENE_AUDIO_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
@@ -13,6 +13,8 @@ import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
 assert.equal(classifyProviderFailure(400, "This model is unavailable for free. The paid version is available now - use this slug instead: qwen/qwen3-coder"), "unavailable");
+assert.equal(describeProviderError({ error: { message: "Provider returned error", metadata: { raw: "upstream model returned 429", provider_name: "Example Provider" } } }), "Provider returned error | upstream model returned 429 | Example Provider", "generic gateway messages must preserve actionable upstream diagnostics");
+
 const catalog = parseFreeCatalog({ data: [
   { id: "qwen/qwen3-coder", pricing: { prompt: "0.0000003", completion: "0.0000012" }, context_length: 262144 },
   { id: "qwen/qwen3-coder:free", pricing: { prompt: "0", completion: "0" }, context_length: 262144 },
