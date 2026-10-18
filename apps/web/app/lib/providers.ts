@@ -109,7 +109,12 @@ export async function getFreeOpenRouterModels(limit = 6, signal?: AbortSignal): 
   // A user override is honoured only when it is verifiably free; a stale ":free"
   // slug that OpenRouter no longer lists as free is silently dropped.
   if (override && ids.includes(override)) ids.unshift(override);
-  return Array.from(new Set(ids)).slice(0, limit);
+  // Keep the verified free router as a final candidate rather than letting its
+  // lower catalog ranking hide it behind the first few model-specific entries.
+  const hasVerifiedFreeRouter = ids.includes("openrouter/free");
+  const ranked = Array.from(new Set(ids.filter(id => id !== "openrouter/free")));
+  const primary = ranked.slice(0, Math.max(0, limit - (hasVerifiedFreeRouter ? 1 : 0)));
+  return hasVerifiedFreeRouter ? [...primary, "openrouter/free"] : primary;
 }
 
 export function hasAlternateProviderKeys(): boolean {
@@ -180,7 +185,7 @@ export async function callChatProvider(
   let result = await attempt(options.json, options.timeoutMs);
   // Some free models reject response_format. Retry once as plain text; the
   // caller extracts JSON tolerantly.
-  if (!result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
+  if (!result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode|failed to generate json|failed_generation|invalid json/i.test(result.detail)) {
     const remaining = options.timeoutMs - (Date.now() - started);
     if (remaining > 2_000 && !options.signal?.aborted) result = await attempt(false, remaining);
   }
