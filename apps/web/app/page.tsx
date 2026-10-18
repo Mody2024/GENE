@@ -43,6 +43,52 @@ function readText(file: File): Promise<string> {
 function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
+type ProjectFileTreeNode = { name: string; path: string; kind: "folder" | "file"; children: ProjectFileTreeNode[] };
+
+function buildProjectFileTree(paths: string[]): ProjectFileTreeNode[] {
+  const root: ProjectFileTreeNode[] = [];
+  for (const path of [...paths].sort((a, b) => a.localeCompare(b))) {
+    const parts = path.split("/");
+    let level = root;
+    let currentPath = "";
+    parts.forEach((name, index) => {
+      currentPath = currentPath ? currentPath + "/" + name : name;
+      const kind = index === parts.length - 1 ? "file" : "folder";
+      let node = level.find(item => item.name === name && item.kind === kind);
+      if (!node) {
+        node = { name, path: currentPath, kind, children: [] };
+        level.push(node);
+      }
+      level = node.children;
+    });
+  }
+  const sortTree = (nodes: ProjectFileTreeNode[]) => {
+    nodes.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "folder" ? -1 : 1));
+    nodes.forEach(node => sortTree(node.children));
+  };
+  sortTree(root);
+  return root;
+}
+
+function ProjectFileTree({ nodes, activeFile, onSelect, depth = 0 }: {
+  nodes: ProjectFileTreeNode[];
+  activeFile: string;
+  onSelect: (path: string) => void;
+  depth?: number;
+}) {
+  return <div className="project-file-tree-list">
+    {nodes.map(node => node.kind === "folder"
+      ? <div className="project-file-tree-folder" key={node.path}>
+          <div className="project-file-tree-folder-label" style={{ paddingLeft: depth * 10 + 8 }}><span>▾</span>{node.name}</div>
+          <ProjectFileTree nodes={node.children} activeFile={activeFile} onSelect={onSelect} depth={depth + 1} />
+        </div>
+      : <button type="button" key={node.path} className={"project-file-tree-file" + (activeFile === node.path ? " active" : "")}
+          style={{ paddingLeft: depth * 10 + 22 }} onClick={() => onSelect(node.path)} title={node.path}>
+          <span aria-hidden="true">▤</span>{node.name}
+        </button>)}
+  </div>;
+}
+
 function GeneMark({ className = "" }: { className?: string }) {
   return <svg className={"gene-logo-svg " + className} viewBox="0 0 48 48" role="img" aria-label="GENE genie lamp and wish spark mark">
     <path className="gene-logo-orbit" d="M8 13C13 5.8 23 3.8 30.2 7.8" fill="none" stroke="#cda75e" strokeWidth="1.5" strokeLinecap="round" />
@@ -2678,7 +2724,7 @@ export default function Home() {
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Delete file</button></div><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => selectProjectFile(path)} title={path}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
+              {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}
             </div>}
 
             {section === "tasks" && <div className="tool-view">
