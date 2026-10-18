@@ -218,6 +218,7 @@ console.log("GENE light-first genie identity tests passed.");
 const modelingPromptSource = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
 const agentRouteSource = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 assert.ok(agentRouteSource.includes("fallbackTitle") && agentRouteSource.includes("fallbackEngine"), "agent normalizer recovers missing plan title and engine from trusted project context");
+assert.ok(agentRouteSource.includes("GeneAudio.music.start") && agentRouteSource.includes("GeneAudio.createSettingsPanel"), "fallback game builders receive the runtime audio contract required by build validation");
 assert.ok(agentRouteSource.includes("plan.description") && agentRouteSource.includes("input.reply.trim().slice(0, 600)"), "agent normalizer fills a missing plan summary without discarding an otherwise usable game build");
 const researchRouteSource = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 assert.ok(modelingPromptSource.includes("GENE PRO-GAME QUALITY BAR"), "game build prompts enforce a production-quality vertical-slice bar");
