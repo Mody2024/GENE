@@ -457,7 +457,7 @@ export default function Home() {
     // Load generated modules into the same sandboxed runtime as the core game/app.
     const moduleScripts = orderRuntimeModulePaths(project.files)
       .map(path => [path, project.files[path]] as const)
-      .map(([path, source]) => "(function(){\\n/* GENE isolated module: " + path + " */\\n" + source.replace(/<\/script/gi, "<\\/script") + "\\n}).call(window);")
+      .map(([path, source]) => "(function(){\n/* GENE isolated module: " + path + " */\n" + source.replace(/<\/script/gi, "<\\/script") + "\n}).call(window);")
       .join("\n;\n");
     if (project.kind === "app") {
       const html = project.files["game.html"].replace(/<script[\s\S]*?<\/script>/gi, "");
