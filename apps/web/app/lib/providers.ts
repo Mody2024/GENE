@@ -55,7 +55,7 @@ const FALLBACK_FREE_MODELS = [
   "google/gemma-3-27b-it:free"
 ];
 
-const DEFAULT_GROQ_MODELS = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "qwen/qwen3-32b", "llama-3.1-8b-instant"];
+const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
 
 let catalogCache: { at: number; entries: CatalogEntry[]; live: boolean } | null = null;
 const deadModels = new Map<string, number>();
@@ -236,7 +236,7 @@ export async function runAlternateChain(options: {
       attemptDetails.push((label + "/" + candidate.model + ": HTTP " + (result.status || 502) + " (" + failureKind + ")" + (result.detail ? " — " + result.detail : "")).slice(0, 220));
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
       const kind = classifyProviderFailure(result.status, result.detail);
-      if (kind === "unavailable" || kind === "paid") markModelUnavailable(candidate.model);
+      if (kind === "unavailable" || kind === "paid" || (result.status === 200 && /empty response/i.test(result.detail))) markModelUnavailable(candidate.model);
       if (kind === "auth") skipProvider.add(candidate.name);
       continue;
     }
