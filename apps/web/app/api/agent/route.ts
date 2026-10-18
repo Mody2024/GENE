@@ -629,6 +629,7 @@ export async function POST(request: NextRequest) {
   const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
+    if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
     const attempt = queued.shift()!;
     const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
@@ -888,6 +889,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch {
+        if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
         // Independent review is best-effort; it must never block an otherwise valid build.
       }
     }
@@ -966,5 +968,6 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
+  if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }
