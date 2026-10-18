@@ -20,6 +20,13 @@ const catalog = parseFreeCatalog({ data: [
 ] }, 10);
 const ids = catalog.map(model => (typeof model === "string" ? model : model.id));
 assert.ok(ids.includes("qwen/qwen3-coder:free") && !ids.includes("qwen/qwen3-coder") && !ids.includes("vendor/paid-model"), "only verifiably free models are routed");
+const textOnlyCatalog = parseFreeCatalog({ data: [
+  { id: "google/lyria-3-clip-preview", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["text", "audio"] } },
+  { id: "vendor/free-tts", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["audio"] } },
+  { id: "vendor/free-chat", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["text"] } }
+] });
+assert.deepEqual(textOnlyCatalog.map(model => model.id), ["vendor/free-chat"], "free audio/music endpoints must never enter the text/code fallback pool");
+
 assert.equal(JSON.parse(extractJsonObjectText('Here:\n```json\n{"a":1}\n```')).a, 1);
 
 // The reported crash: `let hazards;` later used as an array.
