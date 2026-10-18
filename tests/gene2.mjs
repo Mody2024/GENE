@@ -70,6 +70,14 @@ const orderedModules = orderRuntimeModulePaths({
   "node_modules/ignored.js": "ignored();"
 });
 assert.deepEqual(orderedModules, ["src/core.mjs", "src/combat.cjs", "src/ui.js", "src/z-last.js"], "runtime module order follows declared dependencies, then deterministically sorts undeclared modules and excludes node_modules");
+const blueprintOrderedModules = orderRuntimeModulePaths({
+  "game.js": "startGame();",
+  "game-spec.json": JSON.stringify({ architecture: { modules: [{ path: "src/world.js" }, { path: "src/interaction.js" }, { path: "src/save.js" }] }, additionalFiles: ["src/save.js", "src/interaction.js", "src/world.js"] }),
+  "src/world.js": "window.GeneModules.world = {};",
+  "src/interaction.js": "window.GeneModules.interaction = {};",
+  "src/save.js": "window.GeneModules.save = {};"
+});
+assert.deepEqual(blueprintOrderedModules, ["src/world.js", "src/interaction.js", "src/save.js"], "explicit architecture blueprint order controls runtime loading ahead of a stale compatibility manifest");
 assert.deepEqual(orderRuntimeModulePaths({ "game.js": "", "b.js": "", "a.js": "" }), ["a.js", "b.js"], "projects without a module manifest use deterministic alphabetical module order");
 
 // SVG sanitizer.
