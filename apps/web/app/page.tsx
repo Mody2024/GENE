@@ -583,6 +583,10 @@ export default function Home() {
     const parallelReadOnlyRequest = canChatDuringBuild;
     const runController = new AbortController();
     activeRunControllers.current.add(runController);
+    const runFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
+      return fetch(input, { ...init, signal: runController.signal });
+    };
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -650,8 +654,7 @@ export default function Home() {
       if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
         try {
           const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
-          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" },
-                signal: runController.signal, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
@@ -762,10 +765,9 @@ export default function Home() {
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
-              const stageResponse = await fetch("/api/agent", {
+              const stageResponse = await runFetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
                 body: JSON.stringify({
                   ...baseRequest,
                   operation: "buildPart",
@@ -873,9 +875,8 @@ export default function Home() {
                       }
                       try {
                         addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
-                        const forgeResponse = await fetch("/api/forge", {
+                        const forgeResponse = await runFetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
                           body: JSON.stringify({
                             prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
                             kind: ["character", "vehicle", "building", "environment", "prop", "weapon"].includes(String(request?.kind)) ? String(request.kind) : "prop",
@@ -1042,10 +1043,9 @@ export default function Home() {
           for (let finalAttempt = 1; finalAttempt <= 3 && !finalContentPassSucceeded; finalAttempt++) {
             try {
               const retryNote = finalAttempt === 1 ? "" : " RETRY " + finalAttempt + "/3. The previous final pass failed: " + finalPassError.slice(0, 700) + ". Return a smaller complete file. Do not repeat the whole design description; preserve current controls, remove verbose data/tables, and ensure the entire response is valid and closed.";
-              const finalPassResponse = await fetch("/api/agent", {
+              const finalPassResponse = await runFetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
                 body: JSON.stringify({
                   ...baseRequest,
                   operation: "buildPart",
@@ -1081,10 +1081,9 @@ export default function Home() {
           let validationPayload: any = null;
           let validationOk = false;
           for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
-            const validateResponse = await fetch("/api/agent", {
+            const validateResponse = await runFetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
               body: JSON.stringify({
                 ...baseRequest,
                 operation: "validateBuild",
@@ -1130,10 +1129,9 @@ export default function Home() {
                     ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
                     : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
                   : "";
-                const repairResponse = await fetch("/api/agent", {
+                const repairResponse = await runFetch("/api/agent", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
                   body: JSON.stringify({
                     ...baseRequest,
                     operation: "buildPart",
@@ -1209,10 +1207,9 @@ export default function Home() {
             : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
           let response: Response;
           try {
-            response = await fetch("/api/agent", {
+            response = await runFetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-                signal: runController.signal,
               body: JSON.stringify({
                 ...baseRequest,
                 operation,
