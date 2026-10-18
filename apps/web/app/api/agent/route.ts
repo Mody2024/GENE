@@ -231,6 +231,24 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     if (totalCharacters > 8_000_000) throw new Error("Project text exceeds the 8 MB safety budget. Keep large assets as files rather than embedding them into source.");
     normalized.push(file);
   }
+  // Salvage a common model formatting mistake: move executable inline scripts
+  // from game.html into the required game.js file before syntax/runtime validation.
+  // Keep JSON-LD/data scripts untouched, and leave external script tags for the
+  // existing external-dependency validator to reject.
+  if (projectKind === "game") {
+    const htmlFile = normalized.find(file => file.path === "game.html");
+    const jsFile = normalized.find(file => file.path === "game.js");
+    if (htmlFile && jsFile) {
+      const inlineScripts: string[] = [];
+      htmlFile.content = htmlFile.content.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (tag, rawAttrs: string, source: string) => {
+        const attrs = String(rawAttrs || "");
+        if (/\bsrc\s*=/.test(attrs) || /\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["']/i.test(attrs)) return tag;
+        if (source.trim()) inlineScripts.push(source.trim());
+        return "";
+      });
+      if (inlineScripts.length) jsFile.content = inlineScripts.join("\n;\n") + "\n;\n" + jsFile.content;
+    }
+  }
   const pathReport = inspectProjectFilePaths(normalized.map(file => file.path));
   if (!pathReport.ok) {
     const conflict = pathReport.collisions[0];
