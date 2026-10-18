@@ -640,7 +640,6 @@ export async function POST(request: NextRequest) {
         : parts;
       const candidate = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + attempt.model + ":generateContent", {
         method: "POST",
-        signal: request.signal,
         headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.key },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: AGENT_SYSTEM }] },
@@ -663,7 +662,7 @@ export async function POST(request: NextRequest) {
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
-        signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))])
       });
       const candidatePayload = await candidate.json().catch(() => null);
       const candidateText = candidatePayload?.candidates?.[0]?.content?.parts
