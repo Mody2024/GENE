@@ -546,6 +546,19 @@ const baseRun = coordinator.createBuildRun({
   fullGameContent: ["Extra missions", "Distinct ending"]
 });
 assert.deepEqual(coordinator.getReadyTasks(baseRun).map(task => task.id), ["design"], "only dependency-ready tasks may start");
+const duplicateNameRun = coordinator.createBuildRun({
+  projectId: "unique-process-names",
+  tasks: [
+    { id: "design-a", title: "Generate level", kind: "design", acceptance: ["Level plan exists"] },
+    { id: "design-b", title: "Generate level", kind: "design", acceptance: ["Second level plan exists"] },
+    { id: "design-c", title: "generate LEVEL", kind: "design", acceptance: ["Third level plan exists"] }
+  ]
+});
+assert.deepEqual(duplicateNameRun.tasks.map(task => task.title), ["Generate level", "Generate level (2)", "generate LEVEL (3)"], "repeated build process names are made unique case-insensitively within a project run");
+const queuedValidationFailure = coordinator.setTaskStatus(baseRun, "design", "failed", undefined, "Preflight validation rejected assembled files");
+assert.equal(queuedValidationFailure.tasks.find(task => task.id === "design").status, "failed", "queued preflight validation failures are recorded without throwing a second transition error");
+assert.match(queuedValidationFailure.tasks.find(task => task.id === "design").lastError, /Preflight validation rejected/, "preflight failure keeps the original diagnostic");
+
 assert.throws(() => coordinator.createBuildRun({ projectId: "cycle", tasks: [
   { id: "a", title: "A", kind: "design", dependsOn: ["b"], acceptance: [] },
   { id: "b", title: "B", kind: "implement", dependsOn: ["a"], acceptance: [] }
