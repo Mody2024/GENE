@@ -80,10 +80,11 @@ export function resetProviderCaches(): void {
   deadModels.clear();
 }
 
-async function loadCatalog(): Promise<{ entries: CatalogEntry[]; live: boolean }> {
+async function loadCatalog(signal?: AbortSignal): Promise<{ entries: CatalogEntry[]; live: boolean }> {
+  if (signal?.aborted) throw new DOMException("Provider chain cancelled", "AbortError");
   if (catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) return catalogCache;
   try {
-    const response = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(4_500), headers: { Accept: "application/json" } });
+    const response = await fetch(CATALOG_URL, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(4_500)]) : AbortSignal.timeout(4_500), headers: { Accept: "application/json" } });
     if (response.ok) {
       const entries = parseFreeCatalog(await response.json().catch(() => null));
       if (entries.length) {
@@ -91,7 +92,8 @@ async function loadCatalog(): Promise<{ entries: CatalogEntry[]; live: boolean }
         return catalogCache;
       }
     }
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     // Fall through to the static list; the catalog is a best-effort optimisation.
   }
   const entries = FALLBACK_FREE_MODELS.map(id => ({ id, context: 0, score: scoreModel(id, 0) }));
@@ -100,8 +102,8 @@ async function loadCatalog(): Promise<{ entries: CatalogEntry[]; live: boolean }
 }
 
 /** Ranked verified-free OpenRouter model ids (dead models removed). */
-export async function getFreeOpenRouterModels(limit = 6): Promise<string[]> {
-  const { entries } = await loadCatalog();
+export async function getFreeOpenRouterModels(limit = 6, signal?: AbortSignal): Promise<string[]> {
+  const { entries } = await loadCatalog(signal);
   const override = process.env.GENE_OPENROUTER_MODEL?.trim();
   const ids = entries.map(entry => entry.id).filter(id => !isModelMarkedDead(id));
   // A user override is honoured only when it is verifiably free; a stale ":free"
@@ -114,7 +116,8 @@ export function hasAlternateProviderKeys(): boolean {
   return Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim());
 }
 
-export async function listAlternateProviders(siteTitle: string, options: { openrouterLimit?: number; groqLimit?: number } = {}): Promise<AltProvider[]> {
+export async function listAlternateProviders(siteTitle: string, options: { openrouterLimit?: number; groqLimit?: number; signal?: AbortSignal } = {}): Promise<AltProvider[]> {
+  if (options.signal?.aborted) throw new DOMException("Provider chain cancelled", "AbortError");
   const providers: AltProvider[] = [];
   const groqKey = process.env.GROQ_API_KEY?.trim();
   if (groqKey) {
@@ -126,7 +129,7 @@ export async function listAlternateProviders(siteTitle: string, options: { openr
   }
   const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
   if (openRouterKey) {
-    const models = await getFreeOpenRouterModels(options.openrouterLimit ?? 5);
+    const models = await getFreeOpenRouterModels(options.openrouterLimit ?? 5, options.signal);
     for (const model of models) {
       providers.push({
         name: "openrouter",
@@ -142,7 +145,7 @@ export async function listAlternateProviders(siteTitle: string, options: { openr
 
 export async function callChatProvider(
   provider: AltProvider,
-  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number }
+  options: { system: string; user: string; maxTokens: number; temperature: number; json: boolean; timeoutMs: number; signal?: AbortSignal }
 ): Promise<ChatResult> {
   const started = Date.now();
   const attempt = async (useJsonMode: boolean, timeoutMs: number): Promise<ChatResult> => {
@@ -157,7 +160,7 @@ export async function callChatProvider(
           temperature: options.temperature,
           max_tokens: options.maxTokens
         }),
-        signal: AbortSignal.timeout(Math.max(1_000, timeoutMs))
+        signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(Math.max(1_000, timeoutMs))]) : AbortSignal.timeout(Math.max(1_000, timeoutMs))
       });
       const data: any = await response.json().catch(() => null);
       const content = data?.choices?.[0]?.message?.content;
@@ -170,6 +173,7 @@ export async function callChatProvider(
         detail
       };
     } catch (error) {
+      if (options.signal?.aborted) throw error;
       return { ok: false, status: 504, text: "", finish: "", detail: error instanceof Error ? error.message : "network error" };
     }
   };
@@ -178,7 +182,7 @@ export async function callChatProvider(
   // caller extracts JSON tolerantly.
   if (!result.ok && options.json && result.status === 400 && /response_format|json_object|structured|json mode/i.test(result.detail)) {
     const remaining = options.timeoutMs - (Date.now() - started);
-    if (remaining > 2_000) result = await attempt(false, remaining);
+    if (remaining > 2_000 && !options.signal?.aborted) result = await attempt(false, remaining);
   }
   return result;
 }
@@ -198,8 +202,10 @@ export async function runAlternateChain(options: {
   validate?: (text: string) => boolean;
   openrouterLimit?: number;
   groqLimit?: number;
+  signal?: AbortSignal;
 }): Promise<ChainResult> {
-  const candidates = await listAlternateProviders(options.siteTitle, { openrouterLimit: options.openrouterLimit, groqLimit: options.groqLimit });
+  if (options.signal?.aborted) throw new DOMException("Provider chain cancelled", "AbortError");
+  const candidates = await listAlternateProviders(options.siteTitle, { openrouterLimit: options.openrouterLimit, groqLimit: options.groqLimit, signal: options.signal });
   let failure: ChainFailure = { status: 502, detail: "No alternate free provider is configured.", provider: "none" };
   let truncated = false;
   let malformed = false;
@@ -207,6 +213,7 @@ export async function runAlternateChain(options: {
   const tried: string[] = [];
   const skipProvider = new Set<string>();
   for (const candidate of candidates) {
+    if (options.signal?.aborted) throw new DOMException("Provider chain cancelled", "AbortError");
     if (attempts >= (options.maxAttempts ?? 5)) break;
     if (skipProvider.has(candidate.name)) continue;
     const remaining = options.deadline - Date.now();
@@ -220,7 +227,8 @@ export async function runAlternateChain(options: {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       json: options.json,
-      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500)
+      timeoutMs: Math.min(options.perCallMs ?? 14_000, remaining - 500),
+      signal: options.signal
     });
     if (!result.ok) {
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
