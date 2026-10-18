@@ -503,6 +503,17 @@ assert.throws(() => applyPatchBatch(originalTree, [
 assert.throws(() => applyPatchBatch(originalTree, [
   { op: "add_file", path: "../outside.js", content: "unsafe" }
 ]), /Unsafe project path/, "path traversal is rejected");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "add_file", path: "oversized.txt", content: "x".repeat(500_001) }
+]), /500 KB safety limit/, "new files respect the same per-file limit as edits");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "README.md", expected: "GENE test", replacement: "x".repeat(500_001) }
+]), /500 KB safety limit/, "edits cannot grow a file past the per-file limit");
+assert.throws(() => applyPatchBatch(originalTree, Array.from({ length: 101 }, () => ({ op: "delete_file", path: "README.md" }))), /cannot exceed 100 operations/, "oversized patch batches are rejected before applying any operation");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "invent_operation", path: "README.md" }]), /Unsupported patch operation/, "unknown model-generated operations fail closed");
+const fullTree = Object.fromEntries(Array.from({ length: 100 }, (_, index) => ["file-" + index + ".txt", "ok"]));
+assert.throws(() => applyPatchBatch(fullTree, [{ op: "add_file", path: "extra.txt", content: "no" }]), /cannot exceed 100 files/, "project manifests stay within the documented file count limit");
+
 const renamedTree = applyPatchBatch(originalTree, [{ op: "rename_file", path: "README.md", newPath: "docs/README.md" }]);
 assert.equal(renamedTree.files["docs/README.md"], "GENE test", "rename preserves file content");
 assert.equal(renamedTree.files["README.md"], undefined, "rename removes the old manifest path");
