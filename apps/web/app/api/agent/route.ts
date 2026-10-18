@@ -590,7 +590,7 @@ export async function POST(request: NextRequest) {
     ? body.model
     : configuredModel;
   const thinkingLevel = requestedThinking === "fast" ? "low" : requestedThinking === "deep" ? "high" : "medium";
-  const userInput = makeAgentInput({
+  let userInput = makeAgentInput({
     operation: body.operation,
     stagePath: typeof body.stagePath === "string" ? body.stagePath : undefined,
     mode: body.mode,
@@ -601,6 +601,9 @@ export async function POST(request: NextRequest) {
     thinking: thinkingLevel,
     extendedPlanning: body.extendedPlanning === true
   });
+  if (["build", "surprise"].includes(body.operation) && projectKind === "game") {
+    userInput += "\\n\\nFINAL GAME BUILD CONTRACT — do not omit these required deliverables: return a non-empty plan.title, plan.summary and plan.engine matching the requested engine; include game.html, game.css, game.js and game-spec.json. Use the injected GeneAudio kit for real sound: call GeneAudio.music.start('exploration') from the real start/play gesture, GeneAudio.sfx('start') and at least two other named SFX from actual gameplay/UI events, and GeneAudio.createSettingsPanel(container) or a real volume/mute control. Put mapped event names in game-spec.json audio.events and audio.implementation='procedural-web-audio'. Make controls, collisions, progression, pause/resume, restart and reachable win/loss states genuinely work. Never claim a feature that is not implemented.";
+  }
 
   const parts: Array<Record<string, unknown>> = [{ text: userInput }];
   const references = Array.isArray(body.project?.references) ? body.project.references : [];
