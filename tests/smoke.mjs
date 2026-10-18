@@ -65,7 +65,7 @@ assert.ok(page.includes("GENE 2.0 Studio") && page.includes("GENE 2.0") && page.
 assert.ok(layout.includes("GENE 2.0 Studio") && health.includes('version: "2.0.0"'), "website metadata and health endpoint identify GENE 2.0");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
-assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time without exceeding route budget");
+assert.ok(api.includes("AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests combine client cancellation with bounded provider timeouts");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
