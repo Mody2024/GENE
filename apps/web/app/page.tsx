@@ -1957,7 +1957,7 @@ export default function Home() {
   function moveOrRenameProjectFile() {
     if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
     const currentPath = project.activeFile;
-    if (!project.files[currentPath]) return;
+    if (!Object.prototype.hasOwnProperty.call(project.files, currentPath)) return;
     if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
       setNotice("Core runtime files keep their required paths so GENE can still build and preview this project.");
       return;
@@ -1986,7 +1986,7 @@ export default function Home() {
   function deleteProjectFile() {
     if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
     const currentPath = project.activeFile;
-    if (!project.files[currentPath]) return;
+    if (!Object.prototype.hasOwnProperty.call(project.files, currentPath)) return;
     if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
       setNotice("Required core runtime files cannot be deleted. Ask GENE to replace their contents instead.");
       return;
@@ -2724,7 +2724,7 @@ export default function Home() {
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}
+              {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}
             </div>}
 
             {section === "tasks" && <div className="tool-view">
