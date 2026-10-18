@@ -1860,6 +1860,93 @@ export default function Home() {
     }
   }
 
+  function commitFileMutation(nextFiles: Record<string, string>, label: string, nextActiveFile: string) {
+    if (!project) return;
+    const pathReport = inspectProjectFilePaths(Object.keys(nextFiles));
+    if (pathReport.invalid.length || pathReport.collisions.length) {
+      setNotice("File operation rejected: paths must be safe, relative, unique, and portable.");
+      return;
+    }
+    const version: BuildVersion = {
+      number: (project.versions[0]?.number || 0) + 1,
+      label,
+      files: { ...nextFiles },
+      createdAt: now(),
+      testSummary: "File operation saved as a checkpoint. Run build checks and verify the live preview."
+    };
+    const updatedProject = { ...project, files: nextFiles, activeFile: nextActiveFile, versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
+    setProject(updatedProject);
+    setEditedFile(nextFiles[nextActiveFile] || "");
+    setFileDirty(false);
+    setNotice(label + " saved as version " + version.number + ".");
+    setPreviewKey(n => n + 1);
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice(label + " saved and synced to " + data.projectPath + ". Run checks before release."))
+        .catch(error => setNotice(label + " saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
+  }
+
+  function createProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    if (fileDirty && !window.confirm("Discard unsaved editor changes before creating a file?")) return;
+    const entered = window.prompt("New file path (folders are supported)", "src/level.js");
+    if (entered === null) return;
+    const path = entered.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!path || path.startsWith("/") || path.split("/").some(part => !part || part === "." || part === "..") || !/\.[a-z0-9]{1,8}$/i.test(path)) {
+      setNotice("Use a safe relative file path with a file extension, for example src/level.js.");
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(project.files, path)) { setNotice("That file already exists."); return; }
+    if (Object.keys(project.files).length >= 100) { setNotice("Project file limit reached (100)."); return; }
+    const extension = path.split(".").pop()!.toLowerCase();
+    if (!["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"].includes(extension)) {
+      setNotice("That file type is not supported by GENE's project workspace.");
+      return;
+    }
+    const seed = extension === "json" ? "{}\n" : extension === "html" ? "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body></body></html>\n" : "";
+    commitFileMutation({ ...project.files, [path]: seed }, "Created " + path, path);
+  }
+
+  function moveOrRenameProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    const currentPath = project.activeFile;
+    if (!project.files[currentPath]) return;
+    if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
+      setNotice("Core runtime files keep their required paths so GENE can still build and preview this project.");
+      return;
+    }
+    if (fileDirty && !window.confirm("Discard unsaved editor changes before moving this file?")) return;
+    const entered = window.prompt("New file path (change the folder to move it)", currentPath);
+    if (entered === null) return;
+    const nextPath = entered.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!nextPath || nextPath.startsWith("/") || nextPath.split("/").some(part => !part || part === "." || part === "..") || !/\.[a-z0-9]{1,8}$/i.test(nextPath)) {
+      setNotice("Use a safe relative file path with a file extension.");
+      return;
+    }
+    if (nextPath !== currentPath && Object.prototype.hasOwnProperty.call(project.files, nextPath)) { setNotice("A file already exists at that path."); return; }
+    if (nextPath === currentPath) return;
+    const nextFiles = { ...project.files };
+    nextFiles[nextPath] = nextFiles[currentPath];
+    delete nextFiles[currentPath];
+    commitFileMutation(nextFiles, "Moved " + currentPath + " to " + nextPath, nextPath);
+  }
+
+  function deleteProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    const currentPath = project.activeFile;
+    if (!project.files[currentPath]) return;
+    if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
+      setNotice("Required core runtime files cannot be deleted. Ask GENE to replace their contents instead.");
+      return;
+    }
+    if (!window.confirm("Delete " + currentPath + "? A recoverable version checkpoint will be created first.")) return;
+    const nextFiles = { ...project.files };
+    delete nextFiles[currentPath];
+    const nextActive = Object.keys(nextFiles)[0] || "game.js";
+    commitFileMutation(nextFiles, "Deleted " + currentPath, nextActive);
+  }
+
   function selectProjectFile(path: string) {
     if (!project) return;
     if (path !== project.activeFile && fileDirty && !window.confirm("Discard unsaved edits to " + project.activeFile + "?")) return;
@@ -2586,7 +2673,7 @@ export default function Home() {
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => selectProjectFile(path)}>{fileName(path, project.kind || "game")}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
+              {!Object.keys(project.files).length ? <div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !project.files[project.activeFile]}>Delete file</button></div><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => selectProjectFile(path)} title={path}>{path}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
             </div>}
 
             {section === "tasks" && <div className="tool-view">
