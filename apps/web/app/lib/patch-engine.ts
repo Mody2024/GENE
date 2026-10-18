@@ -8,8 +8,12 @@ export type PatchResult = {
 
 const MAX_PATH_LENGTH = 240;
 const MAX_FILE_BYTES = 500_000;
+const MAX_PATCH_OPERATIONS = 100;
+const MAX_PROJECT_FILES = 100;
+const MAX_PROJECT_BYTES = 50_000_000;
 
-function safePath(value: string): string {
+function safePath(value: unknown): string {
+  if (typeof value !== "string") throw new Error("Project path must be a string.");
   const path = value.replace(/\\/g, "/");
   if (!path || path.length > MAX_PATH_LENGTH || path.startsWith("/") ||
       /^[a-zA-Z]:/.test(path) || path.split("/").some(part => !part || part === "." || part === "..") ||
@@ -71,18 +75,38 @@ export function applyPatchBatch(
   operations: PatchOperation[],
 ): PatchResult {
   if (!Array.isArray(operations) || operations.length === 0) throw new Error("A patch batch must contain at least one operation.");
-  const files = { ...currentFiles };
+  if (operations.length > MAX_PATCH_OPERATIONS) throw new Error("A patch batch cannot exceed " + MAX_PATCH_OPERATIONS + " operations.");
+  if (!currentFiles || typeof currentFiles !== "object" || Array.isArray(currentFiles)) throw new Error("Current project files must be a file map.");
+  const files: Record<string, string> = { ...currentFiles };
+  if (Object.keys(files).length > MAX_PROJECT_FILES) throw new Error("Project exceeds the " + MAX_PROJECT_FILES + " file safety limit.");
+  let totalBytes = 0;
+  for (const [existingPath, content] of Object.entries(files)) {
+    safePath(existingPath);
+    if (typeof content !== "string") throw new Error("Project file content must be text: " + existingPath);
+    totalBytes += BufferSize(content);
+    if (BufferSize(content) > MAX_FILE_BYTES) throw new Error("Existing project file exceeds the 500 KB safety limit: " + existingPath);
+  }
+  if (totalBytes > MAX_PROJECT_BYTES) throw new Error("Project exceeds the 50 MB safety limit.");
   const changed = new Set<string>();
   const deleted = new Set<string>();
   for (const operation of operations) {
+    if (!operation || typeof operation !== "object" || Array.isArray(operation)) throw new Error("Each patch operation must be an object.");
+    if (!["add_file", "delete_file", "rename_file", "replace_exact", "replace_range", "apply_diff"].includes((operation as { op?: string }).op || "")) {
+      throw new Error("Unsupported patch operation.");
+    }
     const path = safePath(operation.path);
     if (operation.op === "add_file") {
       if (Object.prototype.hasOwnProperty.call(files, path)) throw new Error("Cannot add an existing file: " + path);
+      if (typeof operation.content !== "string") throw new Error("New file content must be text: " + path);
+      if (BufferSize(operation.content) > MAX_FILE_BYTES) throw new Error("New file exceeds the 500 KB safety limit: " + path);
+      if (Object.keys(files).length >= MAX_PROJECT_FILES) throw new Error("Project cannot exceed " + MAX_PROJECT_FILES + " files.");
       files[path] = operation.content;
+      totalBytes += BufferSize(operation.content);
       changed.add(path);
       deleted.delete(path);
     } else if (operation.op === "delete_file") {
       if (!Object.prototype.hasOwnProperty.call(files, path)) throw new Error("Cannot delete a missing file: " + path);
+      totalBytes -= BufferSize(files[path]);
       delete files[path];
       changed.delete(path);
       deleted.add(path);
@@ -90,6 +114,7 @@ export function applyPatchBatch(
       const target = safePath(operation.newPath);
       if (!Object.prototype.hasOwnProperty.call(files, path)) throw new Error("Cannot rename a missing file: " + path);
       if (Object.prototype.hasOwnProperty.call(files, target)) throw new Error("Cannot rename over an existing file: " + target);
+      if (target === path) throw new Error("Rename target must differ from the source path.");
       files[target] = files[path];
       delete files[path];
       changed.delete(path);
@@ -123,6 +148,7 @@ export function applyPatchBatch(
         changed.add(path);
       }
     }
+    if (totalBytes > MAX_PROJECT_BYTES) throw new Error("Project exceeds the 50 MB safety limit.");
   }
   return { files, changedPaths: [...changed], deletedPaths: [...deleted] };
 }
