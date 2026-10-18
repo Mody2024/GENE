@@ -937,17 +937,21 @@ export async function POST(request: NextRequest) {
       const broken = result.files.filter(file => /\.(?:m?js|cjs)$/i.test(file.path)).filter(file => {
         try { new Function(file.content); return false; } catch { return true; }
       });
+      const syntaxDiagnostics = broken.map(file => {
+        try { new Function(file.content); return { path: file.path, error: "Unknown parse error" }; }
+        catch (error) { return { path: file.path, error: error instanceof Error ? error.message : String(error) }; }
+      });
       if (broken.length && hasAlternateProviderKeys() && Date.now() - startedAt < totalBudgetMs - 7_000) {
         try {
           const repair = await runAlternateChain({
             system: "You are GENE's JavaScript syntax repair tool. Repair ONLY parse/syntax errors in the supplied JavaScript files. Preserve the requested gameplay, logic, controls, APIs and behavior. Do not refactor, add features, invent dependencies, or change paths. Return one JSON object {reply:string,files:[{path:string,content:string}]} with complete replacements only for the listed broken files. If uncertain return files:[] . No markdown.",
-            user: "Fix parse errors only. The supplied JavaScript did not pass new Function syntax validation. Broken files:\\n" + JSON.stringify(broken.map(file => ({ path: file.path, content: file.content.slice(0, 45000) }))),
+            user: "Fix parse errors only. The supplied JavaScript did not pass new Function syntax validation. Exact parser diagnostics:\\n" + JSON.stringify(syntaxDiagnostics) + "\\nBroken files (return complete replacements only for these paths):\\n" + JSON.stringify(broken.map(file => ({ path: file.path, content: file.content.slice(0, 45000) }))),
             maxTokens: 6_000,
             temperature: 0,
             json: true,
-            deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 7_000),
+            deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 9_000),
             signal: request.signal,
-            perCallMs: 4_500,
+            perCallMs: 5_000,
             maxAttempts: 2,
             groqLimit: 1,
             openrouterLimit: 1,
