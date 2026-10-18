@@ -737,7 +737,7 @@ export async function POST(request: NextRequest) {
   let chainDiagnostics: string[] = [];
   if (!payload && hasAlternateProviderKeys()) {
     const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
-    const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
+    const system = isBuild ? "You are GENE, a reliable game/app builder. Return exactly one valid JSON object, no markdown. For a full browser game build, include reply (string), plan (object), and files (array) containing non-empty game.html, game.css, game.js, and game-spec.json. Make the game compact, playable, responsive, and self-contained with no external network assets. Preserve user intent. Never claim features that are not implemented. No provider branding or watermark unless requested." : AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Return one complete JSON object only.";
     const chain = await runAlternateChain({
       system,
       user: userInput + "\n\nALTERNATE PROVIDER COMPACT OUTPUT: Return valid JSON only. For buildPart return exactly one requested file. No markdown. Keep the implementation compact but complete.",
