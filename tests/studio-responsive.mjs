@@ -35,7 +35,8 @@ try {
     await page.locator('.rail-item[aria-label="Plan & tasks"]').click();
     assert.ok((await page.locator(".tool-view-heading h2").count()) > 0, viewport.name + " task navigation should open");
 
-    if (viewport.width <= 820) await page.locator(".mobile-new-project").click();\n    else await page.locator(".project-sidebar button[title=\"New project\"]").click();
+    if (viewport.width <= 820) await page.locator(".mobile-new-project").click();
+    else await page.locator('.project-sidebar button[title="New project"]').click();
     await page.locator('.create-project-dialog[role="dialog"]').waitFor({ state: "visible" });
     assert.match(await page.locator(".create-project-dialog").innerText(), /What are we building\?/);
     await page.locator(".create-project-dialog button").first().click();
