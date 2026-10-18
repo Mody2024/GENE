@@ -34,7 +34,7 @@ export type ChainFailure = { status: number; detail: string; provider: "Groq" | 
 
 export type ChainResult =
   | { ok: true; provider: string; model: string; text: string; finish: string; attempts: number }
-  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[] };
+  | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[]; attemptDetails: string[] };
 
 import { classifyProviderFailure, extractJsonObjectText, parseFreeCatalog, scoreModel } from "./provider-utils.mjs";
 import type { CatalogEntry } from "./provider-utils.mjs";
@@ -211,6 +211,7 @@ export async function runAlternateChain(options: {
   let malformed = false;
   let attempts = 0;
   const tried: string[] = [];
+  const attemptDetails: string[] = [];
   const skipProvider = new Set<string>();
   for (const candidate of candidates) {
     if (options.signal?.aborted) throw new DOMException("Provider chain cancelled", "AbortError");
@@ -231,6 +232,8 @@ export async function runAlternateChain(options: {
       signal: options.signal
     });
     if (!result.ok) {
+      const failureKind = classifyProviderFailure(result.status, result.detail);
+      attemptDetails.push((label + "/" + candidate.model + ": HTTP " + (result.status || 502) + " (" + failureKind + ")" + (result.detail ? " — " + result.detail : "")).slice(0, 220));
       failure = { status: result.status || 502, detail: candidate.name + " (" + candidate.model + "): " + (result.detail || "empty response"), provider: label };
       const kind = classifyProviderFailure(result.status, result.detail);
       if (kind === "unavailable" || kind === "paid") markModelUnavailable(candidate.model);
@@ -238,18 +241,20 @@ export async function runAlternateChain(options: {
       continue;
     }
     if (result.finish === "length") {
+      attemptDetails.push(label + "/" + candidate.model + ": output token limit reached");
       truncated = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") reached its output limit before completing JSON.", provider: label };
       continue;
     }
     if (options.validate && !options.validate(result.text)) {
+      attemptDetails.push(label + "/" + candidate.model + ": returned invalid or incomplete output");
       malformed = true;
       failure = { status: 422, detail: candidate.name + " (" + candidate.model + ") returned incomplete or invalid JSON.", provider: label };
       continue;
     }
     return { ok: true, provider: candidate.name, model: candidate.model, text: result.text, finish: result.finish, attempts };
   }
-  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried };
+  return { ok: false, failure, truncated, malformed, attempts, triedModels: tried, attemptDetails };
 }
 
 export function getGeminiKeys(): string[] {
