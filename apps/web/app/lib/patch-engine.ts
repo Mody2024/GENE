@@ -126,13 +126,16 @@ export function applyPatchBatch(
       const original = files[path];
       let next = original;
       if (operation.op === "replace_exact") {
-        if (!operation.expected || !original.includes(operation.expected)) throw new Error("Patch context is stale or missing in " + path + ".");
+        if (typeof operation.expected !== "string" || !operation.expected) throw new Error("Exact replacement requires non-empty expected text in " + path + ".");
+        if (typeof operation.replacement !== "string") throw new Error("Exact replacement content must be text in " + path + ".");
+        if (!original.includes(operation.expected)) throw new Error("Patch context is stale or missing in " + path + ".");
         const first = original.indexOf(operation.expected);
         if (original.indexOf(operation.expected, first + operation.expected.length) !== -1) {
           throw new Error("Patch context is ambiguous in " + path + "; use a more specific match.");
         }
         next = original.slice(0, first) + operation.replacement + original.slice(first + operation.expected.length);
       } else if (operation.op === "replace_range") {
+        if (typeof operation.replacement !== "string") throw new Error("Range replacement content must be text in " + path + ".");
         const sourceLines = original.split("\n");
         if (!Number.isInteger(operation.startLine) || !Number.isInteger(operation.endLine) ||
             operation.startLine < 1 || operation.endLine < operation.startLine || operation.endLine > sourceLines.length) {
@@ -140,6 +143,7 @@ export function applyPatchBatch(
         }
         next = [...sourceLines.slice(0, operation.startLine - 1), operation.replacement, ...sourceLines.slice(operation.endLine)].join("\n");
       } else if (operation.op === "apply_diff") {
+        if (typeof operation.patch !== "string" || !operation.patch.trim()) throw new Error("Unified diff content must be non-empty text in " + path + ".");
         next = applyUnifiedDiff(original, operation.patch);
       }
       if (BufferSize(next) > MAX_FILE_BYTES) throw new Error("Patched file exceeds the 500 KB safety limit: " + path);
