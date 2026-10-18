@@ -220,6 +220,7 @@ const agentRouteSource = readFileSync(new URL("../apps/web/app/api/agent/route.t
 assert.ok(agentRouteSource.includes("fallbackTitle") && agentRouteSource.includes("fallbackEngine"), "agent normalizer recovers missing plan title and engine from trusted project context");
 assert.ok(agentRouteSource.includes("GeneAudio.music.start") && agentRouteSource.includes("GeneAudio.createSettingsPanel"), "fallback game builders receive the runtime audio contract required by build validation");
 assert.ok(agentRouteSource.includes("FINAL GAME BUILD CONTRACT") && agentRouteSource.includes("plan.title, plan.summary and plan.engine"), "primary and fallback build requests repeat required plan and playable-game deliverables");
+assert.ok(agentRouteSource.includes("perCallMs: isBuild ? 12_000 : 7_000") && agentRouteSource.includes("maxAttempts: isBuild ? 4 : 7"), "whole-game fallback attempts get a realistic generation window within the overall request deadline");
 assert.ok(agentRouteSource.includes("plan.description") && agentRouteSource.includes("input.reply.trim().slice(0, 600)"), "agent normalizer fills a missing plan summary without discarding an otherwise usable game build");
 const researchRouteSource = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 assert.ok(modelingPromptSource.includes("GENE PRO-GAME QUALITY BAR"), "game build prompts enforce a production-quality vertical-slice bar");
