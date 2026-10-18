@@ -511,6 +511,10 @@ assert.throws(() => applyPatchBatch(originalTree, [
 ]), /500 KB safety limit/, "edits cannot grow a file past the per-file limit");
 assert.throws(() => applyPatchBatch(originalTree, Array.from({ length: 101 }, () => ({ op: "delete_file", path: "README.md" }))), /cannot exceed 100 operations/, "oversized patch batches are rejected before applying any operation");
 assert.throws(() => applyPatchBatch(originalTree, [{ op: "invent_operation", path: "README.md" }]), /Unsupported patch operation/, "unknown model-generated operations fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "replace_exact", path: "README.md", expected: 42, replacement: "x" }]), /requires non-empty expected text/, "malformed exact-match payloads fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "replace_range", path: "README.md", startLine: 1, endLine: 1, replacement: null }]), /replacement content must be text/, "malformed range payloads fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "apply_diff", path: "README.md", patch: null }]), /Unified diff content must be non-empty text/, "malformed diff payloads fail closed");
+
 const fullTree = Object.fromEntries(Array.from({ length: 100 }, (_, index) => ["file-" + index + ".txt", "ok"]));
 assert.throws(() => applyPatchBatch(fullTree, [{ op: "add_file", path: "extra.txt", content: "no" }]), /cannot exceed 100 files/, "project manifests stay within the documented file count limit");
 
