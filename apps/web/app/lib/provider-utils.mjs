@@ -37,7 +37,7 @@ export function parseFreeCatalog(payload) {
     // image/video generation, embeddings, rerankers, and moderation endpoints even
     // when a catalog entry advertises text as one of several output modalities.
     const id = item.id.toLowerCase();
-    if (/lyria|audio|music|text-to-speech|(^|[-/])tts([-/.:]|$)|speech|whisper|transcrib|imagegen|image-generation|video-generation|embedding|rerank|moderation|safeguard|guard-model|clip-preview|note-preview|dots-studio|nvidia\\/nemotron/.test(id)) continue;
+    if (/lyria|audio|music|text-to-speech|(^|[-/])tts([-/.:]|$)|speech|whisper|transcrib|imagegen|image-generation|video-generation|embedding|rerank|moderation|safeguard|guard-model|clip-preview|note-preview|dots-studio|nvidia[^a-z]nemotron/.test(id)) continue;
     if (Array.isArray(outputs) && (!outputs.includes("text") || outputs.some(modality => modality !== "text"))) continue;
     const context = Number(item.context_length) || 0;
     if (context && context < 12_000) continue;
