@@ -197,7 +197,7 @@ export function checkpointBuild(
   // monotonic sequence. Continue from the highest recorded suffix to prevent
   // duplicate IDs after the retention window is full.
   const previousSequence = run.checkpoints.reduce((max, item) => {
-    const match = item.id.match(/-(\\d+)$/);
+    const match = item.id.match(/-(\d+)$/);
     return match ? Math.max(max, Number(match[1]) || 0) : max;
   }, 0);
   const checkpoint: BuildCheckpoint = {
