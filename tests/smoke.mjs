@@ -834,3 +834,7 @@ assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelli
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");
 assert.ok(prompts.includes("INTERVIEW COMPLETION GATE") && prompts.includes("DETAILED EDIT PRESERVATION"), "interview completion and targeted-edit requirements are explicit in the model contract");
+assert.ok(prompts.includes("STAGE_CONTEXT_BUDGET = 14_000"), "staged generation has a strict total context budget so large projects do not overflow free models");
+assert.ok(prompts.includes("stageContextUsed") && prompts.includes("middle omitted to fit staged context budget"), "oversized neighboring source files are compacted deterministically while preserving declarations and exports");
+assert.ok(prompts.includes('path === stagePath ? -1') && prompts.includes('path === "game-spec.json" ? 0'), "stage prompts prioritize the target file and required spec before neighboring source");
+
