@@ -212,6 +212,10 @@ assert.ok(themeCss.includes("--studio-accent:#3e795f") && themeCss.includes("rgb
 assert.ok(themeCss.includes("--studio-accent:#b7d9c2") && themeCss.includes("rgba(211,166,82,.055)") && !themeCss.includes("#bbb2ff"), "dark theme uses muted forest-green and warm-gold tokens instead of the old purple accent");
 assert.ok(themePage.includes("GENE genie lamp and wish spark mark") && themePage.includes("gene-logo-spark") && themePage.includes("gene-logo-orbit") && themePage.includes("viewBox=\"0 0 48 48\""), "GENE brand mark uses a custom genie lamp, wish spark and orbit");
 assert.ok(themeCss.includes(".studio-v2 .brand:focus-visible"), "the brand home control has a visible keyboard focus state");
+
+assert.ok(modelingPromptSource.includes("GENE PRO-GAME QUALITY BAR"), "game build prompts enforce a production-quality vertical-slice bar");
+assert.ok(modelingPromptSource.includes("GAMEPLAY FIRST") && modelingPromptSource.includes("PRO ART DIRECTION"), "game prompts prioritize playable mechanics and cohesive art direction");
+assert.ok(modelingPromptSource.includes("ENGINE INTEGRITY") && modelingPromptSource.includes("QA BEFORE RETURN"), "game prompts require engine-specific implementation and a boot-to-ending audit");
 console.log("GENE light-first genie identity tests passed.");
 
 const modelingPromptSource = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
