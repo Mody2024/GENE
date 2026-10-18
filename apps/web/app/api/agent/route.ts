@@ -298,8 +298,12 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         const modulePaths: string[] = [];
         const seenModules = new Set<string>();
         for (const entry of modules) {
-          const modulePath = typeof entry === "string" ? entry : entry && typeof entry === "object" ? entry.path : "";
-          if (typeof modulePath !== "string" || !/\\.(?:m?js|cjs)$/i.test(modulePath) || !isSafeProjectPath(modulePath) || CORE_FILES.has(modulePath)) {
+          const rawModulePath = typeof entry === "string" ? entry : entry && typeof entry === "object" ? entry.path : "";
+          const modulePath = typeof rawModulePath === "string" ? rawModulePath.trim() : rawModulePath;
+          // Descriptive entries (no path, non-JS path, or a core file) are documentation, not loadable modules: skip them.
+          // Only genuinely unsafe JavaScript paths (traversal, absolute, reserved) fail the build.
+          if (typeof modulePath !== "string" || !/\.(?:m?js|cjs)$/i.test(modulePath) || CORE_FILES.has(modulePath)) continue;
+          if (!isSafeProjectPath(modulePath)) {
             throw new Error("Build rejected: every architecture module must have a safe relative JavaScript path.");
           }
           const canonicalPath = modulePath.normalize("NFC").toLowerCase();
