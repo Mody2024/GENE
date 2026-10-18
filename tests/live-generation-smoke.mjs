@@ -19,7 +19,7 @@ if (!health.aiConfigured) {
 
 const scenarios = {
   "signal-garden": {
-    name: scenario.name,
+    name: "Signal Garden",
     prompt: "Build a compact original 2D browser game called Signal Garden. Move with arrow keys or WASD, collect five glowing seeds, avoid moving shadow-orbs, show a score, win/lose states and restart."
   },
   "tiny-platformer": {
