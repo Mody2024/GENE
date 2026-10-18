@@ -299,3 +299,17 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 @media(prefers-reduced-motion:reduce){
   .studio-v2 *, .studio-v2 *::before, .studio-v2 *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
+
+/* Nested project explorer: actual paths, keyboard-accessible folder disclosure, and search. */
+.studio-v2 .project-file-search{display:block;width:100%;min-width:0;margin:0 0 8px;padding:8px 9px;border:1px solid var(--studio-line);border-radius:8px;background:var(--studio-panel);color:var(--studio-ink);font:inherit;font-size:10px}
+.studio-v2 .project-file-search::placeholder{color:var(--studio-faint)}
+.studio-v2 .project-file-tree-list{display:grid;gap:1px;min-width:0}
+.studio-v2 .project-file-tree-folder{min-width:0}
+.studio-v2 .project-file-tree-folder>summary{list-style:none;cursor:pointer;user-select:none}
+.studio-v2 .project-file-tree-folder>summary::-webkit-details-marker{display:none}
+.studio-v2 .project-file-tree-folder>summary>span{display:inline-block;width:13px;color:var(--studio-faint);transition:transform .12s}
+.studio-v2 .project-file-tree-folder:not([open])>summary>span{transform:rotate(-90deg)}
+.studio-v2 .project-file-tree-file{display:flex;width:100%;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px;border:1px solid transparent;background:transparent;color:var(--studio-muted);text-align:left;font:inherit;font-size:10px;min-width:0}
+.studio-v2 .project-file-tree-file>span:first-child{flex:0 0 auto;color:var(--studio-accent);font-family:"DM Mono",monospace;font-size:9px}
+.studio-v2 .project-file-tree-file:hover{background:color-mix(in srgb,var(--studio-accent) 7%,var(--studio-panel));color:var(--studio-ink)}
+.studio-v2 .project-file-tree-file.active{border-color:color-mix(in srgb,var(--studio-accent) 20%,var(--studio-line));background:color-mix(in srgb,var(--studio-accent) 10%,var(--studio-panel));color:var(--studio-ink)}
