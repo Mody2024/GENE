@@ -193,8 +193,15 @@ export function checkpointBuild(
   const fileManifest = Object.fromEntries(
     Object.entries(files).map(([path, source]) => [path, hashText(source)]),
   );
+  // Checkpoint retention prunes old snapshots, so array length is not a
+  // monotonic sequence. Continue from the highest recorded suffix to prevent
+  // duplicate IDs after the retention window is full.
+  const previousSequence = run.checkpoints.reduce((max, item) => {
+    const match = item.id.match(/-(\d+)$/);
+    return match ? Math.max(max, Number(match[1]) || 0) : max;
+  }, 0);
   const checkpoint: BuildCheckpoint = {
-    id: `cp-${run.id}-${run.checkpoints.length + 1}`,
+    id: `cp-${run.id}-${previousSequence + 1}`,
     createdAt: isoNow(now),
     reason,
     planRevision: run.planRevision,

@@ -5,7 +5,7 @@ import vm from "node:vm";
 import { analyzeProjectScripts, repairUninitializedCollections } from "../apps/web/app/lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/app/lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-order.mjs";
-import { classifyProviderFailure, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
+import { classifyProviderFailure, describeProviderError, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
 import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
 import { GENE_AUDIO_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
@@ -13,6 +13,9 @@ import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
 assert.equal(classifyProviderFailure(400, "This model is unavailable for free. The paid version is available now - use this slug instead: qwen/qwen3-coder"), "unavailable");
+assert.equal(describeProviderError({ error: { message: "Provider returned error", metadata: { raw: "upstream model returned 429", provider_name: "Example Provider" } } }), "Provider returned error | upstream model returned 429 | Example Provider", "generic gateway messages must preserve actionable upstream diagnostics");
+assert.equal(classifyProviderFailure(400, describeProviderError({ error: { message: "Provider returned error", metadata: { raw: "This model is unavailable for free" } } })), "unavailable", "raw gateway metadata must drive dead-model cooldown instead of repeating broken free routes");
+
 const catalog = parseFreeCatalog({ data: [
   { id: "qwen/qwen3-coder", pricing: { prompt: "0.0000003", completion: "0.0000012" }, context_length: 262144 },
   { id: "qwen/qwen3-coder:free", pricing: { prompt: "0", completion: "0" }, context_length: 262144 },
@@ -20,6 +23,13 @@ const catalog = parseFreeCatalog({ data: [
 ] }, 10);
 const ids = catalog.map(model => (typeof model === "string" ? model : model.id));
 assert.ok(ids.includes("qwen/qwen3-coder:free") && !ids.includes("qwen/qwen3-coder") && !ids.includes("vendor/paid-model"), "only verifiably free models are routed");
+const textOnlyCatalog = parseFreeCatalog({ data: [
+  { id: "google/lyria-3-clip-preview", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["text", "audio"] } },
+  { id: "vendor/free-tts", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["audio"] } },
+  { id: "vendor/free-chat", pricing: { prompt: "0", completion: "0" }, context_length: 32000, architecture: { output_modalities: ["text"] } }
+] });
+assert.deepEqual(textOnlyCatalog.map(model => model.id), ["vendor/free-chat"], "free audio/music endpoints must never enter the text/code fallback pool");
+
 assert.equal(JSON.parse(extractJsonObjectText('Here:\n```json\n{"a":1}\n```')).a, 1);
 
 // The reported crash: `let hazards;` later used as an array.

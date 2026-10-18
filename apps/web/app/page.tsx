@@ -43,6 +43,52 @@ function readText(file: File): Promise<string> {
 function uid() {
   return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
+type ProjectFileTreeNode = { name: string; path: string; kind: "folder" | "file"; children: ProjectFileTreeNode[] };
+
+function buildProjectFileTree(paths: string[]): ProjectFileTreeNode[] {
+  const root: ProjectFileTreeNode[] = [];
+  for (const path of [...paths].sort((a, b) => a.localeCompare(b))) {
+    const parts = path.split("/");
+    let level = root;
+    let currentPath = "";
+    parts.forEach((name, index) => {
+      currentPath = currentPath ? currentPath + "/" + name : name;
+      const kind = index === parts.length - 1 ? "file" : "folder";
+      let node = level.find(item => item.name === name && item.kind === kind);
+      if (!node) {
+        node = { name, path: currentPath, kind, children: [] };
+        level.push(node);
+      }
+      level = node.children;
+    });
+  }
+  const sortTree = (nodes: ProjectFileTreeNode[]) => {
+    nodes.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "folder" ? -1 : 1));
+    nodes.forEach(node => sortTree(node.children));
+  };
+  sortTree(root);
+  return root;
+}
+
+function ProjectFileTree({ nodes, activeFile, onSelect, depth = 0 }: {
+  nodes: ProjectFileTreeNode[];
+  activeFile: string;
+  onSelect: (path: string) => void;
+  depth?: number;
+}) {
+  return <div className="project-file-tree-list">
+    {nodes.map(node => node.kind === "folder"
+      ? <div className="project-file-tree-folder" key={node.path}>
+          <div className="project-file-tree-folder-label" style={{ paddingLeft: depth * 10 + 8 }}><span>▾</span>{node.name}</div>
+          <ProjectFileTree nodes={node.children} activeFile={activeFile} onSelect={onSelect} depth={depth + 1} />
+        </div>
+      : <button type="button" key={node.path} className={"project-file-tree-file" + (activeFile === node.path ? " active" : "")}
+          style={{ paddingLeft: depth * 10 + 22 }} onClick={() => onSelect(node.path)} title={node.path}>
+          <span aria-hidden="true">▤</span>{node.name}
+        </button>)}
+  </div>;
+}
+
 function GeneMark({ className = "" }: { className?: string }) {
   return <svg className={"gene-logo-svg " + className} viewBox="0 0 48 48" role="img" aria-label="GENE genie lamp and wish spark mark">
     <path className="gene-logo-orbit" d="M8 13C13 5.8 23 3.8 30.2 7.8" fill="none" stroke="#cda75e" strokeWidth="1.5" strokeLinecap="round" />
@@ -170,6 +216,7 @@ export default function Home() {
   const [parallelChatInProgress, setParallelChatInProgress] = useState(false);
   const [queuedRequestCount, setQueuedRequestCount] = useState(0);
   const pendingBuildRequests = useRef<string[]>([]);
+  const activeRunControllers = useRef(new Set<AbortController>());
   const [packageProgress, setPackageProgress] = useState<number | null>(null);
   const [binaryTarget, setBinaryTarget] = useState<"both" | "windows" | "android">("both");
   const [binaryBuildBusy, setBinaryBuildBusy] = useState(false);
@@ -542,6 +589,21 @@ export default function Home() {
     setActivity(prev => [new Date().toLocaleTimeString() + "  " + level + " · " + safeEntry, ...prev].slice(0, 100));
   };
 
+  const stopActiveRun = useCallback(() => {
+    const active = [...activeRunControllers.current];
+    if (!active.length && !pendingBuildRequests.current.length) return;
+    for (const controller of active) controller.abort();
+    activeRunControllers.current.clear();
+    pendingBuildRequests.current = [];
+    setQueuedRequestCount(0);
+    setBusy(false);
+    setParallelChatInProgress(false);
+    setBuildInProgress(false);
+    setCanQueueBuildRequests(false);
+    setNotice("Stopped. No new AI stages will be scheduled. The last saved project version is preserved.");
+    addActivity("Stopped the active run and cleared queued requests.");
+  }, []);
+  
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
     const prompt = text.trim();
@@ -565,6 +627,12 @@ export default function Home() {
     if (busy && !canChatDuringBuild) return;
     if (parallelChatInProgress && !canChatDuringBuild) return;
     const parallelReadOnlyRequest = canChatDuringBuild;
+    const runController = new AbortController();
+    activeRunControllers.current.add(runController);
+    const runFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
+      return fetch(input, { ...init, signal: runController.signal });
+    };
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
     const answerKey = operationOverride || planIntent === "update" ? undefined : project.question?.id;
@@ -628,10 +696,11 @@ export default function Home() {
     addActivity("Request accepted: " + operation);
     setSection("chat");
     try {
+      if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
       if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
         try {
           const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
-          const researchResponse = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
@@ -742,7 +811,7 @@ export default function Home() {
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
             try {
-              const stageResponse = await fetch("/api/agent", {
+              const stageResponse = await runFetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -852,7 +921,7 @@ export default function Home() {
                       }
                       try {
                         addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
-                        const forgeResponse = await fetch("/api/forge", {
+                        const forgeResponse = await runFetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             prompt: String(request?.prompt || ("Create a distinctive " + String(request?.kind || "prop") + " for " + spec.title + ". " + nextProject.initialPrompt)).slice(0, 3800),
@@ -1020,7 +1089,7 @@ export default function Home() {
           for (let finalAttempt = 1; finalAttempt <= 3 && !finalContentPassSucceeded; finalAttempt++) {
             try {
               const retryNote = finalAttempt === 1 ? "" : " RETRY " + finalAttempt + "/3. The previous final pass failed: " + finalPassError.slice(0, 700) + ". Return a smaller complete file. Do not repeat the whole design description; preserve current controls, remove verbose data/tables, and ensure the entire response is valid and closed.";
-              const finalPassResponse = await fetch("/api/agent", {
+              const finalPassResponse = await runFetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1058,7 +1127,7 @@ export default function Home() {
           let validationPayload: any = null;
           let validationOk = false;
           for (let validationAttempt = 0; validationAttempt < 3; validationAttempt++) {
-            const validateResponse = await fetch("/api/agent", {
+            const validateResponse = await runFetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1106,7 +1175,7 @@ export default function Home() {
                     ? " Implement actual audible Web Audio/media playback with a safe user-gesture unlock, background music, at least three gameplay/UI sound events wired to real transitions, and adjustable master/music/SFX volume plus mute. Do not use silent stubs or claim sounds that are not connected."
                     : " Declare only the audio implementation actually present in game.js: enabled=true, implementation=procedural-web-audio or asset-backed, buses master/music/sfx, and at least three event mappings corresponding to real sound calls. Keep all existing spec fields.")
                   : "";
-                const repairResponse = await fetch("/api/agent", {
+                const repairResponse = await runFetch("/api/agent", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1184,7 +1253,7 @@ export default function Home() {
             : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
           let response: Response;
           try {
-            response = await fetch("/api/agent", {
+            response = await runFetch("/api/agent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1348,6 +1417,7 @@ export default function Home() {
         }
       }
     } catch (error) {
+      if (runController.signal.aborted) return;
       const text = explainAgentError(error);
       const failed = { ...nextProject, buildRun: nextProject.buildRun || null, livingPreview: nextProject.livingPreview || null, messages: [...nextProject.messages, message("assistant", "Request failed: " + text + ". No unverified changes were applied.", "error", { prompt, operation })] };
       setProject(current => {
@@ -1367,12 +1437,15 @@ export default function Home() {
       setNotice(text);
       addActivity("Network/response error: " + text);
     } finally {
-      if (parallelReadOnlyRequest) setParallelChatInProgress(false);
-      else setBusy(false);
-      if (operation === "build" || operation === "surprise") {
-        setBuildInProgress(false);
-        setCanQueueBuildRequests(false);
-      }
+      activeRunControllers.current.delete(runController);
+      if (activeRunControllers.current.size === 0) {
+        if (parallelReadOnlyRequest) setParallelChatInProgress(false);
+        else setBusy(false);
+        if (operation === "build" || operation === "surprise") {
+          setBuildInProgress(false);
+          setCanQueueBuildRequests(false);
+        }
+      } else if (parallelReadOnlyRequest) setParallelChatInProgress(false);
     }
   }, [project, busy, buildInProgress, canQueueBuildRequests, aiModel, searchMode, planIntent, interactionMode, extendedPlanning, localAgentStatus, localAgentToken, localAgentUrl]);
 
@@ -1833,6 +1906,98 @@ export default function Home() {
     }
   }
 
+  function commitFileMutation(nextFiles: Record<string, string>, label: string, nextActiveFile: string) {
+    if (!project) return;
+    const pathReport = inspectProjectFilePaths(Object.keys(nextFiles));
+    if (pathReport.invalid.length || pathReport.collisions.length) {
+      setNotice("File operation rejected: paths must be safe, relative, unique, and portable.");
+      return;
+    }
+    const version: BuildVersion = {
+      number: (project.versions[0]?.number || 0) + 1,
+      label,
+      files: { ...nextFiles },
+      createdAt: now(),
+      testSummary: "File operation saved as a checkpoint. Run build checks and verify the live preview."
+    };
+    const updatedProject = { ...project, files: nextFiles, activeFile: nextActiveFile, versions: [version, ...project.versions].slice(0, 8), updatedAt: now() };
+    setProject(updatedProject);
+    setEditedFile(nextFiles[nextActiveFile] || "");
+    setFileDirty(false);
+    setNotice(label + " saved as version " + version.number + ".");
+    setPreviewKey(n => n + 1);
+    if (localAgentStatus === "connected" && localAgentToken) {
+      void writeProjectToDisk(updatedProject, localAgentUrl, localAgentToken)
+        .then(data => setNotice(label + " saved and synced to " + data.projectPath + ". Run checks before release."))
+        .catch(error => setNotice(label + " saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry."));
+    }
+  }
+
+  function createProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    if (fileDirty && !window.confirm("Discard unsaved editor changes before creating a file?")) return;
+    const entered = window.prompt("New file path (folders are supported)", "src/level.js");
+    if (entered === null) return;
+    const path = entered.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!path || path.startsWith("/") || path.split("/").some(part => !part || part === "." || part === "..") || !/\.[a-z0-9]{1,8}$/i.test(path)) {
+      setNotice("Use a safe relative file path with a file extension, for example src/level.js.");
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(project.files, path)) { setNotice("That file already exists."); return; }
+    if (Object.keys(project.files).length >= 100) { setNotice("Project file limit reached (100)."); return; }
+    const extension = path.split(".").pop()!.toLowerCase();
+    if (!["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"].includes(extension)) {
+      setNotice("That file type is not supported by GENE's project workspace.");
+      return;
+    }
+    const seed = extension === "json" ? "{}\n" : extension === "html" ? "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body></body></html>\n" : "";
+    commitFileMutation({ ...project.files, [path]: seed }, "Created " + path, path);
+  }
+
+  function moveOrRenameProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    const currentPath = project.activeFile;
+    if (!Object.prototype.hasOwnProperty.call(project.files, currentPath)) return;
+    if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
+      setNotice("Core runtime files keep their required paths so GENE can still build and preview this project.");
+      return;
+    }
+    if (fileDirty && !window.confirm("Discard unsaved editor changes before moving this file?")) return;
+    const entered = window.prompt("New file path (change the folder to move it)", currentPath);
+    if (entered === null) return;
+    const nextPath = entered.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!nextPath || nextPath.startsWith("/") || nextPath.split("/").some(part => !part || part === "." || part === "..") || !/\.[a-z0-9]{1,8}$/i.test(nextPath)) {
+      setNotice("Use a safe relative file path with a file extension.");
+      return;
+    }
+    const nextExtension = nextPath.split(".").pop()!.toLowerCase();
+    if (!["html","css","js","mjs","cjs","json","svg","png","jpg","jpeg","webp","gif","obj","mtl","glsl","txt","md","gd","ts","wav","mp3","ogg","woff","woff2"].includes(nextExtension)) {
+      setNotice("That file type is not supported by GENE's project workspace.");
+      return;
+    }
+    if (nextPath !== currentPath && Object.prototype.hasOwnProperty.call(project.files, nextPath)) { setNotice("A file already exists at that path."); return; }
+    if (nextPath === currentPath) return;
+    const nextFiles = { ...project.files };
+    nextFiles[nextPath] = nextFiles[currentPath];
+    delete nextFiles[currentPath];
+    commitFileMutation(nextFiles, "Moved " + currentPath + " to " + nextPath, nextPath);
+  }
+
+  function deleteProjectFile() {
+    if (!project || project.mode === "plan") { setNotice("Switch to Build mode before changing project files."); return; }
+    const currentPath = project.activeFile;
+    if (!Object.prototype.hasOwnProperty.call(project.files, currentPath)) return;
+    if (["game.html", "game.css", "game.js", "game-spec.json"].includes(currentPath)) {
+      setNotice("Required core runtime files cannot be deleted. Ask GENE to replace their contents instead.");
+      return;
+    }
+    if (!window.confirm("Delete " + currentPath + "? A recoverable version checkpoint will be created first.")) return;
+    const nextFiles = { ...project.files };
+    delete nextFiles[currentPath];
+    const nextActive = Object.keys(nextFiles)[0] || "game.js";
+    commitFileMutation(nextFiles, "Deleted " + currentPath, nextActive);
+  }
+
   function selectProjectFile(path: string) {
     if (!project) return;
     if (path !== project.activeFile && fileDirty && !window.confirm("Discard unsaved edits to " + project.activeFile + "?")) return;
@@ -1857,6 +2022,7 @@ export default function Home() {
   }
 
   function startNewProject(kind: ProjectKind, preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]) {
+    stopActiveRun();
     const p = newProject(kind, preferredEngine, projectIntent);
     setProject(p);
     setSection("chat");
@@ -2552,13 +2718,13 @@ export default function Home() {
                       <option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
-                  </div><button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
+                  </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
 
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
-              {!Object.keys(project.files).length ? <div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div> : <><div className="editor-tabs">{Object.keys(project.files).map(path => <button key={path} className={project.activeFile === path ? "active" : ""} onClick={() => selectProjectFile(path)}>{fileName(path, project.kind || "game")}</button>)}</div><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></>}
+              {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><textarea className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}
             </div>}
 
             {section === "tasks" && <div className="tool-view">

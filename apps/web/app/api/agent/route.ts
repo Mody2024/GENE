@@ -629,6 +629,7 @@ export async function POST(request: NextRequest) {
   const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
+    if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
     const attempt = queued.shift()!;
     const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
@@ -662,7 +663,7 @@ export async function POST(request: NextRequest) {
           },
           ...(body.operation === "research" ? { tools: [{ googleSearch: {} }] } : {})
         }),
-        signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000, remainingMs - 1_000))])
       });
       const candidatePayload = await candidate.json().catch(() => null);
       const candidateText = candidatePayload?.candidates?.[0]?.content?.parts
@@ -721,6 +722,7 @@ export async function POST(request: NextRequest) {
         break;
       }
     } catch (error) {
+      if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
       const message = error instanceof Error ? error.message : "Network request failed.";
       lastFailure = { status: 504, detail: "Gemini request timed out or the connection stalled (" + message + ")" };
       for (const fallbackModel of fallbackModels.slice(1)) enqueue(attempt.key, fallbackModel, true);
@@ -732,6 +734,7 @@ export async function POST(request: NextRequest) {
   // prices are zero, and rotates through Groq plus those free models. It never calls a model
   // that is not verified free, to avoid unexpected provider charges.
   let chainTried: string[] = [];
+  let chainDiagnostics: string[] = [];
   if (!payload && hasAlternateProviderKeys()) {
     const isBuild = ["build", "surprise", "edit", "buildPart"].includes(body.operation);
     const system = AGENT_SYSTEM + "\n\nYou are running as an alternate provider inside GENE. Follow the same file contract and safety constraints. Never include provider branding or a watermark in generated projects unless the user explicitly requests it. Return one complete JSON object only.";
@@ -742,6 +745,7 @@ export async function POST(request: NextRequest) {
       temperature: body.operation === "interview" ? 0.35 : 0.2,
       json: true,
       deadline: startedAt + totalBudgetMs,
+      signal: request.signal,
       perCallMs: 7_000,
       maxAttempts: 7,
       siteTitle: "GENE Builder",
@@ -778,6 +782,7 @@ export async function POST(request: NextRequest) {
       lastFailure = { status: chain.failure.status, detail: chain.failure.detail };
       if (chain.failure.provider !== "none") lastFailureProvider = chain.failure.provider;
       chainTried = chain.triedModels;
+      chainDiagnostics = chain.attemptDetails || [];
       if (chain.truncated) outputFailure = "truncated";
       else if (chain.malformed) outputFailure = "malformed";
     }
@@ -785,7 +790,10 @@ export async function POST(request: NextRequest) {
 
   if (!payload) {
     if (chainTried.length) {
-      const detail = lastFailure.detail || "No additional provider detail was returned.";
+      const detail = [
+        lastFailure.detail || "No additional provider detail was returned.",
+        chainDiagnostics.length ? "Per-model diagnostics: " + chainDiagnostics.join(" | ") : ""
+      ].filter(Boolean).join(" | ").slice(0, 1_600);
       const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). ";
       if (lastFailure.status === 401 || lastFailure.status === 403) {
         return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
@@ -855,6 +863,7 @@ export async function POST(request: NextRequest) {
           temperature: 0.1,
           json: true,
           deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 10_000),
+          signal: request.signal,
           perCallMs: 6_000,
           maxAttempts: 2,
           groqLimit: 1,
@@ -885,6 +894,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch {
+        if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
         // Independent review is best-effort; it must never block an otherwise valid build.
       }
     }
@@ -963,5 +973,6 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
+  if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }

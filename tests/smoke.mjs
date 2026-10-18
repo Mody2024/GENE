@@ -11,6 +11,8 @@ const rootPackage = JSON.parse(read("package.json"));
 const webPackage = JSON.parse(read("apps/web/package.json"));
 const agentSource = read("apps/agent/src/server.mjs");
 const api = read("apps/web/app/api/agent/route.ts");
+const providers = read("apps/web/app/lib/providers.ts");
+const providerUtils = read("apps/web/app/lib/provider-utils.mjs");
 const publishApi = read("apps/web/app/api/publish/route.ts");
 const buildApi = read("apps/web/app/api/builds/route.ts");
 const buildStatusApi = read("apps/web/app/api/builds/[buildId]/route.ts");
@@ -31,6 +33,7 @@ const css = read("apps/web/app/globals.css");
 const studioDesignCss = read("apps/web/app/studio-redesign.css");
 const planContract = await import("../apps/web/app/lib/plan-contract.mjs");
 const browserSmoke = read("tests/browser-smoke.mjs");
+const liveGenerationSmoke = read("tests/live-generation-smoke.mjs");
 
 const repairedAppTasks = planContract.ensurePlanTasks(["Build the dashboard", "", "Build the dashboard"], "app");
 assert.equal(repairedAppTasks.length, 3, "sparse model plans are repaired to three distinct tasks");
@@ -41,6 +44,8 @@ assert.equal(planContract.ensurePlanMechanics([], "app").length, 1, "missing app
 assert.ok(api.includes("ensurePlanTasks(plan.tasks, projectKind)"), "API repairs sparse plans instead of rejecting them");
 
 assert.ok(rootPackage.workspaces.includes("apps/*"), "root must be a workspace");
+assert.ok(rootPackage.scripts["test:live-generation"] === "node tests/live-generation-smoke.mjs", "live generation playground has a discoverable command");
+assert.ok(liveGenerationSmoke.includes("GENE_PLAYGROUND_ALL") && liveGenerationSmoke.includes("signal-garden") && liveGenerationSmoke.includes("tiny-platformer") && liveGenerationSmoke.includes("orbit-puzzle"), "opt-in live playground covers multiple distinct game scenarios");
 assert.equal(webPackage.dependencies.next, "14.2.35", "web app uses the pinned Next version");
 assert.equal(webPackage.dependencies.jszip, "3.10.1", "project ZIP packaging is installed");
 assert.ok(existsSync(new URL("../apps/web/app/layout.tsx", import.meta.url)), "app layout exists");
@@ -65,11 +70,14 @@ assert.ok(page.includes("GENE 2.0 Studio") && page.includes("GENE 2.0") && page.
 assert.ok(layout.includes("GENE 2.0 Studio") && health.includes('version: "2.0.0"'), "website metadata and health endpoint identify GENE 2.0");
 assert.ok(api.includes("successfulModel = attempt.model"), "successful fallback model is tracked per request");
 assert.ok(api.includes("totalBudgetMs = 52_000"), "Gemini retries stay inside the serverless runtime budget");
-assert.ok(api.includes("signal: AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests allow realistic generation time without exceeding route budget");
+assert.ok(api.includes("AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(attempt.fallback ? 18_000 : 22_000"), "Gemini requests combine client cancellation with bounded provider timeouts");
 assert.ok(api.includes("GEMINI_TIMEOUT"), "Gemini timeout errors are explicit and actionable");
 assert.ok(!api.includes('"gemini-3.7-flash"'), "fallbacks avoid deprecated aliases that route back to the slow primary model");
 assert.ok(api.includes('"gemini-3.5-flash-lite"'), "timeouts can fall back to the documented low-latency Flash-Lite model");
 assert.ok(api.includes("attempts < 8"), "fallback attempts remain bounded");
+assert.ok(providerUtils.includes("lyria|audio|music") && providerUtils.includes("outputs.some(modality => modality !== \"text\")"), "free music/audio endpoints cannot enter the chat/code fallback pool");
+assert.ok(providers.includes("attemptDetails.push") && api.includes("Per-model diagnostics:"), "fallback failures expose per-model reasons instead of only the final error");
+
 
 assert.ok(health.includes('export const dynamic = "force-dynamic"'), "Gemini health reads deployment env at request time instead of build time");
 assert.ok(health.includes('"Cache-Control": "no-store, max-age=0, must-revalidate"'), "Gemini health response cannot be cached stale");
@@ -498,6 +506,21 @@ assert.throws(() => applyPatchBatch(originalTree, [
 assert.throws(() => applyPatchBatch(originalTree, [
   { op: "add_file", path: "../outside.js", content: "unsafe" }
 ]), /Unsafe project path/, "path traversal is rejected");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "add_file", path: "oversized.txt", content: "x".repeat(500_001) }
+]), /500 KB safety limit/, "new files respect the same per-file limit as edits");
+assert.throws(() => applyPatchBatch(originalTree, [
+  { op: "replace_exact", path: "README.md", expected: "GENE test", replacement: "x".repeat(500_001) }
+]), /500 KB safety limit/, "edits cannot grow a file past the per-file limit");
+assert.throws(() => applyPatchBatch(originalTree, Array.from({ length: 101 }, () => ({ op: "delete_file", path: "README.md" }))), /cannot exceed 100 operations/, "oversized patch batches are rejected before applying any operation");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "invent_operation", path: "README.md" }]), /Unsupported patch operation/, "unknown model-generated operations fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "replace_exact", path: "README.md", expected: 42, replacement: "x" }]), /requires non-empty expected text/, "malformed exact-match payloads fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "replace_range", path: "README.md", startLine: 1, endLine: 1, replacement: null }]), /replacement content must be text/, "malformed range payloads fail closed");
+assert.throws(() => applyPatchBatch(originalTree, [{ op: "apply_diff", path: "README.md", patch: null }]), /Unified diff content must be non-empty text/, "malformed diff payloads fail closed");
+
+const fullTree = Object.fromEntries(Array.from({ length: 100 }, (_, index) => ["file-" + index + ".txt", "ok"]));
+assert.throws(() => applyPatchBatch(fullTree, [{ op: "add_file", path: "extra.txt", content: "no" }]), /cannot exceed 100 files/, "project manifests stay within the documented file count limit");
+
 const renamedTree = applyPatchBatch(originalTree, [{ op: "rename_file", path: "README.md", newPath: "docs/README.md" }]);
 assert.equal(renamedTree.files["docs/README.md"], "GENE test", "rename preserves file content");
 assert.equal(renamedTree.files["README.md"], undefined, "rename removes the old manifest path");
@@ -533,6 +556,22 @@ const recovered = coordinator.recoverFromCheckpoint(checkpointRun, checkpointRun
 assert.equal(recovered.files["game.js"], "known-good", "recovery restores the checkpoint source snapshot");
 assert.equal(recovered.run.tasks.find(task => task.id === "design").status, "passed", "recovery preserves completed tasks");
 assert.equal(recovered.run.tasks.find(task => task.id === "core").status, "queued", "recovery requeues unfinished tasks");
+let retainedCheckpointRun = checkpointRun;
+for (let index = 0; index < 12; index += 1) {
+  retainedCheckpointRun = coordinator.checkpointBuild(
+    retainedCheckpointRun,
+    { "game.js": "snapshot-" + index },
+    { passed: ["design"], failed: [] },
+    "task-complete",
+    "checkpoint " + index,
+    "2026-01-01T00:00:" + String(index + 1).padStart(2, "0") + ".000Z"
+  );
+}
+const retainedIds = retainedCheckpointRun.checkpoints.map((checkpoint) => checkpoint.id);
+assert.equal(retainedIds.length, 8, "checkpoint history remains bounded");
+assert.equal(new Set(retainedIds).size, retainedIds.length, "checkpoint IDs stay unique after old snapshots are pruned");
+assert.ok(Number(retainedIds.at(-1).match(/-(\d+)$/)?.[1]) > 8, "checkpoint sequence keeps increasing beyond the retention window");
+
 assert.equal(baseRun.prototype.targetMinutes, undefined, "prototype duration stays project-specific when no estimate is supplied");
 assert.equal(baseRun.fullGame.targetMinutes, undefined, "full-game duration stays project-specific when no estimate is supplied");
 console.log("GENE 1.4 executable patch-engine and build-recovery tests passed.");

@@ -39,7 +39,8 @@ const fixture = {
       winCondition: "All four orbs are collected.",
       lossCondition: "This smoke fixture has no damage/loss state; press restart by reloading the page.",
       performanceBudget: { targetFps: 60, maxEnemies: 0, maxObjects: 40, maxParticles: 8 }
-    }, null, 2)
+    }, null, 2),
+    "src/levels/README.md": "Level notes for the smoke fixture."
   },
   versions: [],
   activeFile: "game.js",
@@ -204,6 +205,18 @@ try {
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
   assert.ok(savedSceneSpec.includes("Browser-tested scene prop") && savedSceneSpec.includes('"scene"') && savedSceneSpec.includes('"position"'), "Scene Studio writes edited object data and transforms to the actual game-spec.json source");
+  await page.locator(".project-file-tree-folder-label").filter({ hasText: "src" }).first().waitFor({ timeout: 5000 });
+  await page.locator('.project-file-tree-file[title="src/levels/README.md"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept("src/levels/smoke.txt"));
+  await page.getByRole("button", { name: /New file/ }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke.txt"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept("src/levels/smoke-moved.txt"));
+  await page.getByRole("button", { name: "Move / rename" }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke-moved.txt"]').waitFor({ timeout: 5000 });
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Delete file" }).click();
+  await page.locator('.project-file-tree-file[title="src/levels/smoke-moved.txt"]').waitFor({ state: "detached", timeout: 5000 });
+  assert.ok(await page.locator(".project-file-tree-folder-label").filter({ hasText: "levels" }).count(), "nested folders remain visible after file operations");
   await page.locator('.rail button[title="Audio Studio"]').click();
   await page.getByRole("heading", { name: "Audio Studio" }).waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: /UI confirm/ }).click();
@@ -403,9 +416,11 @@ try {
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "light", null, { timeout: 5_000 });
   assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "theme choice is persisted before reload");
-  const hydratedHealth = themePage.waitForResponse(response => response.url().endsWith("/api/health"), { timeout: 10_000 });
+  // Verify theme persistence after a full reload. Do not couple this UI assertion
+  // to an optional health poll, which may legitimately be served from a cached response.
   await themePage.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
-  await hydratedHealth;
+  await themePage.waitForFunction(() => document.documentElement.dataset.theme === (localStorage.getItem("gene.theme") || "light"), null, { timeout: 15_000 });
+  assert.equal(await themePage.evaluate(() => localStorage.getItem("gene.theme")), "light", "saved light theme remains in storage after reload");
   // Verify the hydrated React state, not the server's light-first HTML shell.
   await themePage.getByTitle("Switch theme").click();
   await themePage.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5_000 });

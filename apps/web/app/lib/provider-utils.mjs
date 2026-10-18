@@ -33,7 +33,12 @@ export function parseFreeCatalog(payload) {
     if (!isZeroPrice(item.pricing?.prompt) || !isZeroPrice(item.pricing?.completion)) continue;
     if (item.pricing?.request !== undefined && item.pricing?.request !== null && !isZeroPrice(item.pricing.request)) continue;
     const outputs = item.architecture?.output_modalities;
-    if (Array.isArray(outputs) && !outputs.includes("text")) continue;
+    // This router serves chat/code generation only. Exclude audio/music/TTS,
+    // image/video generation, embeddings, rerankers, and moderation endpoints even
+    // when a catalog entry advertises text as one of several output modalities.
+    const id = item.id.toLowerCase();
+    if (/lyria|audio|music|text-to-speech|(^|[-/])tts([-/.:]|$)|speech|whisper|transcrib|imagegen|image-generation|video-generation|embedding|rerank|moderation|safeguard|guard-model|clip-preview/.test(id)) continue;
+    if (Array.isArray(outputs) && (!outputs.includes("text") || outputs.some(modality => modality !== "text"))) continue;
     const context = Number(item.context_length) || 0;
     if (context && context < 12_000) continue;
     entries.push({ id: item.id, context, score: scoreModel(item.id, context) });
@@ -61,6 +66,16 @@ export function extractJsonObjectText(text) {
       return null;
     }
   }
+}
+
+/** Preserve useful upstream diagnostics when a gateway returns a generic error message. */
+export function describeProviderError(data) {
+  const error = data?.error;
+  const parts = [error?.message, error?.metadata?.raw, error?.metadata?.provider_name]
+    .filter(value => typeof value === "string" && value.trim())
+    .map(value => value.trim());
+  const unique = [...new Set(parts)];
+  return (unique.join(" | ") || "empty response").slice(0, 500);
 }
 
 export function classifyProviderFailure(status, detail) {
