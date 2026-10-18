@@ -122,7 +122,7 @@ export function makeAgentInput(input: {
     const content = String(rawContent);
     const excerpt = content.length <= perFileBudget
       ? content
-      : content.slice(0, Math.ceil(perFileBudget * 0.65)) + "\\n/* … middle omitted to fit staged context budget … */\\n" + content.slice(-Math.floor(perFileBudget * 0.35));
+      : content.slice(0, Math.ceil(perFileBudget * 0.65)) + "\n/* … middle omitted to fit staged context budget … */\n" + content.slice(-Math.floor(perFileBudget * 0.35));
     stageFiles[path] = excerpt;
     stageContextUsed += excerpt.length;
   }
