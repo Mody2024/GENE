@@ -864,6 +864,50 @@ export async function POST(request: NextRequest) {
       projectKind === "app" ? "webapp" : body.project?.preferredEngine === "webgl3d" ? "webgl3d" : "canvas2d"
     );
     if (result.plan) result.plan.engine = projectKind === "app" ? "webapp" : body.project?.preferredEngine === "canvas2d" || body.project?.preferredEngine === "webgl3d" ? body.project.preferredEngine : result.plan.engine;
+    // A model can return valid JSON containing broken JavaScript. Catch that before
+    // normal build validation and ask a backup model for a syntax-only repair so one
+    // stray token does not discard the entire generated game.
+    if (["build", "surprise", "buildPart", "edit"].includes(body.operation) && Array.isArray(result.files)) {
+      const broken = result.files.filter(file => /\.(?:m?js|cjs)$/i.test(file.path)).filter(file => {
+        try { new Function(file.content); return false; } catch { return true; }
+      });
+      if (broken.length && hasAlternateProviderKeys() && Date.now() - startedAt < totalBudgetMs - 7_000) {
+        try {
+          const repair = await runAlternateChain({
+            system: "You are GENE's JavaScript syntax repair tool. Repair ONLY parse/syntax errors in the supplied JavaScript files. Preserve the requested gameplay, logic, controls, APIs and behavior. Do not refactor, add features, invent dependencies, or change paths. Return one JSON object {reply:string,files:[{path:string,content:string}]} with complete replacements only for the listed broken files. If uncertain return files:[] . No markdown.",
+            user: "Fix parse errors only. The supplied JavaScript did not pass new Function syntax validation. Broken files:\\n" + JSON.stringify(broken.map(file => ({ path: file.path, content: file.content.slice(0, 45000) }))),
+            maxTokens: 6_000,
+            temperature: 0,
+            json: true,
+            deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 7_000),
+            signal: request.signal,
+            perCallMs: 4_500,
+            maxAttempts: 2,
+            groqLimit: 1,
+            openrouterLimit: 1,
+            siteTitle: "GENE Syntax Repair",
+            validate: text => extractJsonObjectText(text) !== null
+          });
+          if (repair.ok) {
+            const repaired = JSON.parse(extractJsonObjectText(repair.text) as string);
+            const allowed = new Set(broken.map(file => file.path));
+            if (Array.isArray(repaired.files) && repaired.files.length > 0 && repaired.files.every((file: any) => file && allowed.has(file.path) && typeof file.content === "string" && file.content.length > 0)) {
+              const replacements = new Map<string, string>(repaired.files.map((file: { path: string; content: string }) => [file.path, file.content] as [string, string]));
+              const candidates = result.files.map(file => replacements.has(file.path) ? { ...file, content: replacements.get(file.path)! } : file);
+              const allValid = candidates.filter(file => /\.(?:m?js|cjs)$/i.test(file.path)).every(file => {
+                try { new Function(file.content); return true; } catch { return false; }
+              });
+              if (allValid) {
+                result.files = candidates;
+                result.reply += "\\n\\nGENE repaired a generated JavaScript syntax error before validation.";
+              }
+            }
+          }
+        } catch {
+          if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+        }
+      }
+    }
     // Independent second-opinion review is ON by default whenever a free backup provider key is
     // configured and enough time budget remains. Set GENE_AI_REVIEW=false to disable it.
     const reviewEnabled = process.env.GENE_AI_REVIEW?.trim().toLowerCase() !== "false" &&
