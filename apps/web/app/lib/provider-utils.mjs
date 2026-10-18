@@ -9,7 +9,7 @@ export function isZeroPrice(value) {
 export function scoreModel(id, context) {
   const name = id.toLowerCase();
   let score = Math.min(context / 8000, 24);
-  if (/coder/.test(name)) score += 60;
+  if (/coder|code/.test(name)) score += 60;
   if (/qwen3|qwen-3/.test(name)) score += 18;
   if (/deepseek/.test(name)) score += 16;
   if (/gpt-oss/.test(name)) score += 16;
@@ -37,7 +37,7 @@ export function parseFreeCatalog(payload) {
     // image/video generation, embeddings, rerankers, and moderation endpoints even
     // when a catalog entry advertises text as one of several output modalities.
     const id = item.id.toLowerCase();
-    if (/lyria|audio|music|text-to-speech|(^|[-/])tts([-/.:]|$)|speech|whisper|transcrib|imagegen|image-generation|video-generation|embedding|rerank|moderation|safeguard|guard-model|clip-preview/.test(id)) continue;
+    if (/lyria|audio|music|text-to-speech|(^|[-/])tts([-/.:]|$)|speech|whisper|transcrib|imagegen|image-generation|video-generation|embedding|rerank|moderation|safeguard|guard-model|clip-preview|note-preview|dots-studio|nemotron-3-nano-omni/.test(id)) continue;
     if (Array.isArray(outputs) && (!outputs.includes("text") || outputs.some(modality => modality !== "text"))) continue;
     const context = Number(item.context_length) || 0;
     if (context && context < 12_000) continue;
@@ -79,7 +79,7 @@ export function describeProviderError(data) {
 }
 
 export function classifyProviderFailure(status, detail) {
-  if (/unavailable for free|paid version|use this slug|no endpoints found|model.*not found|not a valid model|no longer available|deprecated|decommissioned/i.test(detail)) return "unavailable";
+  if (/unavailable for free|paid version|use this slug|no endpoints found|model.*not found|model.*does not exist|does not exist or you do not have access|not a valid model|no longer available|deprecated|decommissioned/i.test(detail)) return "unavailable";
   if (status === 402 || /payment required|insufficient credits|not enough credits|requires credits|balance too low/i.test(detail)) return "paid";
   if (status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) return "rate";
   if (status === 401 || status === 403) return "auth";
