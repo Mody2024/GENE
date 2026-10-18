@@ -14,6 +14,7 @@ import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
 assert.equal(classifyProviderFailure(400, "This model is unavailable for free. The paid version is available now - use this slug instead: qwen/qwen3-coder"), "unavailable");
 assert.equal(describeProviderError({ error: { message: "Provider returned error", metadata: { raw: "upstream model returned 429", provider_name: "Example Provider" } } }), "Provider returned error | upstream model returned 429 | Example Provider", "generic gateway messages must preserve actionable upstream diagnostics");
+assert.equal(classifyProviderFailure(400, describeProviderError({ error: { message: "Provider returned error", metadata: { raw: "This model is unavailable for free" } } })), "unavailable", "raw gateway metadata must drive dead-model cooldown instead of repeating broken free routes");
 
 const catalog = parseFreeCatalog({ data: [
   { id: "qwen/qwen3-coder", pricing: { prompt: "0.0000003", completion: "0.0000012" }, context_length: 262144 },
