@@ -227,7 +227,9 @@ assert.ok(page.includes('writeProjectToDisk(updatedProject, localAgentUrl, local
 assert.ok(api.includes("GENE_PLAN_MODE_READ_ONLY"), "plan mode is enforced at the API boundary");
 assert.ok(page.includes('window.open("/play/" + encodeURIComponent(project.id)'), "fullscreen opens stable project URL");
 assert.ok(playPage.includes('localStorage.getItem("gene.projects.v1")'), "play route loads the saved project");
-assert.ok(css.includes(':root[data-theme="light"]'), "light theme is implemented");
+assert.ok(css.includes('.gene-app[data-theme="light"]'), "light theme variables target the actual workspace element carrying data-theme");
+assert.ok(api.includes("GENE_REQUEST_TOO_LARGE") && api.includes("context/request-size limit"), "oversized fallback prompts are diagnosed separately from rejected provider keys");
+assert.ok(providerUtils.includes("maximum context") && providerUtils.includes("too many input tokens"), "model-specific context-limit failures skip the incompatible free model instead of poisoning provider auth diagnostics");
 assert.ok(css.includes(".reference-chips"), "reference attachments are styled");
 assert.ok(browserSmoke.includes("coloredPixels > 5000"), "browser suite requires actual painted pixels");
 assert.ok(browserSmoke.includes('page.keyboard.press("ArrowRight")'), "browser suite exercises real keyboard gameplay");
