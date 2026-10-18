@@ -880,6 +880,11 @@ export async function POST(request: NextRequest) {
         chainDiagnostics.length ? "Per-model diagnostics: " + chainDiagnostics.join(" | ") : ""
       ].filter(Boolean).join(" | ").slice(0, 1_600);
       const summary = "GENE tried Gemini and then " + chainTried.length + " free backup model(s) (" + chainTried.join(", ") + "). ";
+      // Some gateways incorrectly report oversized prompts as HTTP 400/403. Do not
+      // misdiagnose those model-specific limits as a rejected deployment API key.
+      if (/request (?:is )?too large|context length|maximum context|context window|input (?:is )?too long|prompt (?:is )?too long|exceeds? (?:the )?(?:model )?(?:context|token|input)|token limit for (?:this )?model|too many input tokens/i.test(detail)) {
+        return jsonError(summary + "The request exceeded a backup model context/request-size limit. GENE skipped incompatible models, but this task still needs a smaller staged request. Existing project files were preserved. Retry by building one stage/file at a time or shorten the design brief. Detail: " + detail, 413, "GENE_REQUEST_TOO_LARGE");
+      }
       if (lastFailure.status === 401 || lastFailure.status === 403) {
         return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
       }
