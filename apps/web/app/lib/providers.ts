@@ -36,7 +36,7 @@ export type ChainResult =
   | { ok: true; provider: string; model: string; text: string; finish: string; attempts: number }
   | { ok: false; failure: ChainFailure; truncated: boolean; malformed: boolean; attempts: number; triedModels: string[]; attemptDetails: string[] };
 
-import { classifyProviderFailure, extractJsonObjectText, parseFreeCatalog, scoreModel } from "./provider-utils.mjs";
+import { classifyProviderFailure, describeProviderError, extractJsonObjectText, parseFreeCatalog, scoreModel } from "./provider-utils.mjs";
 import type { CatalogEntry } from "./provider-utils.mjs";
 export { classifyProviderFailure, extractJsonObjectText, parseFreeCatalog };
 
@@ -164,7 +164,7 @@ export async function callChatProvider(
       });
       const data: any = await response.json().catch(() => null);
       const content = data?.choices?.[0]?.message?.content;
-      const detail = String(data?.error?.message || data?.error?.metadata?.raw || (typeof content === "string" && content.trim() ? "" : "empty response")).slice(0, 400);
+      const detail = data?.error ? describeProviderError(data) : (typeof content === "string" && content.trim() ? "" : "empty response");
       return {
         ok: response.ok && typeof content === "string" && content.trim().length > 0,
         status: response.status,
