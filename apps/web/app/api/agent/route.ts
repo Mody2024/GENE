@@ -762,8 +762,11 @@ export async function POST(request: NextRequest) {
       json: true,
       deadline: startedAt + totalBudgetMs,
       signal: request.signal,
-      perCallMs: 7_000,
-      maxAttempts: 7,
+      // Whole-game JSON needs longer than a chat completion. Spend the remaining
+      // request budget on fewer, meaningful build attempts instead of timing out
+      // every capable model at seven seconds.
+      perCallMs: isBuild ? 12_000 : 7_000,
+      maxAttempts: isBuild ? 4 : 7,
       siteTitle: "GENE Builder",
       validate: text => {
         const json = extractJsonObjectText(text);
