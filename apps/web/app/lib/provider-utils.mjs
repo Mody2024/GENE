@@ -79,6 +79,10 @@ export function describeProviderError(data) {
 }
 
 export function classifyProviderFailure(status, detail) {
+  // Some free routes return context/request-size failures with HTTP 400/403 rather than a
+  // consistent status. Treat these as model-specific incompatibilities, not bad API keys,
+  // and skip the same model for the short dead-model TTL so the next candidate can run.
+  if (/request (?:is )?too large|context length|maximum context|context window|input (?:is )?too long|prompt (?:is )?too long|exceeds? (?:the )?(?:model )?(?:context|token|input)|token limit for (?:this )?model|too many input tokens/i.test(detail)) return "unavailable";
   if (/unavailable for free|paid version|use this slug|no endpoints found|model.*not found|model.*does not exist|does not exist or you do not have access|not a valid model|no longer available|deprecated|decommissioned/i.test(detail)) return "unavailable";
   if (status === 402 || /payment required|insufficient credits|not enough credits|requires credits|balance too low/i.test(detail)) return "paid";
   if (status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) return "rate";
