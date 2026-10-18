@@ -8,8 +8,15 @@ const MODULE_PATH = /\.(?:m?js|cjs)$/i;
 function declaredModuleOrder(files) {
   try {
     const spec = JSON.parse(typeof files["game-spec.json"] === "string" ? files["game-spec.json"] : "{}");
-    if (!Array.isArray(spec?.additionalFiles)) return [];
-    return spec.additionalFiles.filter(path => typeof path === "string" && MODULE_PATH.test(path));
+    const architecturePaths = Array.isArray(spec?.architecture?.modules)
+      ? spec.architecture.modules.map(module => typeof module === "string" ? module : module?.path)
+      : [];
+    const manifestPaths = Array.isArray(spec?.additionalFiles) ? spec.additionalFiles : [];
+    // The explicit architecture blueprint is authoritative when present; the
+    // runtime manifest remains the compatibility fallback for older projects.
+    return [...architecturePaths, ...manifestPaths]
+      .filter(path => typeof path === "string" && MODULE_PATH.test(path)
+        && !/(^|\\/)node_modules\\//i.test(path));
   } catch {
     return [];
   }
