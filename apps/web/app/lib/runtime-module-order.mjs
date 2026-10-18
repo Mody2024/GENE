@@ -16,7 +16,7 @@ function declaredModuleOrder(files) {
     // runtime manifest remains the compatibility fallback for older projects.
     return [...architecturePaths, ...manifestPaths]
       .filter(path => typeof path === "string" && MODULE_PATH.test(path)
-        && !/(^|\\/)node_modules\\//i.test(path));
+        && !/(^|\/)node_modules\//i.test(path));
   } catch {
     return [];
   }
