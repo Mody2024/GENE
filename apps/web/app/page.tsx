@@ -78,10 +78,10 @@ function ProjectFileTree({ nodes, activeFile, onSelect, depth = 0 }: {
 }) {
   return <div className="project-file-tree-list">
     {nodes.map(node => node.kind === "folder"
-      ? <div className="project-file-tree-folder" key={node.path}>
-          <div className="project-file-tree-folder-label" style={{ paddingLeft: depth * 10 + 8 }}><span>▾</span>{node.name}</div>
+      ? <details className="project-file-tree-folder" key={node.path} open>
+          <summary className="project-file-tree-folder-label" style={{ paddingLeft: depth * 10 + 8 }}><span aria-hidden="true">⌄</span>{node.name}</summary>
           <ProjectFileTree nodes={node.children} activeFile={activeFile} onSelect={onSelect} depth={depth + 1} />
-        </div>
+        </details>
       : <button type="button" key={node.path} className={"project-file-tree-file" + (activeFile === node.path ? " active" : "")}
           style={{ paddingLeft: depth * 10 + 22 }} onClick={() => onSelect(node.path)} title={node.path}>
           <span aria-hidden="true">▤</span>{node.name}
@@ -232,6 +232,7 @@ export default function Home() {
   const [freeModels, setFreeModels] = useState<string[]>([]);
   const researchedProjects = useRef<Set<string>>(new Set());
   const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
+  const [fileSearch, setFileSearch] = useState("");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
   const [expandedPreview, setExpandedPreview] = useState(false);
@@ -2582,7 +2583,9 @@ export default function Home() {
         <details className="sidebar-disclosure file-disclosure">
           <summary><span>Project files</span><span className="disclosure-count">{Object.keys(project.files).length}</span></summary>
           <div className="sidebar-disclosure-content">
-            {Object.keys(project.files).length ? Object.keys(project.files).map(path => <button key={path} className={"file-row " + (section === "files" && project.activeFile === path ? "file-selected" : "")} onClick={() => selectProjectFile(path)}><span className="file-icon">{path.endsWith(".js") ? "JS" : path.endsWith(".css") ? "¶" : path.endsWith(".json") ? "{}" : "H"}</span><span>{fileName(path, project.kind || "game")}</span></button>) : <div className="empty-sidebar">Files appear after your first build.</div>}
+            {Object.keys(project.files).length > 0 && <input className="project-file-search" aria-label="Search project files" placeholder="Search files…" value={fileSearch} onChange={event => setFileSearch(event.target.value)} />}
+            {Object.keys(project.files).length ? <ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files).filter(path => path.toLowerCase().includes(fileSearch.trim().toLowerCase())))} activeFile={section === "files" ? project.activeFile : ""} onSelect={path => { selectProjectFile(path); setSection("files"); }} /> : <div className="empty-sidebar">Files appear after your first build.</div>}
+            {Object.keys(project.files).length > 0 && !Object.keys(project.files).some(path => path.toLowerCase().includes(fileSearch.trim().toLowerCase())) && <div className="empty-sidebar">No files match “{fileSearch}”.</div>}
             <button className="open-files-button" onClick={() => setSection("files")}>Open file workspace <span>↗</span></button>
           </div>
         </details>
