@@ -168,7 +168,7 @@ assert.ok(playPage.includes('isApp ? "min-height:100%;height:auto;overflow:auto;
 assert.ok(page.includes('project.kind === "app"'), "preview and workspace logic respect project kind");
 assert.ok(prompts.includes("WEB APP ACCEPTANCE CHECKLIST"), "AI prompt defines app-specific acceptance rules");
 assert.ok(api.includes("external runtime dependency"), "builder blocks external runtime dependencies");
-assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview is sequential");
+assert.ok(prompts.includes("STRICT PROMPT-RELEVANT INTERVIEW CONTRACT") && prompts.includes("Maximum 3 questions total") && prompts.includes("PROMPT FIDELITY / SOURCE OF TRUTH"), "interview must be brief-specific and generation must preserve original prompt intent");
 assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly rejects placeholder games");
 assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
 assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract teaches the model how to consume real Forge assets");
