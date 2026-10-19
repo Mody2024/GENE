@@ -239,7 +239,12 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     (genre === "shooter" || genre === "racing" || genre === "runner" || genre === "fighter" ? "action" : genre === "survival" ? "tense" : genre === "puzzle" ? "calm" : "mystery");
   const targets = scopeTargets(String(answers.scope || ""));
   const title = plan?.title || project.name || "Untitled project";
-  const heroSubject = isApp ? "product hero illustration" : "player character";
+  const requestText = [idea, plan?.summary, ...Object.values(answers)].filter(Boolean).join(" ");
+  const needsCharacterArt = /\b(character|player sprite|hero|npc|avatar|protagonist|person|knight|wizard|creature|monster|enemy|enemies|boss)\b/i.test(requestText) ||
+    /\b(adventure|rpg|role.?playing|horror|survival|combat|shooter|fighter)\b/i.test(genre);
+  const needsEnemyArt = /\b(enemy|enemies|boss|combat|fight|shoot|survival|horror|zombie|monster|creature)\b/i.test(requestText);
+  const needsPickupArt = /\b(collect|coin|gem|pickup|loot|reward|item|treasure|rhythm|runner|platformer)\b/i.test(requestText);
+  const heroSubject = isApp ? "product hero illustration" : needsCharacterArt ? "player character sprite or distinctive silhouette" : "player avatar or signature gameplay object that fits the core mechanic";
   const assetPlan = isApp
     ? [
         { id: "hero", kind: "background" as const, prompt: "Hero illustration for " + title + ": " + idea.slice(0, 160) },
@@ -247,10 +252,10 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
       ]
     : [
         { id: "logo", kind: "logo" as const, prompt: "Title logo for the game " + title + ", " + (palette?.[1] || "bold") + " style" },
-        { id: "hero", kind: "sprite" as const, prompt: heroSubject + " for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", readable silhouette, front/side pose" },
-        { id: "enemy", kind: "sprite" as const, prompt: "main enemy or hazard for " + title + " with a distinct silhouette from the player" },
-        { id: "pickup", kind: "icon" as const, prompt: "collectible pickup icon for " + title + ", glowing, simple shape" },
-        { id: "backdrop", kind: "background" as const, prompt: "layered background scene for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", depth with foreground, midground and sky" }
+        { id: "hero", kind: "sprite" as const, prompt: heroSubject + " for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", readable silhouette designed around the actual gameplay" },
+        ...(needsEnemyArt ? [{ id: "enemy", kind: "sprite" as const, prompt: "main enemy for " + title + " with a distinct silhouette and readable behavior" }] : []),
+        ...(needsPickupArt ? [{ id: "pickup", kind: "icon" as const, prompt: "collectible or gameplay pickup icon for " + title + ", recognizable at small size" }] : []),
+        { id: "backdrop", kind: "background" as const, prompt: "layered game environment for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", composition that keeps hazards and objectives readable" }
       ];
   const referenceContext = (project.references || []).map(reference => {
     const label = reference.name || reference.id || "Untitled reference";
