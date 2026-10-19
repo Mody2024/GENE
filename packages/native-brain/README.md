@@ -25,6 +25,18 @@ This is a research baseline, not yet wired into live game generation. The first 
 
 `src/index.mjs` includes a local JSONL experience ledger. A record only becomes verified if the caller explicitly requests verification and provides at least one test and every supplied test passes. The ledger is not yet wired to the web-deployed native generator; deployment filesystems are not durable storage. The next integration should put persistent experience storage in the local agent or an explicitly configured persistent database, and feed only verified experiences into training.
 
+## Turn verified project learning into training data
+
+The exporter reads the local `experiences.jsonl` ledger and includes only records explicitly marked verified with at least one test and every recorded test passing. It deterministically separates records into training, validation, and held-out evaluation files; unverified and failed experiences are excluded.
+
+```sh
+python packages/native-brain/export_training_data.py \
+  --input /path/to/experiences.jsonl \
+  --out-dir data/native/verified
+```
+
+Review the exported examples before training. The current ledger must still be connected to actual local-agent/browser-test outcomes before it can accumulate useful verified experience automatically. Do not train on self-reported success alone.
+
 ## Run the tests
 
 ```sh
