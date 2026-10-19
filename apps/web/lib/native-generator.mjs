@@ -52,6 +52,16 @@ function visualProfile(prompt, engine) {
   if (/underwater|ocean|sea|island|nature|forest|explor/i.test(p)) return { id: "wild", bg: "#0b1c1b", panel: "#122a27", line: "#28534a", text: "#e4f5ec", muted: "#a4c9bb", accent: "#84d7ad", ink: "#0d2a21", glow: "#1d5849", menu: "The world is yours", subtitle: "Take the path less traveled.", cta: "Explore", genre: "natural exploration" };
   return { id: "adventure", bg: "#0b1015", panel: "#141d25", line: "#293744", text: "#edf4f7", muted: "#a0b1bb", accent: "#b8e3d0", ink: "#10251e", glow: "#263b46", menu: "Your adventure starts here", subtitle: "Discover, improve, and find your own way.", cta: "Start adventure", genre: "stylized adventure" };
 }
+function nativeModulePaths(prompt) {
+  const p=String(prompt||"").toLowerCase();
+  const paths=["src/systems/progression.js","src/systems/input.js","src/systems/collision.js","src/systems/audio.js","src/config/game-config.js"];
+  if(/level|stage|chapter|world|map|platform|explor|story|mission/.test(p)) paths.push("src/world/levels.js");
+  if(/enemy|enemies|boss|combat|character|npc|entity|entities/.test(p)) paths.push("src/entities/entities.js");
+  if(/save|checkpoint|progress|inventory|unlock/.test(p)) paths.push("src/systems/save.js");
+  if(/particle|effect|visual effect|vfx/.test(p)) paths.push("src/systems/effects.js");
+  if(/dialogue|conversation|story|npc|quest/.test(p)) paths.push("src/systems/dialogue.js");
+  return [...new Set(paths)];
+}
 function musicProfile(prompt) {
   const p = String(prompt || "").toLowerCase();
   if (/horror|psychological|haunt|disturb|creepy|dread/i.test(p)) return { mood: "uneasy", notes: [55, 58.27, 82.41], waves: ["sine", "triangle", "sine"], tempo: 0.012 };
@@ -86,7 +96,7 @@ function projectSpec(title, engine, prompt) {
     nativeGeneration: { modelUsed: false, externalAiUsed: false, strategy: "deterministic-native-template-v1" }
   };
 }
-function htmlShell(title, engine, prompt = "") {
+function htmlShell(title, engine, prompt = "", modulePaths = []) {
   const profile = visualProfile(prompt, engine);
   const menuChoice = String(prompt || "").toLowerCase();
   if (/diegetic case file|journal/.test(menuChoice)) { profile.menu = "CASE FILE / 001"; profile.subtitle = "Every detail is evidence."; profile.cta = "Open the case"; }
@@ -121,6 +131,7 @@ function htmlShell(title, engine, prompt = "") {
     <footer class="controls"><span id="control-hint">Move: WASD / arrows · Action: Space · Pause: P · Restart: R</span><button id="pause-button" type="button">Pause</button><button id="restart-button" type="button">Restart</button><button id="audio-button" type="button">Sound: on</button></footer>
     <p id="help" class="help">Built without external AI calls. Your progress is stored locally in this browser.</p>
   </main>
+  ${modulePaths.map(path => '<script src="' + esc(path) + '"></script>').join("\n  ")}
   <script src="game.js"></script>
 </body>
 </html>`;
@@ -498,7 +509,8 @@ export async function createNativeResult(input = {}) {
     }
     return { reply, files: [], plan, complete: true, needsUserDecision: false, references, conversation: { mode: "native-rule-based", externalAiUsed: false, contextualHistoryUsed: history.length > 0 } };
   }
-  const spec = { ...projectSpec(title, engine, designPrompt), designProfile: { id: profile.id, genre: profile.genre, palette: plan.design.palette, menu: plan.design.menuCopy, menuDirection: plan.design.menuDirection }, audio: { ...projectSpec(title, engine, designPrompt).audio, mood: soundtrack.mood, notes: soundtrack.notes, waveforms: soundtrack.waves, implementation: "procedural-web-audio" }, implementationPlan: { stages: plan.stages, tasks: plan.tasks, testMatrix: plan.testMatrix, risks: plan.risks }, references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
+  const modulePaths = engine === "canvas2d" ? nativeModulePaths(designPrompt) : [];
+  const spec = { ...projectSpec(title, engine, designPrompt), additionalFiles: modulePaths, designProfile: { id: profile.id, genre: profile.genre, palette: plan.design.palette, menu: plan.design.menuCopy, menuDirection: plan.design.menuDirection }, audio: { ...projectSpec(title, engine, designPrompt).audio, mood: soundtrack.mood, notes: soundtrack.notes, waveforms: soundtrack.waves, implementation: "procedural-web-audio" }, implementationPlan: { stages: plan.stages, tasks: plan.tasks, testMatrix: plan.testMatrix, risks: plan.risks }, references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
   const files = engine === "webapp"
     ? [
         { path: "game.html", content: appHtml(title, designPrompt) },
@@ -507,10 +519,11 @@ export async function createNativeResult(input = {}) {
         { path: "game-spec.json", content: JSON.stringify({ ...spec, features: ["Add and delete items", "Mark items complete", "Filter by status", "Persist data in local storage"], routes: ["Main workspace"], userFlows: ["Add item", "Complete item", "Delete item", "Filter items"] }, null, 2) }
       ]
     : [
-        { path: "game.html", content: htmlShell(title, engine, designPrompt) },
+        { path: "game.html", content: htmlShell(title, engine, designPrompt, modulePaths) },
         { path: "game.css", content: themedCss(designPrompt, engine) },
         { path: "game.js", content: engine === "webgl3d" ? webglGameJs(fullGameExpansion, designPrompt) : canvasGameJs(title, designPrompt, fullGameExpansion) },
-        { path: "game-spec.json", content: JSON.stringify(spec, null, 2) }
+        { path: "game-spec.json", content: JSON.stringify(spec, null, 2) },
+        ...modulePaths.map(path => nativeModuleSource(path, designPrompt, plan))
       ];
   return {
     reply: "Native-only starter generated for " + title + ". No third-party AI provider was called. This is a playable foundation, not a finished high-end game: the current native generator uses deterministic templates rather than a trained capable language model. Run validation and gameplay tests, then iterate.",
