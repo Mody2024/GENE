@@ -107,6 +107,7 @@ assert.match(racingFiles["game.html"], /menu-arcade/);
 assert.match(horrorFiles["game.css"], /\.menu-case/);
 assert.match(racingFiles["game.css"], /\.menu-arcade/);
 assert.match(horrorFiles["game.js"], /FIELD NOTES|ctx\.fillStyle/);
+assert.doesNotMatch(horrorFiles["game.js"], /\\$\\{profile\\.(panel|accent|glow)\\}/, "generated 2D backgrounds must resolve all palette placeholders");
 assert.match(racingFiles["game.html"], /Ready to run|GARAGE/);
 assert.match(horrorFiles["game.js"], /55,58\.27,82\.41|55/);
 const racing3d = await createNativeResult({
