@@ -38,6 +38,18 @@ for (const [prompt, engine] of [
     assert.match(files["game.js"], /localStorage/);
   }
 }
+for (const engine of ["canvas2d", "webgl3d"]) {
+  const expanded = await createNativeResult({
+    operation: "buildPart",
+    stagePath: "game.js",
+    message: "FULL GAME EXPANSION PASS — add progression and a complete ending.",
+    project: { kind: "game", preferredEngine: engine, name: "Expanded test", initialPrompt: "A game with collectibles and hazards", plan: { title: "Expanded test", engine }, files: {} }
+  });
+  const expandedJs = expanded.files.find(file => file.path === "game.js").content;
+  new Script(expandedJs, { filename: engine + "-expanded.js" });
+  assert.match(expandedJs, /STAGE \\"\+stage|STAGE \"\+stage|STAGE 1\/3/);
+  assert.equal(expanded.nativeGeneration.externalAiUsed, false);
+}
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
