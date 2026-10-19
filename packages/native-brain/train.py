@@ -77,22 +77,26 @@ def encode(text: str) -> list[int]:
 
 
 def batches(samples, batch_size, context, device):
-    pool = [encode(sample) for sample in samples]
-    pool = [torch.tensor(seq, dtype=torch.long) for seq in pool if len(seq) >= 3]
+    """Yield real batches; each sample is independently truncated/padded."""
+    pool = [torch.tensor(encode(sample), dtype=torch.long) for sample in samples]
+    pool = [sequence for sequence in pool if len(sequence) >= 3]
     if not pool:
         raise ValueError("Training samples are too short")
-    for _ in range(batch_size):
-        sequence = random.choice(pool)
-        if len(sequence) > context + 1:
-            start = random.randrange(0, len(sequence) - context)
-            sequence = sequence[start:start + context + 1]
-        x = torch.zeros(context, dtype=torch.long)
-        y = torch.full((context,), -100, dtype=torch.long)
-        n = min(context + 1, len(sequence))
-        x[:n - 1] = sequence[:n - 1]
-        y[:n - 1] = sequence[1:n]
-        yield x, y
-    return
+    while True:
+        inputs, targets = [], []
+        for _ in range(batch_size):
+            sequence = random.choice(pool)
+            if len(sequence) > context + 1:
+                start = random.randrange(0, len(sequence) - context)
+                sequence = sequence[start:start + context + 1]
+            x = torch.zeros(context, dtype=torch.long)
+            y = torch.full((context,), -100, dtype=torch.long)
+            n = min(context + 1, len(sequence))
+            x[:n - 1] = sequence[:n - 1]
+            y[:n - 1] = sequence[1:n]
+            inputs.append(x)
+            targets.append(y)
+        yield torch.stack(inputs).to(device), torch.stack(targets).to(device)
 
 
 def main():
@@ -125,7 +129,6 @@ def main():
         except StopIteration:
             iterator = iter(batches(texts, args.batch_size, args.context, device))
             x, y = next(iterator)
-        x, y = x[None, :].to(device), y[None, :].to(device)
         logits = model(x)
         loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1), ignore_index=-100)
         optimizer.zero_grad(set_to_none=True)
