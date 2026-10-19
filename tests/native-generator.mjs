@@ -56,6 +56,16 @@ for (const engine of ["canvas2d", "webgl3d"]) {
   assert.equal(expanded.nativeGeneration.externalAiUsed, false);
 }
 const interviewProject = { kind: "game", name: "Psychological Mystery", initialPrompt: "A psychological horror game with disturbing mysteries" };
+const preservedBrief = "A 2D detective game set in an abandoned Egyptian cinema. Search rooms for film reels, connect clues on a case board, avoid a shadow that reacts to sound, and reveal who changed the final reel. Use hand-drawn monochrome art and a tense ambient soundtrack.";
+const preservedBuild = await createNativeResult({
+  operation: "build",
+  message: "Continue",
+  project: { kind: "game", preferredEngine: "canvas2d", name: "The Last Reel", initialPrompt: preservedBrief, plan: { title: "The Last Reel", engine: "canvas2d", summary: "A detective investigation inside an abandoned cinema.", genre: "mystery", mechanics: ["Search rooms", "Connect clues", "Avoid sound-reactive shadow", "Reveal final reel"] } }
+});
+const preservedSpec = JSON.parse(preservedBuild.files.find(file => file.path === "game-spec.json").content);
+assert.match(preservedBuild.plan.summary, /abandoned Egyptian cinema/i, "generic stage commands must not overwrite the original game brief");
+assert.match(preservedSpec.summary, /abandoned Egyptian cinema/i, "generated game spec must retain the exact original setting");
+assert.match(preservedSpec.summary, /sound-reactive shadow/i, "generated game spec must preserve named mechanics from the brief");
 const interviewAnswers = {
   "native-core-loop": "Solve mysteries or puzzles",
   "native-perspective": "3D third-person",
