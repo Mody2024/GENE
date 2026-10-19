@@ -153,7 +153,7 @@ function canvasGameJs(title, prompt, fullGame = false) {
     : profile.id === "wild"
     ? 'for(let i=0;i<15;i++){const x=((i*83-camera*.09)%1100+1100)%1100;ctx.strokeStyle="\${profile.accent}";ctx.globalAlpha=.22;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,420);ctx.quadraticCurveTo(x-16,315-(i%4)*22,x+10,260+(i%3)*18);ctx.stroke()}ctx.globalAlpha=1;'
     : 'ctx.strokeStyle="\${profile.glow}";ctx.globalAlpha=.45;ctx.lineWidth=1;for(let i=0;i<9;i++){ctx.beginPath();ctx.moveTo(0,280+i*18);ctx.lineTo(W,280+i*18);ctx.stroke()}ctx.globalAlpha=1;';
-  const resolvedBackdropCode = backdropCode.replaceAll("\\${profile.panel}", profile.panel).replaceAll("\\${profile.accent}", profile.accent).replaceAll("\\${profile.glow}", profile.glow);
+  const resolvedBackdropCode = backdropCode.replaceAll("${profile.panel}", profile.panel).replaceAll("${profile.accent}", profile.accent).replaceAll("${profile.glow}", profile.glow);
   const nextStageCode = fullGame ? `function nextStage(){if(stage>=3){finish(true);return}stage++;camera=0;player.x=120;player.y=360;player.vx=0;player.vy=0;items=[];hazards=[];particles=[];for(let i=0;i<24;i++)items.push({x:260+i*155,y:${platformer ? "310+(i%3)*-65" : "160+(i%5)*62"},r:9,taken:false});for(let i=0;i<11;i++)hazards.push({x:500+i*300,y:${platformer ? "420" : "300+(i%3)*65"},r:${platformer ? "18" : "16"},phase:i*1.7});statusEl.textContent="STAGE "+stage+"/3";sound(720,.16);}` : "";
   return `(() => {
 "use strict";
