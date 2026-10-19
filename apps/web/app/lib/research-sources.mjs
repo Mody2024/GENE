@@ -155,7 +155,11 @@ export function buildResearchBundle(input) {
     facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
     images: images.slice(0, 8),
     models,
-    engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")),
+    engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")).filter(model => {
+      const explicit = /\b(character|player|hero|person|human|ninja|knight|mario|runner|run|enemy|enemies|monster|goomba|slime|zombie|ghost|boss|creature|npc|avatar)\b/i.test(topic);
+      if (/Animated character|Enemies/i.test(model.name)) return explicit;
+      return true;
+    }),
     music: { styles: musicStylesFor(topic, 3), tracks: (Array.isArray(input.commonsAudio) ? input.commonsAudio : []).slice(0, 4), links: (Array.isArray(input.links) ? input.links : []).filter(link => ["fma", "opengameart", "freesound", "commons"].includes(link.id)) },
     games: matches.map(entry => ({ title: entry.title, examples: entry.examples, loop: entry.loop, engine: entry.engine })),
     links: Array.isArray(input.links) ? input.links : [],
