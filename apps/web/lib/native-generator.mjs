@@ -142,6 +142,7 @@ function canvasGameJs(title, prompt, fullGame = false) {
     : profile.id === "wild"
     ? 'for(let i=0;i<15;i++){const x=((i*83-camera*.09)%1100+1100)%1100;ctx.strokeStyle="\${profile.accent}";ctx.globalAlpha=.22;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,420);ctx.quadraticCurveTo(x-16,315-(i%4)*22,x+10,260+(i%3)*18);ctx.stroke()}ctx.globalAlpha=1;'
     : 'ctx.strokeStyle="\${profile.glow}";ctx.globalAlpha=.45;ctx.lineWidth=1;for(let i=0;i<9;i++){ctx.beginPath();ctx.moveTo(0,280+i*18);ctx.lineTo(W,280+i*18);ctx.stroke()}ctx.globalAlpha=1;';
+  const resolvedBackdropCode = backdropCode.replaceAll("\\${profile.panel}", profile.panel).replaceAll("\\${profile.accent}", profile.accent).replaceAll("\\${profile.glow}", profile.glow);
   const nextStageCode = fullGame ? `function nextStage(){if(stage>=3){finish(true);return}stage++;camera=0;player.x=120;player.y=360;player.vx=0;player.vy=0;items=[];hazards=[];particles=[];for(let i=0;i<24;i++)items.push({x:260+i*155,y:${platformer ? "310+(i%3)*-65" : "160+(i%5)*62"},r:9,taken:false});for(let i=0;i<11;i++)hazards.push({x:500+i*300,y:${platformer ? "420" : "300+(i%3)*65"},r:${platformer ? "18" : "16"},phase:i*1.7});statusEl.textContent="STAGE "+stage+"/3";sound(720,.16);}` : "";
   return `(() => {
 "use strict";
@@ -169,7 +170,7 @@ for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particl
 ${fullGame ? 'if(score>=stage*120){if(stage<3)nextStage();else{finish(true);return}}if(player.x+camera>3300){if(stage<3)nextStage();else{finish(true);return}}' : 'if(score>=120){finish(true);return}if(player.x+camera>3300){finish(true);return}'}
 }
 function draw(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"${profile.bg}");g.addColorStop(1,"${profile.glow}");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-${backdropCode}
+${resolvedBackdropCode}
 for(let i=0;i<40;i++){const x=((i*173-camera*.18)%1100+1100)%1100;const y=(i*79)%330;ctx.fillStyle=i%4===0?"#d7e7e755":"#9bb6c422";ctx.fillRect(x,y,2,2)}
 ctx.fillStyle="${profile.panel}";for(let i=0;i<14;i++){const x=((i*120-camera*.4)%1200+1200)%1200-60;ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x+55,240+(i%3)*28);ctx.lineTo(x+110,420);ctx.fill()}
 ctx.fillStyle="${platformer ? "#304b43" : "#1b3039"}";ctx.fillRect(0,420,W,120);ctx.fillStyle="#91c9ad";ctx.fillRect(0,420,W,3);
