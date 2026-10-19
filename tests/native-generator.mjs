@@ -109,6 +109,21 @@ assert.match(racingFiles["game.css"], /\.menu-arcade/);
 assert.match(horrorFiles["game.js"], /FIELD NOTES|ctx\.fillStyle/);
 assert.match(racingFiles["game.html"], /Ready to run|GARAGE/);
 assert.match(horrorFiles["game.js"], /55,58\.27,82\.41|55/);
+const racing3d = await createNativeResult({
+  operation: "build",
+  message: "A 3D racing game with a garage, car model and speed challenges",
+  project: { kind: "game", preferredEngine: "webgl3d", name: "3D Velocity", initialPrompt: "A 3D racing game with a garage, car model and speed challenges" }
+});
+const cosmic3d = await createNativeResult({
+  operation: "build",
+  message: "A 3D space exploration game with a spaceship and cosmic shards",
+  project: { kind: "game", preferredEngine: "webgl3d", name: "Starbound", initialPrompt: "A 3D space exploration game with a spaceship and cosmic shards" }
+});
+const racing3dJs = racing3d.files.find(file => file.path === "game.js").content;
+const cosmic3dJs = cosmic3d.files.find(file => file.path === "game.js").content;
+assert.match(racing3dJs, /player\.x-\.48/);
+assert.match(cosmic3dJs, /player\.x-\.58/);
+assert.notEqual(racing3dJs, cosmic3dJs);
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
