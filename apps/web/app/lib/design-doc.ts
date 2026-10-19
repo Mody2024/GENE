@@ -177,10 +177,12 @@ const APP_BASE: Array<Omit<Question, "step" | "total">> = [
 /** Ordered question list for the current answers, with adaptive genre follow-ups. */
 export function interviewQuestions(kind: ProjectKind, answers: Answers, idea = ""): Question[] {
   const brief = String(idea || "").trim();
+  const briefWords = brief.split(/\s+/).filter(Boolean).length;
   const hasConcreteBrief = brief.length >= 24 && (
     /\b(platformer|platform game|runner|racing|puzzle|detective|mystery|horror|survival|tower defense|roguelike|metroidvania|rhythm|shooter|farming|sandbox|open world|story adventure|simulation)\b/i.test(brief) ||
     /\b(2d|3d|side.?scroll|top.?down|isometric|first.?person|third.?person)\b/i.test(brief) ||
-    /\b(jump|dash|collect|craft|build|fight|shoot|solve|explore|stealth|upgrade|checkpoint|boss|levels?)\b/i.test(brief)
+    /\b(jump|dash|collect|craft|build|fight|shoot|solve|explore|stealth|upgrade|checkpoint|boss|levels?)\b/i.test(brief) ||
+    (briefWords >= 12 && /\b(you play|player|set in|where|while|must|discover|investigate|escape|survive|solve|search|avoid|control|use|with|featuring|includes|story about)\b/i.test(brief))
   );
   if (hasConcreteBrief) return [];
   if (kind === "app") {
