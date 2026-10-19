@@ -178,13 +178,13 @@ const APP_BASE: Array<Omit<Question, "step" | "total">> = [
 export function interviewQuestions(kind: ProjectKind, answers: Answers, idea = ""): Question[] {
   const brief = String(idea || "").trim();
   const hasConcreteBrief = brief.length >= 24 && (
-    /\\b(platformer|platform game|runner|racing|puzzle|detective|mystery|horror|survival|tower defense|roguelike|metroidvania|rhythm|shooter|farming|sandbox|open world|story adventure|simulation)\\b/i.test(brief) ||
-    /\\b(2d|3d|side.?scroll|top.?down|isometric|first.?person|third.?person)\\b/i.test(brief) ||
-    /\\b(jump|dash|collect|craft|build|fight|shoot|solve|explore|stealth|upgrade|checkpoint|boss|levels?)\\b/i.test(brief)
+    /\b(platformer|platform game|runner|racing|puzzle|detective|mystery|horror|survival|tower defense|roguelike|metroidvania|rhythm|shooter|farming|sandbox|open world|story adventure|simulation)\b/i.test(brief) ||
+    /\b(2d|3d|side.?scroll|top.?down|isometric|first.?person|third.?person)\b/i.test(brief) ||
+    /\b(jump|dash|collect|craft|build|fight|shoot|solve|explore|stealth|upgrade|checkpoint|boss|levels?)\b/i.test(brief)
   );
   if (hasConcreteBrief) return [];
   if (kind === "app") {
-    if (/\\b(task manager|habit tracker|budget|notes app|calendar|study planner|dashboard|todo|to-do|inventory manager|chat app|recipe app)\\b/i.test(brief)) return [];
+    if (/\b(task manager|habit tracker|budget|notes app|calendar|study planner|dashboard|todo|to-do|inventory manager|chat app|recipe app)\b/i.test(brief)) return [];
     const q = APP_BASE[1];
     return [{ ...q, step: 1, total: 1 }];
   }
