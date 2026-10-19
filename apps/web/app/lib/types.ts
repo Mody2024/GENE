@@ -5,7 +5,7 @@ export type { ResearchBundle, FileChange };
 export type ProjectKind = "game" | "app";
 export type ProjectIntent = "game-2d" | "game-3d" | "website" | "webapp" | "auto";
 export type Mode = "plan" | "build";
-export type Thinking = "fast" | "balanced" | "deep";
+export type Thinking = "fast" | "balanced" | "deep" | "native";
 export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error"; retry?: { prompt: string; operation: string }; research?: ResearchBundle; changes?: FileChange[] };
 export type Question = {
   id: string;
