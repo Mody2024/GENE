@@ -92,6 +92,10 @@ const horrorFiles = Object.fromEntries(horrorBuild.files.map(file => [file.path,
 const racingFiles = Object.fromEntries(racingBuild.files.map(file => [file.path, file.content]));
 assert.notEqual(horrorBuild.plan.design.visualIdentity, racingBuild.plan.design.visualIdentity);
 assert.notEqual(horrorBuild.plan.design.soundtrack.mood, racingBuild.plan.design.soundtrack.mood);
+assert.equal(JSON.parse(horrorFiles["game-spec.json"]).designProfile.id, "cinematic");
+assert.equal(JSON.parse(racingFiles["game-spec.json"]).designProfile.id, "velocity");
+assert.equal(JSON.parse(horrorFiles["game-spec.json"]).audio.mood, "uneasy");
+assert.ok(JSON.parse(racingFiles["game-spec.json"]).implementationPlan.testMatrix.length >= 3);
 assert.notEqual(horrorFiles["game.css"], racingFiles["game.css"]);
 assert.match(horrorFiles["game.html"], /Something is waiting|CASE FILE/);
 assert.match(racingFiles["game.html"], /Ready to run|GARAGE/);
