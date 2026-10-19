@@ -44,6 +44,32 @@ function nativeInterviewQuestion(kind, answers, prompt) {
   return { ...next, step: questions.indexOf(next) + 1, total: questions.length, multi: false };
 }
 
+function visualProfile(prompt, engine) {
+  const p = String(prompt || "").toLowerCase();
+  if (engine === "webapp") {
+    if (/retro|crt|terminal|hardware|vcr/i.test(p)) return { id: "retro", bg: "#171915", panel: "#25271f", line: "#535b45", text: "#eff2d8", muted: "#aab39a", accent: "#c8f36a", ink: "#1c2411", glow: "#829b3a", menu: "SYSTEM READY", subtitle: "A workspace built around your workflow.", cta: "Open workspace", genre: "retro productivity" };
+    if (/playful|kids|colorful|game.?like|cute/i.test(p)) return { id: "playful", bg: "#fff8ef", panel: "#ffffff", line: "#f0d9c6", text: "#382d43", muted: "#796b7d", accent: "#ff9d75", ink: "#382d43", glow: "#ffd8b7", menu: "Let's get started", subtitle: "A friendly space to make progress.", cta: "Get started", genre: "playful app" };
+    return { id: "studio", bg: "#f4f6f8", panel: "#ffffff", line: "#dce2e8", text: "#17212b", muted: "#637181", accent: "#2f6fed", ink: "#ffffff", glow: "#c7d8ff", menu: "Your workspace", subtitle: "Everything you need, in one clear place.", cta: "Open workspace", genre: "clean studio app" };
+  }
+  if (/horror|psychological|haunt|disturb|creepy|dread|survival horror/i.test(p)) return { id: "cinematic", bg: "#100d12", panel: "#1b151d", line: "#49323e", text: "#f4e9ed", muted: "#c0a9b4", accent: "#c87984", ink: "#1a0c12", glow: "#582d43", menu: "Something is waiting", subtitle: "Some doors should stay closed.", cta: "Enter the unknown", genre: "cinematic horror" };
+  if (/racing|race|driv|speed|drift/i.test(p)) return { id: "velocity", bg: "#10151d", panel: "#171f2b", line: "#36475b", text: "#f1f6ff", muted: "#a6b8cd", accent: "#ffb547", ink: "#201608", glow: "#354c67", menu: "Ready to run?", subtitle: "Find your line. Own the road.", cta: "Start race", genre: "high-velocity arcade" };
+  if (/space|galaxy|planet|cosmic|starship/i.test(p)) return { id: "cosmic", bg: "#090f20", panel: "#111b32", line: "#2b3e65", text: "#edf2ff", muted: "#aab9df", accent: "#9dc4ff", ink: "#101a32", glow: "#263f78", menu: "Beyond the horizon", subtitle: "A vast world is calling.", cta: "Launch mission", genre: "cosmic adventure" };
+  if (/fantasy|dragon|magic|wizard|myth|storybook|fairy/i.test(p)) return { id: "storybook", bg: "#17130e", panel: "#272016", line: "#5c4930", text: "#fff2d6", muted: "#cdbb98", accent: "#e9bd69", ink: "#30200b", glow: "#69502b", menu: "A tale begins", subtitle: "Every legend starts somewhere.", cta: "Begin your journey", genre: "storybook fantasy" };
+  if (/platform|jump|pixel|retro|arcade|runner|geometry dash/i.test(p)) return { id: "arcade", bg: "#10171b", panel: "#1a262b", line: "#35505a", text: "#effcff", muted: "#a9c3c9", accent: "#69e2cf", ink: "#09221f", glow: "#1d625d", menu: "READY PLAYER ONE", subtitle: "One more run. One more record.", cta: "Play now", genre: "precision arcade" };
+  if (/detective|mystery|investigat|puzzle|clue|escape room/i.test(p)) return { id: "noir", bg: "#171716", panel: "#242321", line: "#4c4941", text: "#f2eee4", muted: "#c0b7a4", accent: "#d6b878", ink: "#292111", glow: "#594a30", menu: "Case file 001", subtitle: "Look closer. Nothing is accidental.", cta: "Open the case", genre: "noir mystery" };
+  if (/underwater|ocean|sea|island|nature|forest|explor/i.test(p)) return { id: "wild", bg: "#0b1c1b", panel: "#122a27", line: "#28534a", text: "#e4f5ec", muted: "#a4c9bb", accent: "#84d7ad", ink: "#0d2a21", glow: "#1d5849", menu: "The world is yours", subtitle: "Take the path less traveled.", cta: "Explore", genre: "natural exploration" };
+  return { id: "adventure", bg: "#0b1015", panel: "#141d25", line: "#293744", text: "#edf4f7", muted: "#a0b1bb", accent: "#b8e3d0", ink: "#10251e", glow: "#263b46", menu: "Your adventure starts here", subtitle: "Discover, improve, and find your own way.", cta: "Start adventure", genre: "stylized adventure" };
+}
+function musicProfile(prompt) {
+  const p = String(prompt || "").toLowerCase();
+  if (/horror|psychological|haunt|disturb|creepy|dread/i.test(p)) return { mood: "uneasy", notes: [55, 58.27, 82.41], waves: ["sine", "triangle", "sine"], tempo: 0.012 };
+  if (/race|driv|speed|drift|runner|arcade|platform|geometry dash/i.test(p)) return { mood: "energetic", notes: [110, 164.81, 220], waves: ["sawtooth", "triangle", "square"], tempo: 0.024 };
+  if (/space|galaxy|cosmic|planet|starship/i.test(p)) return { mood: "weightless", notes: [65.41, 98, 146.83], waves: ["sine", "sine", "triangle"], tempo: 0.014 };
+  if (/fantasy|dragon|magic|wizard|storybook/i.test(p)) return { mood: "wonder", notes: [130.81, 164.81, 196], waves: ["triangle", "sine", "triangle"], tempo: 0.016 };
+  if (/detective|mystery|investigat|puzzle|noir/i.test(p)) return { mood: "investigative", notes: [73.42, 110, 146.83], waves: ["triangle", "sine", "sine"], tempo: 0.013 };
+  if (/underwater|ocean|sea|forest|nature|explor/i.test(p)) return { mood: "organic", notes: [82.41, 123.47, 185], waves: ["sine", "triangle", "sine"], tempo: 0.015 };
+  return { mood: "adventure", notes: [110, 164.81, 220], waves: ["sine", "triangle", "sine"], tempo: 0.018 };
+}
 function pickEngine(input) {
   if (input.kind === "app") return "webapp";
   if (["canvas2d", "webgl3d"].includes(input.engine)) return input.engine;
