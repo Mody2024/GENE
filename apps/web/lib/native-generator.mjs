@@ -388,13 +388,13 @@ export async function createNativeResult(input = {}) {
   const operation = text(input.operation || "build");
   const userMessage = text(input.message || input.prompt);
   const projectPrompt = text(input.project?.initialPrompt);
-  const plan = input.project?.plan && typeof input.project.plan === "object" ? input.project.plan : {};
+  const existingPlan = input.project?.plan && typeof input.project.plan === "object" ? input.project.plan : {};
   const commandOnly = /^(?:build|build it|build game|build the game|continue|continue building|generate|generate it|start|start building|go|do it|surprise|create|make it|proceed|retry|try again|fix it)$/i.test(userMessage);
   const isBuildOperation = ["build", "buildPart", "surprise"].includes(operation);
   // The original brief is the source of truth. Build-stage messages such as "continue" or
   // "build" must never replace it with a generic command and silently change the game.
   const prompt = isBuildOperation
-    ? [projectPrompt, text(plan.summary, 2200), text(plan.genre, 120), ...(Array.isArray(plan.mechanics) ? plan.mechanics.map(item => text(item, 180)) : []), ...(userMessage && !commandOnly && userMessage !== projectPrompt ? ["Latest requested changes: " + userMessage] : [])].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join("\n\n").slice(0, 12000) || userMessage
+    ? [projectPrompt, text(existingPlan.summary, 2200), text(existingPlan.genre, 120), ...(Array.isArray(existingPlan.mechanics) ? existingPlan.mechanics.map(item => text(item, 180)) : []), ...(userMessage && !commandOnly && userMessage !== projectPrompt ? ["Latest requested changes: " + userMessage] : [])].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join("\n\n").slice(0, 12000) || userMessage
     : operation === "interview"
       ? projectPrompt || userMessage
       : userMessage || projectPrompt;
