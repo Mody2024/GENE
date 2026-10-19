@@ -21,6 +21,19 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
 
   const toggle = (choice: string) => setPicked(current => current.includes(choice) ? current.filter(item => item !== choice) : [...current, choice]);
   const choose = (choice: string) => question.multi ? toggle(choice) : setPicked([choice]);
+  const previewClass = (choice: string) => {
+    const value = choice.toLowerCase();
+    if (/horror|creepy|dark|cinematic|case file|noir/.test(value)) return "preview-noir";
+    if (/arcade|pixel|energetic|runner|score/.test(value)) return "preview-arcade";
+    if (/fantasy|storybook|magic|illustrated/.test(value)) return "preview-fantasy";
+    if (/racing|speed|garage|driv/.test(value)) return "preview-racing";
+    if (/space|cosmic|atmospheric|ambient|wonder/.test(value)) return "preview-cosmic";
+    if (/playful|colorful|kids/.test(value)) return "preview-playful";
+    if (/retro|crt|hardware/.test(value)) return "preview-retro";
+    if (/clean|minimal|studio|professional|personal use/.test(value)) return "preview-clean";
+    if (/nature|ocean|explor/.test(value)) return "preview-nature";
+    return "preview-default";
+  };
   const submitPicked = () => { if (busy || picked.length === 0) return; onAnswer(question.multi ? picked.join("; ") : picked[0]); };
   const submitCustom = () => {
     const value = custom.trim();
@@ -50,6 +63,7 @@ export default function InterviewCard({ question, busy, onAnswer, onDefault, onS
               disabled={busy}
               onClick={() => choose(choice)}
             >
+              <span className={"g3-choice-preview " + previewClass(choice)} aria-hidden="true"><i /><i /><i /></span>
               <span>{choice}</span>
               {question.recommended === choice && <em>Recommended</em>}
             </button>

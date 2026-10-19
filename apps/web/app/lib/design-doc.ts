@@ -176,12 +176,22 @@ const APP_BASE: Array<Omit<Question, "step" | "total">> = [
 
 /** Ordered question list for the current answers, with adaptive genre follow-ups. */
 export function interviewQuestions(kind: ProjectKind, answers: Answers, idea = ""): Question[] {
-  if (kind === "app") return APP_BASE.map((q, i, all) => ({ ...q, step: i + 1, total: all.length }));
-  const genre = detectGenre(idea, answers.genre);
-  const follow = GENRE_FOLLOW_UPS[genre];
-  const list = [...GAME_BASE];
-  if (follow) list.splice(5, 0, follow);
-  return list.map((q, i, all) => ({ ...q, step: i + 1, total: all.length }));
+  const brief = String(idea || "").trim();
+  const briefWords = brief.split(/\s+/).filter(Boolean).length;
+  const hasConcreteBrief = brief.length >= 24 && (
+    /\b(platformer|platform game|runner|racing|puzzle|detective|mystery|horror|survival|tower defense|roguelike|metroidvania|rhythm|shooter|farming|sandbox|open world|story adventure|simulation)\b/i.test(brief) ||
+    /\b(2d|3d|side.?scroll|top.?down|isometric|first.?person|third.?person)\b/i.test(brief) ||
+    /\b(jump|dash|collect|craft|build|fight|shoot|solve|explore|stealth|upgrade|checkpoint|boss|levels?)\b/i.test(brief) ||
+    (briefWords >= 12 && /\b(you play|player|set in|where|while|must|discover|investigate|escape|survive|solve|search|avoid|control|use|with|featuring|includes|story about)\b/i.test(brief))
+  );
+  if (hasConcreteBrief) return [];
+  if (kind === "app") {
+    if (/\b(task manager|habit tracker|budget|notes app|calendar|study planner|dashboard|todo|to-do|inventory manager|chat app|recipe app)\b/i.test(brief)) return [];
+    const q = APP_BASE[1];
+    return [{ ...q, step: 1, total: 1 }];
+  }
+  const q = GAME_BASE[0];
+  return [{ ...q, step: 1, total: 1 }];
 }
 
 export function nextInterviewQuestion(kind: ProjectKind, answers: Answers, idea = ""): Question | null {
@@ -231,7 +241,12 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
     (genre === "shooter" || genre === "racing" || genre === "runner" || genre === "fighter" ? "action" : genre === "survival" ? "tense" : genre === "puzzle" ? "calm" : "mystery");
   const targets = scopeTargets(String(answers.scope || ""));
   const title = plan?.title || project.name || "Untitled project";
-  const heroSubject = isApp ? "product hero illustration" : "player character";
+  const requestText = [idea, plan?.summary, ...Object.values(answers)].filter(Boolean).join(" ");
+  const needsCharacterArt = /\b(character|player sprite|hero|npc|avatar|protagonist|person|knight|wizard|creature|monster|enemy|enemies|boss)\b/i.test(requestText) ||
+    /\b(adventure|rpg|role.?playing|horror|survival|combat|shooter|fighter)\b/i.test(genre);
+  const needsEnemyArt = /\b(enemy|enemies|boss|combat|fight|shoot|survival|horror|zombie|monster|creature)\b/i.test(requestText);
+  const needsPickupArt = /\b(collect|coin|gem|pickup|loot|reward|item|treasure|rhythm|runner|platformer)\b/i.test(requestText);
+  const heroSubject = isApp ? "product hero illustration" : needsCharacterArt ? "player character sprite or distinctive silhouette" : "player avatar or signature gameplay object that fits the core mechanic";
   const assetPlan = isApp
     ? [
         { id: "hero", kind: "background" as const, prompt: "Hero illustration for " + title + ": " + idea.slice(0, 160) },
@@ -239,10 +254,10 @@ export function buildDesignDoc(project: GeneProject): DesignDoc {
       ]
     : [
         { id: "logo", kind: "logo" as const, prompt: "Title logo for the game " + title + ", " + (palette?.[1] || "bold") + " style" },
-        { id: "hero", kind: "sprite" as const, prompt: heroSubject + " for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", readable silhouette, front/side pose" },
-        { id: "enemy", kind: "sprite" as const, prompt: "main enemy or hazard for " + title + " with a distinct silhouette from the player" },
-        { id: "pickup", kind: "icon" as const, prompt: "collectible pickup icon for " + title + ", glowing, simple shape" },
-        { id: "backdrop", kind: "background" as const, prompt: "layered background scene for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", depth with foreground, midground and sky" }
+        { id: "hero", kind: "sprite" as const, prompt: heroSubject + " for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", readable silhouette designed around the actual gameplay" },
+        ...(needsEnemyArt ? [{ id: "enemy", kind: "sprite" as const, prompt: "main enemy for " + title + " with a distinct silhouette and readable behavior" }] : []),
+        ...(needsPickupArt ? [{ id: "pickup", kind: "icon" as const, prompt: "collectible or gameplay pickup icon for " + title + ", recognizable at small size" }] : []),
+        { id: "backdrop", kind: "background" as const, prompt: "layered game environment for " + title + ", " + pick(answers, "fantasy", "fitting world") + ", composition that keeps hazards and objectives readable" }
       ];
   const referenceContext = (project.references || []).map(reference => {
     const label = reference.name || reference.id || "Untitled reference";

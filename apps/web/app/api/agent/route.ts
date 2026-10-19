@@ -7,6 +7,7 @@ import { extractJsonObjectText, hasAlternateProviderKeys, runAlternateChain } fr
 import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 import { nextInterviewQuestion } from "../../lib/design-doc";
+import { createNativeResult } from "../../../lib/native-generator.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -684,6 +685,17 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Assembled project failed validation.";
       return jsonError("The staged project did not pass final validation: " + message + " No files were saved. Retry the build or ask GENE to repair the specific stage.", 422, "GENE_STAGED_BUILD_VALIDATION_FAILED");
+    }
+  }
+
+  // Explicit native mode is a hard boundary: this branch returns before any provider keys,
+  // fetch calls, or fallback chains are inspected. No third-party model is called.
+  if (body.thinking === "native" || process.env.GENE_NATIVE_ONLY === "true") {
+    try {
+      const result = await createNativeResult({ ...body, operation: body.operation });
+      return NextResponse.json({ ok: true, aiMode: "native", model: "Gene Native (deterministic)", result });
+    } catch (error) {
+      return jsonError(error instanceof Error ? error.message : "Native generation failed.", 422, "GENE_NATIVE_GENERATION_FAILED");
     }
   }
 

@@ -168,7 +168,7 @@ assert.ok(playPage.includes('isApp ? "min-height:100%;height:auto;overflow:auto;
 assert.ok(page.includes('project.kind === "app"'), "preview and workspace logic respect project kind");
 assert.ok(prompts.includes("WEB APP ACCEPTANCE CHECKLIST"), "AI prompt defines app-specific acceptance rules");
 assert.ok(api.includes("external runtime dependency"), "builder blocks external runtime dependencies");
-assert.ok(prompts.includes("Ask at most ONE high-impact question"), "interview is sequential");
+assert.ok(prompts.includes("STRICT PROMPT-RELEVANT INTERVIEW CONTRACT") && prompts.includes("Maximum 3 questions total") && prompts.includes("PROMPT FIDELITY / SOURCE OF TRUTH"), "interview must be brief-specific and generation must preserve original prompt intent");
 assert.ok(prompts.includes("Avoid empty black screens"), "prompt explicitly rejects placeholder games");
 assert.ok(prompts.includes("navigator.getGamepads"), "game builder contract requires real Gamepad API polling");
 assert.ok(prompts.includes("window.__GENE_ASSETS__"), "game builder contract teaches the model how to consume real Forge assets");
@@ -847,8 +847,8 @@ assert.ok(targetIntentRegressionInterview.includes("Skip interview and build") &
 assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interface system") && targetIntentRegressionStyles.includes("real-progress-current") && targetIntentRegressionStyles.includes("grid-template-columns:repeat(4,minmax(0,1fr))"), "clean surfaces, four explicit project targets and compact current-step progress are styled");
 
 const researchRouteSource = read("apps/web/app/api/research/route.ts");
-assert.ok(researchRouteSource.includes("wikipedia(searchText, wikiHost)") && researchRouteSource.includes("polyHavenCatalog()") && researchRouteSource.includes("Promise.all(["), "research route gathers Wikipedia and the CC0 model catalogue together for game builds too");
-assert.ok(researchRouteSource.includes("commons(searchText, \"image\"") && researchRouteSource.includes("musicSearchTerms(topic)") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData"), "research route also gathers licensed images and music tracks and only downloads image bytes from allow-listed hosts");
+assert.ok(researchRouteSource.includes("wikipedia(searchText, wikiHost)") && researchRouteSource.includes("wants3DModels ? polyHavenCatalog()") && researchRouteSource.includes("Promise.all(["), "research route gathers facts and only searches 3D catalogues for explicit 3D requests");
+assert.ok(researchRouteSource.includes("commons(assetQuery") && researchRouteSource.includes("musicSearchTerms(topic)") && researchRouteSource.includes("wantsCharacterArt") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData"), "research targets requested asset types and only downloads image bytes from allow-listed hosts");
 assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelling") && page.includes("generatedModels"), "3D build pipeline requests real Forge meshes and records actual generated asset paths");
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");

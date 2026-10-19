@@ -640,6 +640,9 @@ export default function Home() {
         !/\b(skip (?:the )?interview|no questions|without (?:an? )?interview|build immediately|just build|use sensible defaults|don't ask|do not ask)\b/i.test(prompt)) {
       operation = "interview";
     }
+    // A pending interview is a stateful workflow: every answer must advance
+    // the interview rather than falling through to a build/edit operation.
+    if (project.question && !operationOverride) operation = "interview";
     if (operation === "research") setSearchMode(false);
     if (operation === "surprise") {
       operation = "surprise";
@@ -1322,6 +1325,7 @@ export default function Home() {
       const result: AgentResponse = payload.result;
       setLiveRun(current => current ? { ...current, stage: "apply", model: typeof payload.model === "string" ? payload.model : current.model } : current);
       addActivity("Response received from " + (payload.model || payload.aiMode || "agent"));
+      if (Array.isArray((result as any).processingTrace)) for (const step of (result as any).processingTrace) if (typeof step === "string") addActivity(step);
       if (payload.reviewedBy) addActivity("Independent code review completed by " + payload.reviewedBy);
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
@@ -2743,8 +2747,8 @@ export default function Home() {
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools">
                     <button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button>
-                    <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
-                      <option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
+                    <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning. Native: no external AI calls." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
+                      <option value="native">Gene Native · no external AI</option><option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
                   </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>

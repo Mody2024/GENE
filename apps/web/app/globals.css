@@ -58,7 +58,8 @@ body{background:var(--bg)}.gene-app{background:radial-gradient(ellipse at 70% -1
 .gene-mark>.gene-logo-svg{width:44px;height:44px;color:var(--green)}
 .project-delete:focus-visible,.recent-delete:focus-visible,.preview-reopen-tab:focus-visible,.gene-logo-svg:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 
-.expanded-live-editor{position:absolute;z-index:12;left:24px;bottom:56px;width:min(560px,calc(100% - 48px));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:12px;border:1px solid var(--border-strong);border-radius:15px;background:color-mix(in srgb,var(--surface) 91%,transparent);box-shadow:0 14px 44px rgba(0,0,0,.36);backdrop-filter:blur(22px)}
+.expanded-live-editor{position:absolute;z-index:12;pointer-events:none;left:24px;bottom:56px;width:min(560px,calc(100% - 48px));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:12px;border:1px solid var(--border-strong);border-radius:15px;background:color-mix(in srgb,var(--surface) 91%,transparent);box-shadow:0 14px 44px rgba(0,0,0,.36);backdrop-filter:blur(22px)}
+.expanded-live-editor-label,.expanded-live-editor textarea,.expanded-live-editor button{pointer-events:auto}
 .expanded-live-editor-label{grid-column:1/-1;display:flex;align-items:center;gap:8px;font:700 9px "DM Mono",monospace;letter-spacing:.09em;color:var(--green)}
 .expanded-live-editor-label span:last-child{font:500 10px "DM Sans",sans-serif;letter-spacing:0;color:var(--muted);margin-left:4px}
 .expanded-live-editor textarea{resize:vertical;min-height:44px;max-height:130px;width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text);font:11px/1.55 "DM Sans",sans-serif;outline:none}

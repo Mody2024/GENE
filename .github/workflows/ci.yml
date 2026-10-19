@@ -25,10 +25,14 @@ jobs:
         run: npm run check --workspace=@gene/local-agent
       - name: Check cloud build helper syntax
         run: node --check scripts/cloud-build.mjs && node --check scripts/upload-cloud-output.mjs
+      - name: Check scratch-trained model syntax
+        run: python -m py_compile packages/native-brain/train.py packages/native-brain/infer.py packages/native-brain/export_training_data.py packages/native-brain/test_export_training_data.py && python -m unittest discover -s packages/native-brain -p "test_*.py"
       - name: Run contract and local-agent end-to-end tests
         run: npm test
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+      - name: Run native generated-game browser tests
+        run: npm run test:native-browser
       - name: Build web app
         run: npm run build
       - name: Start web app
@@ -43,5 +47,7 @@ jobs:
           done
           cat /tmp/gene-web.log
           exit 1
+      - name: Test native API without external providers
+        run: node tests/native-api.mjs
       - name: Test real browser preview and UI controls
         run: npm run test:browser
