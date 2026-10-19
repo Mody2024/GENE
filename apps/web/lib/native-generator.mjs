@@ -444,7 +444,7 @@ export async function createNativeResult(input = {}) {
   };
   if (operation === "buildPart" && input.stagePath && !["game.html", "game.css", "game.js", "game-spec.json"].includes(input.stagePath)) {
     const requestedPath = text(input.stagePath, 240);
-    if (!requestedPath || requestedPath.split("/").some(part => !part || part === "." || part === "..") || !/^[a-zA-Z0-9_./-]+\\.(?:m?js|cjs|css|html|json|svg|txt|md)$/i.test(requestedPath)) throw new TypeError("Requested recovery path is invalid or unsupported.");
+    if (!requestedPath || requestedPath.split("/").some(part => !part || part === "." || part === "..") || !/^[a-zA-Z0-9_./-]+\.(?:m?js|cjs|css|html|json|svg|txt|md)$/i.test(requestedPath)) throw new TypeError("Requested recovery path is invalid or unsupported.");
     const file = nativeModuleSource(input.stagePath, designPrompt, plan);
     return { reply: "Recovered exactly " + input.stagePath + " using Gene's native module generator. The requested path is preserved and no external AI was called.", files: [file], plan, complete: true, needsUserDecision: false, references, nativeGeneration: { modelUsed: false, externalAiUsed: false, exactRequestedPath: input.stagePath, strategy: "native-module-recovery-v1" } };
   }
