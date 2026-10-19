@@ -218,8 +218,8 @@ export async function createNativeResult(input = {}) {
     mimeType: text(ref?.mimeType, 80),
     textContent: ref?.kind === "text" ? text(ref?.textContent, 5000) : ""
   })) : [];
-  const referenceText = attachedReferences.filter(ref => ref.textContent).map(ref => ref.name + ": " + ref.textContent).join("\\n").slice(0, 10000);
-  const designPrompt = [prompt, referenceText].filter(Boolean).join("\\n\\nReference context:\\n");
+  const referenceText = attachedReferences.filter(ref => ref.textContent).map(ref => ref.name + ": " + ref.textContent).join("\n").slice(0, 10000);
+  const designPrompt = [prompt, referenceText].filter(Boolean).join("\n\nReference context:\n");
   const engine = pickEngine({ kind, engine: input.project?.preferredEngine || input.project?.plan?.engine || input.engine, prompt: designPrompt });
   const projectName = text(input.project?.name);
   const title = titleFrom(input.project?.plan?.title || (projectName && projectName !== "New project" ? projectName : "") || input.project?.initialPrompt || prompt);
@@ -227,7 +227,7 @@ export async function createNativeResult(input = {}) {
   const references = [...ENGINE_DOCS[engine], ...attachedReferences.map(ref => ({ title: ref.name, note: ref.kind === "image" ? "User/research image reference attached; this template does not analyze image pixels." : ref.textContent.slice(0, 420), source: "project-attachment" }))];
   const plan = {
     title, kind, engine,
-    summary: ("Native-only build plan for: " + prompt.slice(0, 700) + (referenceText ? "\\nReference context: " + referenceText.slice(0, 1600) : "")).slice(0, 2600),
+    summary: ("Native-only build plan for: " + prompt.slice(0, 700) + (referenceText ? "\nReference context: " + referenceText.slice(0, 1600) : "")).slice(0, 2600),
     tasks: kind === "app"
       ? ["Define the main user flow and data contract", "Build responsive semantic UI", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
       : ["Establish the playable core loop and controls", "Implement responsive rendering and game state", "Add score, hazards, recovery, and restart", "Connect audio feedback and controls", "Run source checks and manual gameplay review"],
@@ -261,7 +261,7 @@ export async function createNativeResult(input = {}) {
     return { reply: "Native mode is active. This deterministic starter asks for your highest-impact choice before building.", question: { id: "native-core-loop", text: "What should the player do most of the time? Choose the main gameplay loop, then Gene will create a playable first build.", why: "The core loop affects movement, goals, level design, and the test plan.", choices: ["Explore and collect", "Fight enemies", "Platform and jump", "Solve puzzles", "Drive or run", "Manage/build"], recommended: "Explore and collect", step: 1, total: 1 }, files: [], plan: null, complete: false, needsUserDecision: true };
   }
   if (operation === "enhancePrompt") {
-    return { reply: prompt + "\\n\\nNative implementation checklist:\\n- Preserve the requested genre, platform, perspective, and visual identity.\\n- Build a playable core loop before adding optional systems.\\n- Keep controls, scoring/progression, pause/restart, and win/loss behavior testable.\\n- Use the attached research notes and references as constraints; verify licenses before shipping assets.\\n- Run source validation and browser gameplay tests; report anything not verified.", files: [], plan, complete: true, needsUserDecision: false, references };
+    return { reply: prompt + "\n\nNative implementation checklist:\n- Preserve the requested genre, platform, perspective, and visual identity.\n- Build a playable core loop before adding optional systems.\n- Keep controls, scoring/progression, pause/restart, and win/loss behavior testable.\n- Use the attached research notes and references as constraints; verify licenses before shipping assets.\n- Run source validation and browser gameplay tests; report anything not verified.", files: [], plan, complete: true, needsUserDecision: false, references };
   }
   if (operation === "plan") {
     return { reply: "Created a native, rule-based plan without external AI calls. This is structured planning, not neural-model reasoning.", files: [], plan, complete: true, needsUserDecision: false, references };
