@@ -76,6 +76,7 @@ function canvasGameJs(title, prompt, fullGame = false) {
   const platformer = /platform|jump|side.?scroll/i.test(prompt);
   const spooky = /horror|mystery|dark|haunt/i.test(prompt);
   const playerColor = spooky ? "#c6d7e2" : "#b8e3d0";
+  const nextStageCode = fullGame ? `function nextStage(){if(stage>=3){finish(true);return}stage++;camera=0;player.x=120;player.y=360;player.vx=0;player.vy=0;items=[];hazards=[];particles=[];for(let i=0;i<24;i++)items.push({x:260+i*155,y:${platformer ? "310+(i%3)*-65" : "160+(i%5)*62"},r:9,taken:false});for(let i=0;i<11;i++)hazards.push({x:500+i*300,y:${platformer ? "420" : "300+(i%3)*65"},r:${platformer ? "18" : "16"},phase:i*1.7});statusEl.textContent="STAGE "+stage+"/3";sound(720,.16);}` : "";
   return `(() => {
 "use strict";
 const canvas=document.getElementById("game-canvas"),ctx=canvas.getContext("2d");
@@ -90,7 +91,7 @@ function reset(){stage=1;score=0;elapsed=0;player.x=120;player.y=360;player.vx=0
 function start(){if(ended)reset();running=true;paused=false;ended=false;overlay.classList.add("hidden");statusEl.textContent="PLAYING";sound(620,.12);last=performance.now();requestAnimationFrame(loop)}
 function finish(win){running=false;ended=true;overlay.classList.remove("hidden");overlayTitle.textContent=win?"Challenge complete!":"Try again";overlayCopy.textContent=win?"You cleared the course. Restart to beat your score.":"You ran out of health. Your next run starts fresh.";startBtn.textContent="Play again";statusEl.textContent=win?"COMPLETE":"GAME OVER";sound(win?760:180,.24,win?"sine":"triangle");}
 function pause(){if(!running)return;paused=!paused;statusEl.textContent=paused?"PAUSED":"PLAYING";pauseBtn.textContent=paused?"Resume":"Pause";if(!paused){last=performance.now();requestAnimationFrame(loop)}}
-${fullGame ? 'function nextStage(){if(stage>=3){finish(true);return}stage++;camera=0;player.x=120;player.y=360;player.vx=0;player.vy=0;items=[];hazards=[];particles=[];for(let i=0;i<24;i++)items.push({x:260+i*155,y:${platformer ? "310+(i%3)*-65" : "160+(i%5)*62"},r:9,taken:false});for(let i=0;i<11;i++)hazards.push({x:500+i*300,y:${platformer ? "420" : "300+(i%3)*65"},r:${platformer ? "18" : "16"},phase:i*1.7});statusEl.textContent="STAGE "+stage+"/3";sound(720,.16);}' : ''}
+${nextStageCode}
 function update(dt){elapsed+=dt;const left=keys.has("ArrowLeft")||keys.has("a"),right=keys.has("ArrowRight")||keys.has("d"),up=keys.has("ArrowUp")||keys.has("w"),down=keys.has("ArrowDown")||keys.has("s");
 player.vx+=(Number(right)-Number(left))*1500*dt;player.vx*=Math.pow(.001,dt);player.vx=Math.max(-270,Math.min(270,player.vx));
 ${platformer ? "if((up||keys.has(' '))&&player.grounded){player.vy=-560;player.grounded=false;sound(420,.08)}player.vy+=1300*dt;player.y+=player.vy*dt;player.grounded=false;if(player.y+player.r>=420){player.y=420-player.r;player.vy=0;player.grounded=true}if(player.y<20){player.y=20;player.vy=0}" : "player.vy+=(Number(down)-Number(up))*1000*dt;player.vy*=Math.pow(.003,dt);player.vy=Math.max(-230,Math.min(230,player.vy));player.y+=player.vy*dt;player.y=Math.max(65,Math.min(H-55,player.y));"}
