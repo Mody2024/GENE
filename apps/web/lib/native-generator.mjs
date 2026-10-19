@@ -245,10 +245,18 @@ export async function createNativeResult(input = {}) {
     };
   }
   if (operation === "interview") {
-    return { reply: "Native mode is active. This deterministic starter asks for your highest-impact choices before building.", question: { id: "native-core-loop", text: "What should the player do most of the time? Choose the main gameplay loop, then Gene will create a playable first build.", why: "The core loop affects movement, goals, level design, and the test plan.", choices: ["Explore and collect", "Fight enemies", "Platform and jump", "Solve puzzles", "Drive or run", "Manage/build"], recommended: "Explore and collect", step: 1, total: 1 }, files: [], plan: null, complete: false, needsUserDecision: true };
+    const answers = input.answers && typeof input.answers === "object" ? input.answers : {};
+    if (Object.keys(answers).length > 0) {
+      plan.summary += " Interview choices: " + Object.entries(answers).map(([key, value]) => key + "=" + text(value, 180)).join("; ").slice(0, 600);
+      return { reply: "Native interview complete. I incorporated the supplied choices into the deterministic build plan; no external AI was called.", question: null, files: [], plan, complete: true, needsUserDecision: false, references };
+    }
+    return { reply: "Native mode is active. This deterministic starter asks for your highest-impact choice before building.", question: { id: "native-core-loop", text: "What should the player do most of the time? Choose the main gameplay loop, then Gene will create a playable first build.", why: "The core loop affects movement, goals, level design, and the test plan.", choices: ["Explore and collect", "Fight enemies", "Platform and jump", "Solve puzzles", "Drive or run", "Manage/build"], recommended: "Explore and collect", step: 1, total: 1 }, files: [], plan: null, complete: false, needsUserDecision: true };
   }
   if (operation === "plan" || operation === "enhancePrompt") {
     return { reply: "Created a native, rule-based plan without external AI calls. This is structured planning, not neural-model reasoning.", files: [], plan, complete: true, needsUserDecision: false, references };
+  }
+  if (operation === "edit") {
+    return { reply: "No files were changed. Gene Native can create and validate its current starter templates, but arbitrary semantic edits to existing source are not safe yet without the native code-reasoning model. Use a fresh native build, or switch to a provider-backed mode for this edit until native code editing is implemented.", files: [], plan, complete: true, needsUserDecision: false, nativeGeneration: { modelUsed: false, externalAiUsed: false, editSupported: false } };
   }
   if (operation === "chat") {
     const memory = Array.isArray(input.history) ? input.history.slice(-8).map(item => text(item?.content || item?.text, 500)).filter(Boolean) : [];
