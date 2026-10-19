@@ -412,8 +412,27 @@ export async function createNativeResult(input = {}) {
     return { reply: "No files were changed. Gene Native can create and validate its current starter templates, but arbitrary semantic edits to existing source are not safe yet without the native code-reasoning model. Use a fresh native build, or switch to a provider-backed mode for this edit until native code editing is implemented.", files: [], plan, complete: true, needsUserDecision: false, nativeGeneration: { modelUsed: false, externalAiUsed: false, editSupported: false } };
   }
   if (operation === "chat") {
-    const memory = Array.isArray(input.history) ? input.history.slice(-8).map(item => text(item?.content || item?.text, 500)).filter(Boolean) : [];
-    return { reply: "Gene Native mode is running without an external AI model. I can currently use deterministic planning, build the playable starter, and attach engine references. Your request was: " + prompt.slice(0, 1200) + (memory.length ? "\nRecent conversation context: " + memory.join(" | ").slice(0, 900) : ""), files: [], plan, complete: true, needsUserDecision: false, references };
+    const history = Array.isArray(input.history) ? input.history : [];
+    const q = prompt.toLowerCase();
+    const context = "Current project: " + plan.title + " (" + plan.engine + ", " + profile.genre + ").";
+    let reply;
+    if (q.includes("menu") || q.includes("title screen") || q.includes("interface") || q.includes("visual") || q.includes("design") || q.includes("theme")) {
+      reply = context + "\n\nDesign direction: " + profile.genre + ", using the " + profile.id + " visual profile and " + profile.menu + " title-screen direction. To apply a change, ask Gene to rebuild with the menu style you want. The native builder can vary rule-based profiles, but cannot yet invent arbitrary high-end layouts like a trained general model.";
+    } else if (q.includes("music") || q.includes("soundtrack") || q.includes("audio") || q.includes("sound effect")) {
+      reply = context + "\n\nAudio direction: " + soundtrack.mood + ". Gene synthesizes original tones locally with Web Audio; notes and timbres vary by genre. This is procedural audio, not a neural composer or recorded orchestral soundtrack.";
+    } else if (q.includes("model") || q.includes("neural") || q.includes("train") || q.includes("intelligence") || q.includes("quality") || q.includes("better games")) {
+      reply = context + "\n\nHonest status: this native path does not call another AI, but generation still uses rule-based templates and deterministic planning. The scratch-trained neural model is not yet driving complete game creation. The next milestone is verified examples, held-out evaluation, model-assisted generation, and browser tests that reject broken outputs.";
+    } else if (q.includes("plan") || q.includes("roadmap") || q.includes("next") || q.includes("steps") || q.includes("progress")) {
+      reply = context + "\n\nImplementation stages:\n" + (plan.stages || []).map((stage, i) => (i + 1) + ". " + stage.name + ": " + stage.goal).join("\n") + "\n\nA plan is not proof that the game passed browser tests.";
+    } else if (q.includes("research") || q.includes("reference") || q.includes("search") || q.includes("inspiration")) {
+      reply = context + "\n\nI can attach curated engine documentation and public search links without an AI API. Live research is only claimed when retrieval succeeds; reference images are guidance, not proof that their pixels or licenses were analyzed.";
+    } else if (q.includes("error") || q.includes("bug") || q.includes("broken") || q.includes("crash") || q.includes("fix")) {
+      reply = context + "\n\nSend the exact error or the steps that reproduce it. Native mode must not claim a fix until the output and relevant interaction have been tested.";
+    } else {
+      const memory = history.slice(-6).map(item => text(item?.content || item?.text, 260)).filter(Boolean);
+      reply = "I understood: " + text(prompt, 700) + ". " + context + "\n\nI can discuss the saved plan, genre profile, audio direction, references, and test checklist without an external AI. This chat response alone does not modify project files; ask for a build or a specific edit to change them." + (memory.length ? "\n\nRecent context: " + memory.join(" | ").slice(0, 700) : "");
+    }
+    return { reply, files: [], plan, complete: true, needsUserDecision: false, references, conversation: { mode: "native-rule-based", externalAiUsed: false, contextualHistoryUsed: history.length > 0 } };
   }
   const spec = { ...projectSpec(title, engine, designPrompt), references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
   const files = engine === "webapp"
