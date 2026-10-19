@@ -47,7 +47,7 @@ for (const engine of ["canvas2d", "webgl3d"]) {
   });
   const expandedJs = expanded.files.find(file => file.path === "game.js").content;
   new Script(expandedJs, { filename: engine + "-expanded.js" });
-  assert.match(expandedJs, /STAGE \\"\+stage|STAGE \"\+stage|STAGE 1\/3/);
+  assert.ok(expandedJs.includes('"STAGE "+stage+"/3"') || expandedJs.includes('"STAGE 1/3"'), "full-game mode should add staged progression");
   assert.equal(expanded.nativeGeneration.externalAiUsed, false);
 }
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
