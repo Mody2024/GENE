@@ -36,6 +36,7 @@ function nativeInterviewQuestion(kind, answers, prompt) {
     { id: "native-core-loop", text: "What should the player do most of the time?", why: "The core loop determines mechanics, level design, feedback, and the tests Gene should run.", choices: ["Explore and discover", "Fight and survive", "Platform and jump", "Solve mysteries or puzzles", "Race, drive, or run", "Build, manage, or simulate"], recommended: /horror|mystery|psychological/i.test(prompt) ? "Solve mysteries or puzzles" : /platform/i.test(prompt) ? "Platform and jump" : "Explore and discover" },
     { id: "native-perspective", text: "How should the player see and control the world?", why: "Perspective changes camera behavior, movement, input design, and the visual workload.", choices: ["2D side view", "2D top-down", "3D third-person", "3D first-person", "Isometric"], recommended: /2d|platform|pixel/i.test(prompt) ? "2D side view" : /first.person|fps/i.test(prompt) ? "3D first-person" : /3d|open.world/i.test(prompt) ? "3D third-person" : "2D side view" },
     { id: "native-visual-style", text: "Which art direction should define the game?", why: "Gene will use this to guide palette, silhouettes, UI, and environment treatment.", choices: ["Polished stylized 3D", "Low-poly atmospheric", "Pixel art", "Hand-painted storybook", "Dark cinematic horror", "Clean geometric"], recommended: /horror|psychological|disturbing/i.test(prompt) ? "Dark cinematic horror" : /low.poly/i.test(prompt) ? "Low-poly atmospheric" : /pixel/i.test(prompt) ? "Pixel art" : "Polished stylized 3D" },
+    { id: "native-menu", text: "What should the title screen and menus feel like?", why: "Menus should belong to this specific game's world and genre, not reuse the same generic start screen.", choices: ["Cinematic title screen with story atmosphere", "Diegetic case file / journal", "Arcade cabinet with bold score panels", "Minimal elegant pause menu", "Fantasy map and illustrated panels", "High-speed racing garage"], recommended: /horror|psychological|mystery/i.test(prompt) ? "Diegetic case file / journal" : /race|driv|speed/i.test(prompt) ? "High-speed racing garage" : /fantasy|magic|dragon/i.test(prompt) ? "Fantasy map and illustrated panels" : /arcade|platform|runner/i.test(prompt) ? "Arcade cabinet with bold score panels" : "Cinematic title screen with story atmosphere" },
     { id: "native-progression", text: "What should give the game a satisfying sense of progression?", why: "A clear progression system makes the game feel intentional instead of like a short mechanics demo.", choices: ["Three handcrafted stages", "Explore one larger world", "Story chapters and clues", "Increasing challenge and upgrades", "Short replayable runs"], recommended: /story|mystery|horror/i.test(prompt) ? "Story chapters and clues" : "Three handcrafted stages" },
     { id: "native-audio", text: "What audio direction should Gene build into the game?", why: "The native audio system can synthesize original music and effects locally, without paid APIs or copied tracks.", choices: ["Atmospheric procedural soundtrack", "Energetic arcade music", "Creepy ambient soundscape", "Minimal sound effects only", "Silent by default"], recommended: /horror|mystery|psychological/i.test(prompt) ? "Creepy ambient soundscape" : "Atmospheric procedural soundtrack" }
   ];
@@ -299,13 +300,50 @@ export async function createNativeResult(input = {}) {
   const title = titleFrom(input.project?.plan?.title || (projectName && projectName !== "New project" ? projectName : "") || input.project?.initialPrompt || prompt);
   const fullGameExpansion = operation === "buildPart" && input.stagePath === "game.js" && /FULL GAME EXPANSION PASS/i.test(prompt);
   const references = [...ENGINE_DOCS[engine], ...attachedReferences.map(ref => ({ title: ref.name, note: ref.kind === "image" ? "User/research image reference attached; this template does not analyze image pixels." : ref.textContent.slice(0, 420), source: "project-attachment" }))];
+  const profile = visualProfile(designPrompt, engine);
+  const soundtrack = musicProfile(designPrompt);
   const plan = {
     title, kind, engine,
+    genre: profile.genre,
     summary: ("Native-only build plan for: " + designPrompt.slice(0, 2200)).slice(0, 2600),
+    design: {
+      visualIdentity: profile.id,
+      palette: { background: profile.bg, panel: profile.panel, accent: profile.accent, text: profile.text },
+      menuDirection: text(savedAnswers["native-menu"], 240) || profile.menu,
+      menuCopy: { title: profile.menu, subtitle: profile.subtitle, primaryAction: profile.cta },
+      soundtrack: { mood: soundtrack.mood, synthesis: "Web Audio API oscillator/gain layers", notes: soundtrack.notes, waves: soundtrack.waves },
+      variationSeed: title + "|" + profile.id + "|" + soundtrack.mood
+    },
+    stages: kind === "app" ? [
+      { name: "Define", goal: "Turn the main user task into a clear flow", acceptance: ["Primary action is visible", "Empty and invalid states are explained"] },
+      { name: "Build", goal: "Implement responsive screens and state", acceptance: ["Keyboard and touch work", "State changes are visible"] },
+      { name: "Verify", goal: "Test persistence and recovery", acceptance: ["Reload preserves saved state", "Invalid input does not destroy work"] }
+    ] : [
+      { name: "Identity and core loop", goal: "Establish genre, player fantasy, controls, and game feel", acceptance: ["Title menu matches genre", "Core loop is playable", "Controls are explained"] },
+      { name: "World and progression", goal: "Create a distinct environment and meaningful objective progression", acceptance: ["World uses the selected art direction", "At least one objective completes", "Win and loss states are reachable"] },
+      { name: "Polish and audio", goal: "Add responsive feedback, soundtrack, and recovery", acceptance: ["Music and effects have independent mute behavior", "Pause and restart work", "UI remains usable on narrow screens"] },
+      { name: "Verification", goal: "Run static checks and interactive gameplay tests", acceptance: ["No uncaught startup error", "Primary controls change game state", "Restart returns to a valid initial state"] }
+    ],
     tasks: kind === "app"
-      ? ["Define the main user flow and data contract", "Build responsive semantic UI", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
-      : ["Establish the playable core loop and controls", "Implement responsive rendering and game state", "Add score, hazards, recovery, and restart", "Connect audio feedback and controls", "Run source checks and manual gameplay review"],
-    mechanics: kind === "app" ? ["Responsive UI", "Form validation", "Local persistence", "Accessible interactions"] : ["Movement", "Scoring", "Hazards", "Pause and restart", "Procedural audio"],
+      ? ["Define the main user flow and data contract", "Build responsive semantic UI in the selected visual style", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
+      : ["Establish the genre-specific title/menu and playable core loop", "Implement the selected camera/perspective and responsive rendering", "Add objective progression, hazards, recovery, and restart", "Synthesize genre-appropriate music and event-based sound effects", "Run source checks and interactive gameplay tests"],
+    mechanics: kind === "app" ? ["Responsive UI", "Form validation", "Local persistence", "Accessible interactions"] : [
+      ...new Set([text(savedAnswers["native-core-loop"], 100) || "Exploration", "Objective progression", "Contextual feedback", "Pause and restart", soundtrack.mood + " procedural audio"])
+    ],
+    testMatrix: kind === "app" ? [
+      { test: "Primary workflow", method: "Browser interaction", expected: "User can complete the primary task" },
+      { test: "Persistence", method: "Reload browser", expected: "Saved state is restored" },
+      { test: "Responsive layout", method: "Narrow viewport", expected: "Controls remain visible and usable" }
+    ] : [
+      { test: "Startup", method: "Load generated page", expected: "Canvas/context initializes without uncaught error" },
+      { test: "Core controls", method: "Keyboard and pointer input", expected: "Player or world state responds" },
+      { test: "Audio", method: "Start then mute/unmute", expected: "Audio starts on user gesture and respects mute" },
+      { test: "Recovery", method: "Pause, restart, win/loss", expected: "State transitions remain valid" }
+    ],
+    risks: [
+      { risk: engine === "webgl3d" ? "WebGL unavailable on some devices" : "Audio may be blocked before a user gesture", mitigation: engine === "webgl3d" ? "Show a clear fallback message and offer the 2D target" : "Start audio only after explicit interaction and provide a mute control" },
+      { risk: "Rule-based native generation has limited semantic flexibility", mitigation: "Keep scope honest, validate generated output, and use verified project experiences for future scratch-model training" }
+    ],
     performanceBudget: { targetFps: 60, maxEnemies: kind === "app" ? 0 : 12, maxObjects: 350, maxParticles: kind === "app" ? 0 : 90 },
     references,
     research: { mode: "source-index", externalAiUsed: false, searchedLiveWeb: false, note: "These are curated official/reference sources, not live search results. Use the included search links for live web research." }
