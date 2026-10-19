@@ -260,7 +260,10 @@ export async function createNativeResult(input = {}) {
     }
     return { reply: "Native mode is active. This deterministic starter asks for your highest-impact choice before building.", question: { id: "native-core-loop", text: "What should the player do most of the time? Choose the main gameplay loop, then Gene will create a playable first build.", why: "The core loop affects movement, goals, level design, and the test plan.", choices: ["Explore and collect", "Fight enemies", "Platform and jump", "Solve puzzles", "Drive or run", "Manage/build"], recommended: "Explore and collect", step: 1, total: 1 }, files: [], plan: null, complete: false, needsUserDecision: true };
   }
-  if (operation === "plan" || operation === "enhancePrompt") {
+  if (operation === "enhancePrompt") {
+    return { reply: prompt + "\\n\\nNative implementation checklist:\\n- Preserve the requested genre, platform, perspective, and visual identity.\\n- Build a playable core loop before adding optional systems.\\n- Keep controls, scoring/progression, pause/restart, and win/loss behavior testable.\\n- Use the attached research notes and references as constraints; verify licenses before shipping assets.\\n- Run source validation and browser gameplay tests; report anything not verified.", files: [], plan, complete: true, needsUserDecision: false, references };
+  }
+  if (operation === "plan") {
     return { reply: "Created a native, rule-based plan without external AI calls. This is structured planning, not neural-model reasoning.", files: [], plan, complete: true, needsUserDecision: false, references };
   }
   if (operation === "edit") {
