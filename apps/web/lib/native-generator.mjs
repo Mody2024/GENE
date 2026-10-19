@@ -235,6 +235,7 @@ async function searchNativeSources(query) {
 export async function createNativeResult(input = {}) {
   const prompt = text(input.message || input.prompt);
   if (!prompt) throw new TypeError("Enter a game or app idea first.");
+  const operation = text(input.operation || "build");
   const kind = input.project?.kind === "app" || input.kind === "app" ? "app" : "game";
   const attachedReferences = Array.isArray(input.project?.references) ? input.project.references.slice(0, 24).map(ref => ({
     name: text(ref?.name, 180) || "attached-reference",
@@ -243,16 +244,18 @@ export async function createNativeResult(input = {}) {
     textContent: ref?.kind === "text" ? text(ref?.textContent, 5000) : ""
   })) : [];
   const referenceText = attachedReferences.filter(ref => ref.textContent).map(ref => ref.name + ": " + ref.textContent).join("\n").slice(0, 10000);
-  const designPrompt = [prompt, referenceText].filter(Boolean).join("\n\nReference context:\n");
+  const savedAnswers = input.answers && typeof input.answers === "object" ? input.answers : {};
+  const answerText = Object.entries(savedAnswers).filter(([key]) => key.startsWith("native-")).map(([key, value]) => key.replace("native-", "") + ": " + text(value, 300)).join("\n");
+  const baseIdea = operation === "interview" ? text(input.project?.initialPrompt) || prompt : prompt;
+  const designPrompt = [baseIdea, answerText ? "Design decisions:\n" + answerText : "", referenceText ? "Reference context:\n" + referenceText : ""].filter(Boolean).join("\n\n");
   const engine = pickEngine({ kind, engine: input.project?.preferredEngine || input.project?.plan?.engine || input.engine, prompt: designPrompt });
   const projectName = text(input.project?.name);
   const title = titleFrom(input.project?.plan?.title || (projectName && projectName !== "New project" ? projectName : "") || input.project?.initialPrompt || prompt);
-  const operation = text(input.operation || "build");
   const fullGameExpansion = operation === "buildPart" && input.stagePath === "game.js" && /FULL GAME EXPANSION PASS/i.test(prompt);
   const references = [...ENGINE_DOCS[engine], ...attachedReferences.map(ref => ({ title: ref.name, note: ref.kind === "image" ? "User/research image reference attached; this template does not analyze image pixels." : ref.textContent.slice(0, 420), source: "project-attachment" }))];
   const plan = {
     title, kind, engine,
-    summary: ("Native-only build plan for: " + prompt.slice(0, 700) + (referenceText ? "\nReference context: " + referenceText.slice(0, 1600) : "")).slice(0, 2600),
+    summary: ("Native-only build plan for: " + designPrompt.slice(0, 2200)).slice(0, 2600),
     tasks: kind === "app"
       ? ["Define the main user flow and data contract", "Build responsive semantic UI", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
       : ["Establish the playable core loop and controls", "Implement responsive rendering and game state", "Add score, hazards, recovery, and restart", "Connect audio feedback and controls", "Run source checks and manual gameplay review"],
