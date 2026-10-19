@@ -157,7 +157,45 @@ function appHtml(title) {
 }
 const appCss = `:root{color-scheme:light;--ink:#17232a;--muted:#667780;--line:#dce5e8;--accent:#176b58;--bg:#f3f7f6}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#edf5f1,#f8faf9 60%);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,sans-serif}.app{width:min(760px,calc(100% - 32px));margin:clamp(28px,8vh,90px) auto}.eyebrow{font-size:10px;letter-spacing:.18em;color:var(--accent);font-weight:800;margin:0 0 8px}h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.05em;margin:0}.sub{color:var(--muted);margin:8px 0 26px}.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:clamp(16px,4vw,28px);box-shadow:0 18px 60px #29473a0a}label{font-weight:650;font-size:13px}.entry{display:flex;gap:8px;margin-top:8px}input,select,button{font:inherit;border:1px solid var(--line);border-radius:10px;padding:11px 12px}input{flex:1;min-width:0}button{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7bc4ae;outline-offset:2px}.list-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}.list-head label{display:flex;align-items:center;gap:7px}ul{list-style:none;padding:0;margin:12px 0 0}li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #edf1f2}li input{flex:0 0 auto;width:17px;height:17px;accent-color:var(--accent)}li span{flex:1;overflow-wrap:anywhere}li.done span{color:#81908a;text-decoration:line-through}li button{background:transparent;color:#68777c;border-color:var(--line);padding:6px 9px;font-size:12px}.help{font-size:12px;color:var(--muted);margin-top:16px}@media(max-width:480px){.entry{flex-direction:column}.list-head{align-items:flex-start;flex-direction:column}}`;
 
-export function createNativeResult(input = {}) {
+async function searchNativeSources(query) {
+  const q = text(query, 220);
+  if (!q) return [];
+  const timeout = () => AbortSignal.timeout(4500);
+  const requests = [
+    (async () => {
+      const url = "https://developer.mozilla.org/api/v1/search?q=" + encodeURIComponent(q) + "&locale=en-US";
+      const response = await fetch(url, { signal: timeout(), headers: { "Accept": "application/json" } });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (Array.isArray(data.documents) ? data.documents : []).slice(0, 4).map(item => ({
+        title: text(item.title, 180) || "MDN reference",
+        url: typeof item.mdn_url === "string" ? "https://developer.mozilla.org" + item.mdn_url : typeof item.url === "string" ? item.url : "",
+        note: text(item.summary || item.popularity, 420) || "MDN documentation search result",
+        source: "MDN",
+        live: true
+      })).filter(item => item.url.startsWith("https://developer.mozilla.org/"));
+    })(),
+    (async () => {
+      const url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + encodeURIComponent(q) + "&format=json&origin=*&srlimit=3";
+      const response = await fetch(url, { signal: timeout(), headers: { "Accept": "application/json" } });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (Array.isArray(data?.query?.search) ? data.query.search : []).slice(0, 3).map(item => ({
+        title: text(item.title, 180) || "Wikipedia article",
+        url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(String(item.title || "").replace(/ /g, "_")),
+        note: text(String(item.snippet || "").replace(/<[^>]*>/g, " ").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&"), 420),
+        source: "Wikipedia",
+        live: true
+      })).filter(item => item.title && item.url);
+    })()
+  ];
+  const settled = await Promise.allSettled(requests);
+  const output = [];
+  for (const item of settled) if (item.status === "fulfilled") output.push(...item.value);
+  return output.slice(0, 7);
+}
+
+export async function createNativeResult(input = {}) {
   const prompt = text(input.message || input.prompt);
   if (!prompt) throw new TypeError("Enter a game or app idea first.");
   const kind = input.project?.kind === "app" || input.kind === "app" ? "app" : "game";
@@ -179,11 +217,19 @@ export function createNativeResult(input = {}) {
   };
   if (operation === "research") {
     const q = encodeURIComponent(prompt);
-    return { reply: "Native research mode: no AI API was called. Here are engine-specific references and direct live-search links. Live results are opened in your browser; this response does not claim to have read them.", files: [], plan, complete: true, needsUserDecision: false, research: { sources: references, searches: [
+    const searches = [
       { title: "Search the web", url: "https://www.google.com/search?q=" + q },
       { title: "Search GitHub", url: "https://github.com/search?q=" + q + "&type=code" },
       { title: "Search MDN", url: "https://developer.mozilla.org/en-US/search?q=" + q }
-    ] } };
+    ];
+    const liveSources = await searchNativeSources(prompt);
+    return {
+      reply: liveSources.length
+        ? "Native research completed using public documentation/search endpoints. No AI API was called. Treat snippets as discovery leads and verify technical details in the linked source."
+        : "Native research could not retrieve live results in this run. No AI API was called; use the search links and curated engine documentation below.",
+      files: [], plan, complete: true, needsUserDecision: false,
+      research: { sources: [...liveSources, ...references], searches, liveSearchAttempted: true, liveSearchSucceeded: liveSources.length > 0, externalAiUsed: false }
+    };
   }
   if (operation === "interview") {
     return { reply: "Native mode is active. This deterministic starter asks for your highest-impact choices before building.", question: { id: "native-core-loop", text: "What should the player do most of the time? Choose the main gameplay loop, then Gene will create a playable first build.", why: "The core loop affects movement, goals, level design, and the test plan.", choices: ["Explore and collect", "Fight enemies", "Platform and jump", "Solve puzzles", "Drive or run", "Manage/build"], recommended: "Explore and collect", step: 1, total: 1 }, files: [], plan: null, complete: false, needsUserDecision: true };
