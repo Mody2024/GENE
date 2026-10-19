@@ -16,7 +16,7 @@ try {
   const runtimeErrors = [];
   page.on("pageerror", error => runtimeErrors.push(error.message));
   await page.setContent(gameHtml, { waitUntil: "load" });
-  await page.getByRole("button", { name: "Start game" }).click();
+  await page.locator("#start-button").click();
   await page.waitForTimeout(180);
   assert.equal(await page.locator("#status").textContent(), "PLAYING");
   await page.keyboard.down("ArrowRight");
