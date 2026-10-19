@@ -212,14 +212,22 @@ export async function createNativeResult(input = {}) {
   const prompt = text(input.message || input.prompt);
   if (!prompt) throw new TypeError("Enter a game or app idea first.");
   const kind = input.project?.kind === "app" || input.kind === "app" ? "app" : "game";
-  const engine = pickEngine({ kind, engine: input.project?.preferredEngine || input.project?.plan?.engine || input.engine, prompt });
+  const attachedReferences = Array.isArray(input.project?.references) ? input.project.references.slice(0, 24).map(ref => ({
+    name: text(ref?.name, 180) || "attached-reference",
+    kind: ref?.kind === "image" ? "image" : "text",
+    mimeType: text(ref?.mimeType, 80),
+    textContent: ref?.kind === "text" ? text(ref?.textContent, 5000) : ""
+  })) : [];
+  const referenceText = attachedReferences.filter(ref => ref.textContent).map(ref => ref.name + ": " + ref.textContent).join("\\n").slice(0, 10000);
+  const designPrompt = [prompt, referenceText].filter(Boolean).join("\\n\\nReference context:\\n");
+  const engine = pickEngine({ kind, engine: input.project?.preferredEngine || input.project?.plan?.engine || input.engine, prompt: designPrompt });
   const projectName = text(input.project?.name);
   const title = titleFrom(input.project?.plan?.title || (projectName && projectName !== "New project" ? projectName : "") || input.project?.initialPrompt || prompt);
   const operation = text(input.operation || "build");
-  const references = ENGINE_DOCS[engine];
+  const references = [...ENGINE_DOCS[engine], ...attachedReferences.map(ref => ({ title: ref.name, note: ref.kind === "image" ? "User/research image reference attached; this template does not analyze image pixels." : ref.textContent.slice(0, 420), source: "project-attachment" }))];
   const plan = {
     title, kind, engine,
-    summary: "Native-only build plan for: " + prompt.slice(0, 700),
+    summary: ("Native-only build plan for: " + prompt.slice(0, 700) + (referenceText ? "\\nReference context: " + referenceText.slice(0, 1600) : "")).slice(0, 2600),
     tasks: kind === "app"
       ? ["Define the main user flow and data contract", "Build responsive semantic UI", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
       : ["Establish the playable core loop and controls", "Implement responsive rendering and game state", "Add score, hazards, recovery, and restart", "Connect audio feedback and controls", "Run source checks and manual gameplay review"],
@@ -262,7 +270,7 @@ export async function createNativeResult(input = {}) {
     const memory = Array.isArray(input.history) ? input.history.slice(-8).map(item => text(item?.content || item?.text, 500)).filter(Boolean) : [];
     return { reply: "Gene Native mode is running without an external AI model. I can currently use deterministic planning, build the playable starter, and attach engine references. Your request was: " + prompt.slice(0, 1200) + (memory.length ? "\nRecent conversation context: " + memory.join(" | ").slice(0, 900) : ""), files: [], plan, complete: true, needsUserDecision: false, references };
   }
-  const spec = projectSpec(title, engine, prompt);
+  const spec = { ...projectSpec(title, engine, designPrompt), references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
   const files = engine === "webapp"
     ? [
         { path: "game.html", content: appHtml(title) },
@@ -273,7 +281,7 @@ export async function createNativeResult(input = {}) {
     : [
         { path: "game.html", content: htmlShell(title, engine) },
         { path: "game.css", content: css },
-        { path: "game.js", content: engine === "webgl3d" ? webglGameJs() : canvasGameJs(title, prompt) },
+        { path: "game.js", content: engine === "webgl3d" ? webglGameJs() : canvasGameJs(title, designPrompt) },
         { path: "game-spec.json", content: JSON.stringify(spec, null, 2) }
       ];
   return {
