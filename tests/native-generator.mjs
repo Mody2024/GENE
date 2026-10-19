@@ -18,6 +18,10 @@ for (const [prompt, engine] of [
   const files = Object.fromEntries(result.files.map(file => [file.path, file.content]));
   const spec = JSON.parse(files["game-spec.json"]);
   assert.equal(spec.engine, engine);
+  for (const path of spec.additionalFiles || []) {
+    assert.ok(files[path], "declared source module must exist: " + path);
+    assert.ok(files["game.html"].includes('src="' + path + '"'), "HTML must load the declared module: " + path);
+  }
   assert.ok(files["game.html"].includes("game.js"));
   assert.ok(files["game.css"].length > 100);
   new Script(files["game.js"], { filename: prompt + ".js" });
