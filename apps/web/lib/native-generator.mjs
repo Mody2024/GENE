@@ -434,7 +434,7 @@ export async function createNativeResult(input = {}) {
     }
     return { reply, files: [], plan, complete: true, needsUserDecision: false, references, conversation: { mode: "native-rule-based", externalAiUsed: false, contextualHistoryUsed: history.length > 0 } };
   }
-  const spec = { ...projectSpec(title, engine, designPrompt), references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
+  const spec = { ...projectSpec(title, engine, designPrompt), designProfile: { id: profile.id, genre: profile.genre, palette: plan.design.palette, menu: plan.design.menuCopy, menuDirection: plan.design.menuDirection }, audio: { ...projectSpec(title, engine, designPrompt).audio, mood: soundtrack.mood, notes: soundtrack.notes, waveforms: soundtrack.waves, implementation: "procedural-web-audio" }, implementationPlan: { stages: plan.stages, tasks: plan.tasks, testMatrix: plan.testMatrix, risks: plan.risks }, references: attachedReferences.map(({ name, kind, mimeType }) => ({ name, kind, mimeType })), researchSources: references.map(({ title, url, source }) => ({ title, url, source: source || "curated-documentation" })) };
   const files = engine === "webapp"
     ? [
         { path: "game.html", content: appHtml(title, designPrompt) },
