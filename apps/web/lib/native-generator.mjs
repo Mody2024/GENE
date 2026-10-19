@@ -1,5 +1,3 @@
-import { createNativeBrief } from "../../../packages/native-brain/src/index.mjs";
-
 const ENGINE_DOCS = {
   canvas2d: [
     { title: "MDN Canvas API", url: "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API", note: "Canvas rendering, drawing primitives, and animation." },
@@ -164,7 +162,8 @@ export function createNativeResult(input = {}) {
   if (!prompt) throw new TypeError("Enter a game or app idea first.");
   const kind = input.project?.kind === "app" || input.kind === "app" ? "app" : "game";
   const engine = pickEngine({ kind, engine: input.project?.preferredEngine || input.project?.plan?.engine || input.engine, prompt });
-  const title = titleFrom(input.project?.name || input.project?.plan?.title || input.project?.initialPrompt || prompt);
+  const projectName = text(input.project?.name);
+  const title = titleFrom(input.project?.plan?.title || (projectName && projectName !== "New project" ? projectName : "") || input.project?.initialPrompt || prompt);
   const operation = text(input.operation || "build");
   const references = ENGINE_DOCS[engine];
   const plan = {
