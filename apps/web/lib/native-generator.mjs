@@ -33,7 +33,9 @@ function nativeInterviewQuestion(kind, answers, prompt) {
   }
   const mechanics=/\b(platformer|platform game|jump|double jump|dash|combat|fight|shoot|stealth|puzzle|mystery|detective|racing|driving|runner|survival|tower defense|strategy|farming|building|crafting|exploration|metroidvania|roguelike|rhythm|shooter)\b/.test(p);
   const genre=/\b(horror|psychological|mystery|detective|platformer|platform game|racing|runner|arcade|puzzle|survival|adventure|metroidvania|roguelike|rhythm|strategy|simulation|farming|rpg|shooter)\b/.test(p);
-  if((!mechanics&&!genre)&&!text(answers["native-core-loop"],400))return {id:"native-core-loop",text:"What should the player mainly do in this game?",why:"This changes the mechanics, level layout and win condition. I will infer the rest instead of asking unrelated questions.",choices:["Platforming and precise jumps","Combat and enemy encounters","Exploration and secrets","Puzzles and mystery","Racing or time trials","Building or simulation"],recommended:"Platforming and precise jumps",step:1,total:1,multi:false};
+  const words=p.split(/\s+/).filter(Boolean).length;
+  const descriptiveBrief=words>=12&&/\b(you play|player|set in|where|while|must|discover|investigate|escape|survive|solve|search|avoid|control|use|with|featuring|includes|story about|goal is)\b/.test(p);
+  if((!mechanics&&!genre&&!descriptiveBrief)&&!text(answers["native-core-loop"],400))return {id:"native-core-loop",text:"What should the player mainly do in this game?",why:"This changes the mechanics, level layout and win condition. I will infer the rest instead of asking unrelated questions.",choices:["Platforming and precise jumps","Combat and enemy encounters","Exploration and secrets","Puzzles and mystery","Racing or time trials","Building or simulation"],recommended:"Platforming and precise jumps",step:1,total:1,multi:false};
   return null;
 }
 function visualProfile(prompt, engine) {
