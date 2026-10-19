@@ -113,7 +113,7 @@ function htmlShell(title, engine, prompt = "") {
     ? `<div class="overlay-card menu-mission"><p class="eyebrow">MISSION BRIEFING / 01</p><h2 id="overlay-title">${esc(profile.menu)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><div class="menu-meta"><span>STATUS</span><strong>AWAITING PILOT</strong></div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
     : profile.id === "wild"
     ? `<div class="overlay-card menu-explore"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">No fixed route. Follow what catches your eye.</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
-    : `${menuMarkup}`;
+    : `<div class="overlay-card"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -126,7 +126,7 @@ function htmlShell(title, engine, prompt = "") {
 <body>
   <main id="game-shell" data-engine="${engine}">
     <header class="topbar"><div><p class="eyebrow">${esc(profile.genre)} / GENE BUILD</p><h1 id="game-title">${esc(title)}</h1></div><div class="hud" aria-live="polite"><span id="score-label">SCORE</span><strong id="score">0</strong><span id="status">READY</span></div></header>
-    <section class="stage" aria-label="Game area"><canvas id="game-canvas" aria-label="${esc(title)} play area"></canvas><div id="overlay" class="overlay"><div class="overlay-card"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><button id="start-button" type="button">${esc(profile.cta)}</button></div></div></section>
+    <section class="stage" aria-label="Game area"><canvas id="game-canvas" aria-label="${esc(title)} play area"></canvas><div id="overlay" class="overlay">${menuMarkup}</div></section>
     <footer class="controls"><span id="control-hint">Move: WASD / arrows · Action: Space · Pause: P · Restart: R</span><button id="pause-button" type="button">Pause</button><button id="restart-button" type="button">Restart</button><button id="audio-button" type="button">Sound: on</button></footer>
     <p id="help" class="help">Built without external AI calls. Your progress is stored locally in this browser.</p>
   </main>
