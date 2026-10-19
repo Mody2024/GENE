@@ -60,7 +60,7 @@ const interviewAnswers = {
 };
 const firstQuestion = await createNativeResult({ operation: "interview", message: interviewProject.initialPrompt, project: interviewProject, answers: {} });
 assert.equal(firstQuestion.question.id, "native-core-loop");
-assert.equal(firstQuestion.question.total, 5);
+assert.equal(firstQuestion.question.total, 6);
 const secondQuestion = await createNativeResult({ operation: "interview", message: "Solve mysteries or puzzles", project: interviewProject, answers: { "native-core-loop": "Solve mysteries or puzzles" } });
 assert.equal(secondQuestion.question.id, "native-perspective");
 const completedInterview = await createNativeResult({ operation: "interview", message: "Creepy ambient soundscape", project: interviewProject, answers: interviewAnswers });
