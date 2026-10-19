@@ -29,6 +29,8 @@ jobs:
         run: npm test
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+      - name: Run native generated-game browser tests
+        run: npm run test:native-browser
       - name: Build web app
         run: npm run build
       - name: Start web app
