@@ -59,11 +59,13 @@ const interviewAnswers = {
   "native-progression": "Story chapters and clues",
   "native-audio": "Creepy ambient soundscape"
 };
-const firstQuestion = await createNativeResult({ operation: "interview", message: interviewProject.initialPrompt, project: interviewProject, answers: {} });
+const firstQuestion = await createNativeResult({ operation: "interview", message: "A game", project: { ...interviewProject, initialPrompt: "A game" }, answers: {} });
 assert.equal(firstQuestion.question.id, "native-core-loop");
-assert.equal(firstQuestion.question.total, 6);
+assert.equal(firstQuestion.question.total, 1);
+const specificBrief = await createNativeResult({ operation: "interview", message: interviewProject.initialPrompt, project: interviewProject, answers: {} });
+assert.equal(specificBrief.question, null, "a detailed brief should not trigger unrelated interview questions");
 const secondQuestion = await createNativeResult({ operation: "interview", message: "Solve mysteries or puzzles", project: interviewProject, answers: { "native-core-loop": "Solve mysteries or puzzles" } });
-assert.equal(secondQuestion.question.id, "native-perspective");
+assert.equal(secondQuestion.question, null, "answered or inferable decisions should not be asked again");
 const completedInterview = await createNativeResult({ operation: "interview", message: "Creepy ambient soundscape", project: interviewProject, answers: interviewAnswers });
 assert.equal(completedInterview.question, null);
 assert.match(completedInterview.plan.design.menuDirection, /case file/i);
@@ -125,6 +127,17 @@ const cosmic3dJs = cosmic3d.files.find(file => file.path === "game.js").content;
 assert.match(racing3dJs, /player\.x-\.48/);
 assert.match(cosmic3dJs, /player\.x-\.58/);
 assert.notEqual(racing3dJs, cosmic3dJs);
+const progressionPart = await createNativeResult({
+  operation: "buildPart",
+  stagePath: "src/systems/progression.js",
+  message: "Complete a robust 2D game progression system with stage unlocks and local saves",
+  project: { kind: "game", preferredEngine: "canvas2d", name: "Progression Recovery", initialPrompt: "A 2D platformer with three stages, collectibles and checkpoints" }
+});
+assert.equal(progressionPart.files.length, 1, "buildPart must return exactly one requested file");
+assert.equal(progressionPart.files[0].path, "src/systems/progression.js", "buildPart must preserve the requested path exactly");
+assert.match(progressionPart.files[0].content, /completeStage/);
+assert.match(progressionPart.files[0].content, /localStorage/);
+new Script(progressionPart.files[0].content, { filename: "src/systems/progression.js" });
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
