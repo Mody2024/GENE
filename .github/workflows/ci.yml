@@ -47,5 +47,7 @@ jobs:
           done
           cat /tmp/gene-web.log
           exit 1
+      - name: Test native API without external providers
+        run: node tests/native-api.mjs
       - name: Test real browser preview and UI controls
         run: npm run test:browser
