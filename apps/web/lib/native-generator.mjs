@@ -523,7 +523,7 @@ export async function createNativeResult(input = {}) {
       ];
   return {
     reply: "Native-only starter generated for " + title + ". No third-party AI provider was called. This is a playable foundation, not a finished high-end game: the current native generator uses deterministic templates rather than a trained capable language model. Run validation and gameplay tests, then iterate.",
-    files,
+    files: operation === "buildPart" ? files.filter(file => file.path === input.stagePath) : files,
     plan: { ...plan, nativeGeneration: { modelUsed: false, externalAiUsed: false, strategy: "deterministic-native-template-v1" } },
     complete: true,
     needsUserDecision: false,
