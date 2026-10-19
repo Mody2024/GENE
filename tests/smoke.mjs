@@ -59,7 +59,7 @@ assert.ok(api.includes("perCallMs: isBuild ? 12_000 : 7_000") && api.includes("m
 assert.ok(api.includes("? 25_000 : totalBudgetMs"), "Gemini primary attempts leave a larger reserved window for backup providers");
 assert.ok(api.includes("value.files[0]?.path === body.stagePath") && api.includes("paths.has(path)"), "alternate model candidates are rejected and retried unless they satisfy the requested file contract");
 assert.ok(page.includes("GENE only uses free AI models") && page.includes("OPENROUTER_FALLBACK_FAILED"), "provider failures are explained in plain language and stay free-only");
-assert.ok(page.includes("AUTOMATIC RECOVERY RETRY") && page.includes("retryableCodes") && page.includes("Retry request"), "transient failures receive bounded automatic retries and failed messages expose a manual retry action");
+assert.ok(page.includes("AUTOMATIC RECOVERY RETRY") && page.includes("classifyFailure(failureMessage, code, status)") && page.includes("Retry request"), "transient failures receive bounded automatic retries and failed messages expose a manual retry action");
 assert.ok(page.includes("msg.retry!.prompt") && page.includes("Your last saved files are preserved"), "manual retry reuses the failed request context without discarding the current project");
 assert.ok(page.includes("const rawError = payload?.error?.message") && page.includes("const error = explainAgentError(rawError"), "API failures are normalized into the user-facing error explanations before display");
 assert.ok(css.includes(".message-row.kind-error .assistant-copy") && css.includes(".inline-error{margin-top:10px;padding:"), "inline error messages have a distinct, readable visual treatment");
@@ -128,7 +128,7 @@ assert.ok(!page.includes('project.mode === "plan" && <div className="composer-to
 
 assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt") && page.includes("Enhance prompt") && prompts.includes("PLANNING WORKFLOW"), "composer tools expose deep planning and prompt enhancement without cluttering the input area");
 assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Edit the selected live-preview element") && page.includes('aria-label="Select in preview to edit"'), "live preview supports selecting an element to prepare a targeted edit");
-assert.ok(page.includes("files in the current manifest") && page.includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
+assert.ok(page.includes("files in the current manifest") && readFileSync("apps/web/app/lib/error-recovery.mjs", "utf8").includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
 assert.ok(api.includes("body.operation === \"enhancePrompt\"") && api.includes("extendedPlanning: body.extendedPlanning === true"), "API accepts the prompt enhancer operation and extended planning flag");
 assert.ok(api.includes("no keyboard, touch, or controller input handlers were found"), "final validation reports absent input handlers without inventing keyboard controls");
 assert.ok(css.includes(".gene15-tools") && css.includes(".extended-plan-toggle"), "GENE 1.5 planning controls have responsive styling");
@@ -847,7 +847,8 @@ assert.ok(targetIntentRegressionInterview.includes("Skip interview and build") &
 assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interface system") && targetIntentRegressionStyles.includes("real-progress-current") && targetIntentRegressionStyles.includes("grid-template-columns:repeat(4,minmax(0,1fr))"), "clean surfaces, four explicit project targets and compact current-step progress are styled");
 
 const researchRouteSource = read("apps/web/app/api/research/route.ts");
-assert.ok(researchRouteSource.includes("Promise.all([wikipedia(wikiQuery), polyHavenCatalog()])"), "research route collects CC0 model catalogue results for game builds too");
+assert.ok(researchRouteSource.includes("wikipedia(searchText, wikiHost)") && researchRouteSource.includes("polyHavenCatalog()") && researchRouteSource.includes("Promise.all(["), "research route gathers Wikipedia and the CC0 model catalogue together for game builds too");
+assert.ok(researchRouteSource.includes("commons(searchText, \"image\"") && researchRouteSource.includes("musicSearchTerms(topic)") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData"), "research route also gathers licensed images and music tracks and only downloads image bytes from allow-listed hosts");
 assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelling") && page.includes("generatedModels"), "3D build pipeline requests real Forge meshes and records actual generated asset paths");
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");

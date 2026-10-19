@@ -381,7 +381,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
     const allowedEngine = projectKind === "app" ? spec.engine === "webapp" : (spec.engine === "canvas2d" || spec.engine === "webgl3d");
     if (!allowedEngine) throw new Error(projectKind === "app" ? "Build rejected: an app must declare engine=webapp." : "Build rejected: a game must use canvas2d or webgl3d.");
     if (plannedEngine && spec.engine !== plannedEngine) throw new Error("Build rejected: project spec engine does not match the approved plan engine.");
-    const html = byPath["game.html"];
+    let html = byPath["game.html"];
     const css = byPath["game.css"];
     const js = byPath["game.js"];
     // Input often lives in a generated module (for example src/systems/input.js), not game.js.
@@ -507,6 +507,28 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         throw new Error("Build rejected: app spec needs a valid performanceBudget.targetFps (30–120).");
       }
     } else {
+      // Self-heal descriptive spec metadata deterministically instead of discarding an otherwise working game.
+      // Only descriptive fields are filled (and budgets clamped to GENE's limits); source-level failures still fail and go to model repair.
+      {
+        const filled: string[] = [];
+        const fillField = (key: string, value: unknown) => { spec[key] = value; filled.push(key); };
+        const text = (value: unknown) => typeof value === "string" && value.trim().length > 0;
+        if (!text(spec.genre)) fillField("genre", spec.engine === "webgl3d" ? "3D action" : "arcade");
+        if (!Array.isArray(spec.mechanics) || !spec.mechanics.length || !spec.mechanics.every((item: unknown) => text(item))) fillField("mechanics", ["Move and act with the controls", "Collect or defeat targets to score", "Avoid hazards to stay alive"]);
+        if (!text(spec.objective)) fillField("objective", "Complete the main challenge of " + (text(spec.title) ? String(spec.title).trim() : "the game"));
+        if (!text(spec.winCondition)) fillField("winCondition", "Reach the target score or finish the final stage");
+        if (!text(spec.lossCondition)) fillField("lossCondition", "Run out of lives, health or time");
+        const rawBudget = spec.performanceBudget && typeof spec.performanceBudget === "object" && !Array.isArray(spec.performanceBudget) ? spec.performanceBudget : {};
+        const pick = (value: unknown, fallback: number, min: number, max: number) => { const n = Number(value); return Number.isFinite(n) && n >= 0 ? Math.min(max, Math.max(min, Math.round(n))) : fallback; };
+        const healedBudget = { targetFps: pick(rawBudget.targetFps, 60, 30, 120), maxEnemies: pick(rawBudget.maxEnemies, 20, 0, 40), maxObjects: pick(rawBudget.maxObjects, 300, 0, 1200), maxParticles: pick(rawBudget.maxParticles, 100, 0, 300) };
+        if (JSON.stringify(healedBudget) !== JSON.stringify({ targetFps: rawBudget.targetFps, maxEnemies: rawBudget.maxEnemies, maxObjects: rawBudget.maxObjects, maxParticles: rawBudget.maxParticles })) fillField("performanceBudget", healedBudget);
+        if (filled.length) {
+          spec.autoFilled = filled;
+          byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+          const filledSpecFile = normalized.find(file => file.path === "game-spec.json");
+          if (filledSpecFile) filledSpecFile.content = byPath["game-spec.json"];
+        }
+      }
       if (typeof spec.genre !== "string" || !spec.genre.trim()) throw new Error("Build rejected: game spec needs a genre.");
       if (!Array.isArray(spec.mechanics) || spec.mechanics.length < 1 || !spec.mechanics.every((item: unknown) => typeof item === "string" && item.trim())) throw new Error("Build rejected: gameplay mechanics are missing.");
       if (!Array.isArray(spec.controls) || spec.controls.length < 1 || !spec.controls.every((item: unknown) => typeof item === "string" && item.trim())) {
@@ -534,6 +556,39 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (!budget || !Number.isFinite(budget.targetFps) || budget.targetFps < 30 || budget.targetFps > 120) throw new Error("Build rejected: performanceBudget.targetFps must be between 30 and 120.");
       if (![budget.maxEnemies, budget.maxObjects, budget.maxParticles].every((n: unknown) => Number.isInteger(n) && Number(n) >= 0)) throw new Error("Build rejected: performance budgets must be non-negative integers.");
       if (budget.maxEnemies > 40 || budget.maxObjects > 1200 || budget.maxParticles > 300) throw new Error("Build rejected: requested object, enemy, or particle budget exceeds GENE's conservative limits.");
+      // A canvas without the expected id is a one-attribute fix; add it instead of rejecting.
+      if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) {
+        let healedHtml = html;
+        if (/<canvas\b(?![^>]*\bid=)/i.test(html)) healedHtml = html.replace(/<canvas\b(?![^>]*\bid=)/i, '<canvas id="game-canvas"');
+        else if (!/<canvas\b/i.test(html) && !/createElement\s*\(\s*["']canvas["']\s*\)/.test(runtimeSource) && /<body[^>]*>/i.test(html)) healedHtml = html.replace(/<body[^>]*>/i, match => match + '\n<canvas id="game-canvas"></canvas>');
+        if (healedHtml !== html) {
+          html = healedHtml;
+          byPath["game.html"] = healedHtml;
+          const htmlFileToHeal = normalized.find(file => file.path === "game.html");
+          if (htmlFileToHeal) htmlFileToHeal.content = healedHtml;
+        }
+      }
+      // The spec must not promise controls the code cannot deliver: rewrite the claim to match the proven handlers.
+      {
+        const keyRe = /(keydown|keyup|event\.key|event\.code|keyCode)/i;
+        const touchRe = /(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i;
+        const padRe = /(getGamepads|gamepadconnected|gamepaddisconnected)/i;
+        const claims = spec.controls.join(" ").toLowerCase();
+        const overpromised = (/keyboard|wasd|arrow keys|key bindings/.test(claims) && !keyRe.test(runtimeSource)) || (/touch|mobile|pointer controls/.test(claims) && !touchRe.test(runtimeSource)) || (/gamepad|controller/.test(claims) && !padRe.test(runtimeSource));
+        if (overpromised) {
+          const proven: string[] = [];
+          if (keyRe.test(runtimeSource)) proven.push("Keyboard controls: use the movement/action keys shown in the game.");
+          if (touchRe.test(runtimeSource)) proven.push("Touch and pointer controls: use the visible on-screen controls.");
+          if (padRe.test(runtimeSource)) proven.push("Gamepad/controller controls: use the mapped buttons and sticks.");
+          if (proven.length) {
+            spec.controls = proven;
+            spec.autoFilled = Array.from(new Set([...(Array.isArray(spec.autoFilled) ? spec.autoFilled : []), "controls"]));
+            byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
+            const controlsSpecFile = normalized.find(file => file.path === "game-spec.json");
+            if (controlsSpecFile) controlsSpecFile.content = byPath["game-spec.json"];
+          }
+        }
+      }
       if (!/<canvas\b[^>]*\bid=["']game-canvas["']/i.test(html)) throw new Error("Build rejected: game.html must include a canvas with id=game-canvas.");
       if (!/requestAnimationFrame|\.requestAnimationFrame/.test(js)) throw new Error("Build rejected: game.js has no requestAnimationFrame loop.");
       if (!/addEventListener|onkeydown|onkeyup|ontouchstart|onclick/.test(js)) throw new Error("Build rejected: game.js has no detectable input/event handling.");

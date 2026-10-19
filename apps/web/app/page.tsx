@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentResponse, BuildVersion, BuildRun, GeneProject, Mode, ProjectKind, Thinking } from "./lib/types";
+import type { AgentResponse, BuildVersion, BuildRun, FileChange, GeneProject, Mode, ProjectKind, ResearchBundle, Thinking } from "./lib/types";
 import { checkpointBuild, createBuildRun, recoverFromCheckpoint, resumeBuild, setTaskStatus } from "./lib/build-orchestrator";
 import JSZip from "jszip";
 import ObjViewport from "./components/ObjViewport";
@@ -10,6 +10,10 @@ import AudioStudio from "./components/AudioStudio";
 import ArtStudio from "./components/ArtStudio";
 import DesignDocPanel from "./components/DesignDocPanel";
 import InterviewCard from "./components/InterviewCard";
+import ResearchCard from "./components/ResearchCard";
+import LiveRunPanel, { type LiveRun } from "./components/LiveRunPanel";
+import { describeChanges, summarizeChanges } from "./lib/diff-stats.mjs";
+import { backoffMs, classifyFailure, repairTargetsFor, retryGuidance } from "./lib/error-recovery.mjs";
 import { buildDesignDoc } from "./lib/design-doc";
 import { playableDemoFiles } from "./lib/starter-game";
 import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
@@ -117,8 +121,8 @@ function explainAgentError(error: unknown, code?: unknown): string {
   if (/GEMINI_OUTPUT_TRUNCATED|GEMINI_OUTPUT_INVALID|output limit|malformed JSON/i.test(raw)) return "The AI response was incomplete or could not be validated. GENE preserved the current project and can retry this stage with a smaller implementation.";
   return raw.slice(0, 900) || "GENE encountered an unexpected error. Your last saved project version was preserved; inspect the activity log and retry.";
 }
-function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error", retry?: { prompt: string; operation: string }) {
-  return { id: uid(), role, content, createdAt: now(), kind, ...(retry ? { retry } : {}) };
+function message(role: "user" | "assistant" | "system", content: string, kind?: "question" | "plan" | "build" | "error", retry?: { prompt: string; operation: string }, extras?: { research?: ResearchBundle; changes?: FileChange[] }) {
+  return { id: uid(), role, content, createdAt: now(), kind, ...(retry ? { retry } : {}), ...(extras?.research ? { research: extras.research } : {}), ...(extras?.changes?.length ? { changes: extras.changes } : {}) };
 }
 function newProject(kind: ProjectKind = "game", preferredEngine?: GeneProject["preferredEngine"], projectIntent?: GeneProject["projectIntent"]): GeneProject {
   const targetIntent = projectIntent || (kind === "app" ? "webapp" : preferredEngine === "webgl3d" ? "game-3d" : preferredEngine === "canvas2d" ? "game-2d" : "auto");
@@ -244,6 +248,7 @@ export default function Home() {
   const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
+  const [liveRun, setLiveRun] = useState<LiveRun | null>(null);
   const [activity, setActivity] = useState<string[]>([]);
   const [localAgentUrl, setLocalAgentUrl] = useState("http://127.0.0.1:38421");
   const [localAgentToken, setLocalAgentToken] = useState("");
@@ -534,27 +539,8 @@ export default function Home() {
     addActivity("Saved research notes for “" + topic.slice(0, 60) + "” as a builder reference.");
   }
 
-  // Automatic free research: once a game/app plan exists, fetch real-world context and free CC0 model/library
-  // pointers once per project and attach them as a builder reference. Best effort and silent on failure.
-  useEffect(() => {
-    if (!project?.plan || researchedProjects.current.has(project.id)) return;
-    if ((project.references || []).some(item => item.name === "research-notes.md")) { researchedProjects.current.add(project.id); return; }
-    const query = [project.initialPrompt, project.plan.title, project.plan.summary, project.answers?.fantasy, project.answers?.genre, ...(project.plan.mechanics || [])].filter(Boolean).join(" ");
-    const projectId = project.id;
-    void fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, kind: project.kind === "app" ? "app" : "game" }) })
-      .then(response => response.json().catch(() => null))
-      .then(data => {
-        if (!data?.ok || typeof data.notes !== "string") return;
-        setProject(prev => {
-          if (!prev || prev.id !== projectId || (prev.references || []).some(item => item.name === "research-notes.md")) return prev;
-          return { ...prev, references: [...(prev.references || []), { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(data.notes).slice(0, 20_000), size: String(data.notes).length }], updatedAt: now() };
-        });
-        researchedProjects.current.add(projectId);
-        addActivity("Free web research attached to the plan (" + (data.sources?.wikipedia || 0) + " Wikipedia, " + (data.sources?.polyhaven || 0) + " CC0 model matches).");
-      })
-      .catch(() => { researchedProjects.current.delete(projectId); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.plan?.title, project?.id]);
+  // Research now runs visibly per request inside runAgent and is attached to the message that used it.
+
 
   const savedAssets = useMemo(() => {
     if (!project) return [];
@@ -688,6 +674,9 @@ export default function Home() {
     }
     if (parallelReadOnlyRequest) setParallelChatInProgress(true);
     else setBusy(true);
+    if (operation !== "build" && operation !== "surprise") {
+      setLiveRun({ id: uid(), operation, prompt: silent ? "Repairing a runtime error reported by the live preview" : prompt, startedAt: Date.now(), stage: "context", files: Object.entries(nextProject.files).map(([path, content]) => ({ path, size: String(content).length })) });
+    }
     setNotice("");
     if (!parallelReadOnlyRequest) {
       setRuntimeState("idle");
@@ -698,21 +687,38 @@ export default function Home() {
     setSection("chat");
     try {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
-      if ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")) {
+      const needsResearch = !silent && (operation === "research" || ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")));
+      if (needsResearch) {
+        const researchQuery = operation === "research"
+          ? prompt.slice(0, 900)
+          : [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
+        setLiveRun(current => current ? { ...current, stage: "research", research: { topic: researchQuery, status: "running" } } : current);
+        addActivity("Researching “" + researchQuery.slice(0, 70) + "” (Wikipedia, Wikimedia Commons, Poly Haven)");
         try {
-          const researchQuery = [nextProject.initialPrompt, prompt, nextProject.plan?.title, nextProject.plan?.summary, ...(nextProject.plan?.mechanics || []), nextProject.answers?.genre, nextProject.answers?.fantasy].filter(Boolean).join(" ").slice(0, 900);
           const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
           const researchData = await researchResponse.json().catch(() => null);
-          if (researchResponse.ok && researchData?.ok && typeof researchData.notes === "string" && researchData.notes.trim()) {
+          if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
+            const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
-            nextProject = { ...nextProject, references: [...(nextProject.references || []).filter(item => item.name !== note.name), note] };
-            setProject(current => current && current.id === nextProject.id ? { ...current, references: nextProject.references, updatedAt: now() } : current);
+            const kept = (nextProject.references || []).filter(item => item.name !== note.name && !/^research-image-/.test(item.name));
+            // The model accepts at most 4 reference images; the user's own attachments always win.
+            const freeSlots = Math.max(0, 4 - kept.filter(item => item.kind === "image").length);
+            const imageRefs = imageData.slice(0, freeSlots).map((image, index) => ({ id: uid(), name: "research-image-" + (index + 1) + "-" + String(image.name || "reference").replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40) + (image.mimeType === "image/png" ? ".png" : image.mimeType === "image/webp" ? ".webp" : image.mimeType === "image/gif" ? ".gif" : ".jpg"), mimeType: image.mimeType, kind: "image" as const, dataBase64: image.dataBase64, size: Math.round(image.dataBase64.length * 0.75) }));
+            const bundle: ResearchBundle = { ...researchData.bundle, sent: { notes: true, images: imageRefs.length } };
+            const references = [...kept, note, ...imageRefs];
+            const attach = (messages: GeneProject["messages"]) => { const index = messages.map(item => item.role).lastIndexOf("user"); return index < 0 ? messages : messages.map((item, position) => position === index ? { ...item, research: bundle } : item); };
+            nextProject = { ...nextProject, references, messages: attach(nextProject.messages) };
+            setProject(current => current && current.id === nextProject.id ? { ...current, references, messages: attach(current.messages), updatedAt: now() } : current);
             researchedProjects.current.add(nextProject.id);
-            addActivity("Attached real research before generation (" + (researchData.sources?.wikipedia || 0) + " Wikipedia results, " + (researchData.sources?.polyhaven || 0) + " CC0 model matches).");
+            setLiveRun(current => current ? { ...current, research: { topic: researchQuery, status: "done", images: bundle.images.length, facts: bundle.facts.length } } : current);
+            addActivity("Attached research to your message: " + bundle.images.length + " images, " + bundle.facts.length + " facts, " + (bundle.models.length + bundle.engineModels.length) + " models, " + (bundle.music.styles.length + bundle.music.tracks.length) + " music references. Sent to GENE: notes + " + imageRefs.length + " image(s).");
           } else {
+            setLiveRun(current => current ? { ...current, research: { topic: researchQuery, status: "failed" } } : current);
             addActivity("Research was unavailable or incomplete; GENE will mark assumptions and continue without inventing sources.");
           }
         } catch {
+          if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
+          setLiveRun(current => current ? { ...current, research: { topic: researchQuery, status: "failed" } } : current);
           addActivity("Research request failed; preserving the project and continuing with explicitly labeled assumptions.");
         }
       }
@@ -1168,18 +1174,8 @@ export default function Home() {
             addActivity("Final validation failed: " + validationError.slice(0, 180));
             if (validationAttempt >= 2) break;
 
-            const repairPath = stagePaths.find(path => validationError.includes(path)) ||
-              (/input handlers|no keyboard.*touch.*controller|event handlers.*found/i.test(validationError) ? "game.js" :
-               /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError) ? "game.js" :
-               /spec|title|engine|mechanic|objective|win condition|loss condition|performance budget|genre|controls/i.test(validationError) ? "game-spec.json" :
-               /html|canvas|script|semantic|markup/i.test(validationError) ? "game.html" :
-               /css|style|layout/i.test(validationError) ? "game.css" : "game.js");
-            // Audio is a cross-file contract: real playback belongs in game.js and
-            // its honest implementation/bus/event contract belongs in game-spec.json.
-            // Repairing only the spec can never fix missing sound code, and repairing
-            // only code can never fix missing audio metadata.
-            const repairPaths = /audio|sound|music|sfx|volume|mute|sound effect/i.test(validationError)
-              ? ["game.js", "game-spec.json"] : [repairPath];
+            // Audio is a cross-file contract (code + spec); repairTargetsFor handles that and path hints.
+            const repairPaths = repairTargetsFor(validationError, stagePaths);
             let repaired = true;
             for (const targetPath of repairPaths) {
               addActivity("Attempting targeted repair of " + targetPath + " (" + (validationAttempt + 1) + "/3)");
@@ -1256,16 +1252,18 @@ export default function Home() {
       } else {
         // Retry transient provider failures and incomplete model outputs automatically.
         // Keep this bounded: one initial request plus two compact retries.
-        const retryableCodes = /OPENROUTER_FALLBACK_FAILED|OPENROUTER_RATE_LIMITED|GEMINI_TIMEOUT|GEMINI_OUTPUT_TRUNCATED|GEMINI_OUTPUT_INVALID|GEMINI_CAPACITY_BUSY|GEMINI_API_ERROR|GENE_VALIDATION_FAILED|GENE_STAGED_BUILD_VALIDATION_FAILED/i;
+        let lastFailure: { kind: ReturnType<typeof classifyFailure>["kind"]; message: string } = { kind: "unknown", message: "" };
         for (let attempt = 0; attempt < 3; attempt++) {
           if (attempt > 0) {
-            addActivity("Automatic recovery retry " + (attempt + 1) + "/3 after a provider or output failure");
-            setNotice("GENE is retrying with a shorter, complete response. Your current project files remain safe.");
-            await new Promise(resolve => window.setTimeout(resolve, attempt === 1 ? 650 : 1300));
+            const waitMs = backoffMs(lastFailure.kind, attempt);
+            addActivity("Automatic recovery retry " + (attempt + 1) + "/3 after: " + classifyFailure(lastFailure.message, "").title.toLowerCase() + " (waiting " + Math.round(waitMs / 100) / 10 + "s)");
+            setNotice("GENE is retrying. Your current project files remain safe.");
+            await new Promise(resolve => window.setTimeout(resolve, waitMs));
           }
-          const retryInstruction = attempt === 0 ? "" : attempt === 1
+          const retryInstruction = attempt === 0 ? "" : retryGuidance(lastFailure.kind, lastFailure.message, attempt) + (attempt === 1
             ? "\n\nAUTOMATIC RECOVERY RETRY 2/3 — DIAGNOSE AND SIMPLIFY: Re-read the project files and failure context, identify the most likely cause, then retry with a smaller complete implementation. Preserve working behavior and established filenames; remove optional effects before removing the requested core. Return one valid complete response, never a fragment."
-            : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.";
+            : "\n\nAUTOMATIC RECOVERY RETRY 3/3 — CHANGE APPROACH: Do not repeat the previous implementation strategy. Use a safer alternative architecture or simpler algorithm, reduce cross-file dependencies, verify identifiers and file paths, and prioritize a runnable result that satisfies the core request. Preserve saved files. For edits, touch only necessary files. Do not claim runtime verification without evidence.");
+          setLiveRun(current => current ? { ...current, stage: "model", attempt: attempt + 1 } : current);
           let response: Response;
           try {
             response = await runFetch("/api/agent", {
@@ -1281,6 +1279,7 @@ export default function Home() {
           } catch (networkError) {
             const detail = networkError instanceof Error ? networkError.message : "network connection lost";
             addActivity("Network failure on request attempt " + (attempt + 1) + "/3: " + detail);
+            lastFailure = { kind: "network", message: detail };
             if (attempt < 2) {
               setNotice("GENE lost the connection to its server. It will retry with a different recovery strategy; saved files remain untouched.");
               continue;
@@ -1294,8 +1293,10 @@ export default function Home() {
           if (responseOk && payload?.ok) break;
           const code = String(payload?.error?.code || "");
           const status = response.status;
-          const retryable = retryableCodes.test(code) || ((status >= 500 || status === 429) && !/KEY_REJECTED|NOT_CONFIGURED|GENE_REQUEST_ERROR/.test(code));
-          if (!retryable || attempt >= 2) break;
+          const failureMessage = String(payload?.error?.message || "");
+          const failure = classifyFailure(failureMessage, code, status);
+          lastFailure = { kind: failure.kind, message: failureMessage };
+          if (!failure.retryable || attempt >= 2) break;
         }
       }
       if (!responseOk || !payload?.ok) {
@@ -1319,6 +1320,7 @@ export default function Home() {
         return;
       }
       const result: AgentResponse = payload.result;
+      setLiveRun(current => current ? { ...current, stage: "apply", model: typeof payload.model === "string" ? payload.model : current.model } : current);
       addActivity("Response received from " + (payload.model || payload.aiMode || "agent"));
       if (payload.reviewedBy) addActivity("Independent code review completed by " + payload.reviewedBy);
       let files = { ...nextProject.files };
@@ -1341,7 +1343,9 @@ export default function Home() {
         ? result.plan || nextProject.plan || null
         : nextProject.plan || null;
       if ((operation === "plan" || operation === "interview") && result.plan) addActivity("Plan updated: " + result.plan.tasks.length + " task(s)");
-      const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : (operation === "plan" || operation === "interview") && result.plan ? "plan" : result.question ? "question" : undefined);
+      const fileChanges = changedPaths.length ? summarizeChanges(nextProject.files, files, changedPaths) : [];
+      if (fileChanges.length) addActivity("Changed: " + describeChanges(fileChanges, 6));
+      const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : (operation === "plan" || operation === "interview") && result.plan ? "plan" : result.question ? "question" : undefined, undefined, { changes: fileChanges });
       const updated: GeneProject = {
         ...nextProject,
         name: (nextProject.name === "Untitled game" || nextProject.name === "Untitled app") ? (result.plan?.title || (isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name)) : nextProject.name,
@@ -1415,6 +1419,7 @@ export default function Home() {
         autoRepairAttempts.current = 0;
         runtimeRefreshAttempts.current = 0;
         addActivity("Files updated: " + changedPaths.join(", "));
+        setLiveRun(current => current ? { ...current, stage: "reload" } : current);
         setSection("chat");
         setPreviewOpen(true);
         setPreviewKey(n => n + 1);
@@ -1454,6 +1459,7 @@ export default function Home() {
     } finally {
       activeRunControllers.current.delete(runController);
       if (activeRunControllers.current.size === 0) {
+        setLiveRun(null);
         if (parallelReadOnlyRequest) setParallelChatInProgress(false);
         else setBusy(false);
         if (operation === "build" || operation === "surprise") {
@@ -2676,8 +2682,11 @@ export default function Home() {
                   {msg.role !== "user" && <div className="message-avatar">{msg.role === "system" ? "•" : "G"}</div>}
                   <div className="message-content">
                     {msg.role === "user" ? <div className="user-bubble">{msg.content}</div> : <div className="assistant-copy">{msg.content}</div>}
+                    {msg.research && <ResearchCard bundle={msg.research} />}
+                    {msg.changes && msg.changes.length > 0 && <div className="change-list" aria-label="Files changed by this request">{msg.changes.map(change => <button type="button" key={change.path} className={"change-row " + change.status} title="Open this file" onClick={() => { setProject(current => current ? { ...current, activeFile: change.path } : current); setSection("files"); }}><span className="change-path">{change.path}</span><span className="change-stat">{change.status === "removed" ? "removed" : <><b>+{change.added}</b> <i>−{change.removed}</i></>}</span></button>)}</div>}
                     {msg.kind === "error" && <div className="message-recovery">
                       <div className="inline-error">Your last saved files are preserved.</div>
+                      {msg.retry && classifyFailure(msg.content, "").autoFix && <button className="retry-message-button" onClick={() => void runAgent(msg.retry!.prompt + retryGuidance(classifyFailure(msg.content, "").kind, msg.content, 1), msg.retry!.operation)} disabled={busy || buildInProgress || parallelChatInProgress} title="Retry and tell GENE exactly what failed so it fixes that problem"><span aria-hidden="true">✦</span> Fix automatically</button>}
                       {msg.retry && <button className="retry-message-button" onClick={() => void runAgent(msg.retry!.prompt, msg.retry!.operation)} disabled={busy || buildInProgress || parallelChatInProgress} title="Retry this request using the latest saved project and build checkpoint"><span aria-hidden="true">↻</span> Retry request</button>}
                     </div>}
                   </div>
@@ -2691,9 +2700,11 @@ export default function Home() {
                   onSkip={startBuild}
                 />}
                 {/* The plan lives in the pinned workspace header and Tasks view, never as a moving chat message. */}
-                {(busy || buildInProgress || queuedRequestCount > 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : operationText(project.mode, hasGame)}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
-                {(busy || buildInProgress) && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
+                {(busy || buildInProgress || queuedRequestCount > 0) && !(liveRun && !buildInProgress && queuedRequestCount === 0) && <div className="working-row"><span className="spinner" /><div><strong>{buildInProgress ? "Building your project" : queuedRequestCount ? "Requests queued" : project.mode === "plan" ? "Planning with the configured AI" : "Working with the configured AI"}</strong><small>{queuedRequestCount ? queuedRequestCount + " request(s) queued in order." : (liveRun && !buildInProgress ? "“" + liveRun.prompt.slice(0, 90) + (liveRun.prompt.length > 90 ? "…”" : "”") : operationText(project.mode, hasGame))}{buildInProgress && canQueueBuildRequests ? " · Existing preview remains available." : ""}</small></div><button title="Show the real activity log" aria-expanded={showActivity} onClick={() => setShowActivity(!showActivity)}>{showActivity ? "Hide log" : "Activity ↗"}</button></div>}
+                {liveRun && !buildInProgress && <LiveRunPanel run={liveRun} logOpen={showActivity} onToggleLog={() => setShowActivity(value => !value)} />}
+                {buildInProgress && project.buildRun && <div className="real-progress-panel" role="status" aria-live="polite">
                   <div className="real-progress-heading"><span>BUILD PROGRESS</span><strong>{project.buildRun.tasks.filter(task => task.status === "passed").length}/{project.buildRun.tasks.length} steps verified</strong><b>{project.buildRun.tasks.length ? Math.round(project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100) : 0}%</b></div>
+                  {(project.plan?.title || project.initialPrompt) && <div className="real-progress-ask">Building: {(project.plan?.title || project.initialPrompt || "").slice(0, 120)}</div>}
                   <div className="real-progress-track"><span style={{ width: (project.buildRun.tasks.length ? project.buildRun.tasks.filter(task => task.status === "passed").length / project.buildRun.tasks.length * 100 : 0) + "%" }} /></div>
                   <div className="real-progress-current"><span className="real-progress-current-dot" /><div><small>{project.buildRun.tasks.some(task => task.status === "running") ? "WORKING NOW" : project.buildRun.tasks.some(task => task.status === "failed") ? "RECOVERY NEEDED" : "UP NEXT"}</small><strong>{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.title || "Finishing and validating the project"}</strong><small className="real-progress-current-files">{(project.buildRun.tasks.find(task => task.status === "running") || project.buildRun.tasks.find(task => task.status === "failed") || project.buildRun.tasks.find(task => task.status === "queued"))?.files?.join(" · ") || "Checking the assembled project"}</small></div></div>
                   <details className="real-progress-details">
@@ -2715,7 +2726,7 @@ export default function Home() {
                   </div>
                   <details className="composer-tools-menu composer-options">
                     <summary title="More tools" aria-label="More composer tools"><span>···</span></summary>
-                    <div className="composer-tools-menu-panel">
+                    <div className="composer-tools-menu-panel" onClick={event => { if ((event.target as HTMLElement).closest("button")) (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); }}>
                       <div className="overflow-menu-caption">TOOLS</div>
                       <button type="button" className="menu-action" title="Improve the draft prompt without starting a build" onClick={enhanceDraftPrompt} disabled={!draft.trim() || enhancingPrompt || busy}><span>✦</span><span>{enhancingPrompt ? "Enhancing…" : "Enhance prompt"}</span></button>
                       <button type="button" className={"menu-action " + (extendedPlanning ? "synced" : "")} aria-pressed={extendedPlanning} title="Ask additional planning questions and expand architecture and test gates." onClick={() => setExtendedPlanning(value => !value)}><span>☷</span><span>{extendedPlanning ? "Deep planning on" : "Deep planning"}</span></button>

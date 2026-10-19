@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildSearchLinks, cleanQuery, filterPolyHaven, formatResearchNotes, keywords } from "../../lib/research-sources.mjs";
+import {
+  buildResearchBundle,
+  buildSearchLinks,
+  cleanQuery,
+  filterPolyHaven,
+  formatResearchNotes,
+  keywords,
+  musicSearchTerms,
+  parseCommonsFiles,
+  parseWikipediaPages
+} from "../../lib/research-sources.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -8,32 +18,56 @@ const USER_AGENT = "GENE-Studio/2.0 (free game and app builder; contact via repo
 let polyHavenCache: { at: number; data: Record<string, unknown> | null } | null = null;
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
-async function wikipedia(query: string): Promise<Array<{ title: string; extract: string; url: string }>> {
-  const url = "https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrlimit=3&prop=extracts%7Cinfo&exintro=1&explaintext=1&exchars=700&inprop=url&redirects=1&gsrsearch=" + encodeURIComponent(query);
+/** Only these hosts are ever fetched for image bytes, so research can never be used to reach other servers. */
+const IMAGE_HOSTS = new Set(["upload.wikimedia.org", "cdn.polyhaven.com"]);
+const MAX_IMAGE_BYTES = 180_000;
+const MAX_IMAGES_SENT = 3;
+
+async function getJson(url: string, timeoutMs = 6_000): Promise<any | null> {
   try {
-    const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: AbortSignal.timeout(5_000) });
-    if (!response.ok) return [];
-    const data: any = await response.json().catch(() => null);
-    const pages = Object.values(data?.query?.pages || {}) as Array<{ title?: string; extract?: string; fullurl?: string; index?: number }>;
-    return pages
-      .filter(page => typeof page.title === "string" && typeof page.extract === "string" && page.extract.trim())
-      .sort((a, b) => (a.index || 0) - (b.index || 0))
-      .map(page => ({ title: String(page.title), extract: String(page.extract), url: String(page.fullurl || "https://en.wikipedia.org/wiki/" + encodeURIComponent(String(page.title))) }));
+    const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return null;
+    return await response.json().catch(() => null);
   } catch {
-    return [];
+    return null;
   }
+}
+
+async function wikipedia(query: string, host: string) {
+  const url = "https://" + host + "/w/api.php?action=query&format=json&generator=search&gsrlimit=4&prop=extracts%7Cinfo%7Cpageimages&exintro=1&explaintext=1&exchars=700&inprop=url&piprop=thumbnail&pithumbsize=480&redirects=1&origin=*&gsrsearch=" + encodeURIComponent(query);
+  return parseWikipediaPages(await getJson(url, 5_000), host);
+}
+
+async function commons(query: string, kind: "image" | "audio", limit: number) {
+  const filter = kind === "audio" ? "filetype:audio" : "filetype:bitmap";
+  const url = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=" + limit +
+    "&gsrsearch=" + encodeURIComponent(query + " " + filter) +
+    "&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=480&iiextmetadatafilter=LicenseShortName%7CArtist&origin=*";
+  return parseCommonsFiles(await getJson(url, 6_000), kind);
 }
 
 async function polyHavenCatalog(): Promise<Record<string, unknown> | null> {
   if (polyHavenCache && Date.now() - polyHavenCache.at < 60 * 60 * 1000) return polyHavenCache.data;
+  const data = await getJson("https://api.polyhaven.com/assets?t=models", 6_000);
+  polyHavenCache = data && typeof data === "object"
+    ? { at: Date.now(), data }
+    : { at: Date.now() - 50 * 60 * 1000, data: null };
+  return polyHavenCache.data;
+}
+
+/** Download a small thumbnail so GENE receives real pixels as a reference image. */
+async function fetchImageData(image: { id: string; title: string; thumb: string }) {
   try {
-    const response = await fetch("https://api.polyhaven.com/assets?t=models", { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: AbortSignal.timeout(6_000) });
-    if (!response.ok) { polyHavenCache = { at: Date.now() - 50 * 60 * 1000, data: null }; return null; }
-    const data = await response.json().catch(() => null);
-    polyHavenCache = { at: Date.now(), data: data && typeof data === "object" ? data : null };
-    return polyHavenCache.data;
+    const url = new URL(image.thumb);
+    if (url.protocol !== "https:" || !IMAGE_HOSTS.has(url.hostname)) return null;
+    const response = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(5_000) });
+    if (!response.ok) return null;
+    const mimeType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return null;
+    return { id: image.id, name: image.title, mimeType, dataBase64: bytes.toString("base64") };
   } catch {
-    polyHavenCache = { at: Date.now() - 50 * 60 * 1000, data: null };
     return null;
   }
 }
@@ -50,27 +84,41 @@ export async function POST(request: NextRequest) {
   else if (++bucket.count > 20) return NextResponse.json({ ok: false, error: { code: "GENE_RATE_LIMIT", message: "Research limit reached. Please wait a minute." } }, { status: 429 });
 
   const words = keywords(topic);
-  const wikiQuery = words.slice(0, 4).join(" ") || topic;
-  const [wiki, catalog] = await Promise.all([wikipedia(wikiQuery), polyHavenCatalog()]);
+  const searchText = words.slice(0, 4).join(" ") || topic;
+  const arabic = /[؀-ۿ]/.test(topic);
+  const wikiHost = arabic ? "ar.wikipedia.org" : "en.wikipedia.org";
+  const wantImages = body?.images !== false;
+
+  const [wiki, catalog, commonsImages, ...audioSets] = await Promise.all([
+    wikipedia(searchText, wikiHost),
+    polyHavenCatalog(),
+    commons(searchText, "image", 6),
+    ...musicSearchTerms(topic).map(term => commons(term, "audio", 3))
+  ]);
+  const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = filterPolyHaven(catalog, topic, 6);
   const links = buildSearchLinks(words.slice(0, 3).join(" ") || topic);
-  const unreachable: string[] = [];
-  if (!wiki.length) unreachable.push("Wikipedia returned nothing for this topic or could not be reached");
-  if (!catalog) unreachable.push("the Poly Haven model catalog could not be reached");
-  const notes = formatResearchNotes({
-    topic,
-    wiki,
-    models,
-    links,
-    note: unreachable.length ? "Some live sources were unavailable (" + unreachable.join("; ") + "), so only the verified parts are listed." : ""
-  });
+
+  const unavailable: string[] = [];
+  if (!wiki.length) unavailable.push((arabic ? "Arabic " : "") + "Wikipedia returned nothing for this topic or could not be reached");
+  if (!commonsImages.length) unavailable.push("Wikimedia Commons returned no licensed images");
+  if (!catalog) unavailable.push("the Poly Haven model catalog could not be reached");
+
+  const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, links, unavailable, createdAt: new Date().toISOString() });
+  const imageData = wantImages
+    ? (await Promise.all(bundle.images.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
+    : [];
+
   return NextResponse.json({
     ok: true,
     topic,
-    sources: { wikipedia: wiki.length, polyhaven: models.length },
+    bundle,
+    imageData,
+    notes: formatResearchNotes(bundle),
+    // Kept for older clients.
+    sources: { wikipedia: wiki.length, polyhaven: models.length, images: bundle.images.length, audio: commonsAudio.length },
     models,
     links,
-    notes,
-    partial: unreachable.length > 0
+    partial: unavailable.length > 0
   });
 }

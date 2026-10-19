@@ -5,9 +5,9 @@
  * Subway-style runner, Mario-style platformer and arcade game starts from the same quality bar
  * instead of inventing stick figures from scratch:
  *
- *   2D (Canvas):  GeneModels.drawCharacter / drawEnemy / drawCoin / drawBlock / drawTrainCar / drawBackdrop
+ *   2D (Canvas):  GeneModels.drawCharacter / drawEnemy / drawCoin / drawBlock / drawTrainCar / drawBackdrop / drawShip / drawCar / drawTree / drawGem / drawHeart
  *   3D (WebGL):   GeneModels.rig3D.character(style) + GeneModels.bake(rig, state, t, rootMatrix)
- *                 GeneModels.props3D.train / coin / barrier / crate / tree
+ *                 GeneModels.props3D.train / coin / barrier / crate / tree / car / ship
  *                 GeneModels.mesh (box, cylinder, sphere, merge, transform) and GeneModels.mat4
  *
  * Meshes are plain typed arrays {positions, normals, colors, indices} so any hand-written WebGL
@@ -167,6 +167,63 @@ export const GENE_MODELS_SOURCE = String.raw`(function (root) {
     } catch (e) { return false; }
   };
 
+  M.drawShip = function (ctx, x, y, size, opts) {
+    try {
+      opts = opts || {}; var s = (Number(size) || 48) / 48, t = Number(opts.t) || 0, c = opts.color || '#6ec6ff';
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s); if (opts.flip) ctx.scale(1, -1);
+      var flame = 8 + Math.sin(t * 40) * 3;
+      ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.moveTo(-5, 14); ctx.lineTo(0, 14 + flame); ctx.lineTo(5, 14); ctx.fill();
+      ctx.fillStyle = shade(c, 0.7); ctx.beginPath(); ctx.moveTo(-8, 2); ctx.lineTo(-24, 18); ctx.lineTo(-24, 8); ctx.lineTo(-10, -8); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(8, 2); ctx.lineTo(24, 18); ctx.lineTo(24, 8); ctx.lineTo(10, -8); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(0, -24); ctx.quadraticCurveTo(12, -6, 9, 14); ctx.lineTo(-9, 14); ctx.quadraticCurveTo(-12, -6, 0, -24); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(-3, -6, 2.2, 7, 0.1, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#1b2a41'; ctx.beginPath(); ctx.ellipse(0, -4, 4.5, 6.5, 0, 0, TAU); ctx.fill();
+      ctx.restore(); return true;
+    } catch (e) { return false; }
+  };
+  M.drawCar = function (ctx, x, y, w, opts) {
+    try {
+      opts = opts || {}; w = Number(w) || 90; var h = w * 0.42, t = Number(opts.t) || 0, c = opts.color || '#e63946';
+      ctx.save(); ctx.translate(x, y); if (opts.facing < 0) ctx.scale(-1, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0, 0, w * 0.5, h * 0.12, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(-w / 2, -h * 0.25); ctx.lineTo(-w * 0.38, -h * 0.55); ctx.lineTo(-w * 0.12, -h * 0.9); ctx.lineTo(w * 0.22, -h * 0.9); ctx.lineTo(w * 0.42, -h * 0.5); ctx.lineTo(w / 2, -h * 0.3); ctx.lineTo(w / 2, -h * 0.08); ctx.lineTo(-w / 2, -h * 0.08); ctx.fill();
+      ctx.fillStyle = 'rgba(190,230,255,0.9)'; ctx.beginPath(); ctx.moveTo(-w * 0.1, -h * 0.82); ctx.lineTo(-w * 0.28, -h * 0.52); ctx.lineTo(w * 0.36, -h * 0.5); ctx.lineTo(w * 0.2, -h * 0.82); ctx.fill();
+      ctx.fillStyle = '#ffe28a'; ctx.fillRect(w * 0.44, -h * 0.34, w * 0.06, h * 0.12);
+      var spin = t * 20;
+      [-w * 0.28, w * 0.28].forEach(function (wx) { ctx.fillStyle = '#16161b'; ctx.beginPath(); ctx.arc(wx, -h * 0.08, h * 0.2, 0, TAU); ctx.fill(); ctx.strokeStyle = '#9aa0a6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + Math.cos(spin) * h * 0.12, -h * 0.08 + Math.sin(spin) * h * 0.12); ctx.lineTo(wx - Math.cos(spin) * h * 0.12, -h * 0.08 - Math.sin(spin) * h * 0.12); ctx.stroke(); });
+      ctx.restore(); return true;
+    } catch (e) { return false; }
+  };
+  M.drawTree = function (ctx, x, y, size, t) {
+    try {
+      size = Number(size) || 80; var sway = Math.sin((Number(t) || 0) * 1.6 + x * 0.01) * size * 0.03;
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(-size * 0.06, -size * 0.35, size * 0.12, size * 0.35);
+      ctx.fillStyle = '#2f9d57'; ctx.beginPath(); ctx.arc(sway, -size * 0.55, size * 0.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3dbb6a'; ctx.beginPath(); ctx.arc(sway - size * 0.1, -size * 0.62, size * 0.2, 0, TAU); ctx.arc(sway + size * 0.14, -size * 0.5, size * 0.17, 0, TAU); ctx.fill();
+      ctx.restore(); return true;
+    } catch (e) { return false; }
+  };
+  M.drawGem = function (ctx, x, y, r, t, color) {
+    try {
+      r = Number(r) || 12; color = color || '#5ce1e6'; var glint = 0.5 + Math.sin((Number(t) || 0) * 5) * 0.3;
+      ctx.save(); ctx.translate(x, y + Math.sin((Number(t) || 0) * 2.4) * 2);
+      ctx.fillStyle = shade(color, 0.7); ctx.beginPath(); ctx.moveTo(0, r); ctx.lineTo(-r, -r * 0.2); ctx.lineTo(r, -r * 0.2); ctx.fill();
+      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-r, -r * 0.2); ctx.lineTo(-r * 0.5, -r); ctx.lineTo(r * 0.5, -r); ctx.lineTo(r, -r * 0.2); ctx.lineTo(0, r * 0.1); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,' + glint + ')'; ctx.beginPath(); ctx.moveTo(-r * 0.5, -r); ctx.lineTo(-r * 0.15, -r * 0.2); ctx.lineTo(-r * 0.7, -r * 0.2); ctx.fill();
+      ctx.restore(); return true;
+    } catch (e) { return false; }
+  };
+  M.drawHeart = function (ctx, x, y, size, t) {
+    try {
+      size = Number(size) || 20; var beat = 1 + Math.max(0, Math.sin((Number(t) || 0) * 6)) * 0.12, r = size / 2 * beat;
+      ctx.save(); ctx.translate(x, y); ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.moveTo(0, r * 0.9);
+      ctx.bezierCurveTo(-r * 1.6, -r * 0.2, -r * 0.8, -r * 1.3, 0, -r * 0.45); ctx.bezierCurveTo(r * 0.8, -r * 1.3, r * 1.6, -r * 0.2, 0, r * 0.9); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(-r * 0.55, -r * 0.45, r * 0.18, r * 0.3, -0.6, 0, TAU); ctx.fill();
+      ctx.restore(); return true;
+    } catch (e) { return false; }
+  };
+
   /* ---------- 3D math + meshes ---------- */
   var mat4 = M.mat4 = {
     identity: function () { return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); },
@@ -322,6 +379,23 @@ export const GENE_MODELS_SOURCE = String.raw`(function (root) {
       var T = mat4.translate;
       return compose([[boxMesh(0.14, 1.1, 0.14, '#555b66'), T(-0.9, 0.55, 0)], [boxMesh(0.14, 1.1, 0.14, '#555b66'), T(0.9, 0.55, 0)],
         [boxMesh(1.9, 0.28, 0.12, '#ffd23f'), T(0, 0.95, 0)], [boxMesh(0.36, 0.28, 0.14, '#222'), T(-0.6, 0.95, 0)], [boxMesh(0.36, 0.28, 0.14, '#222'), T(0.2, 0.95, 0)], [boxMesh(0.36, 0.28, 0.14, '#222'), T(0.8, 0.95, 0)]]);
+    },
+    car: function (color) {
+      color = color || '#e63946'; var T = mat4.translate;
+      return compose([
+        [boxMesh(1.7, 0.6, 3.6, color), T(0, 0.55, 0)], [boxMesh(1.4, 0.5, 1.7, shade2(color, 1.2)), T(0, 1.05, 0.2)],
+        [boxMesh(1.3, 0.34, 0.1, '#bfe6ff'), T(0, 1.08, -0.66)], [boxMesh(0.4, 0.2, 0.1, '#fff2b0'), T(-0.55, 0.62, -1.82)], [boxMesh(0.4, 0.2, 0.1, '#fff2b0'), T(0.55, 0.62, -1.82)],
+        [boxMesh(0.4, 0.2, 0.1, '#ff3b3b'), T(-0.55, 0.62, 1.82)], [boxMesh(0.4, 0.2, 0.1, '#ff3b3b'), T(0.55, 0.62, 1.82)],
+        [transformMesh(cylinderMesh(0.34, 0.34, 0.26, 12, '#16161b'), mat4.rotateZ(Math.PI / 2)), T(-0.86, 0.34, -1.1)], [transformMesh(cylinderMesh(0.34, 0.34, 0.26, 12, '#16161b'), mat4.rotateZ(Math.PI / 2)), T(0.86, 0.34, -1.1)],
+        [transformMesh(cylinderMesh(0.34, 0.34, 0.26, 12, '#16161b'), mat4.rotateZ(Math.PI / 2)), T(-0.86, 0.34, 1.1)], [transformMesh(cylinderMesh(0.34, 0.34, 0.26, 12, '#16161b'), mat4.rotateZ(Math.PI / 2)), T(0.86, 0.34, 1.1)]
+      ]);
+    },
+    ship: function (color) {
+      color = color || '#6ec6ff'; var T = mat4.translate;
+      return compose([
+        [transformMesh(cylinderMesh(0.5, 0.12, 2.2, 10, color), mat4.rotateX(-Math.PI / 2)), T(0, 0, 0)], [boxMesh(2.6, 0.08, 0.9, shade2(color, 0.7)), T(0, 0, 0.5)],
+        [boxMesh(0.08, 0.6, 0.6, shade2(color, 0.85)), T(0, 0.35, 0.8)], [sphereMesh(0.28, 8, '#1b2a41'), T(0, 0.3, -0.3)], [boxMesh(0.3, 0.3, 0.3, '#ff9f1c'), T(0, 0, 1.2)]
+      ]);
     },
     crate: function (color) { return transformMesh(boxMesh(1, 1, 1, color || '#b9782f'), mat4.translate(0, 0.5, 0)); },
     tree: function () {

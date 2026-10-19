@@ -1,8 +1,12 @@
+import type { ResearchBundle } from "./research-sources.mjs";
+import type { FileChange } from "./diff-stats.mjs";
+
+export type { ResearchBundle, FileChange };
 export type ProjectKind = "game" | "app";
 export type ProjectIntent = "game-2d" | "game-3d" | "website" | "webapp" | "auto";
 export type Mode = "plan" | "build";
 export type Thinking = "fast" | "balanced" | "deep";
-export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error"; retry?: { prompt: string; operation: string } };
+export type ChatMessage = { id: string; role: "user" | "assistant" | "system"; content: string; createdAt: string; kind?: "question" | "plan" | "build" | "error"; retry?: { prompt: string; operation: string }; research?: ResearchBundle; changes?: FileChange[] };
 export type Question = {
   id: string;
   text: string;

@@ -7,6 +7,8 @@
  * is free to use; licences are stated per source and must still be checked on each asset page.
  */
 
+import { matchGameKnowledge, musicStylesFor } from "./game-knowledge.mjs";
+
 export function cleanQuery(value) {
   return String(value || "").replace(/[^\p{L}\p{N}\s'&-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120);
 }
@@ -28,6 +30,8 @@ export function buildSearchLinks(query) {
     { id: "itch", label: "itch.io free assets", kind: "Art, audio, fonts", license: "Varies (check each)", url: "https://itch.io/game-assets/free?q=" + q },
     { id: "sketchfab", label: "Sketchfab (downloadable, CC)", kind: "3D models", license: "CC (check each)", url: "https://sketchfab.com/search?features=downloadable&licenses=7c23a1ba438d4306920229c12afcb5f9&q=" + q + "&type=models" },
     { id: "freesound", label: "Freesound", kind: "Sound effects", license: "CC0 / CC-BY (check each)", url: "https://freesound.org/search/?q=" + q },
+    { id: "commons", label: "Wikimedia Commons", kind: "Images, audio, video", license: "CC / public domain (check each)", url: "https://commons.wikimedia.org/w/index.php?search=" + q },
+    { id: "fma", label: "Free Music Archive", kind: "Music tracks", license: "CC (check each)", url: "https://freemusicarchive.org/search?quicksearch=" + q },
     { id: "ambientcg", label: "ambientCG", kind: "PBR textures", license: "CC0", url: "https://ambientcg.com/list?q=" + q }
   ];
 }
@@ -54,22 +58,167 @@ export function filterPolyHaven(catalog, query, limit = 6) {
   return results.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, limit);
 }
 
-/** Markdown research note that is saved as a project reference and given to the builder. */
-export function formatResearchNotes({ topic, wiki = [], models = [], links = [], note = "" }) {
+const MOOD_QUERY = { action: "chiptune", calm: "ambient piano", tense: "dark ambient", mystery: "ambient", triumph: "fanfare", sad: "melancholy piano" };
+
+const ENGINE_MODELS = [
+  { re: /train|subway|metro|rail|locomotive/, name: "Train car", call: "GeneModels.props3D.train(color) / GeneModels.drawTrainCar(ctx,…)", dims: "2D+3D" },
+  { re: /runner|character|player|hero|person|human|ninja|knight|mario|run/, name: "Animated character", call: "GeneModels.rig3D.character(style) + bake(rig, state, t, root) / GeneModels.drawCharacter(ctx,…)", dims: "2D+3D" },
+  { re: /coin|money|gold|cash|prize|millionaire/, name: "Spinning coin", call: "GeneModels.drawCoin(ctx,…) / GeneModels.props3D.coin()", dims: "2D+3D" },
+  { re: /car|race|racing|drift|kart|vehicle|truck/, name: "Car", call: "GeneModels.props3D.car(color) / GeneModels.drawCar(ctx,…)", dims: "2D+3D" },
+  { re: /ship|space|rocket|galaga|invader|asteroid|shooter/, name: "Spaceship", call: "GeneModels.props3D.ship(color) / GeneModels.drawShip(ctx,…)", dims: "2D+3D" },
+  { re: /tree|forest|nature|garden|farm|park/, name: "Tree", call: "GeneModels.props3D.tree() / GeneModels.drawTree(ctx,…)", dims: "2D+3D" },
+  { re: /enemy|monster|goomba|slime|zombie|ghost|boss|creature/, name: "Enemies (walker, slime, flyer)", call: "GeneModels.drawEnemy(ctx, x, y, size, t, {kind})", dims: "2D" },
+  { re: /gem|diamond|crystal|jewel|match/, name: "Gem", call: "GeneModels.drawGem(ctx, x, y, r, t, color)", dims: "2D" },
+  { re: /heart|health|life|lives/, name: "Heart (health)", call: "GeneModels.drawHeart(ctx, x, y, size, t)", dims: "2D" },
+  { re: /block|brick|question|tile|wall/, name: "Brick / question / ground block", call: "GeneModels.drawBlock(ctx, x, y, size, kind, t)", dims: "2D" },
+  { re: /barrier|obstacle|crate|box|fence/, name: "Barrier and crate", call: "GeneModels.props3D.barrier() / crate(color)", dims: "3D" },
+  { re: /sky|background|parallax|landscape|city|night|sunset/, name: "Animated parallax backdrop", call: "GeneModels.drawBackdrop(ctx, w, h, t, theme)", dims: "2D" }
+];
+
+/** Built-in GeneModels that fit the topic, so research can point at models GENE can really use. */
+export function matchEngineModels(text, limit = 5) {
+  const source = String(text || "").toLowerCase();
+  return ENGINE_MODELS.filter(item => item.re.test(source)).slice(0, limit).map(({ name, call, dims }) => ({ name, call, dims }));
+}
+
+function stripHtml(value) {
+  return String(value || "").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+}
+
+/** Wikipedia pages (extracts + thumbnails) from an action=query response. */
+export function parseWikipediaPages(data, host = "en.wikipedia.org") {
+  const pages = Object.values((data && data.query && data.query.pages) || {});
+  return pages
+    .filter(page => page && typeof page.title === "string" && typeof page.extract === "string" && page.extract.trim())
+    .sort((a, b) => (a.index || 0) - (b.index || 0))
+    .map(page => ({
+      title: String(page.title),
+      extract: String(page.extract),
+      url: String(page.fullurl || "https://" + host + "/wiki/" + encodeURIComponent(String(page.title).replace(/ /g, "_"))),
+      thumb: page.thumbnail && typeof page.thumbnail.source === "string" && /^https:\/\//.test(page.thumbnail.source) ? page.thumbnail.source : undefined
+    }));
+}
+
+const IMAGE_MIME = /^image\/(?:jpeg|png|webp|gif|svg\+xml)$/i;
+const AUDIO_NAME = /\.(?:ogg|oga|opus|mp3|wav|flac)$/i;
+
+/** Wikimedia Commons files with licence + credit from a generator=search&prop=imageinfo response. */
+export function parseCommonsFiles(data, kind = "image") {
+  const pages = Object.values((data && data.query && data.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+  const out = [];
+  for (const page of pages) {
+    const info = page && Array.isArray(page.imageinfo) ? page.imageinfo[0] : null;
+    if (!info || typeof info.url !== "string" || !/^https:\/\//.test(info.url)) continue;
+    const meta = info.extmetadata || {};
+    const license = stripHtml(meta.LicenseShortName && meta.LicenseShortName.value);
+    if (!license) continue; // never present a file whose licence we cannot state
+    const title = String(page.title || "").replace(/^File:/i, "").replace(/\.[A-Za-z0-9]+$/, "").replace(/_/g, " ");
+    const base = { id: "commons-" + String(page.pageid || title), title, license, credit: stripHtml(meta.Artist && meta.Artist.value).slice(0, 120) || "Wikimedia Commons contributors", page: String(info.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(String(page.title || "").replace(/ /g, "_"))), source: "Wikimedia Commons" };
+    if (kind === "audio") {
+      if (!AUDIO_NAME.test(String(page.title || "")) && !/^audio\//i.test(String(info.mime || ""))) continue;
+      out.push({ ...base, url: info.url });
+    } else {
+      if (!IMAGE_MIME.test(String(info.mime || ""))) continue;
+      const thumb = typeof info.thumburl === "string" && /^https:\/\//.test(info.thumburl) ? info.thumburl : info.url;
+      out.push({ ...base, thumb, full: info.url });
+    }
+  }
+  return out;
+}
+
+export function polyHavenThumb(id) {
+  return "https://cdn.polyhaven.com/asset_img/thumbs/" + encodeURIComponent(String(id)) + ".png?width=256&height=256";
+}
+
+/** Query terms for music search derived from the best-matching genre's mood. */
+export function musicSearchTerms(topic) {
+  const styles = musicStylesFor(topic, 2);
+  const terms = styles.map(style => MOOD_QUERY[style.mood] || "ambient");
+  return Array.from(new Set(terms.length ? terms : ["ambient"]));
+}
+
+/** Assemble the single research bundle that is shown on the message and sent to GENE. */
+export function buildResearchBundle(input) {
+  const topic = cleanQuery(input.topic);
+  const wiki = Array.isArray(input.wiki) ? input.wiki : [];
+  const images = [];
+  const seen = new Set();
+  const pushImage = item => { const key = item.thumb || item.full; if (key && !seen.has(key)) { seen.add(key); images.push(item); } };
+  for (const page of wiki) if (page.thumb) pushImage({ id: "wiki-" + page.title, title: page.title, thumb: page.thumb, full: page.thumb, page: page.url, license: "See Wikipedia page", credit: "Wikipedia", source: "Wikipedia" });
+  for (const file of (Array.isArray(input.commonsImages) ? input.commonsImages : [])) pushImage(file);
+  const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" }));
+  const matches = matchGameKnowledge(topic, 3);
+  return {
+    id: String(input.id || "research-" + Date.now().toString(36)),
+    topic,
+    createdAt: String(input.createdAt || new Date().toISOString()),
+    facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
+    images: images.slice(0, 8),
+    models,
+    engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")),
+    music: { styles: musicStylesFor(topic, 3), tracks: (Array.isArray(input.commonsAudio) ? input.commonsAudio : []).slice(0, 4), links: (Array.isArray(input.links) ? input.links : []).filter(link => ["fma", "opengameart", "freesound", "commons"].includes(link.id)) },
+    games: matches.map(entry => ({ title: entry.title, examples: entry.examples, loop: entry.loop, engine: entry.engine })),
+    links: Array.isArray(input.links) ? input.links : [],
+    unavailable: Array.isArray(input.unavailable) ? input.unavailable : []
+  };
+}
+
+/** Markdown note given to the builder. Most useful guidance comes first because staged prompts truncate references. */
+export function formatResearchNotes(input) {
+  const bundle = input && Array.isArray(input.facts) ? input : null;
+  const topic = bundle ? bundle.topic : input.topic;
   const lines = ["# Research notes: " + topic, ""];
-  if (note) lines.push(note, "");
-  if (wiki.length) {
-    lines.push("## Real-world and visual context (Wikipedia)");
-    for (const page of wiki) lines.push("- **" + page.title + "** — " + String(page.extract || "").replace(/\s+/g, " ").slice(0, 420) + " (" + page.url + ")");
-    lines.push("");
+  if (bundle) {
+    if (bundle.games.length) {
+      lines.push("## Games like this (real references; learn from how they play, do not copy assets)");
+      for (const game of bundle.games) lines.push("- **" + game.title + "** (" + game.examples.join(", ") + "): " + game.loop);
+      lines.push("");
+    }
+    if (bundle.music.styles.length) {
+      lines.push("## Music direction (use GeneAudio)");
+      for (const style of bundle.music.styles) lines.push("- " + style.genre + ": GeneAudio mood '" + style.mood + "', ~" + style.bpm + " BPM, " + style.scale + "; " + style.instruments + ". " + style.notes + ". SFX: " + style.sfx.join(", ") + ".");
+      for (const track of bundle.music.tracks) lines.push("- Reference track: " + track.title + " — " + track.page + " (" + track.license + ", " + track.credit + ")");
+      lines.push("");
+    }
+    if (bundle.engineModels.length) {
+      lines.push("## Built-in GENE models to use");
+      for (const model of bundle.engineModels) lines.push("- " + model.name + " [" + model.dims + "]: " + model.call);
+      lines.push("");
+    }
+    if (bundle.images.length) {
+      lines.push("## Visual references (" + bundle.images.length + ")");
+      for (const image of bundle.images) lines.push("- " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
+      lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition.", "");
+    }
+    if (bundle.facts.length) {
+      lines.push("## Real-world context (Wikipedia)");
+      for (const fact of bundle.facts) lines.push("- **" + fact.title + "** — " + fact.extract + " (" + fact.url + ")");
+      lines.push("");
+    }
+    if (bundle.models.length) {
+      lines.push("## Free CC0 3D models that match (Poly Haven)");
+      for (const model of bundle.models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + (model.tags || []).join(", ") + ")");
+      lines.push("");
+    }
+    if (bundle.unavailable.length) lines.push("Note: some live sources were unavailable (" + bundle.unavailable.join("; ") + "); only verified parts are listed.", "");
+    lines.push("## Free asset libraries to search");
+    for (const link of bundle.links) lines.push("- " + link.label + " (" + link.kind + "; " + link.license + "): " + link.url);
+  } else {
+    const wiki = input.wiki || [], models = input.models || [], links = input.links || [];
+    if (input.note) lines.push(input.note, "");
+    if (wiki.length) {
+      lines.push("## Real-world and visual context (Wikipedia)");
+      for (const page of wiki) lines.push("- **" + page.title + "** — " + String(page.extract || "").replace(/\s+/g, " ").slice(0, 420) + " (" + page.url + ")");
+      lines.push("");
+    }
+    if (models.length) {
+      lines.push("## Free CC0 3D models that match (Poly Haven)");
+      for (const model of models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + model.tags.join(", ") + ")");
+      lines.push("");
+    }
+    lines.push("## Free asset libraries to search");
+    for (const link of links) lines.push("- " + link.label + " (" + link.kind + "; " + link.license + "): " + link.url);
   }
-  if (models.length) {
-    lines.push("## Free CC0 3D models that match (Poly Haven)");
-    for (const model of models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + model.tags.join(", ") + ")");
-    lines.push("");
-  }
-  lines.push("## Free asset libraries to search");
-  for (const link of links) lines.push("- " + link.label + " (" + link.kind + "; " + link.license + "): " + link.url);
-  lines.push("", "Builder guidance: the game runtime cannot download files. Use procedural drawing, saved SVG illustrations (assets/art/*.svg via GENE_ART) and Forge OBJ meshes; use the context above for accurate themes, silhouettes, palettes and naming, not for copying protected designs.");
-  return lines.join("\n").slice(0, 6500);
+  lines.push("", "Builder guidance: the game runtime cannot download files. Use procedural drawing, GeneModels, GeneAudio, saved SVG illustrations (assets/art/*.svg via GENE_ART) and Forge OBJ meshes; use the context above to make objects, palette, proportions and music accurate to the real subject.");
+  return lines.join("\n").slice(0, 8000);
 }

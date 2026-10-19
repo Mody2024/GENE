@@ -322,3 +322,52 @@ body { font-family: Inter, "DM Sans", system-ui, "Segoe UI", sans-serif;
 .gene-app.studio-v2 .composer .send-button:disabled { background: var(--studio-soft); color: var(--studio-faint); opacity: 1; }
 .gene-app.studio-v2 .composer-tools-menu-panel { border-radius: 12px; border: 1px solid var(--studio-line-strong); background: var(--studio-panel); }
 .gene-app.studio-v2 .reference-chip { border-radius: 99px; background: var(--studio-soft); border: 0; }
+
+/* ---- Research card, live run panel, change list ---- */
+.gene-app.studio-v2 .research-card { margin: 8px 0 4px; border: 1px solid var(--studio-line); border-radius: 12px; background: var(--studio-panel); font-size: 12px; overflow: hidden; }
+.gene-app.studio-v2 .research-card > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; min-width: 0; }
+.gene-app.studio-v2 .research-card > summary::-webkit-details-marker { display: none; }
+.gene-app.studio-v2 .rc-title { font-weight: 650; color: var(--studio-ink); }
+.gene-app.studio-v2 .rc-topic { flex: 1; min-width: 0; color: var(--studio-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gene-app.studio-v2 .rc-meta { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.gene-app.studio-v2 .rc-count, .gene-app.studio-v2 .rc-chip { font-size: 10.5px; padding: 1px 7px; border-radius: 99px; background: var(--studio-soft); color: var(--studio-muted); white-space: nowrap; }
+.gene-app.studio-v2 .research-card section { padding: 4px 12px 10px; border-top: 1px solid var(--studio-line); }
+.gene-app.studio-v2 .research-card h4 { margin: 8px 0 6px; font-size: 10.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--studio-faint); }
+.gene-app.studio-v2 .rc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gene-app.studio-v2 .rc-list p { margin: 2px 0 0; color: var(--studio-muted); line-height: 1.5; }
+.gene-app.studio-v2 .rc-list a { color: inherit; text-decoration: none; }
+.gene-app.studio-v2 .rc-list a:hover { text-decoration: underline; }
+.gene-app.studio-v2 .rc-dim { color: var(--studio-faint); font-size: 11px; }
+.gene-app.studio-v2 .rc-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--studio-muted); background: var(--studio-soft); padding: 4px 7px; border-radius: 6px; overflow-wrap: anywhere; }
+.gene-app.studio-v2 .rc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-top: 6px; }
+.gene-app.studio-v2 .rc-image { display: grid; gap: 2px; text-decoration: none; color: var(--studio-ink); min-width: 0; }
+.gene-app.studio-v2 .rc-image img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: var(--studio-soft); border: 1px solid var(--studio-line); }
+.gene-app.studio-v2 .rc-image span { font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gene-app.studio-v2 .rc-image small { font-size: 10px; color: var(--studio-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gene-app.studio-v2 .rc-track { display: grid; gap: 4px; margin-top: 8px; }
+.gene-app.studio-v2 .rc-track audio { width: 100%; height: 30px; }
+.gene-app.studio-v2 .rc-note, .gene-app.studio-v2 .rc-empty { margin: 0; padding: 8px 12px; color: var(--studio-faint); border-top: 1px solid var(--studio-line); }
+.gene-app.studio-v2 .rc-sent { padding: 7px 12px; border-top: 1px solid var(--studio-line); color: var(--studio-muted); font-size: 11px; background: var(--studio-raised); }
+
+.gene-app.studio-v2 .live-run { margin: 10px 0; padding: 12px 14px; border: 1px solid var(--studio-line); border-radius: 12px; background: var(--studio-panel); }
+.gene-app.studio-v2 .live-run-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+.gene-app.studio-v2 .live-run-head span { color: var(--studio-faint); font-variant-numeric: tabular-nums; }
+.gene-app.studio-v2 .live-run-ask { margin: 8px 0 10px; padding: 0 0 0 10px; border-left: 2px solid var(--studio-line-strong); color: var(--studio-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.gene-app.studio-v2 .live-run-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gene-app.studio-v2 .live-run-steps li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; align-items: start; font-size: 12px; }
+.gene-app.studio-v2 .live-run-steps small { display: block; color: var(--studio-faint); font-size: 11px; overflow-wrap: anywhere; }
+.gene-app.studio-v2 .lr-mark { text-align: center; color: var(--studio-faint); }
+.gene-app.studio-v2 .lr-done .lr-mark { color: var(--ok); }
+.gene-app.studio-v2 .lr-active .lr-mark { color: var(--studio-ink); animation: gene-pulse 1.1s ease-in-out infinite !important; }
+.gene-app.studio-v2 .lr-todo { opacity: .55; }
+@keyframes gene-pulse { 50% { opacity: .25; } }
+.gene-app.studio-v2 .real-progress-ask { margin: 2px 0 8px; color: var(--studio-muted); font-size: 12px; }
+
+.gene-app.studio-v2 .change-list { display: grid; gap: 2px; margin: 8px 0 2px; max-width: 460px; }
+.gene-app.studio-v2 .change-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--studio-raised); color: var(--studio-ink); font-size: 11.5px; text-align: left; cursor: pointer; }
+.gene-app.studio-v2 .change-row:hover { background: var(--studio-soft); }
+.gene-app.studio-v2 .change-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gene-app.studio-v2 .change-stat { white-space: nowrap; color: var(--studio-faint); font-variant-numeric: tabular-nums; }
+.gene-app.studio-v2 .change-stat b { color: var(--ok); font-weight: 600; }
+.gene-app.studio-v2 .change-stat i { color: var(--red); font-style: normal; }
+.gene-app.studio-v2 .live-run-log { margin-left: 10px; padding: 0; border: 0; background: transparent; color: var(--studio-muted); text-decoration: underline; font-size: 11px; cursor: pointer; }

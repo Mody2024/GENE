@@ -7,8 +7,11 @@ import { normalizeProjectFilePath, inspectProjectFilePaths } from "../apps/web/a
 import { orderRuntimeModulePaths } from "../apps/web/app/lib/runtime-module-order.mjs";
 import { classifyProviderFailure, describeProviderError, parseFreeCatalog, extractJsonObjectText } from "../apps/web/app/lib/provider-utils.mjs";
 import { sanitizeSvg } from "../apps/web/app/lib/svg-safety.mjs";
-import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes } from "../apps/web/app/lib/research-sources.mjs";
+import { cleanQuery, buildSearchLinks, filterPolyHaven, formatResearchNotes, parseWikipediaPages, parseCommonsFiles, polyHavenThumb, buildResearchBundle, matchEngineModels, musicSearchTerms } from "../apps/web/app/lib/research-sources.mjs";
 import { GENE_AUDIO_SOURCE, GENE_MODELS_SOURCE, buildRuntimeKitScript } from "../apps/web/app/lib/runtime-kit.mjs";
+import { diffLines, summarizeChanges, describeChanges } from "../apps/web/app/lib/diff-stats.mjs";
+import { GAME_KNOWLEDGE, matchGameKnowledge, musicStylesFor, formatBrain } from "../apps/web/app/lib/game-knowledge.mjs";
+import { classifyFailure, backoffMs, retryGuidance, repairTargetsFor } from "../apps/web/app/lib/error-recovery.mjs";
 import { validateCloudBuildReport } from "../apps/web/app/lib/cloud-build-report.mjs";
 
 // Provider routing: the exact error from the field must be treated as "unavailable", paid models never enter the pool.
@@ -109,6 +112,109 @@ for (const name of ["jump", "coin", "hit", "explosion", "win", "does-not-exist"]
 assert.doesNotThrow(() => { sandbox.GeneAudio.music.start("tense"); sandbox.GeneAudio.music.stop(); sandbox.GeneAudio.setMuted(true); });
 assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
 
+// Research bundle: real parsing of Wikipedia/Commons/Poly Haven responses into viewable, attributable references.
+{
+  const wikiData = { query: { pages: {
+    "2": { pageid: 2, title: "Subway Surfers", index: 2, extract: "Subway Surfers is an endless runner mobile game.", fullurl: "https://en.wikipedia.org/wiki/Subway_Surfers", thumbnail: { source: "https://upload.wikimedia.org/wikipedia/en/thumb/a/a.jpg/480px-a.jpg" } },
+    "1": { pageid: 1, title: "Endless runner", index: 1, extract: "Endless running is a subgenre of platform game.", thumbnail: { source: "http://insecure.example/x.jpg" } },
+    "3": { pageid: 3, title: "Empty", index: 3, extract: "   " }
+  } } };
+  const wiki = parseWikipediaPages(wikiData);
+  assert.deepEqual(wiki.map(page => page.title), ["Endless runner", "Subway Surfers"], "wikipedia pages keep relevance order and drop empty extracts");
+  assert.equal(wiki[0].thumb, undefined, "non-https thumbnails are never used");
+  assert.ok(wiki[1].url.startsWith("https://en.wikipedia.org/"));
+  const commonsImages = { query: { pages: {
+    "10": { pageid: 10, title: "File:Metro train.jpg", index: 1, imageinfo: [{ thumburl: "https://upload.wikimedia.org/t/480px-Metro_train.jpg", url: "https://upload.wikimedia.org/Metro_train.jpg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Metro_train.jpg", mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "<a href=\"//x\">Jane &amp; Co</a>" } } }] },
+    "11": { pageid: 11, title: "File:No licence.png", index: 2, imageinfo: [{ url: "https://upload.wikimedia.org/n.png", mime: "image/png", extmetadata: {} }] },
+    "12": { pageid: 12, title: "File:Doc.pdf", index: 3, imageinfo: [{ url: "https://upload.wikimedia.org/d.pdf", mime: "application/pdf", extmetadata: { LicenseShortName: { value: "CC0" } } }] }
+  } } };
+  const imgs = parseCommonsFiles(commonsImages, "image");
+  assert.equal(imgs.length, 1, "files without a stated licence or with a non-image type are dropped");
+  assert.equal(imgs[0].license, "CC BY-SA 4.0"); assert.equal(imgs[0].credit, "Jane & Co"); assert.ok(imgs[0].thumb.includes("480px"));
+  const commonsAudio = { query: { pages: { "20": { pageid: 20, title: "File:Chiptune loop.ogg", imageinfo: [{ url: "https://upload.wikimedia.org/c.ogg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Chiptune_loop.ogg", mime: "application/ogg", extmetadata: { LicenseShortName: { value: "CC0" }, Artist: { value: "Someone" } } }] } } } };
+  const audio = parseCommonsFiles(commonsAudio, "audio");
+  assert.equal(audio.length, 1); assert.equal(audio[0].title, "Chiptune loop"); assert.ok(audio[0].url.endsWith(".ogg"));
+  assert.ok(polyHavenThumb("wooden_crate_01").startsWith("https://cdn.polyhaven.com/asset_img/thumbs/wooden_crate_01.png"));
+  const bundle = buildResearchBundle({ topic: "subway surfers style 3d runner with trains and coins", wiki, commonsImages: imgs, commonsAudio: audio, models: [{ id: "train_01", name: "Train", tags: ["train"], url: "https://polyhaven.com/a/train_01", license: "CC0" }], links: buildSearchLinks("subway") });
+  assert.ok(bundle.images.length === 2 && bundle.images.every(image => image.thumb.startsWith("https://") && image.license && image.page), "every image has a source page, licence and https thumbnail");
+  assert.ok(bundle.games[0].title.includes("3D lane runner"), "matched real reference games are attached");
+  assert.ok(bundle.music.styles[0].mood === "action" && bundle.music.tracks.length === 1 && bundle.music.links.length >= 2, "music styles, a real playable track and library links are attached");
+  assert.ok(bundle.engineModels.some(model => /train/i.test(model.name)) && bundle.engineModels.some(model => /coin/i.test(model.name)), "built-in models that fit the topic are suggested");
+  assert.ok(bundle.models[0].thumb.includes("train_01"));
+  const notes = formatResearchNotes(bundle);
+  assert.ok(notes.indexOf("Games like this") < notes.indexOf("Real-world context") && notes.includes("Music direction") && notes.includes("Visual references") && notes.includes("Reference track"), "notes lead with builder guidance and list images, music and tracks");
+  assert.ok(notes.length <= 8000);
+  assert.ok(matchEngineModels("a car racing game").some(model => /car/i.test(model.name)));
+  assert.deepEqual(musicSearchTerms("a mario platformer"), ["chiptune"]);
+  assert.equal(cleanQuery("من سيربح المليون"), "من سيربح المليون", "Arabic queries survive cleaning");
+}
+
+// Central error recovery: every failure class gets the right retry/auto-fix decision and repair target.
+{
+  const kind = (message, code, status) => classifyFailure(message, code, status).kind;
+  assert.equal(kind("Build rejected: architecture module src/systems/renderer.js is missing from the assembled project.", "GENE_VALIDATION_FAILED"), "validation");
+  assert.equal(classifyFailure("Build rejected: x", "GENE_VALIDATION_FAILED").autoFix, true, "validation failures are fixed automatically");
+  assert.equal(kind("The staged project did not pass final validation: Build rejected: audio", "GENE_STAGED_BUILD_VALIDATION_FAILED"), "validation");
+  assert.equal(kind("anything", "OPENROUTER_RATE_LIMITED"), "rate-limit");
+  assert.equal(kind("Failed to fetch"), "network");
+  assert.equal(kind("The request timed out", "GEMINI_TIMEOUT"), "timeout");
+  assert.equal(kind("x", "GEMINI_OUTPUT_TRUNCATED"), "bad-output");
+  assert.equal(kind("x", "GEMINI_KEY_REJECTED"), "config");
+  assert.equal(classifyFailure("x", "GEMINI_KEY_REJECTED").retryable, false, "a rejected key is never retried blindly");
+  assert.equal(kind("ReferenceError: score is not defined"), "runtime");
+  assert.equal(kind("weird", "", 503), "provider-busy");
+  assert.equal(kind("weird", "", 200), "unknown");
+  assert.ok(backoffMs("rate-limit", 2) > backoffMs("network", 2) && backoffMs("network", 3) > backoffMs("network", 1), "backoff grows and rate limits wait longest");
+  assert.ok(retryGuidance("validation", "Build rejected: no canvas", 2).includes("Build rejected: no canvas"), "the retry tells the model exactly why it failed");
+  assert.deepEqual(repairTargetsFor("Build rejected: game audio is missing", ["game.js"]), ["game.js", "game-spec.json"]);
+  assert.deepEqual(repairTargetsFor("src/systems/renderer.js is missing", ["game.js", "src/systems/renderer.js"]), ["src/systems/renderer.js"], "a named stage file is repaired directly");
+  assert.deepEqual(repairTargetsFor("game.html must include a canvas", []), ["game.html"]);
+  assert.deepEqual(repairTargetsFor("something odd", []), ["game.js"]);
+}
+
+// GENE brain: every entry is complete, uses real GeneAudio moods/GeneModels calls, and requests match the right genre.
+{
+  const moods = new Set(["calm", "mystery", "tense", "action", "triumph", "sad"]);
+  const knownCalls = /GeneModels\.(?:drawCharacter|drawEnemy|drawBlock|drawCoin|drawGem|drawHeart|drawTree|drawBackdrop|drawShip|drawCar|drawTrainCar|props3D|rig3D|mesh)/;
+  assert.ok(GAME_KNOWLEDGE.length >= 24, "brain covers a broad set of game genres");
+  const ids = new Set();
+  for (const entry of GAME_KNOWLEDGE) {
+    assert.ok(!ids.has(entry.id), "unique id " + entry.id); ids.add(entry.id);
+    assert.ok(entry.examples.length >= 2 && entry.mechanics.length >= 4 && entry.feel.length >= 3 && entry.pitfalls.length >= 2 && entry.sfx.length >= 3, entry.id + " is fully described");
+    assert.ok(moods.has(entry.music.mood) && entry.music.bpm >= 60 && entry.music.bpm <= 180, entry.id + " maps to a real GeneAudio mood and sane BPM");
+    assert.doesNotThrow(() => new RegExp(entry.pattern, "i"), entry.id + " pattern compiles");
+    if (/GeneModels/.test(entry.models)) assert.ok(knownCalls.test(entry.models), entry.id + " only names GeneModels calls that exist");
+  }
+  const top = text => matchGameKnowledge(text, 1)[0]?.id;
+  assert.equal(top("make a mario style platformer"), "platformer");
+  assert.equal(top("a subway surfers like 3d runner with trains"), "runner3d");
+  assert.equal(top("who wants to be a millionaire quiz game"), "quiz");
+  assert.equal(top("لعبة من سيربح المليون"), "quiz", "Arabic quiz requests are recognised");
+  assert.equal(top("vampire survivors style horde game"), "arena-shooter");
+  assert.equal(top("tetris clone"), "block-puzzle");
+  assert.equal(top("a space invaders shooter"), "space-shooter");
+  assert.deepEqual(matchGameKnowledge("hello there"), [], "no genre is invented for unrelated text");
+  assert.equal(musicStylesFor("mario platformer")[0].mood, "action");
+  const brain = formatBrain("a subway surfers style game");
+  assert.ok(brain.includes("GENE BRAIN") && brain.includes("Subway Surfers") && brain.includes("GeneModels") && brain.length <= 5200, "brain block is compact and concrete");
+}
+
+// Real edit summaries: exact line diffs, added/removed/modified detection and a readable one-line description.
+{
+  assert.deepEqual(diffLines("a\nb\nc", "a\nb\nc"), { added: 0, removed: 0 });
+  assert.deepEqual(diffLines("a\nb\nc", "a\nX\nc"), { added: 1, removed: 1 });
+  assert.deepEqual(diffLines("", "x\ny"), { added: 2, removed: 0 });
+  assert.deepEqual(diffLines("a\n", "a\nb\n"), { added: 1, removed: 0 }, "a trailing newline is not an extra line");
+  assert.deepEqual(diffLines("x\ny", ""), { added: 0, removed: 2 });
+  assert.deepEqual(diffLines("1\n2\n3\n4", "2\n3\n4\n5"), { added: 1, removed: 1 });
+  const changes = summarizeChanges({ "game.js": "a\nb", "old.js": "z", "same.css": "q" }, { "game.js": "a\nb\nc\nd", "new.js": "n", "same.css": "q" });
+  assert.deepEqual(changes.map(change => [change.path, change.status, change.added, change.removed]), [["game.js", "modified", 2, 0], ["new.js", "added", 1, 0], ["old.js", "removed", 0, 1]]);
+  assert.equal(describeChanges(changes), "game.js +2 −0 · new.js +1 −0 · old.js removed");
+  assert.deepEqual(summarizeChanges({ "a.js": "1" }, { "a.js": "2", "b.js": "x" }, ["a.js"]).map(change => change.path), ["a.js"], "report can be limited to the files a request touched");
+  const big = Array.from({ length: 3000 }, (_, index) => "line " + index).join("\n");
+  assert.equal(diffLines(big, big.replace("line 1500", "changed")).added, 1, "large files still produce a sound diff");
+}
+
 // GeneModels: animated 2D models + rigged low-poly 3D models must be valid, finite and always safe to call.
 {
   const calls = [];
@@ -123,6 +229,7 @@ assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
   for (const kind of ["brick", "question", "ground"]) assert.equal(GM.drawBlock(ctx, 0, 0, 32, kind, 1), true);
   for (const theme of ["day", "dusk", "night", "city"]) assert.equal(GM.drawBackdrop(ctx, 640, 360, 2, theme), true);
   assert.equal(GM.drawCoin(ctx, 10, 10, 10, 0.5), true);
+  assert.equal(GM.drawShip(ctx, 5, 5, 48, { t: 1 }), true); assert.equal(GM.drawCar(ctx, 5, 5, 90, { t: 1 }), true); assert.equal(GM.drawTree(ctx, 5, 5, 80, 1), true); assert.equal(GM.drawGem(ctx, 5, 5, 12, 1), true); assert.equal(GM.drawHeart(ctx, 5, 5, 20, 1), true);
   assert.equal(GM.drawTrainCar(ctx, 0, 0, 120, 70, 1, "#2e86de"), true);
   assert.ok(calls.length > 100, "2D models issue real draw calls");
   const rig = GM.rig3D.character("hero");
@@ -135,7 +242,7 @@ assert.ok(buildRuntimeKitScript().includes("GeneAudio"));
   for (const state of ["idle", "walk", "run", "jump", "fall", "slide", "hit"]) checkMesh(GM.bake(rig, state, 0.9, GM.mat4.translate(1, 0, -3)), "baked " + state);
   const runA = GM.bake(rig, "run", 0.0), runB = GM.bake(rig, "run", 0.13);
   assert.ok(Array.from(runA.positions).some((value, index) => Math.abs(value - runB.positions[index]) > 0.01), "run animation actually moves the limbs over time");
-  for (const prop of ["train", "coin", "barrier", "crate", "tree"]) checkMesh(GM.props3D[prop](), "prop " + prop);
+  for (const prop of ["train", "coin", "barrier", "crate", "tree", "car", "ship"]) checkMesh(GM.props3D[prop](), "prop " + prop);
   assert.ok(buildRuntimeKitScript().includes("GeneModels") && buildRuntimeKitScript().includes("GeneAudio"), "runtime bootstrap injects both kits");
 }
 
@@ -274,12 +381,12 @@ const researchRouteSource = readFileSync(new URL("../apps/web/app/api/research/r
 assert.ok(modelingPromptSource.includes("GENE PRO-GAME QUALITY BAR"), "game build prompts enforce a production-quality vertical-slice bar");
 assert.ok(modelingPromptSource.includes("GAMEPLAY FIRST") && modelingPromptSource.includes("PRO ART DIRECTION"), "game prompts prioritize playable mechanics and cohesive art direction");
 assert.ok(modelingPromptSource.includes("ENGINE INTEGRITY") && modelingPromptSource.includes("QA BEFORE RETURN"), "game prompts require engine-specific implementation and a boot-to-ending audit");
-assert.ok(researchRouteSource.includes("Promise.all([wikipedia(wikiQuery), polyHavenCatalog()])"), "game research fetches the real Poly Haven asset catalogue rather than skipping 3D assets");
+assert.ok(researchRouteSource.includes("polyHavenCatalog()") && researchRouteSource.includes("api.polyhaven.com/assets?t=models"), "game research fetches the real Poly Haven asset catalogue rather than skipping 3D assets");
 assert.ok(modelingPromptSource.includes("REAL 3D MODEL PIPELINE") && modelingPromptSource.includes("modelRequests") && modelingPromptSource.includes("GENE3D.parseOBJ"), "3D builds explicitly request real Forge meshes and wire OBJ/MTL geometry into the renderer");
 assert.ok(modelingPromptSource.includes("DETAILED EDIT PRESERVATION") && modelingPromptSource.includes("SELF-REPAIR AND TASK DECOMPOSITION"), "detailed changes preserve unrelated systems and large failures have a module-splitting recovery contract");
 assert.ok(themePage.includes("shouldSplitLongGameTask") && themePage.includes("gameplay-core.js") && themePage.includes("gameplay-ui.js"), "truncated game.js output automatically splits into two dependency-aware modules and retries integration");
 assert.ok(themePage.includes("genreArchitectures") && ["src/world/exploration.js", "src/systems/runner-movement.js", "src/world/voxel-system.js", "src/world/grid-map.js", "src/player/platformer-controller.js", "src/systems/weapons.js", "src/vehicle/vehicle-controller.js", "src/systems/puzzle-state.js"].every(path => themePage.includes(path)), "staged game builder maps distinct genres to purpose-built system hierarchies rather than one universal template");
 assert.ok(themePage.includes("architecture.modules must list each planned file") && themePage.includes("architecture.dataFlow") && themePage.includes("fail visibly rather than silently skipping mechanics") && themePage.includes("Do not access another module's private state directly"), "game generation requires explicit architecture, data flow, dependency order and real module API integration");
-assert.ok(themePage.includes("Attached real research before generation") && themePage.includes('spec.modelingStatus = generatedModels.length ? "forge-generated-obj-mtl"'), "research is awaited before a build and actual Forge asset generation is recorded honestly");
+assert.ok((themePage.includes("needsResearch") && themePage.includes("await runFetch(\"/api/research\"") && themePage.includes("Attached research to your message")) && themePage.includes('spec.modelingStatus = generatedModels.length ? "forge-generated-obj-mtl"'), "research is awaited before a build and actual Forge asset generation is recorded honestly");
 assert.ok(themePage.includes("hasSource && asksForChange") && themePage.includes('operation = "edit"'), "specific changes typed in Chat are routed to source edits for existing projects");
 assert.ok(themePage.includes("skip (?:the )?interview") && themePage.includes('operation = "interview"'), "new builds start the interview unless the user explicitly opts out");
