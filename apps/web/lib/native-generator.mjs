@@ -103,6 +103,17 @@ function htmlShell(title, engine, prompt = "") {
   else if (/fantasy map|illustrated panels/.test(menuChoice)) { profile.menu = "THE CHRONICLES"; profile.subtitle = "Your legend begins on this map."; profile.cta = "Begin your journey"; }
   else if (/racing garage/.test(menuChoice)) { profile.menu = "GARAGE / RACE CONTROL"; profile.subtitle = "Tune in. Line up. Go."; profile.cta = "Start race"; }
   else if (/cinematic title screen/.test(menuChoice)) { profile.menu = "A STORY ONLY YOU CAN ENTER"; profile.subtitle = "The first choice changes everything."; profile.cta = "Begin"; }
+  const menuMarkup = profile.id === "cinematic" || profile.id === "noir"
+    ? `<div class="overlay-card menu-case"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">FIELD NOTES · EVIDENCE · UNKNOWN</p><div class="menu-meta"><span>FILE STATUS</span><strong>UNRESOLVED</strong></div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "velocity" || profile.id === "arcade"
+    ? `<div class="overlay-card menu-arcade"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><div class="menu-score"><span>BEST RUN</span><strong>000120</strong><span>READY</span></div><p id="overlay-copy">Every run is another chance to beat your record.</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "storybook"
+    ? `<div class="overlay-card menu-story"><p class="eyebrow">CHAPTER I · ${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">A new page is waiting to be written.</p><div class="menu-divider">✦ ───── ✦ ───── ✦</div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "cosmic"
+    ? `<div class="overlay-card menu-mission"><p class="eyebrow">MISSION BRIEFING / 01</p><h2 id="overlay-title">${esc(profile.menu)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><div class="menu-meta"><span>STATUS</span><strong>AWAITING PILOT</strong></div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "wild"
+    ? `<div class="overlay-card menu-explore"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">No fixed route. Follow what catches your eye.</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : `${menuMarkup}`;
   return `<!doctype html>
 <html lang="en">
 <head>
