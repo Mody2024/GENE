@@ -2743,7 +2743,7 @@ export default function Home() {
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools">
                     <button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button>
-                    <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="Native: no external AI; Fast: quickest provider mode; Thinking: balanced; GENE BH: strongest provider mode." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
+                    <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning. Native: no external AI calls." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
                       <option value="native">Gene Native · no external AI</option><option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
                     <span className="key-hint">Enter · Shift+Enter for a new line</span>
