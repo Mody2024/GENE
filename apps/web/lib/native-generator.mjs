@@ -26,25 +26,16 @@ function esc(value) {
   return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 }
 function nativeInterviewQuestion(kind, answers, prompt) {
-  const app = kind === "app";
-  const questions = app ? [
-    { id: "native-users", text: "Who is this app primarily for?", why: "This changes the default workflow, terminology, and accessibility choices.", choices: ["Just me / personal use", "A small team", "Customers or the public", "Students / learning"], recommended: "Just me / personal use" },
-    { id: "native-core-loop", text: "What is the single most important thing users should accomplish?", why: "Gene will prioritize this path before adding secondary screens.", choices: ["Create and organize things", "Track progress or habits", "Discover and browse content", "Communicate or collaborate", "Learn or practice", "Manage a workflow"], recommended: "Create and organize things" },
-    { id: "native-visual-style", text: "What visual direction should the interface use?", why: "The design system controls color, spacing, hierarchy, and component style.", choices: ["Clean light and minimal", "Warm editorial", "Dark professional", "Playful and colorful", "Retro hardware"], recommended: "Clean light and minimal" },
-    { id: "native-data", text: "How should the first version save data?", why: "This sets a clear persistence boundary without requiring paid services.", choices: ["On this device only", "Export/import files", "Prepare for a future shared backend"], recommended: "On this device only" }
-  ] : [
-    { id: "native-core-loop", text: "What should the player do most of the time?", why: "The core loop determines mechanics, level design, feedback, and the tests Gene should run.", choices: ["Explore and discover", "Fight and survive", "Platform and jump", "Solve mysteries or puzzles", "Race, drive, or run", "Build, manage, or simulate"], recommended: /horror|mystery|psychological/i.test(prompt) ? "Solve mysteries or puzzles" : /platform/i.test(prompt) ? "Platform and jump" : "Explore and discover" },
-    { id: "native-perspective", text: "How should the player see and control the world?", why: "Perspective changes camera behavior, movement, input design, and the visual workload.", choices: ["2D side view", "2D top-down", "3D third-person", "3D first-person", "Isometric"], recommended: /2d|platform|pixel/i.test(prompt) ? "2D side view" : /first.person|fps/i.test(prompt) ? "3D first-person" : /3d|open.world/i.test(prompt) ? "3D third-person" : "2D side view" },
-    { id: "native-visual-style", text: "Which art direction should define the game?", why: "Gene will use this to guide palette, silhouettes, UI, and environment treatment.", choices: ["Polished stylized 3D", "Low-poly atmospheric", "Pixel art", "Hand-painted storybook", "Dark cinematic horror", "Clean geometric"], recommended: /horror|psychological|disturbing/i.test(prompt) ? "Dark cinematic horror" : /low.poly/i.test(prompt) ? "Low-poly atmospheric" : /pixel/i.test(prompt) ? "Pixel art" : "Polished stylized 3D" },
-    { id: "native-menu", text: "What should the title screen and menus feel like?", why: "Menus should belong to this specific game's world and genre, not reuse the same generic start screen.", choices: ["Cinematic title screen with story atmosphere", "Diegetic case file / journal", "Arcade cabinet with bold score panels", "Minimal elegant pause menu", "Fantasy map and illustrated panels", "High-speed racing garage"], recommended: /horror|psychological|mystery/i.test(prompt) ? "Diegetic case file / journal" : /race|driv|speed/i.test(prompt) ? "High-speed racing garage" : /fantasy|magic|dragon/i.test(prompt) ? "Fantasy map and illustrated panels" : /arcade|platform|runner/i.test(prompt) ? "Arcade cabinet with bold score panels" : "Cinematic title screen with story atmosphere" },
-    { id: "native-progression", text: "What should give the game a satisfying sense of progression?", why: "A clear progression system makes the game feel intentional instead of like a short mechanics demo.", choices: ["Three handcrafted stages", "Explore one larger world", "Story chapters and clues", "Increasing challenge and upgrades", "Short replayable runs"], recommended: /story|mystery|horror/i.test(prompt) ? "Story chapters and clues" : "Three handcrafted stages" },
-    { id: "native-audio", text: "What audio direction should Gene build into the game?", why: "The native audio system can synthesize original music and effects locally, without paid APIs or copied tracks.", choices: ["Atmospheric procedural soundtrack", "Energetic arcade music", "Creepy ambient soundscape", "Minimal sound effects only", "Silent by default"], recommended: /horror|mystery|psychological/i.test(prompt) ? "Creepy ambient soundscape" : "Atmospheric procedural soundtrack" }
-  ];
-  const next = questions.find(question => !text(answers[question.id], 400));
-  if (!next) return null;
-  return { ...next, step: questions.indexOf(next) + 1, total: questions.length, multi: false };
+  const p=String(prompt||"").toLowerCase();
+  if(kind==="app"){
+    if(/\b(task manager|habit tracker|budget|notes app|calendar|study planner|dashboard|todo|to-do|inventory manager)\b/.test(p)||text(answers["native-core-loop"],400))return null;
+    return {id:"native-core-loop",text:"What is the one thing this app must help you do first?",why:"This decides the first working screen. I will infer other details and you can revise them later.",choices:["Create and organize information","Track progress or habits","Learn or practice","Manage a workflow"],recommended:"Create and organize information",step:1,total:1,multi:false};
+  }
+  const mechanics=/\b(platformer|platform game|jump|double jump|dash|combat|fight|shoot|stealth|puzzle|mystery|detective|racing|driving|runner|survival|tower defense|strategy|farming|building|crafting|exploration|metroidvania|roguelike|rhythm|shooter)\b/.test(p);
+  const genre=/\b(horror|psychological|mystery|detective|platformer|platform game|racing|runner|arcade|puzzle|survival|adventure|metroidvania|roguelike|rhythm|strategy|simulation|farming|rpg|shooter)\b/.test(p);
+  if((!mechanics&&!genre)&&!text(answers["native-core-loop"],400))return {id:"native-core-loop",text:"What should the player mainly do in this game?",why:"This changes the mechanics, level layout and win condition. I will infer the rest instead of asking unrelated questions.",choices:["Platforming and precise jumps","Combat and enemy encounters","Exploration and secrets","Puzzles and mystery","Racing or time trials","Building or simulation"],recommended:"Platforming and precise jumps",step:1,total:1,multi:false};
+  return null;
 }
-
 function visualProfile(prompt, engine) {
   const p = String(prompt || "").toLowerCase();
   if (engine === "webapp") {
