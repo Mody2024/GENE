@@ -343,3 +343,18 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .notice-details[open] summary{display:block;margin-top:4px}
 .notice-details p{margin:6px 0 0;padding:8px 10px;max-height:140px;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 @media (max-width:640px){.notice{padding:8px 12px;flex-wrap:wrap}}
+
+/* Choice previews make interview decisions visual and immediately comparable. */
+.g3-choice-preview{display:flex;align-items:flex-end;gap:4px;width:100%;height:42px;padding:7px 8px;border:1px solid color-mix(in srgb,var(--border-strong) 65%,transparent);border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#edf2f5,#dce5eb)}
+.g3-choice-preview i{display:block;flex:1;height:45%;border-radius:3px;background:#7f9ba8;opacity:.9}.g3-choice-preview i:nth-child(2){height:75%}.g3-choice-preview i:nth-child(3){height:58%}
+.g3-choice-preview.preview-noir{background:radial-gradient(circle at 70% 30%,#633a4c,#1b1720 70%)}.preview-noir i{background:#c87984}
+.g3-choice-preview.preview-arcade{background:linear-gradient(135deg,#0e222b,#17635f)}.preview-arcade i{background:#69e2cf;box-shadow:0 0 8px #69e2cf55}
+.g3-choice-preview.preview-fantasy{background:linear-gradient(135deg,#352617,#8b6a3a)}.preview-fantasy i{background:#e9bd69}
+.g3-choice-preview.preview-racing{background:linear-gradient(135deg,#111d31,#304c6d)}.preview-racing i{background:#ffb547}
+.g3-choice-preview.preview-cosmic{background:radial-gradient(circle at 65% 30%,#304a88,#0c1429 75%)}.preview-cosmic i{background:#9dc4ff}
+.g3-choice-preview.preview-playful{background:linear-gradient(135deg,#fff0df,#ffd0c1)}.preview-playful i{background:#ff9d75}
+.g3-choice-preview.preview-retro{background:linear-gradient(135deg,#20251b,#465337)}.preview-retro i{background:#c8f36a}
+.g3-choice-preview.preview-clean{background:linear-gradient(135deg,#fff,#e5ecf4)}.preview-clean i{background:#2f6fed}
+.g3-choice-preview.preview-nature{background:linear-gradient(135deg,#0f3934,#6ba58a)}.preview-nature i{background:#84d7ad}
+.g3-choice-preview.preview-default{background:linear-gradient(135deg,#263744,#536e80)}.preview-default i{background:#b8e3d0}
+.studio-v2 .g3-choice-preview{height:32px;border-radius:6px;padding:5px 6px}.studio-v2 .g3-choice{gap:7px}
