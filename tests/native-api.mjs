@@ -28,6 +28,7 @@ assert.equal(payload.ok, true);
 assert.equal(payload.aiMode, "native", "native mode must select the provider-free route");
 assert.equal(payload.model, "Gene Native (deterministic)");
 assert.equal(payload.result.nativeGeneration.externalAiUsed, false);
-assert.equal(payload.result.files.length, 4);
+assert.ok(payload.result.files.length >= 4, "native 2D builds can include task-specific source modules");
+assert.ok(payload.result.files.some(file => file.path === "src/systems/progression.js"), "native 2D build should include its persistent progression system");
 assert.ok(payload.result.files.some(file => file.path === "game.js"));
 console.log("native-api: /api/agent generated a project in explicit native mode without invoking provider routing");
