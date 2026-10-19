@@ -7,7 +7,7 @@ for (const [prompt, engine] of [
   ["A 3D low-poly exploration game", "webgl3d"],
   ["A task manager web app", "webapp"]
 ]) {
-  const result = createNativeResult({
+  const result = await createNativeResult({
     operation: "build",
     mode: "build",
     message: prompt,
@@ -35,7 +35,7 @@ for (const [prompt, engine] of [
     assert.match(files["game.js"], /localStorage/);
   }
 }
-const research = createNativeResult({ operation: "research", message: "webgl collision detection" });
+const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.searchedLiveWeb, false);
 assert.ok(research.research.searches.some(item => item.url.includes("github.com/search")));
 console.log("native-generator: generated JS parses for 2D, 3D, and web-app targets; references are labeled honestly");
