@@ -12,7 +12,7 @@ try {
   const files = Object.fromEntries(game.files.map(file => [file.path, file.content]));
   const gameHtml = files["game.html"]
     .replace('<link rel="stylesheet" href="game.css">', "<style>" + files["game.css"] + "</style>")
-    .replace(/<script src="([^"]+)"><\\/script>/g, (_match, path) => { assert.ok(files[path], "generated HTML references missing file " + path); return "<script>" + files[path] + "</script>"; });
+    .replace(/<script src="([^"]+)"><\/script>/g, (_match, path) => { assert.ok(files[path], "generated HTML references missing file " + path); return "<script>" + files[path] + "</script>"; });
   const runtimeErrors = [];
   page.on("pageerror", error => runtimeErrors.push(error.message));
   await page.setContent(gameHtml, { waitUntil: "load" });
@@ -38,7 +38,7 @@ try {
   const threeDFiles = Object.fromEntries(threeD.files.map(file => [file.path, file.content]));
   const threeDHtml = threeDFiles["game.html"]
     .replace('<link rel="stylesheet" href="game.css">', "<style>" + threeDFiles["game.css"] + "</style>")
-    .replace(/<script src="([^"]+)"><\\/script>/g, (_match, path) => { assert.ok(threeDFiles[path], "generated 3D HTML references missing file " + path); return "<script>" + threeDFiles[path] + "</script>"; });
+    .replace(/<script src="([^"]+)"><\/script>/g, (_match, path) => { assert.ok(threeDFiles[path], "generated 3D HTML references missing file " + path); return "<script>" + threeDFiles[path] + "</script>"; });
   await page.setContent(threeDHtml, { waitUntil: "load" });
   assert.equal(await page.evaluate(() => Boolean(document.getElementById("game-canvas").getContext("webgl"))), true, "3D target must initialize WebGL");
   await page.getByRole("button", { name: "Start game" }).click();
@@ -58,7 +58,7 @@ try {
   const appFiles = Object.fromEntries(app.files.map(file => [file.path, file.content]));
   const appHtml = appFiles["game.html"]
     .replace('<link rel="stylesheet" href="game.css">', "<style>" + appFiles["game.css"] + "</style>")
-    .replace(/<script src="([^"]+)"><\\/script>/g, (_match, path) => { assert.ok(appFiles[path], "generated app HTML references missing file " + path); return "<script>" + appFiles[path] + "</script>"; });
+    .replace(/<script src="([^"]+)"><\/script>/g, (_match, path) => { assert.ok(appFiles[path], "generated app HTML references missing file " + path); return "<script>" + appFiles[path] + "</script>"; });
   await page.route("http://gene.test/**", route => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: appHtml }));
   await page.goto("http://gene.test/app");
   await page.locator("#task-input").fill("Check native game quality");
