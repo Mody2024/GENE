@@ -50,6 +50,34 @@ for (const engine of ["canvas2d", "webgl3d"]) {
   assert.ok(expandedJs.includes('"STAGE "+stage+"/3"') || expandedJs.includes('"STAGE 1/3"'), "full-game mode should add staged progression");
   assert.equal(expanded.nativeGeneration.externalAiUsed, false);
 }
+const interviewProject = { kind: "game", name: "Psychological Mystery", initialPrompt: "A psychological horror game with disturbing mysteries" };
+const interviewAnswers = {
+  "native-core-loop": "Solve mysteries or puzzles",
+  "native-perspective": "3D third-person",
+  "native-visual-style": "Dark cinematic horror",
+  "native-progression": "Story chapters and clues",
+  "native-audio": "Creepy ambient soundscape"
+};
+const firstQuestion = await createNativeResult({ operation: "interview", message: interviewProject.initialPrompt, project: interviewProject, answers: {} });
+assert.equal(firstQuestion.question.id, "native-core-loop");
+assert.equal(firstQuestion.question.total, 5);
+const secondQuestion = await createNativeResult({ operation: "interview", message: "Solve mysteries or puzzles", project: interviewProject, answers: { "native-core-loop": "Solve mysteries or puzzles" } });
+assert.equal(secondQuestion.question.id, "native-perspective");
+const completedInterview = await createNativeResult({ operation: "interview", message: "Creepy ambient soundscape", project: interviewProject, answers: interviewAnswers });
+assert.equal(completedInterview.question, null);
+assert.equal(completedInterview.plan.engine, "webgl3d");
+assert.match(completedInterview.plan.summary, /psychological horror game/i);
+assert.match(completedInterview.plan.summary, /Creepy ambient soundscape/i);
+for (const engine of ["canvas2d", "webgl3d"]) {
+  const audioBuild = await createNativeResult({
+    operation: "build",
+    message: "A game with original procedural ambient music and effects",
+    project: { kind: "game", preferredEngine: engine, name: "Audio check", initialPrompt: "A game with original procedural ambient music and effects" }
+  });
+  const js = audioBuild.files.find(file => file.path === "game.js").content;
+  assert.match(js, /function musicStart\(\)/);
+  assert.match(js, /function musicStop\(\)/);
+}
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
