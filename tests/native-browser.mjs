@@ -24,7 +24,7 @@ try {
   await page.keyboard.up("ArrowRight");
   await page.keyboard.press("p");
   assert.equal(await page.locator("#status").textContent(), "PAUSED");
-  await page.getByRole("button", { name: "Pause" }).click();
+  await page.getByRole("button", { name: "Resume" }).click();
   assert.equal(await page.locator("#status").textContent(), "PLAYING");
   await page.getByRole("button", { name: "Restart" }).click();
   assert.equal(await page.locator("#status").textContent(), "PLAYING");
@@ -39,8 +39,8 @@ try {
   const appHtml = appFiles["game.html"]
     .replace('<link rel="stylesheet" href="game.css">', "<style>" + appFiles["game.css"] + "</style>")
     .replace('<script src="game.js"></script>', "<script>" + appFiles["game.js"] + "</script>");
-  await page.goto("about:blank");
-  await page.setContent(appHtml, { waitUntil: "load" });
+  await page.route("http://gene.test/**", route => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: appHtml }));
+  await page.goto("http://gene.test/app");
   await page.locator("#task-input").fill("Check native game quality");
   await page.getByRole("button", { name: "Add item" }).click();
   await page.getByText("Check native game quality").waitFor();
