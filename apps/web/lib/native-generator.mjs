@@ -97,6 +97,12 @@ function projectSpec(title, engine, prompt) {
 }
 function htmlShell(title, engine, prompt = "") {
   const profile = visualProfile(prompt, engine);
+  const menuChoice = String(prompt || "").toLowerCase();
+  if (/diegetic case file|journal/.test(menuChoice)) { profile.menu = "CASE FILE / 001"; profile.subtitle = "Every detail is evidence."; profile.cta = "Open the case"; }
+  else if (/arcade cabinet|bold score panels/.test(menuChoice)) { profile.menu = "INSERT COIN / PRESS START"; profile.subtitle = "Beat the record. Change the board."; profile.cta = "Play now"; }
+  else if (/fantasy map|illustrated panels/.test(menuChoice)) { profile.menu = "THE CHRONICLES"; profile.subtitle = "Your legend begins on this map."; profile.cta = "Begin your journey"; }
+  else if (/racing garage/.test(menuChoice)) { profile.menu = "GARAGE / RACE CONTROL"; profile.subtitle = "Tune in. Line up. Go."; profile.cta = "Start race"; }
+  else if (/cinematic title screen/.test(menuChoice)) { profile.menu = "A STORY ONLY YOU CAN ENTER"; profile.subtitle = "The first choice changes everything."; profile.cta = "Begin"; }
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -121,6 +127,7 @@ const css = `:root{color-scheme:dark;--bg:#0b1015;--panel:#141d25;--line:#293744
 
 function canvasGameJs(title, prompt, fullGame = false) {
   const profile = visualProfile(prompt, "canvas2d");
+  const music = musicProfile(prompt);
   const platformer = /platform|jump|side.?scroll/i.test(prompt);
   const spooky = /horror|mystery|dark|haunt/i.test(prompt);
   const playerColor = profile.text;
@@ -169,7 +176,10 @@ startBtn.addEventListener("click",start);pauseBtn.addEventListener("click",pause
 reset();draw();
 })();`;
 }
-function webglGameJs(fullGame = false) {
+function webglGameJs(fullGame = false, prompt = "") {
+  const profile = visualProfile(prompt, "webgl3d");
+  const accentRgb = profile.accent.match(/[0-9a-f]{2}/gi).map(value => parseInt(value, 16) / 255);
+  const music = musicProfile(prompt);
   return `(() => {"use strict";
 const canvas=document.getElementById("game-canvas"),gl=canvas.getContext("webgl",{antialias:true,alpha:false});
 const overlay=document.getElementById("overlay"),startBtn=document.getElementById("start-button"),scoreEl=document.getElementById("score"),status=document.getElementById("status"),pauseBtn=document.getElementById("pause-button"),restartBtn=document.getElementById("restart-button"),audioBtn=document.getElementById("audio-button"),overlayTitle=document.getElementById("overlay-title"),overlayCopy=document.getElementById("overlay-copy");
@@ -179,7 +189,7 @@ const fs="precision mediump float;varying vec3 vColor;void main(){gl_FragColor=v
 function makeShader(type,src){const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));return sh}
 const program=gl.createProgram();gl.attachShader(program,makeShader(gl.VERTEX_SHADER,vs));gl.attachShader(program,makeShader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));gl.useProgram(program);
 const faces=[
- [[[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]],[.3,.85,.7]],
+ [[[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]],[${accentRgb.join(",")}]],
  [[[.5,-.5,-.5],[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5]],[.2,.48,.75]],
  [[[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]],[.75,.9,.85]],
  [[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]],[.22,.32,.4]],
@@ -409,7 +419,7 @@ export async function createNativeResult(input = {}) {
   const files = engine === "webapp"
     ? [
         { path: "game.html", content: appHtml(title, designPrompt) },
-        { path: "game.css", content: appCss },
+        { path: "game.css", content: themedAppCss(designPrompt) },
         { path: "game.js", content: appJs(title) },
         { path: "game-spec.json", content: JSON.stringify({ ...spec, features: ["Add and delete items", "Mark items complete", "Filter by status", "Persist data in local storage"], routes: ["Main workspace"], userFlows: ["Add item", "Complete item", "Delete item", "Filter items"] }, null, 2) }
       ]
