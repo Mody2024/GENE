@@ -123,6 +123,20 @@ function htmlShell(title, engine, prompt = "", modulePaths = []) {
     ? `<div class="overlay-card menu-mission"><p class="eyebrow">MISSION BRIEFING / 01</p><h2 id="overlay-title">${esc(profile.menu)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><div class="menu-meta"><span>STATUS</span><strong>AWAITING PILOT</strong></div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
     : profile.id === "wild"
     ? `<div class="overlay-card menu-explore"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">No fixed route. Follow what catches your eye.</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "abyss"
+    ? `<div class="overlay-card menu-dive"><p class="eyebrow">${esc(profile.menu)}</p><div class="dive-ring" aria-hidden="true">◉</div><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">OXYGEN STABLE · SONAR ACTIVE</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "western"
+    ? `<div class="overlay-card menu-wanted"><p class="wanted-label">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(title)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><div class="wanted-rule">★ · BOUNTY POSTED · ★</div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "rhythm"
+    ? `<div class="overlay-card menu-rhythm"><p class="eyebrow">${esc(profile.menu)}</p><div class="beat-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">SYNC / FLOW / REPEAT</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "comic"
+    ? `<div class="overlay-card menu-comic"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">A NEW CHAPTER · A NEW CONSEQUENCE</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "museum"
+    ? `<div class="overlay-card menu-archive"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><div class="archive-stamp">CATALOGUED · NOT UNDERSTOOD</div><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "radio"
+    ? `<div class="overlay-card menu-radio"><p class="eyebrow">${esc(profile.menu)}</p><div class="radio-dial" aria-hidden="true"><span>88.4</span></div><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">RX LOCKED · SOURCE UNKNOWN</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
+    : profile.id === "kitchen"
+    ? `<div class="overlay-card menu-kitchen"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">PREP YOUR STATION · SERVICE IS LIVE</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`
     : `<div class="overlay-card"><p class="eyebrow">${esc(profile.menu)}</p><h2 id="overlay-title">${esc(profile.subtitle)}</h2><p id="overlay-copy">${esc(profile.subtitle)}</p><button id="start-button" type="button">${esc(profile.cta)}</button></div>`;
   return `<!doctype html>
 <html lang="en">
@@ -306,6 +320,13 @@ function themedCss(prompt, engine) {
     .replace('background:#101a22eF', 'background:' + profile.panel + 'f2');
   if (profile.id === "abyss") themed = themed.replace("border-radius:20px", "border-radius:48% 48% 16px 16px").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 0 0 8px #66e1d111,0 0 55px #0e657055");
   if (profile.id === "western") themed = themed.replace("background:#101a22eF", "background:#f0dfbd").replace("border-radius:20px", "border-radius:2px").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 18px 55px #0009, inset 0 0 0 5px #795338");
+  if (profile.id === "rhythm") themed = themed.replace("border-radius:20px", "border-radius:6px").replace("border:1px solid #ffffff22", "border:1px solid #f2cb69").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 0 0 5px #f2cb6911,0 18px 60px #0008");
+  if (profile.id === "comic") themed = themed.replace("border-radius:20px", "border-radius:0").replace("box-shadow:0 20px 80px #0007", "box-shadow:8px 8px 0 #ffce57,16px 16px 0 #0006");
+  if (profile.id === "museum") themed = themed.replace("border-radius:20px", "border-radius:2px").replace("text-align:center", "text-align:left");
+  if (profile.id === "radio") themed = themed.replace("border-radius:20px", "border-radius:12px").replace("box-shadow:0 20px 80px #0007", "box-shadow:inset 0 0 0 5px #0002,0 18px 60px #0008");
+  if (profile.id === "kitchen") themed = themed.replace("border-radius:20px", "border-radius:28px 28px 8px 8px").replace("border:1px solid #ffffff22", "border:1px solid var(--accent)");
+  if (profile.id === "abyss") themed = themed.replace("border-radius:20px", "border-radius:48% 48% 16px 16px").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 0 0 8px #66e1d111,0 0 55px #0e657055");
+  if (profile.id === "western") themed = themed.replace("background:#101a22eF", "background:#f0dfbd").replace("border-radius:20px", "border-radius:2px").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 18px 55px #0009,inset 0 0 0 5px #795338");
   if (profile.id === "rhythm") themed = themed.replace("border-radius:20px", "border-radius:6px").replace("border:1px solid #ffffff22", "border:1px solid #f2cb69").replace("box-shadow:0 20px 80px #0007", "box-shadow:0 0 0 5px #f2cb6911,0 18px 60px #0008");
   if (profile.id === "comic") themed = themed.replace("border-radius:20px", "border-radius:0").replace("box-shadow:0 20px 80px #0007", "box-shadow:8px 8px 0 #ffce57,16px 16px 0 #0006");
   if (profile.id === "museum") themed = themed.replace("border-radius:20px", "border-radius:2px").replace("text-align:center", "text-align:left");
