@@ -18,7 +18,8 @@
     "test:playground": "node tests/playground.mjs",
     "test:live-generation": "node tests/live-generation-smoke.mjs",
     "test:studio-ui": "node tests/studio-responsive.mjs",
-    "test:quality": "node tests/game-quality-benchmark.mjs"
+    "test:quality": "node tests/game-quality-benchmark.mjs",
+    "test:native-browser": "node tests/native-browser.mjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
