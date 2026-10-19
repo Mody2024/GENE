@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { createNativeResult } from "../apps/web/lib/native-generator.mjs";
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ["--enable-webgl", "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=swiftshader"] });
 try {
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
   const game = await createNativeResult({
@@ -30,6 +30,26 @@ try {
   assert.equal(await page.locator("#status").textContent(), "PLAYING");
   assert.equal(await page.locator("#score").textContent(), "0");
   assert.deepEqual(runtimeErrors, [], "generated 2D game must not throw browser runtime errors");
+
+  const threeD = await createNativeResult({
+    operation: "build", message: "A 3D exploration game with collectibles and hazards",
+    project: { kind: "game", preferredEngine: "webgl3d", name: "Native 3D Explorer", initialPrompt: "A 3D exploration game with collectibles and hazards" }
+  });
+  const threeDFiles = Object.fromEntries(threeD.files.map(file => [file.path, file.content]));
+  const threeDHtml = threeDFiles["game.html"]
+    .replace('<link rel="stylesheet" href="game.css">', "<style>" + threeDFiles["game.css"] + "</style>")
+    .replace('<script src="game.js"></script>', "<script>" + threeDFiles["game.js"] + "</script>");
+  await page.setContent(threeDHtml, { waitUntil: "load" });
+  assert.equal(await page.evaluate(() => Boolean(document.getElementById("game-canvas").getContext("webgl"))), true, "3D target must initialize WebGL");
+  await page.getByRole("button", { name: "Start game" }).click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator("#status").textContent(), "EXPLORING");
+  await page.keyboard.down("ArrowUp");
+  await page.waitForTimeout(250);
+  await page.keyboard.up("ArrowUp");
+  await page.keyboard.press("p");
+  assert.equal(await page.locator("#status").textContent(), "PAUSED");
+  assert.deepEqual(runtimeErrors, [], "generated 3D game must not throw browser runtime errors");
 
   const app = await createNativeResult({
     operation: "build", message: "A local task manager web app",
