@@ -78,6 +78,24 @@ for (const engine of ["canvas2d", "webgl3d"]) {
   assert.match(js, /function musicStart\(\)/);
   assert.match(js, /function musicStop\(\)/);
 }
+const horrorBuild = await createNativeResult({
+  operation: "build",
+  message: "A psychological horror game with a case file menu and creepy ambient soundtrack",
+  project: { kind: "game", preferredEngine: "canvas2d", name: "Case File", initialPrompt: "A psychological horror game with a case file menu and creepy ambient soundtrack" }
+});
+const racingBuild = await createNativeResult({
+  operation: "build",
+  message: "A high-speed racing game with a racing garage and energetic soundtrack",
+  project: { kind: "game", preferredEngine: "canvas2d", name: "Velocity", initialPrompt: "A high-speed racing game with a racing garage and energetic soundtrack" }
+});
+const horrorFiles = Object.fromEntries(horrorBuild.files.map(file => [file.path, file.content]));
+const racingFiles = Object.fromEntries(racingBuild.files.map(file => [file.path, file.content]));
+assert.notEqual(horrorBuild.plan.design.visualIdentity, racingBuild.plan.design.visualIdentity);
+assert.notEqual(horrorBuild.plan.design.soundtrack.mood, racingBuild.plan.design.soundtrack.mood);
+assert.notEqual(horrorFiles["game.css"], racingFiles["game.css"]);
+assert.match(horrorFiles["game.html"], /Something is waiting|CASE FILE/);
+assert.match(racingFiles["game.html"], /Ready to run|GARAGE/);
+assert.match(horrorFiles["game.js"], /55,58\.27,82\.41|55/);
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
