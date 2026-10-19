@@ -1325,6 +1325,7 @@ export default function Home() {
       const result: AgentResponse = payload.result;
       setLiveRun(current => current ? { ...current, stage: "apply", model: typeof payload.model === "string" ? payload.model : current.model } : current);
       addActivity("Response received from " + (payload.model || payload.aiMode || "agent"));
+      if (Array.isArray((result as any).processingTrace)) for (const step of (result as any).processingTrace) if (typeof step === "string") addActivity(step);
       if (payload.reviewedBy) addActivity("Independent code review completed by " + payload.reviewedBy);
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
