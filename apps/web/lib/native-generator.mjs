@@ -413,14 +413,14 @@ export async function createNativeResult(input = {}) {
       { name: "Build", goal: "Implement responsive screens and state", acceptance: ["Keyboard and touch work", "State changes are visible"] },
       { name: "Verify", goal: "Test persistence and recovery", acceptance: ["Reload preserves saved state", "Invalid input does not destroy work"] }
     ] : [
-      { name: "Identity and core loop", goal: "Establish genre, player fantasy, controls, and game feel", acceptance: ["Title menu matches genre", "Core loop is playable", "Controls are explained"] },
-      { name: "World and progression", goal: "Create a distinct environment and meaningful objective progression", acceptance: ["World uses the selected art direction", "At least one objective completes", "Win and loss states are reachable"] },
-      { name: "Polish and audio", goal: "Add responsive feedback, soundtrack, and recovery", acceptance: ["Music and effects have independent mute behavior", "Pause and restart work", "UI remains usable on narrow screens"] },
-      { name: "Verification", goal: "Run static checks and interactive gameplay tests", acceptance: ["No uncaught startup error", "Primary controls change game state", "Restart returns to a valid initial state"] }
+      { name: profile.genre + " core loop", goal: "Build the requested gameplay loop: " + (text(savedAnswers["native-core-loop"], 160) || "infer mechanics from the game brief"), acceptance: ["The primary action changes game state", "Controls match the requested genre", "The player can recover and retry"] },
+      { name: profile.genre + " world and progression", goal: "Create levels, objectives and difficulty changes that fit " + profile.genre, acceptance: ["Objectives are reachable", "Progression changes the challenge", "Completion and failure are both handled"] },
+      { name: profile.genre + " presentation", goal: "Create a distinct menu, readable game feedback and fitting procedural audio", acceptance: ["Menu is genre-specific", "Gameplay objects are visually distinct", "Audio has a working mute control"] },
+      { name: "Verify " + profile.genre + " build", goal: "Run source checks and interactive gameplay tests", acceptance: ["No uncaught startup error", "Primary controls change game state", "Restart returns to a valid initial state"] }
     ],
     tasks: kind === "app"
       ? ["Define the main user flow and data contract", "Build responsive semantic UI in the selected visual style", "Wire validation and visible state changes", "Persist state locally", "Run source and interaction checks"]
-      : ["Establish the genre-specific title/menu and playable core loop", "Implement the selected camera/perspective and responsive rendering", "Add objective progression, hazards, recovery, and restart", "Synthesize genre-appropriate music and event-based sound effects", "Run source checks and interactive gameplay tests"],
+      : ["Design " + profile.genre + " mechanics and acceptance tests", "Implement " + profile.genre + " controls and responsive rendering", "Build " + profile.genre + " objectives, progression and recovery", "Create a distinct " + profile.genre + " menu, feedback and procedural audio", "Verify generated source files and interactive gameplay"],
     mechanics: kind === "app" ? ["Responsive UI", "Form validation", "Local persistence", "Accessible interactions"] : [
       ...new Set([text(savedAnswers["native-core-loop"], 100) || "Exploration", "Objective progression", "Contextual feedback", "Pause and restart", soundtrack.mood + " procedural audio"])
     ],
