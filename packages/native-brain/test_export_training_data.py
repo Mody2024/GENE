@@ -21,7 +21,7 @@ class ExportTrainingDataTests(unittest.TestCase):
         unverified = dict(self.good, id="unverified", verified=False)
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "experiences.jsonl"
-            path.write_text("\\n".join(json.dumps(row) for row in [self.good, bad, unverified]) + "\\n", encoding="utf-8")
+            path.write_text("\n".join(json.dumps(row) for row in [self.good, bad, unverified]) + "\n", encoding="utf-8")
             rows = read_verified(path)
         self.assertEqual([row["id"] for row in rows], ["verified-1"])
 
