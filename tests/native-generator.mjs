@@ -29,6 +29,9 @@ for (const [prompt, engine] of [
   if (engine === "webgl3d") {
     assert.match(files["game.js"], /getContext\("webgl"/);
     assert.match(files["game.js"], /drawArrays/);
+    assert.match(files["game.js"], /const pickups=\[\]/);
+    assert.match(files["game.js"], /player\.z/);
+    assert.match(files["game.js"], /function update\(dt\)/);
   }
   if (engine === "webapp") {
     assert.match(files["game.html"], /task-form/);
