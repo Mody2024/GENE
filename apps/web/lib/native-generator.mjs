@@ -441,6 +441,10 @@ export async function createNativeResult(input = {}) {
     references,
     research: { mode: "source-index", externalAiUsed: false, searchedLiveWeb: false, note: "These are curated official/reference sources, not live search results. Use the included search links for live web research." }
   };
+  if (operation === "buildPart" && input.stagePath && !["game.html", "game.css", "game.js", "game-spec.json"].includes(input.stagePath)) {
+    const file = nativeModuleSource(input.stagePath, designPrompt, plan);
+    return { reply: "Recovered exactly " + input.stagePath + " using Gene's native module generator. The requested path is preserved and no external AI was called.", files: [file], plan, complete: true, needsUserDecision: false, references, nativeGeneration: { modelUsed: false, externalAiUsed: false, exactRequestedPath: input.stagePath, strategy: "native-module-recovery-v1" } };
+  }
   if (operation === "research") {
     const q = encodeURIComponent(prompt);
     const searches = [
@@ -448,7 +452,9 @@ export async function createNativeResult(input = {}) {
       { title: "Search GitHub", url: "https://github.com/search?q=" + q + "&type=code" },
       { title: "Search MDN", url: "https://developer.mozilla.org/en-US/search?q=" + q }
     ];
-    const liveSources = await searchNativeSources(prompt);
+    const researchQueries = researchQueryFor(prompt, engine).slice(0, 3);
+    const liveGroups = await Promise.all(researchQueries.map(query => searchNativeSources(query)));
+    const liveSources = [...new Map(liveGroups.flat().map(source => [source.url, source])).values()].slice(0, 10);
     return {
       reply: liveSources.length
         ? "Native research completed using public documentation/search endpoints. No AI API was called. Treat snippets as discovery leads and verify technical details in the linked source."
