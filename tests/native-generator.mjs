@@ -14,13 +14,14 @@ for (const [prompt, engine] of [
     project: { kind: engine === "webapp" ? "app" : "game", preferredEngine: engine, name: "New project", initialPrompt: prompt }
   });
   assert.equal(result.nativeGeneration.externalAiUsed, false);
-  assert.equal(result.files.length, 4);
+  assert.ok(result.files.length >= 4, "native builds may create additional task-specific source modules");
   const files = Object.fromEntries(result.files.map(file => [file.path, file.content]));
   const spec = JSON.parse(files["game-spec.json"]);
   assert.equal(spec.engine, engine);
   assert.ok(files["game.html"].includes("game.js"));
   assert.ok(files["game.css"].length > 100);
   new Script(files["game.js"], { filename: prompt + ".js" });
+  for (const file of result.files.filter(file => /\\.(?:m?js|cjs)$/i.test(file.path))) new Script(file.content, { filename: file.path });
   if (engine === "canvas2d") {
     assert.match(files["game.js"], /requestAnimationFrame/);
     assert.match(files["game.js"], /getContext\("2d"\)/);
