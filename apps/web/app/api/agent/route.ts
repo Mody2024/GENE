@@ -692,7 +692,7 @@ export async function POST(request: NextRequest) {
   // fetch calls, or fallback chains are inspected. No third-party model is called.
   if (body.thinking === "native" || process.env.GENE_NATIVE_ONLY === "true") {
     try {
-      const result = createNativeResult({ ...body, operation: body.operation });
+      const result = await createNativeResult({ ...body, operation: body.operation });
       return NextResponse.json({ ok: true, aiMode: "native", model: "Gene Native (deterministic)", result });
     } catch (error) {
       return jsonError(error instanceof Error ? error.message : "Native generation failed.", 422, "GENE_NATIVE_GENERATION_FAILED");
