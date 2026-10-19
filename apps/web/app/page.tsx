@@ -640,6 +640,9 @@ export default function Home() {
         !/\b(skip (?:the )?interview|no questions|without (?:an? )?interview|build immediately|just build|use sensible defaults|don't ask|do not ask)\b/i.test(prompt)) {
       operation = "interview";
     }
+    // A pending interview is a stateful workflow: every answer must advance
+    // the interview rather than falling through to a build/edit operation.
+    if (project.question && !operationOverride) operation = "interview";
     if (operation === "research") setSearchMode(false);
     if (operation === "surprise") {
       operation = "surprise";
