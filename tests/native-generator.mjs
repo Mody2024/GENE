@@ -157,4 +157,29 @@ const research = await createNativeResult({ operation: "research", message: "web
 assert.equal(research.research.externalAiUsed, false);
 assert.equal(research.research.liveSearchAttempted, true);
 assert.ok(research.research.searches.some(item => item.url.includes("github.com/search")));
+
+for (const [prompt, expectedProfile, expectedMenu] of [
+  ["A deep sea submarine expedition under the ocean", "abyss", "menu-dive"],
+  ["A wild west bounty hunting game", "western", "menu-wanted"],
+  ["A rhythm game that syncs to drums and melody", "rhythm", "menu-rhythm"],
+  ["A comic book adventure with cel shaded panels", "comic", "menu-comic"],
+  ["An exploration game inside an ancient museum archive", "museum", "menu-archive"],
+  ["A shortwave radio transmission mystery", "radio", "menu-radio"],
+  ["A cooking restaurant time management game", "kitchen", "menu-kitchen"]
+]) {
+  const result = await createNativeResult({
+    operation: "build",
+    message: prompt,
+    project: { kind: "game", preferredEngine: "canvas2d", name: "Creative variation", initialPrompt: prompt }
+  });
+  const generated = Object.fromEntries(result.files.map(file => [file.path, file.content]));
+  const spec = JSON.parse(generated["game-spec.json"]);
+  assert.equal(spec.designProfile.id, expectedProfile, "concept should select its own creative profile: " + prompt);
+  assert.ok(spec.designProfile.creativeSignature, "design signature must be saved for comparison");
+  assert.ok(spec.designProfile.menuLayout, "menu layout metaphor must be recorded");
+  assert.ok(generated["game.html"].includes(expectedMenu), "menu composition must change for " + expectedProfile);
+  assert.ok(generated["game.css"].length > 100);
+  new Script(generated["game.js"], { filename: expectedProfile + ".js" });
+}
+
 console.log("native-generator: generated JS parses for 2D, 3D, and web-app targets; references are labeled honestly");
