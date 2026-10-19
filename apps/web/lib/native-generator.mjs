@@ -95,7 +95,8 @@ function projectSpec(title, engine, prompt) {
     nativeGeneration: { modelUsed: false, externalAiUsed: false, strategy: "deterministic-native-template-v1" }
   };
 }
-function htmlShell(title, engine, prompt = "") {\n  const profile = visualProfile(prompt, engine);
+function htmlShell(title, engine, prompt = "") {
+  const profile = visualProfile(prompt, engine);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -233,10 +234,15 @@ function themedCss(prompt, engine) {
   if (profile.id === "arcade" || profile.id === "velocity") themed = themed.replace('border-radius:18px', 'border-radius:8px').replace('border-radius:20px', 'border-radius:10px');
   return themed;
 }
+function themedAppCss(prompt) {
+  const profile = visualProfile(prompt, "webapp");
+  return appCss.replace("--ink:#17232a", "--ink:" + profile.text).replace("--muted:#667780", "--muted:" + profile.muted).replace("--line:#dce5e8", "--line:" + profile.line).replace("--accent:#176b58", "--accent:" + profile.accent).replace("--bg:#f3f7f6", "--bg:" + profile.bg).replace("linear-gradient(145deg,#edf5f1,#f8faf9 60%)", "linear-gradient(145deg," + profile.bg + "," + profile.panel + " 60%)").replace("background:#fff", "background:" + profile.panel);
+}
 function appJs(title) {
   return `(() => {"use strict";const form=document.getElementById("task-form"),input=document.getElementById("task-input"),list=document.getElementById("task-list"),count=document.getElementById("task-count"),filter=document.getElementById("task-filter");let tasks=[];try{tasks=JSON.parse(localStorage.getItem("gene-native-tasks")||"[]")}catch{}function save(){localStorage.setItem("gene-native-tasks",JSON.stringify(tasks));render()}function render(){list.innerHTML="";const shown=tasks.filter(t=>filter.value==="all"||(filter.value==="open"&&!t.done)||(filter.value==="done"&&t.done));for(const task of shown){const li=document.createElement("li");li.className=task.done?"done":"";const check=document.createElement("input");check.type="checkbox";check.checked=task.done;check.setAttribute("aria-label","Complete "+task.text);check.addEventListener("change",()=>{task.done=check.checked;save()});const label=document.createElement("span");label.textContent=task.text;const del=document.createElement("button");del.type="button";del.textContent="Delete";del.addEventListener("click",()=>{tasks=tasks.filter(t=>t.id!==task.id);save()});li.append(check,label,del);list.append(li)}count.textContent=tasks.filter(t=>!t.done).length+" remaining · "+tasks.length+" total"}form.addEventListener("submit",e=>{e.preventDefault();const value=input.value.trim();if(!value){input.focus();return}tasks.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),text:value.slice(0,180),done:false});input.value="";save();input.focus()});filter.addEventListener("change",render);render()})();`;
 }
-function appHtml(title) {
+function appHtml(title, prompt = "") {
+  const profile = visualProfile(prompt, "webapp");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="game.css"></head><body><main class="app"><header><p class="eyebrow">${esc(profile.genre)} / GENE APP</p><h1>${esc(title)}</h1><p class="sub">${esc(profile.subtitle)} Your data stays in this browser.</p></header><section class="panel"><form id="task-form"><label for="task-input">What do you want to track?</label><div class="entry"><input id="task-input" maxlength="180" placeholder="Add a task or idea…" required><button type="submit">Add item</button></div></form><div class="list-head"><strong id="task-count">0 remaining</strong><label>Show <select id="task-filter"><option value="all">All items</option><option value="open">Open</option><option value="done">Completed</option></select></label></div><ul id="task-list"></ul></section><p class="help">No account or external service required. Data is saved in this browser.</p></main><script src="game.js"></script></body></html>`;
 }
 const appCss = `:root{color-scheme:light;--ink:#17232a;--muted:#667780;--line:#dce5e8;--accent:#176b58;--bg:#f3f7f6}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#edf5f1,#f8faf9 60%);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,sans-serif}.app{width:min(760px,calc(100% - 32px));margin:clamp(28px,8vh,90px) auto}.eyebrow{font-size:10px;letter-spacing:.18em;color:var(--accent);font-weight:800;margin:0 0 8px}h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.05em;margin:0}.sub{color:var(--muted);margin:8px 0 26px}.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:clamp(16px,4vw,28px);box-shadow:0 18px 60px #29473a0a}label{font-weight:650;font-size:13px}.entry{display:flex;gap:8px;margin-top:8px}input,select,button{font:inherit;border:1px solid var(--line);border-radius:10px;padding:11px 12px}input{flex:1;min-width:0}button{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7bc4ae;outline-offset:2px}.list-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}.list-head label{display:flex;align-items:center;gap:7px}ul{list-style:none;padding:0;margin:12px 0 0}li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #edf1f2}li input{flex:0 0 auto;width:17px;height:17px;accent-color:var(--accent)}li span{flex:1;overflow-wrap:anywhere}li.done span{color:#81908a;text-decoration:line-through}li button{background:transparent;color:#68777c;border-color:var(--line);padding:6px 9px;font-size:12px}.help{font-size:12px;color:var(--muted);margin-top:16px}@media(max-width:480px){.entry{flex-direction:column}.list-head{align-items:flex-start;flex-direction:column}}`;
@@ -408,7 +414,7 @@ export async function createNativeResult(input = {}) {
       ]
     : [
         { path: "game.html", content: htmlShell(title, engine, designPrompt) },
-        { path: "game.css", content: css },
+        { path: "game.css", content: themedCss(designPrompt, engine) },
         { path: "game.js", content: engine === "webgl3d" ? webglGameJs(fullGameExpansion, designPrompt) : canvasGameJs(title, designPrompt, fullGameExpansion) },
         { path: "game-spec.json", content: JSON.stringify(spec, null, 2) }
       ];
