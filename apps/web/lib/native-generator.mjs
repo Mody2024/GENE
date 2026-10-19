@@ -131,6 +131,17 @@ function canvasGameJs(title, prompt, fullGame = false) {
   const platformer = /platform|jump|side.?scroll/i.test(prompt);
   const spooky = /horror|mystery|dark|haunt/i.test(prompt);
   const playerColor = profile.text;
+  const backdropCode = profile.id === "cinematic" || profile.id === "noir"
+    ? 'for(let i=0;i<9;i++){const x=(i*137-camera*.08)%1100;ctx.fillStyle="\${profile.panel}";ctx.globalAlpha=.35+(i%3)*.12;ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x+22,150+(i%4)*25);ctx.lineTo(x+58,420);ctx.fill()}ctx.globalAlpha=1;for(let i=0;i<5;i++){ctx.fillStyle="\${profile.accent}";ctx.globalAlpha=.035;ctx.fillRect(0,90+i*58,W,18)}ctx.globalAlpha=1;'
+    : profile.id === "velocity"
+    ? 'ctx.strokeStyle="\${profile.accent}";ctx.globalAlpha=.24;ctx.lineWidth=3;for(let i=0;i<8;i++){const x=W/2+(i-4)*72;ctx.beginPath();ctx.moveTo(W/2+(x-W/2)*.12,245);ctx.lineTo(x+Math.sin(elapsed*2+i)*18,540);ctx.stroke()}ctx.globalAlpha=1;'
+    : profile.id === "cosmic"
+    ? 'for(let i=0;i<4;i++){const x=((i*271-camera*.025)%1150+1150)%1150-70,y=70+(i%3)*86,r=18+(i%3)*11;ctx.strokeStyle="\${profile.accent}";ctx.globalAlpha=.25;ctx.beginPath();ctx.ellipse(x,y,r*1.9,r*.7,elapsed*.03,0,Math.PI*2);ctx.stroke();ctx.fillStyle="\${profile.glow}";ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;'
+    : profile.id === "storybook"
+    ? 'for(let i=0;i<7;i++){const x=((i*190-camera*.12)%1350+1350)%1350-150;ctx.fillStyle=i%2?"\${profile.panel}":"\${profile.glow}";ctx.globalAlpha=.6;ctx.beginPath();ctx.moveTo(x,420);ctx.quadraticCurveTo(x+75,250-(i%3)*30,x+155,420);ctx.fill()}ctx.globalAlpha=1;'
+    : profile.id === "wild"
+    ? 'for(let i=0;i<15;i++){const x=((i*83-camera*.09)%1100+1100)%1100;ctx.strokeStyle="\${profile.accent}";ctx.globalAlpha=.22;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,420);ctx.quadraticCurveTo(x-16,315-(i%4)*22,x+10,260+(i%3)*18);ctx.stroke()}ctx.globalAlpha=1;'
+    : 'ctx.strokeStyle="\${profile.glow}";ctx.globalAlpha=.45;ctx.lineWidth=1;for(let i=0;i<9;i++){ctx.beginPath();ctx.moveTo(0,280+i*18);ctx.lineTo(W,280+i*18);ctx.stroke()}ctx.globalAlpha=1;';
   const nextStageCode = fullGame ? `function nextStage(){if(stage>=3){finish(true);return}stage++;camera=0;player.x=120;player.y=360;player.vx=0;player.vy=0;items=[];hazards=[];particles=[];for(let i=0;i<24;i++)items.push({x:260+i*155,y:${platformer ? "310+(i%3)*-65" : "160+(i%5)*62"},r:9,taken:false});for(let i=0;i<11;i++)hazards.push({x:500+i*300,y:${platformer ? "420" : "300+(i%3)*65"},r:${platformer ? "18" : "16"},phase:i*1.7});statusEl.textContent="STAGE "+stage+"/3";sound(720,.16);}` : "";
   return `(() => {
 "use strict";
@@ -158,6 +169,7 @@ for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particl
 ${fullGame ? 'if(score>=stage*120){if(stage<3)nextStage();else{finish(true);return}}if(player.x+camera>3300){if(stage<3)nextStage();else{finish(true);return}}' : 'if(score>=120){finish(true);return}if(player.x+camera>3300){finish(true);return}'}
 }
 function draw(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"${profile.bg}");g.addColorStop(1,"${profile.glow}");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+${backdropCode}
 for(let i=0;i<40;i++){const x=((i*173-camera*.18)%1100+1100)%1100;const y=(i*79)%330;ctx.fillStyle=i%4===0?"#d7e7e755":"#9bb6c422";ctx.fillRect(x,y,2,2)}
 ctx.fillStyle="${profile.panel}";for(let i=0;i<14;i++){const x=((i*120-camera*.4)%1200+1200)%1200-60;ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x+55,240+(i%3)*28);ctx.lineTo(x+110,420);ctx.fill()}
 ctx.fillStyle="${platformer ? "#304b43" : "#1b3039"}";ctx.fillRect(0,420,W,120);ctx.fillStyle="#91c9ad";ctx.fillRect(0,420,W,3);
