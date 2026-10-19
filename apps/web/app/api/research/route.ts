@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, links, unavailable, createdAt: new Date().toISOString() });
-  const imageData = wantImages
+  const imageData = wantsImages
     ? (await Promise.all(bundle.images.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
 
