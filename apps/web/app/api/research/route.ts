@@ -89,12 +89,12 @@ export async function POST(request: NextRequest) {
   const arabic = /[؀-ۿ]/.test(topic);
   const wikiHost = arabic ? "ar.wikipedia.org" : "en.wikipedia.org";
   const wantsImages = body?.images !== false;
-  const wants3DModels = /\\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\\b/i.test(lowerTopic);
-  const wantsCharacterArt = /\\b(character|player sprite|hero sprite|enemy|npc|creature|character design|sprite sheet)\\b/i.test(lowerTopic);
-  const wantsAudio = !/\\b(no music|silent|no audio|without sound)\\b/i.test(lowerTopic);
+  const wants3DModels = /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
+  const wantsCharacterArt = /\b(character|player sprite|hero sprite|enemy|npc|creature|character design|sprite sheet)\b/i.test(lowerTopic);
+  const wantsAudio = !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
   const assetQuery = wantsCharacterArt
     ? topic + " 2D game character sprite"
-    : /\\b(background|environment|world|level|landscape|scene|tileset|terrain)\\b/i.test(lowerTopic)
+    : /\b(background|environment|world|level|landscape|scene|tileset|terrain)\b/i.test(lowerTopic)
       ? topic + " game environment background"
       : topic + " game level art environment";
 
