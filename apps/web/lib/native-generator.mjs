@@ -267,7 +267,15 @@ function themedCss(prompt, engine) {
   if (profile.id === "playful") themed = themed.replace('border-radius:18px', 'border-radius:28px').replace('border-radius:20px', 'border-radius:26px');
   if (profile.id === "cinematic" || profile.id === "noir") themed = themed.replace('letter-spacing:-.04em;margin:8px 0', 'letter-spacing:.01em;margin:8px 0').replace('backdrop-filter:blur(3px)', 'backdrop-filter:blur(8px)');
   if (profile.id === "arcade" || profile.id === "velocity") themed = themed.replace('border-radius:18px', 'border-radius:8px').replace('border-radius:20px', 'border-radius:10px');
-  return themed;
+  const menuCss = `
+.menu-meta{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:18px 0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.12em;color:var(--muted)}.menu-meta strong{color:var(--accent);font-size:11px}.menu-divider{margin:20px 0;color:var(--accent);letter-spacing:.2em;opacity:.85}
+.menu-case{max-width:460px!important;text-align:left!important;border-radius:4px!important;border-top:3px solid var(--accent)!important;box-shadow:0 22px 70px #0009,8px 8px 0 #0004!important}.menu-case .eyebrow{letter-spacing:.24em}.menu-case h2{font-family:Georgia,serif;font-weight:500;letter-spacing:-.02em!important}.menu-case #overlay-copy{font-size:11px;letter-spacing:.18em}
+.menu-arcade{max-width:500px!important;border-radius:8px!important;border:2px solid var(--accent)!important;box-shadow:0 0 0 5px #0006,0 0 45px color-mix(in srgb,var(--accent) 18%,transparent)!important}.menu-arcade h2{text-transform:uppercase;letter-spacing:.04em!important;font-weight:900}.menu-score{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0;padding:14px 10px;background:#0003;border:1px solid var(--line);font-size:10px;letter-spacing:.12em}.menu-score strong{font-size:23px;color:var(--accent);font-variant-numeric:tabular-nums}
+.menu-story{background:linear-gradient(145deg,var(--panel),var(--bg))!important;border-radius:42px 8px 42px 8px!important;border:1px solid var(--accent)!important;box-shadow:0 18px 60px #0006!important}.menu-story h2{font-family:Georgia,serif;font-weight:500!important;letter-spacing:0!important;line-height:1.2!important}.menu-story .menu-divider{font-size:12px}
+.menu-mission{max-width:430px!important;text-align:left!important;border-left:3px solid var(--accent)!important;border-radius:4px 18px 18px 4px!important}.menu-mission h2{font-size:clamp(28px,4vw,42px)!important;letter-spacing:.01em!important;text-transform:uppercase}.menu-explore{border-radius:28px 28px 8px 28px!important;background:linear-gradient(145deg,var(--panel),var(--bg))!important;border-color:var(--accent)!important}.menu-explore h2{font-family:Georgia,serif;font-weight:500!important;letter-spacing:0!important}
+@media(max-width:560px){.menu-score{gap:6px;flex-wrap:wrap}.menu-score strong{font-size:19px}.menu-meta{gap:8px}}
+`;
+  return themed + menuCss;
 }
 function themedAppCss(prompt) {
   const profile = visualProfile(prompt, "webapp");
