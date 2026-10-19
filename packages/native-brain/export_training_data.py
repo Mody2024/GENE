@@ -69,7 +69,7 @@ def main() -> None:
         buckets[split_for(record, args.seed)].append(format_record(record))
     for name, rows in buckets.items():
         output = args.out_dir / f"{name}.jsonl"
-        output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\\n" for row in rows), encoding="utf-8")
+        output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
     print(json.dumps({"verified_records": len(records), "splits": {name: len(rows) for name, rows in buckets.items()}, "out_dir": str(args.out_dir)}, ensure_ascii=False))
 
 
