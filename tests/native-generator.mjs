@@ -64,7 +64,7 @@ assert.equal(firstQuestion.question.total, 5);
 const secondQuestion = await createNativeResult({ operation: "interview", message: "Solve mysteries or puzzles", project: interviewProject, answers: { "native-core-loop": "Solve mysteries or puzzles" } });
 assert.equal(secondQuestion.question.id, "native-perspective");
 const completedInterview = await createNativeResult({ operation: "interview", message: "Creepy ambient soundscape", project: interviewProject, answers: interviewAnswers });
-assert.equal(completedInterview.question, null);
+assert.equal(completedInterview.question, null);\nassert.match(completedInterview.plan.design.menuDirection, /case file/i);\nassert.equal(completedInterview.plan.design.soundtrack.mood, "uneasy");\nassert.equal(completedInterview.plan.stages.length, 4);
 assert.equal(completedInterview.plan.engine, "webgl3d");
 assert.match(completedInterview.plan.summary, /psychological horror game/i);
 assert.match(completedInterview.plan.summary, /Creepy ambient soundscape/i);
