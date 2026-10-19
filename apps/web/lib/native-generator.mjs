@@ -145,6 +145,17 @@ function canvasGameJs(title, prompt, fullGame = false) {
   const spooky = /horror|mystery|dark|haunt/i.test(prompt);
   const playerColor = profile.text;
   const playerRenderCode = 'ctx.save();ctx.translate(player.x,player.y+Math.sin(elapsed*10)*1.5);const stride=Math.sin(elapsed*13)*4;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="' + profile.ink + '";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-5,7);ctx.lineTo(-7+stride,15);ctx.lineTo(-10+stride,18);ctx.moveTo(5,7);ctx.lineTo(7-stride,15);ctx.lineTo(10-stride,18);ctx.stroke();ctx.fillStyle="' + profile.accent + '";ctx.beginPath();ctx.roundRect(-9,-6,18,18,5);ctx.fill();ctx.fillStyle="' + profile.glow + '";ctx.fillRect(-7,-2,14,4);ctx.strokeStyle="' + profile.ink + '";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-8,-2);ctx.lineTo(-13+stride*.35,5);ctx.moveTo(8,-2);ctx.lineTo(13-stride*.35,5);ctx.stroke();ctx.fillStyle="' + profile.text + '";ctx.beginPath();ctx.arc(0,-14,8,0,Math.PI*2);ctx.fill();ctx.fillStyle="' + profile.ink + '";ctx.beginPath();ctx.arc(2,-15,1.4,0,Math.PI*2);ctx.arc(-3,-15,1.4,0,Math.PI*2);ctx.fill();' + ((profile.id === "cinematic" || profile.id === "noir") ? 'ctx.fillStyle="' + profile.panel + '";ctx.beginPath();ctx.moveTo(-10,-18);ctx.lineTo(-2,-28);ctx.lineTo(9,-19);ctx.lineTo(11,3);ctx.lineTo(-11,3);ctx.closePath();ctx.fill();ctx.fillStyle="' + profile.text + '";ctx.beginPath();ctx.arc(0,-14,5,0,Math.PI*2);ctx.fill();ctx.fillStyle="' + profile.ink + '";ctx.fillRect(-5,-17,10,3);' : 'ctx.fillStyle="' + profile.accent + '";ctx.beginPath();ctx.arc(0,-14,7,Math.PI,Math.PI*2);ctx.fill();') + 'ctx.fillStyle="' + profile.glow + '";ctx.fillRect(-5,0,10,3);ctx.restore();';
+  const pickupRenderCode = profile.id === "cinematic" || profile.id === "noir"
+    ? 'ctx.fillStyle="' + profile.panel + '";ctx.fillRect(-8,-10,16,20);ctx.strokeStyle="' + profile.accent + '";ctx.lineWidth=1.5;ctx.strokeRect(-8,-10,16,20);ctx.beginPath();ctx.moveTo(-4,-4);ctx.lineTo(4,-4);ctx.moveTo(-4,0);ctx.lineTo(3,0);ctx.stroke();'
+    : profile.id === "velocity" || profile.id === "arcade"
+    ? 'ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();ctx.fillStyle="' + profile.ink + '";ctx.font="bold 11px system-ui";ctx.textAlign="center";ctx.fillText("$",0,4);'
+    : profile.id === "cosmic"
+    ? 'ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.fill();ctx.strokeStyle="' + profile.text + '";ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(0,0,13,4,elapsed,0,Math.PI*2);ctx.stroke();'
+    : profile.id === "storybook"
+    ? 'ctx.beginPath();for(let i=0;i<10;i++){const r=i%2?4:10,a=-Math.PI/2+i*Math.PI/5;const x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.fill();'
+    : profile.id === "wild"
+    ? 'ctx.beginPath();ctx.ellipse(0,0,5,11,Math.sin(elapsed)*.25,0,Math.PI*2);ctx.fill();ctx.strokeStyle="' + profile.ink + '";ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(0,8);ctx.stroke();'
+    : 'ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(8,0);ctx.lineTo(0,10);ctx.lineTo(-8,0);ctx.closePath();ctx.fill();';
   const backdropCode = profile.id === "cinematic" || profile.id === "noir"
     ? 'for(let i=0;i<9;i++){const x=(i*137-camera*.08)%1100;ctx.fillStyle="\${profile.panel}";ctx.globalAlpha=.35+(i%3)*.12;ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x+22,150+(i%4)*25);ctx.lineTo(x+58,420);ctx.fill()}ctx.globalAlpha=1;for(let i=0;i<5;i++){ctx.fillStyle="\${profile.accent}";ctx.globalAlpha=.035;ctx.fillRect(0,90+i*58,W,18)}ctx.globalAlpha=1;'
     : profile.id === "velocity"
@@ -190,7 +201,7 @@ for(let i=0;i<40;i++){const x=((i*173-camera*.18)%1100+1100)%1100;const y=(i*79)
 ctx.fillStyle="${profile.panel}";for(let i=0;i<14;i++){const x=((i*120-camera*.4)%1200+1200)%1200-60;ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x+55,240+(i%3)*28);ctx.lineTo(x+110,420);ctx.fill()}
 ctx.fillStyle="${platformer ? "#304b43" : "#1b3039"}";ctx.fillRect(0,420,W,120);ctx.fillStyle="#91c9ad";ctx.fillRect(0,420,W,3);
 ${platformer ? "for(let i=0;i<18;i++){const x=((i*145-camera*.8)%1250+1250)%1250-30;const y=350-(i%3)*62;ctx.fillStyle='#355e55';ctx.fillRect(x,y,94,12);ctx.fillStyle='#8bc4a7';ctx.fillRect(x,y,94,3)}" : ""}
-for(const item of items){if(item.taken)continue;const x=item.x-camera;if(x< -30||x>W+30)continue;ctx.save();ctx.translate(x,item.y);ctx.rotate(elapsed*1.5);ctx.fillStyle="${profile.accent}";ctx.shadowColor="${profile.accent}";ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(8,0);ctx.lineTo(0,10);ctx.lineTo(-8,0);ctx.closePath();ctx.fill();ctx.restore()}
+for(const item of items){if(item.taken)continue;const x=item.x-camera;if(x< -30||x>W+30)continue;ctx.save();ctx.translate(x,item.y+Math.sin(elapsed*3+item.x)*2);ctx.rotate(elapsed*1.5);ctx.fillStyle="${profile.accent}";ctx.shadowColor="${profile.accent}";ctx.shadowBlur=14;${pickupRenderCode}ctx.restore()}
 for(const h of hazards){const x=h.x-camera;if(x< -50||x>W+50)continue;ctx.fillStyle="${profile.accent}";ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(x,h.y+${platformer ? "0" : "Math.sin(elapsed*1.5+h.phase)*26"},h.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
 ${playerRenderCode}
 ctx.fillStyle="#e5edf0";ctx.font="700 12px system-ui";ctx.fillText("HEALTH "+ "♥ ".repeat(Math.max(0,player.health)),20,28);ctx.fillStyle="#a8c0ca";ctx.fillText("GOAL 120",W-92,28);
