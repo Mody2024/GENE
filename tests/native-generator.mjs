@@ -36,6 +36,7 @@ for (const [prompt, engine] of [
   }
 }
 const research = await createNativeResult({ operation: "research", message: "webgl collision detection" });
-assert.equal(research.research.searchedLiveWeb, false);
+assert.equal(research.research.externalAiUsed, false);
+assert.equal(research.research.liveSearchAttempted, true);
 assert.ok(research.research.searches.some(item => item.url.includes("github.com/search")));
 console.log("native-generator: generated JS parses for 2D, 3D, and web-app targets; references are labeled honestly");
