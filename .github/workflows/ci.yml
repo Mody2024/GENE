@@ -25,6 +25,8 @@ jobs:
         run: npm run check --workspace=@gene/local-agent
       - name: Check cloud build helper syntax
         run: node --check scripts/cloud-build.mjs && node --check scripts/upload-cloud-output.mjs
+      - name: Check scratch-trained model syntax
+        run: python -m py_compile packages/native-brain/train.py packages/native-brain/infer.py
       - name: Run contract and local-agent end-to-end tests
         run: npm test
       - name: Install Playwright Chromium
