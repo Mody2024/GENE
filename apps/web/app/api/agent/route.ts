@@ -1383,7 +1383,7 @@ export async function POST(request: NextRequest) {
     }
     const assetPaths = new Set(generatedAssetFiles.map(file => file.path));
     result.files = [...result.files.filter((file: any) => !assetPaths.has(file.path)), ...generatedAssetFiles];
-    result.reply += "\n\nGENE Forge tool run: generated " + forgeToolAssets.length + " validated 3D asset recipe(s) (" + forgeToolAssets.map(asset => asset.kind + ": " + asset.partCount + " parts").join(", ") + "). OBJ/MTL/JSON source assets are included under assets/models/.";
+    result.reply += "\n\nGENE Forge — completed stages: building " + forgeToolAssets.map(asset => asset.kind).join(", building ") + "; applying per-part colours and material types; validating geometry and bounds; exporting matching OBJ/MTL/JSON files; passing the generated recipes into the game build.\n\nForge generated " + forgeToolAssets.length + " validated 3D asset recipe(s) (" + forgeToolAssets.map(asset => asset.kind + ": " + asset.partCount + " parts").join(", ") + "). Source assets are included under assets/models/.";
   }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
