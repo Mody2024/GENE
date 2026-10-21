@@ -53,7 +53,7 @@ assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit
 assert.ok(api.includes("GEMINI_API_KEY_2") && api.includes("GEMINI_API_KEY_3"), "Gemini failover supports multiple independently configured keys");
 assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lite"), "Gemini failover includes supported stable fallback models");
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
-assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter key, rate-limit and exhaustion failures are reported distinctly");
+assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED") && api.includes("providerKeyName"), "provider key, rate-limit and exhaustion failures are reported distinctly with provider-specific key guidance");
 assert.ok(api.includes("runAlternateChain") && !api.includes("GENE_OPENROUTER_MODEL"), "OpenRouter fallback uses the free-model router, not a hard-coded model override");
 assert.ok(api.includes("perCallMs: isBuild ? 12_000 : 7_000") && api.includes("maxAttempts: isBuild ? 4 : 7"), "whole-game builds get longer bounded fallback calls while other requests retain broader model coverage");
 assert.ok(api.includes("? 25_000 : totalBudgetMs"), "Gemini primary attempts leave a larger reserved window for backup providers");
@@ -137,7 +137,7 @@ assert.ok(page.includes("extendedPlanning") && page.includes("enhanceDraftPrompt
 assert.ok(page.includes("gene-custom-selection") && page.includes("gene-custom-edit-mode") && page.includes("Edit the selected live-preview element") && page.includes('aria-label="Select in preview to edit"'), "live preview supports selecting an element to prepare a targeted edit");
 assert.ok(page.includes("files in the current manifest") && readFileSync("apps/web/app/lib/error-recovery.mjs", "utf8").includes("input handlers|no keyboard.*touch.*controller"), "build progress avoids a changing denominator and missing input handlers target runtime code for repair");
 assert.ok(api.includes("body.operation === \"enhancePrompt\"") && api.includes("extendedPlanning: body.extendedPlanning === true"), "API accepts the prompt enhancer operation and extended planning flag");
-assert.ok(api.includes("no keyboard, touch, or controller input handlers were found"), "final validation reports absent input handlers without inventing keyboard controls");
+assert.ok(api.includes("no keyboard, touch, controller, or interactive UI handlers were found in the assembled JavaScript"), "final validation reports absent input handlers without inventing keyboard controls");
 assert.ok(css.includes(".gene15-tools") && css.includes(".extended-plan-toggle"), "GENE 1.5 planning controls have responsive styling");
 assert.ok(prompts.includes("UNIFIED BRAIN CONTRACT") && prompts.includes("AUTONOMOUS DESIGN PASS") && prompts.includes("CONTINUITY CONTRACT"), "all project types share one continuous autonomous design brain");
 assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType: "application/json" }'), "web research is not forced into JSON MIME mode that can interfere with grounding");
@@ -617,6 +617,11 @@ assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.inc
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
+const genePrompts = read("apps/web/app/lib/prompts.ts");
+assert.match(genePrompts, /AUTONOMOUS TOOL ORCHESTRATION/, "GENE prompt explains transparent tool orchestration and consent boundaries");
+assert.match(genePrompts, /LARGE REQUEST DECOMPOSITION/, "GENE prompt decomposes long requests into dependency-aware stages");
+assert.match(genePrompts, /SINGLE AUDIO OWNER \/ NO DUPLICATE SETTINGS/, "GENE prompt prevents duplicate audio controls and loops");
+assert.match(api, /data-gene-audio-settings/, "automatic audio repair has an idempotent guard against duplicate settings panels");
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Update plan") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
@@ -653,7 +658,9 @@ assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/scri
 
 // GENE 1.4 regressions: the builder must grow beyond the four boot files,
 // run a real one-question-at-a-time interview, and recover rather than restart.
-assert.ok(page.includes('project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"'), "new Plan Mode projects begin with the interview instead of jumping straight to a shallow plan");
+assert.ok(page.includes('interactionMode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"') && page.includes('else if (interactionMode === "chat" && !explicitBuildIntent) operation = "chat"'), "Plan mode remains planning-only and Chat stays conversational unless an explicit build intent is selected");
+assert.ok(page.includes("renderer:\'dom-text-game\'") && page.includes("controls:!!controls"), "DOM-based text and quiz games can pass live preview detection without a canvas");
+assert.ok(page.includes("GAMEPLAY CONTROLS ARE REQUIRED") && page.includes("four clickable answers") && page.includes("Never render a nonfunctional control"), "game generation requires functional quiz choices, progression and wired controls");
 assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
 assert.ok(page.includes('new Set(["json","js","svg"') && page.includes("test(stagePath)"), "JavaScript modules are accepted and scheduled as real generation stages");
 assert.ok(page.includes("recoverFromCheckpoint(nextProject.buildRun)") && page.includes("Checkpoint recovery: kept completed stage"), "failed builds restore the latest checkpoint and skip already-passed stages");
@@ -686,7 +693,8 @@ assert.ok(api.includes("const runtimeSource = Object.entries(byPath).filter(([pa
 assert.ok(api.includes("GENE audio auto-wiring") && api.includes("window.GeneAudio.music.start(") && !api.includes("the game uses GeneAudio but is incomplete"), "an incomplete GeneAudio integration is repaired deterministically instead of rejecting the whole build");
 assert.ok(api.includes("GENE auto-placeholder") && api.includes("spec.healedModules = healed") && api.includes("minimal full-viewport default"), "declared-but-missing modules and a missing stylesheet are self-healed instead of rejecting the build");
 assert.ok(api.includes("spec.controls = inferred") && api.includes("normalizedSpecChanged") && api.includes("validationFiles"), "final validation deterministically repairs and returns a missing game controls contract");
-assert.ok(api.includes("const recoveredControls: string[] = []") && api.includes("game controls are missing and no keyboard, touch, or controller handlers were found"), "build contract recovers controls from the complete assembled runtime and gives a precise error when no input handlers exist");
+assert.ok(api.includes("const recoveredControls: string[] = []") && api.includes("game controls are missing and no keyboard, touch, controller, or interactive UI handlers were found"), "build contract recovers controls from the complete assembled runtime and gives a precise error when no input handlers exist");
+assert.ok(api.includes("Interactive game UI: click or tap the on-screen choices and controls.") && api.includes("(?:click|submit|change|input)"), "click-based quiz and text games count their actual UI handlers as valid controls");
 assert.ok(page.includes("Add app modules only when the actual requested feature scope needs them") && page.includes("A module is justified by a feature, not by a fixed template"), "additional modules are selected from project scope instead of a fixed file template");
 
 assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
@@ -707,6 +715,7 @@ assert.ok(prompts.includes("binary media must come from the asset/Forge pipeline
 assert.ok(page.includes("key must match this filename exactly") && page.includes("window.GeneModules["), "generated modules use deterministic global API names the runtime can call");
 assert.ok(page.includes("isRuntimeLoadablePath") && page.includes("model\\.obj"), "asset staging is gated by an explicit runtime-loadable path contract");
 assert.ok(page.includes("Integrate into game") && page.includes("Load it into the actual playable scene") && page.includes("visibly present in the preview"), "saved Forge meshes have a source-linked scene-integration workflow that requests visible runtime proof");
+assert.ok(css.includes(".forge-view .forge-form-top{grid-template-columns:repeat(3,minmax(0,1fr))") && css.includes(".forge-view .forge-prompt:focus") && css.includes(".forge-view .forge-asset-card:hover"), "Forge workshop has responsive structured controls, visible focus, and refined asset cards");
 
 
 const studioContract = read("apps/web/app/lib/studio-contract.ts");

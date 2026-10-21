@@ -450,8 +450,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
             kitSfxCalls >= 2 ? "" : "  window.addEventListener('pointerdown', function () { if (sfxReady()) window.GeneAudio.sfx('ui'); }, { passive: true });",
             kitSfxCalls >= 2 ? "" : "  window.addEventListener('keydown', function (e) { if (!e.repeat && sfxReady()) window.GeneAudio.sfx('hit'); }, { passive: true });",
             kitControls ? "" : "  function mountAudioPanel() {",
-            kitControls ? "" : "    var host = document.createElement('div'); host.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:50;font:12px system-ui,sans-serif';",
-            kitControls ? "" : "    var toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = 'Audio'; toggle.setAttribute('aria-label', 'Audio settings');",
+            kitControls ? "" : "    var host = document.createElement('div'); host.id = 'gene-audio-settings-host'; host.setAttribute('data-gene-audio-settings', 'true'); host.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:50;font:12px system-ui,sans-serif';",
+            kitControls ? "" : "    /* Reuse an existing settings control; never inject a second Audio panel. */",
+            kitControls ? "" : "    if (document.querySelector('[data-gene-audio-settings], #gene-audio-settings, #gene-audio-settings-host')) return;",
+            kitControls ? "" : "    var toggle = document.createElement('button'); toggle.type = 'button'; toggle.id = 'gene-audio-settings'; toggle.setAttribute('data-gene-audio-settings', 'true'); toggle.textContent = 'Audio'; toggle.setAttribute('aria-label', 'Audio settings');",
             kitControls ? "" : "    toggle.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,20,.8);color:#eaf2f7;cursor:pointer';",
             kitControls ? "" : "    var slot = document.createElement('div'); slot.style.cssText = 'display:none;margin-bottom:6px'; window.GeneAudio.createSettingsPanel(slot);",
             kitControls ? "" : "    toggle.addEventListener('click', function () { slot.style.display = slot.style.display === 'none' ? 'block' : 'none'; });",
@@ -540,9 +542,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           .map(([, content]) => content).join("\n");
         const recoveredControls: string[] = [];
         if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(allRuntimeSource)) recoveredControls.push("Keyboard controls: use the movement/action keys shown in the game.");
+        if (/(addEventListener\s*\(\s*[\'"](?:click|submit|change|input)[\'"]|\.onclick\s*=|onClick\s*=)/i.test(allRuntimeSource)) recoveredControls.push("Interactive game UI: click or tap the on-screen choices and controls.");
         if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(allRuntimeSource)) recoveredControls.push("Touch and pointer controls: use the visible on-screen controls.");
         if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(allRuntimeSource)) recoveredControls.push("Gamepad/controller controls: use the mapped buttons and sticks.");
-        if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, or controller handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
+        if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, controller, or interactive UI handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
         spec.controls = recoveredControls;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
         // Persist deterministic contract repairs into the actual returned files.
@@ -655,10 +658,11 @@ export async function POST(request: NextRequest) {
         const source = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
         const inferred: string[] = [];
         if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(source)) inferred.push("Keyboard controls: use the displayed movement/action keys.");
+        if (/(addEventListener\s*\(\s*[\'"](?:click|submit|change|input)[\'"]|\.onclick\s*=|onClick\s*=)/i.test(source)) inferred.push("Interactive game UI: click or tap the on-screen choices and controls.");
         if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(source)) inferred.push("Touch/pointer controls: use the on-screen controls or tap/drag the play area.");
         if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(source)) inferred.push("Gamepad/controller controls: use the mapped controller buttons and sticks.");
         if (!inferred.length) {
-          throw new Error("Build rejected: game controls are missing because no keyboard, touch, or controller input handlers were found in the assembled JavaScript. Implement real input handlers in game.js or a runtime module, then declare the supported controls in game-spec.json.");
+          throw new Error("Build rejected: game controls are missing because no keyboard, touch, controller, or interactive UI handlers were found in the assembled JavaScript. Implement real input handlers in game.js or a runtime module, then declare the supported controls in game-spec.json.");
         }
         spec.controls = inferred;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
@@ -714,6 +718,17 @@ export async function POST(request: NextRequest) {
 
   const apiKeys = getGeminiKeys();
   if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
+    // An explicitly selected native mode is handled above. For normal AI modes,
+    // never silently turn the first plan/interview into a low-quality deterministic plan.
+    // Return a clear provider error so users can fix configuration instead of mistaking
+    // a rule-based outline for an AI-generated plan.
+    if (["plan", "interview"].includes(body.operation)) {
+      return jsonError(
+        "GENE could not create an AI plan because no AI provider key is configured. Select GENE Fast / Thinking / GENE BH and configure a valid Gemini, Groq, or OpenRouter key in the deployment environment. No project files were changed. Use Gene Native only when you intentionally want a deterministic offline outline.",
+        503,
+        "GENE_AI_PROVIDER_NOT_CONFIGURED"
+      );
+    }
     const answers = body.answers || {};
     const known = Object.keys(answers);
     if (body.operation === "interview") {
@@ -1182,7 +1197,8 @@ export async function POST(request: NextRequest) {
         return jsonError(summary + "The request exceeded a backup model context/request-size limit. GENE skipped incompatible models, but this task still needs a smaller staged request. Existing project files were preserved. Retry by building one stage/file at a time or shorten the design brief. Detail: " + detail, 413, "GENE_REQUEST_TOO_LARGE");
       }
       if (lastFailure.status === 401 || lastFailure.status === 403) {
-        return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
+        const providerKeyName = /groq/i.test(lastFailureProvider) ? "GROQ_API_KEY" : /openrouter/i.test(lastFailureProvider) ? "OPENROUTER_API_KEY" : "the selected provider key";
+        return jsonError(summary + lastFailureProvider + " rejected its API key or account access. Check only " + providerKeyName + " in the deployment environment; remove that key only if you intentionally no longer use that provider. GENE will not delete secrets automatically. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
       }
       if (lastFailure.status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) {
         return jsonError(summary + "Free routes are rate-limited or out of capacity right now. Wait a minute and retry, or add another free Gemini key (GEMINI_API_KEY_2). Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");

@@ -50,9 +50,9 @@ export function backoffMs(kind, attempt) {
 /** Remove credentials and sensitive URL query strings before showing or reusing error text. */
 export function sanitizeFailureDetail(value) {
   return String(value || "")
-    .replace(/\\b(?:sk-[A-Za-z0-9_-]{12,}|AIza[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{12,})\\b/g, "[redacted credential]")
-    .replace(/([?&](?:key|api_key|token|access_token|authorization)=)[^&\\s]+/gi, "$1[redacted]")
-    .replace(/\\s+/g, " ")
+    .replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|AIza[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{12,})\b/g, "[redacted credential]")
+    .replace(/([?&](?:key|api_key|token|access_token|authorization)=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 800);
 }

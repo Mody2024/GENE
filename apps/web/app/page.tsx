@@ -488,7 +488,7 @@ export default function Home() {
     const engine = (() => { try { return JSON.parse(spec).engine === "webgl3d" ? "webgl3d" : "canvas2d"; } catch { return "canvas2d"; } })();
     const monitor = [
       "(function(){",
-      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'unknown'},'*');return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0){alpha++;if(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0){alpha++;if(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
+      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){var b=document.body;var controls=b&&b.querySelector('button,input,select,textarea,[role=button],[role=radio],[role=option],a[href],form,[tabindex]');var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||controls));if(visible){window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:'rendered',renderer:'dom-text-game',controls:!!controls},'*');}else{parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'dom-text-game'},'*');}return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0){alpha++;if(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0){alpha++;if(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:(e.message||'script error')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno+':'+e.colno:''),stack:e.error&&e.error.stack?String(e.error.stack).slice(0,900):''},'*');});",
       "window.addEventListener('unhandledrejection',function(e){var r=e.reason;parent.postMessage({type:'gene-runtime',state:'error',message:'Unhandled promise rejection: '+String(r&&r.message||r||'unknown rejection'),stack:r&&r.stack?String(r.stack).slice(0,900):''},'*');});",
       "window.addEventListener('message',function(e){if(e.data&&e.data.type==='gene-custom-edit-mode'){window.__geneCustomEdit=!!e.data.enabled;document.documentElement.style.cursor=window.__geneCustomEdit?'crosshair':'';}});",
@@ -642,11 +642,14 @@ export default function Home() {
     if (!operationOverride) {
       const hasSource = Object.keys(project.files).length > 0;
       const asksForChange = /\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|modify|adjust|remap|integrate|repair|polish)\b/i.test(prompt);
+      const explicitBuildIntent = /\b(build|implement|generate|code|start building|apply (?:the )?(?:plan|changes)|make the changes|edit the files)\b/i.test(prompt);
       if (searchMode) operation = "research";
+      // Workspace mode is authoritative: plan updates must not fall through into build/edit.
+      else if (interactionMode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
+      // Chat is conversational by default. Explicit implementation can still mutate source.
+      else if (interactionMode === "chat" && !explicitBuildIntent) operation = "chat";
       else if (isConversationOnly(prompt)) operation = "chat";
       else if (hasSource && asksForChange) operation = "edit";
-      else if (interactionMode === "chat") operation = "chat";
-      else if (interactionMode === "plan" || project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
       else if (!hasSource) operation = "build";
       else operation = "edit";
     }
@@ -704,7 +707,18 @@ export default function Home() {
     setSection("chat");
     try {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
-      const needsResearch = !silent && (operation === "research" || ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")));
+      const chatNeedsResearch = operation === "chat" && (
+        /\b(search|research|look up|find sources|sources for|check online|browse the web|verify online|latest|current|today|this week|recent|up[- ]to[- ]date|documentation|what changed|release date|version of|news about|who is|what is|what are|when is|when did|where is|why does|why is|how does|how do|how much|how many|which is|compare|versus|vs\.?|price|cost|available|supported|compatible)\b/i.test(prompt) ||
+        (prompt.trim().length >= 55 && /[?؟]/.test(prompt) && !/\b(write me|make me|create me|tell me a story|roleplay|brainstorm|imagine)\b/i.test(prompt))
+      );
+      // Research runs automatically for planning/building and chat questions that
+      // depend on current or externally verifiable facts. The explicit web-research
+      // toggle can still force a search for any prompt.
+      const needsResearch = !silent && (
+        operation === "research" ||
+        chatNeedsResearch ||
+        ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
+      );
       if (needsResearch) {
         const researchQuery = operation === "research"
           ? prompt.slice(0, 900)
@@ -877,6 +891,7 @@ export default function Home() {
                 : /\.(?:m?js|cjs)$/i.test(stagePath) && stagePath !== "game.js"
                   ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.(?:m?js|cjs)$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs. Implement the responsibility named for this path, expose a small documented API under the filename-derived GeneModules key, and keep private variables scoped inside an IIFE. Do not access another module's private state directly; communicate through its declared API. Include safe initialization and return a meaningful result or explicit error for invalid input."
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Initialize and validate the shared module registry, call each required API in the planned dependency order, and make missing APIs fail visibly rather than silently skipping mechanics. Keep the main loop, input, state updates, collision/rules, rendering, win/loss flow and reset coherent; keep state ownership explicit between systems. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
+              "GAMEPLAY CONTROLS ARE REQUIRED: implement every control the genre implies, visibly inside the game UI, and wire it to real state changes. For DOM/text/quiz games, use semantic clickable buttons and keyboard-accessible interactions, show selected/correct/incorrect feedback, update score and progress, and make Next/Continue/Restart/Lifeline/Menu controls functional. For a Who Wants to Be a Millionaire-style game, include four clickable answers, question progression, a money ladder, answer feedback, working lifelines only if shown, and restart/game-over behavior. Add visible focus styles, accessible labels, touch-friendly targets and a short control hint. Never render a nonfunctional control; hide features that are not implemented. Validate real interactions in the browser and fix missing handlers before marking complete." +
               (stageAttempt > 1 ? " RETRY " + stageAttempt + "/5: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " ALTERNATE IMPLEMENTATION: replace the failed algorithm with a simpler but complete one; remove optional effects and verify every identifier." : stageAttempt === 4 ? " SECOND ALTERNATE: use a different state layout or control flow from previous attempts, keep only essential mechanics, and ensure all dependencies exist." : stageAttempt === 5 ? " FINAL RECOVERY: return the smallest complete, bootable implementation of this exact file; no optional systems, repeated data, or unconnected modules." : "");
             try {
               const stageResponse = await runFetch("/api/agent", {
@@ -1849,24 +1864,21 @@ export default function Home() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  async function addReferences(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget;
-    const selected = Array.from(input.files || []);
-    input.value = "";
+  async function addReferenceFiles(selected: File[]) {
     if (!project || !selected.length) return;
     const current = project.references || [];
     let totalBytes = current.reduce((sum, ref) => sum + ref.size, 0);
     const added: GeneProject["references"] = [];
     const skipped: string[] = [];
     for (const file of selected) {
-      if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB)"); continue; }
+      if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB; resize it and try again)"); continue; }
       if (totalBytes + file.size > 950 * 1024) { skipped.push(file.name + " (project reference budget reached)"); continue; }
       if (/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
         try {
           const dataUrl = await readDataUrl(file);
           const dataBase64 = dataUrl.split(",")[1] || "";
           if (!dataBase64) { skipped.push(file.name + " (image data unreadable)"); continue; }
-          added.push({ id: uid(), name: file.name, mimeType: file.type, kind: "image", dataBase64, size: file.size });
+          added.push({ id: uid(), name: file.name || "pasted-image-" + (added.length + 1) + ".png", mimeType: file.type, kind: "image", dataBase64, size: file.size });
           totalBytes += file.size;
         } catch { skipped.push(file.name + " (could not read)"); }
       } else if (ALLOWED_REFERENCE_TEXT.test(file.name) || file.type.startsWith("text/") || file.type === "application/json") {
@@ -1881,10 +1893,33 @@ export default function Home() {
       }
     }
     if (added.length) {
-      setProject({ ...project, references: [...current, ...added], updatedAt: now() });
-      setNotice("Attached " + added.length + " reference file(s). The selected AI provider will receive these references with the next request.");
+      setProject(currentProject => currentProject && currentProject.id === project.id
+        ? { ...currentProject, references: [...(currentProject.references || []), ...added], updatedAt: now() }
+        : currentProject);
+      setNotice("Attached " + added.length + " file(s). They'll be sent to GENE with your next message.");
     }
     if (skipped.length) setNotice((added.length ? "Attached " + added.length + ". " : "") + "Skipped: " + skipped.join(", "));
+  }
+
+  async function addReferences(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const selected = Array.from(input.files || []);
+    input.value = "";
+    await addReferenceFiles(selected);
+  }
+
+  function pasteReferenceImages(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(event.clipboardData.items || []);
+    const images = items
+      .filter(item => item.kind === "file" && /^image\/(jpeg|png|webp|gif)$/.test(item.type))
+      .map(item => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    if (!images.length) return;
+    event.preventDefault();
+    void addReferenceFiles(images.map((file, index) => {
+      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/gif" ? "gif" : "jpg";
+      return new File([file], "pasted-image-" + (index + 1) + "." + extension, { type: file.type, lastModified: Date.now() });
+    }));
   }
 
   function removeReference(id: string) {
@@ -2834,7 +2869,7 @@ export default function Home() {
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
-              <form className="composer studio-composer" onSubmit={onSubmit}>
+              <form className="composer studio-composer" onSubmit={onSubmit} onDragOver={event => { if (Array.from(event.dataTransfer.types).includes("Files")) event.preventDefault(); }} onDrop={event => { if (Array.from(event.dataTransfer.types).includes("Files")) { event.preventDefault(); void addReferenceFiles(Array.from(event.dataTransfer.files || [])); } }}>
                 <div className="composer-context-label"><span className="composer-context-dot" /> {interactionMode === "chat" ? "Chat with GENE" : interactionMode === "plan" ? "Plan your project" : "Build and edit"}<span className="composer-context-hint">{interactionMode === "chat" ? "Ideas, questions, and edits" : interactionMode === "plan" ? "Shape scope before building" : "Apply changes to real files"}</span></div>
                 <div className="composer-toolbar">
                   <div className="composer-mode-switch" role="group" aria-label="Conversation mode">
@@ -2857,14 +2892,14 @@ export default function Home() {
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
                 </div>}
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 128) : 46) + "px"; }} placeholder={interactionMode === "chat" ? "Ask anything. Talk through ideas, get explanations, or explore options…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe what you want to create and we'll plan it together…") : hasGame ? "Describe the change you want GENE to make…" : "Describe the app or game to build…"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 128) : 46) + "px"; }} onPaste={pasteReferenceImages} placeholder={interactionMode === "chat" ? "Ask anything. Paste an image or drop files here…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project… (paste an image or drop files)" : "Describe what you want to create… (paste an image or drop files)") : hasGame ? "Describe the change… (paste an image or drop files)" : "Describe the app or game… (paste an image or drop files)"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools">
                     <button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button>
                     <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning. Native: no external AI calls." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
                       <option value="native">Gene Native · no external AI</option><option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
-                    <span className="key-hint">Enter · Shift+Enter for a new line</span>
+                    <span className="key-hint">Drop files or paste an image · Enter to send</span>
                   </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
