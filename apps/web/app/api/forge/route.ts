@@ -468,6 +468,10 @@ export async function POST(request: NextRequest) {
       asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
     });
   } catch (e) {
-    return fail(422, "ASSET_VALIDATION_FAILED", "GENE Forge rejected the generated recipe: " + (e instanceof Error ? e.message : String(e)) + ". No mesh files were saved.");
+    // Provider output is untrusted: if its recipe fails validation or mesh construction,
+    // try the bounded native generator before returning an error.
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(422, "ASSET_VALIDATION_FAILED", "GENE Forge rejected the generated recipe and the native fallback could not safely replace it: " + (e instanceof Error ? e.message : String(e)) + ". No mesh files were saved.");
   }
 }
