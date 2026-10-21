@@ -33,8 +33,8 @@ assert.match(studioPage, /fetch\("\/api\/forge\/2d"/, "asset workshop must call 
 assert.match(studioPage, /generateForge2DAsset/, "asset workshop must save native 2D output");
 assert.match(studioPage, /Integrate the generated 2D asset/, "2D assets must offer a game-integration action");
 assert.match(studioPage, /Saved artwork/, "asset workshop must list saved 2D assets");
-assert.match(runtimeAssets, /asset-2d\\\\\.json/, "runtime asset bootstrap must include 2D manifests");
-assert.match(runtimeAssets, /sprite\\\\\.svg/, "runtime asset bootstrap must expose generated sprite sheets");
+assert.ok(runtimeAssets.includes("asset-2d\\.json"), "runtime asset bootstrap must include 2D manifests");
+assert.ok(runtimeAssets.includes("sprite\\.svg"), "runtime asset bootstrap must expose generated sprite sheets");
 assert.match(runtimeAssets, /A\.draw=function\(ctx,p,x,y,w,h\)/, "generated SVG assets must be drawable by Canvas games");
 assert.match(presets, /part\("left upper arm","capsule"/, "native characters must use capsule limbs instead of purely cylindrical limbs");
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
