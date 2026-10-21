@@ -1018,6 +1018,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px sol
 .studio-v2 .forge-assets-heading>span{font-size:9px;color:#858c8f}
 .studio-v2 .forge-asset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .studio-v2 .forge-asset-card{min-width:0;overflow:hidden;border:1px solid var(--studio-line);border-radius:14px;background:#17191c;padding:13px}
+.studio-v2 .forge-2d-preview{display:grid;place-items:center;min-height:150px;margin:10px 0;border:1px solid var(--studio-line);border-radius:10px;background-color:#f3f0e8;background-image:linear-gradient(45deg,#e5e0d6 25%,transparent 25%),linear-gradient(-45deg,#e5e0d6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e0d6 75%),linear-gradient(-45deg,transparent 75%,#e5e0d6 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;overflow:hidden}
+.studio-v2 .forge-2d-preview img{display:block;max-width:100%;max-height:260px;object-fit:contain}
 .studio-v2 .forge-asset-card-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .studio-v2 .forge-asset-card-title strong{font-size:12px;color:#e4e8df}
 .studio-v2 .forge-asset-card-title small{display:block;margin-top:4px;font-size:9px;color:#8c9394}
