@@ -714,6 +714,17 @@ export async function POST(request: NextRequest) {
 
   const apiKeys = getGeminiKeys();
   if (apiKeys.length === 0 && !process.env.GROQ_API_KEY?.trim() && !process.env.OPENROUTER_API_KEY?.trim()) {
+    // An explicitly selected native mode is handled above. For normal AI modes,
+    // never silently turn the first plan/interview into a low-quality deterministic plan.
+    // Return a clear provider error so users can fix configuration instead of mistaking
+    // a rule-based outline for an AI-generated plan.
+    if (["plan", "interview"].includes(body.operation)) {
+      return jsonError(
+        "GENE could not create an AI plan because no AI provider key is configured. Select GENE Fast / Thinking / GENE BH and configure a valid Gemini, Groq, or OpenRouter key in the deployment environment. No project files were changed. Use Gene Native only when you intentionally want a deterministic offline outline.",
+        503,
+        "GENE_AI_PROVIDER_NOT_CONFIGURED"
+      );
+    }
     const answers = body.answers || {};
     const known = Object.keys(answers);
     if (body.operation === "interview") {
