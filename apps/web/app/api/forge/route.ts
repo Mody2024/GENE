@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
-import { buildNativeForgeRecipe } from "../../lib/forge-presets.mjs";
+import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
