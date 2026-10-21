@@ -1260,10 +1260,10 @@ export default function Home() {
         // Retry transient provider failures and incomplete model outputs automatically.
         // Keep this bounded: one initial request plus two compact retries.
         let lastFailure: { kind: ReturnType<typeof classifyFailure>["kind"]; message: string } = { kind: "unknown", message: "" };
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 5; attempt++) {
           if (attempt > 0) {
             const waitMs = backoffMs(lastFailure.kind, attempt);
-            addActivity("Automatic recovery retry " + (attempt + 1) + "/3 after: " + classifyFailure(lastFailure.message, "").title.toLowerCase() + " (waiting " + Math.round(waitMs / 100) / 10 + "s)");
+            addActivity("Automatic recovery retry " + (attempt + 1) + "/5 after: " + classifyFailure(lastFailure.message, "").title.toLowerCase() + " (waiting " + Math.round(waitMs / 100) / 10 + "s)");
             setNotice("GENE is retrying. Your current project files remain safe.");
             await new Promise(resolve => window.setTimeout(resolve, waitMs));
           }
@@ -1285,13 +1285,13 @@ export default function Home() {
             });
           } catch (networkError) {
             const detail = networkError instanceof Error ? networkError.message : "network connection lost";
-            addActivity("Network failure on request attempt " + (attempt + 1) + "/3: " + detail);
+            addActivity("Network failure on request attempt " + (attempt + 1) + "/5: " + detail);
             lastFailure = { kind: "network", message: detail };
-            if (attempt < 2) {
+            if (attempt < 4) {
               setNotice("GENE lost the connection to its server. It will retry with a different recovery strategy; saved files remain untouched.");
               continue;
             }
-            payload = { ok: false, error: { code: "GENE_NETWORK_RETRY_EXHAUSTED", message: "The connection failed on all three request attempts. No unconfirmed changes were applied. Retry when the connection is stable." } };
+            payload = { ok: false, error: { code: "GENE_NETWORK_RETRY_EXHAUSTED", message: "The connection failed on all five request attempts. No unconfirmed changes were applied. Retry when the connection is stable." } };
             responseOk = false;
             break;
           }
@@ -1303,7 +1303,7 @@ export default function Home() {
           const failureMessage = String(payload?.error?.message || "");
           const failure = classifyFailure(failureMessage, code, status);
           lastFailure = { kind: failure.kind, message: failureMessage };
-          if (!failure.retryable || attempt >= 2) break;
+          if (!failure.retryable || attempt >= 4) break;
         }
       }
       if (!responseOk || !payload?.ok) {
