@@ -1100,6 +1100,32 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  if (!payload && body.operation === "buildPart" && !request.signal.aborted) {
+    // If all configured providers fail (including rejected keys), preserve progress by using
+    // the local deterministic generator for this one requested file. Never mislabel it as AI.
+    try {
+      const nativeResult = await createNativeResult({ ...body, operation: "buildPart" });
+      const normalized = normalizeAgentResult(
+        nativeResult as AgentResponse,
+        "buildPart",
+        body.project?.plan || undefined,
+        projectKind,
+        body.project?.name || "Untitled Project",
+        projectKind === "app" ? "webapp" : body.project?.preferredEngine === "webgl3d" ? "webgl3d" : "canvas2d"
+      );
+      const safeFiles = validateFiles(normalized.files || [], "buildPart", body.project?.plan?.engine, body.mode, projectKind, false);
+      if (safeFiles.length !== 1 || safeFiles[0]?.path !== body.stagePath || safeFiles[0].content.length > 500_000) {
+        throw new Error("Native fallback did not return exactly the requested safe file.");
+      }
+      normalized.files = safeFiles;
+      normalized.reply = "AI providers were unavailable or rejected access. GENE used its built-in deterministic recovery generator for this file, then applied source validation. This is a native fallback, not an AI-generated result.";
+      return NextResponse.json({ ok: true, aiMode: "native-fallback", model: "GENE Native Recovery", result: normalized });
+    } catch (nativeError) {
+      if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+      // Keep the original provider error below; it is more actionable than a generic fallback failure.
+    }
+  }
+
   if (!payload) {
     if (chainTried.length) {
       const detail = [
