@@ -8,7 +8,6 @@ import {
   keywords,
   musicSearchTerms,
   parseCommonsFiles,
-  parseGoogleSearchResults,
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
 
