@@ -92,7 +92,7 @@ assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API s
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(api.includes("GENE FORGE 2D TOOL RESULTS") && api.includes("/api/forge/2d") && api.includes("assets/forge2d/"), "normal 2D game builds invoke Forge, pass generated asset paths to the model, and include the actual SVG/manifest files");
 assert.ok(api.includes("put executable source in game.js and load it with a local game.js script src"), "final validation permits the local game.js entry while rejecting inline and remote script tags");
-const finalHtmlScriptGuard = /<script\\b(?![^>]*\\btype\\s*=\\s*["'](?:application\\/json|application\\/ld\\+json)["'])(?![^>]*\\bsrc\\s*=\\s*["'](?:\\.\\/)?game\\.js(?:[?#][^"']*)?["'])/i;
+const finalHtmlScriptGuard = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])(?![^>]*\bsrc\s*=\s*["'](?:\.\/)?game\.js(?:[?#][^"']*)?["'])/i;
 assert.equal(finalHtmlScriptGuard.test('<script src="./game.js"></script>'), false, "the standard local game.js script entry must pass final validation");
 assert.equal(finalHtmlScriptGuard.test('<script>startGame()</script>'), true, "inline executable script tags must be rejected if they reach the final HTML check");
 assert.equal(finalHtmlScriptGuard.test('<script src="https://cdn.example/game.js"></script>'), true, "remote executable script tags must be rejected");
