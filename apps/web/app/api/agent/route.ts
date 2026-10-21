@@ -1196,7 +1196,7 @@ export async function POST(request: NextRequest) {
       }
       if (lastFailure.status === 401 || lastFailure.status === 403) {
         const providerKeyName = /groq/i.test(lastFailureProvider) ? "GROQ_API_KEY" : /openrouter/i.test(lastFailureProvider) ? "OPENROUTER_API_KEY" : "the selected provider key";
-        return jsonError(summary + lastFailureProvider + " rejected its API key or account access. Check only " + providerKeyName + " in the deployment environment; remove that key only if you intentionally no longer use that provider. GENE will not delete secrets automatically. Your existing project files were preserved. Detail: " + detail, 503, "AI_PROVIDER_KEY_REJECTED");
+        return jsonError(summary + lastFailureProvider + " rejected its API key or account access. Check only " + providerKeyName + " in the deployment environment; remove that key only if you intentionally no longer use that provider. GENE will not delete secrets automatically. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
       }
       if (lastFailure.status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) {
         return jsonError(summary + "Free routes are rate-limited or out of capacity right now. Wait a minute and retry, or add another free Gemini key (GEMINI_API_KEY_2). Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");
