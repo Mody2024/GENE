@@ -698,7 +698,7 @@ export default function Home() {
         setLiveRun(current => current ? { ...current, stage: "research", research: { topic: researchQuery, status: "running" } } : current);
         addActivity("Researching “" + researchQuery.slice(0, 70) + "” (Wikipedia, Wikimedia Commons, Poly Haven)");
         try {
-          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", images: /\\b(images?|screenshots?|concept art|visual references?|reference pictures?)\\b/i.test(researchQuery) }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", images: /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(researchQuery) }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
