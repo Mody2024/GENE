@@ -820,6 +820,52 @@ export async function POST(request: NextRequest) {
     userInput += "\n\nFINAL GAME BUILD CONTRACT — do not omit required deliverables: return non-empty plan.title, plan.summary and plan.engine matching the requested engine; include the four current runtime compatibility entry files game.html, game.css, game.js and game-spec.json, but treat them ONLY as the launch/compatibility shell, not as a universal project architecture. FIRST classify the game genre, engine, complexity, core systems, asset needs and likely growth; then design a project-specific file tree BEFORE writing code. Choose meaningful names and folders independently for THIS game (for example src/world/, src/player/, src/combat/, src/quests/, src/economy/, src/ai/, src/save/, src/ui/, assets/models/, assets/audio/, shaders/ only when needed). Do not create irrelevant folders or modules, and do not dump every mechanic into game.js. Keep game.js as a small bootstrap/orchestrator where possible and put substantial systems in separately named project files using the runtime-supported loading approach. Declare every extra JavaScript module path in game-spec.json additionalFiles in dependency/load order and return every declared file. The current sandbox loads these as ordered classic scripts, not native ES modules: wrap each module in an IIFE and expose its API under window.GeneModules[filenameWithoutExtension] so files have independent scope; game.js is the final bootstrap that composes those APIs. Do not use import/export syntax or depend on implicit global const/function leakage. Different genres must produce visibly different trees. Include a concise architecture description and file-tree summary in the plan. Preserve the requested engine and project identity. Use the injected GeneAudio kit for real sound: call GeneAudio.music.start('exploration') from the real start/play gesture, GeneAudio.sfx('start') and at least two other named SFX from actual gameplay/UI events, and expose settings with GeneAudio.createSettingsPanel(container) or a working volume/mute control. Put mapped event names in game-spec.json audio.events and audio.implementation='procedural-web-audio'. Make controls, collisions, progression, pause/resume, restart and reachable win/loss states genuinely work. Never claim a feature that is not implemented.";
   }
 
+  // GENE Forge tool bridge: run bounded native modelling before the game model writes code.
+  // The recipe is injected into the build context and its source mesh files are returned with the project.
+  let forgeToolAssets: Array<{ kind: string; name: string; recipe: any; files: Record<string, string>; partCount: number; triangleCount: number }> = [];
+  const forgePrompt = String(body.message || body.project?.initialPrompt || "");
+  const wants3DForge = ["build", "surprise"].includes(body.operation) && projectKind === "game" && (
+    body.project?.projectIntent === "game-3d" || body.project?.preferredEngine === "webgl3d" || body.project?.plan?.engine === "webgl3d" ||
+    /\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(forgePrompt)
+  );
+  if (wants3DForge && !request.signal.aborted) {
+    const lowerPrompt = forgePrompt.toLowerCase();
+    const requestedKinds: Array<{ kind: string; prompt: string }> = [
+      { kind: "character", prompt: "Create the main playable character for this game. " + forgePrompt },
+      { kind: "environment", prompt: "Create a recognizable environment landmark and ground-contact forms for this game world. " + forgePrompt }
+    ];
+    if (/\b(vehicle|truck|car|van|driving|racing|bus)\b/i.test(lowerPrompt)) requestedKinds.push({ kind: "vehicle", prompt: "Create the main vehicle for this game. " + forgePrompt });
+    if (/\b(furniture|chair|table|sofa|bed|cabinet|crate|prop)\b/i.test(lowerPrompt) && requestedKinds.length < 3) requestedKinds.push({ kind: "prop", prompt: "Create the most important gameplay prop for this game. " + forgePrompt });
+    const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
+    const toolResults = await Promise.all(requestedKinds.slice(0, 3).map(async item => {
+      try {
+        const endpoint = new URL("/api/forge", request.url);
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle: String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200), nativeOnly: true }),
+          signal: request.signal,
+          cache: "no-store"
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        const asset = data?.ok ? data.asset : null;
+        if (!asset || !asset.recipe || !asset.files || typeof asset.files["model.obj"] !== "string") return null;
+        return { kind: item.kind, name: String(asset.name || item.kind), recipe: asset.recipe, files: asset.files, partCount: Number(asset.partCount) || 0, triangleCount: Number(asset.triangleCount) || 0 };
+      } catch {
+        if (request.signal.aborted) return null;
+        return null;
+      }
+    }));
+    forgeToolAssets = toolResults.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
+    if (forgeToolAssets.length) {
+      userInput += "\n\nGENE FORGE TOOL RESULTS — THESE ARE REAL GENERATED ASSETS, NOT SUGGESTIONS. Forge generated and validated the following procedural 3D recipes. Use these exact recipes as the source of truth for the in-game meshes: implement their supported shapes, positions, scales, rotations, and per-part colours in the requested WebGL renderer; adapt scale/camera only when necessary. Do not replace them with generic placeholder geometry. Mesh exports will also be included in the project under assets/models/. Do not use network CDNs.\n" +
+        JSON.stringify(forgeToolAssets.map((asset, index) => ({ id: "forge_asset_" + (index + 1), kind: asset.kind, name: asset.name, recipe: asset.recipe, partCount: asset.partCount, triangleCount: asset.triangleCount, files: { obj: "assets/models/" + asset.kind + ".obj", mtl: "assets/models/" + asset.kind + ".mtl", metadata: "assets/models/" + asset.kind + ".json" } })));
+    } else {
+      userInput += "\n\nGENE FORGE TOOL STATUS: The bounded native asset tool did not return a validated recipe for this request. Do not claim that Forge assets were generated; build the best valid game you can and disclose the missing tool asset.";
+    }
+  }
+
   const parts: Array<Record<string, unknown>> = [{ text: userInput }];
   const references = Array.isArray(body.project?.references) ? body.project.references : [];
   const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -1322,6 +1368,23 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
+  if (forgeToolAssets.length && Array.isArray(result.files)) {
+    const generatedAssetFiles: Array<{ path: string; content: string }> = [];
+    for (const asset of forgeToolAssets) {
+      const entries: Array<[string, string]> = [
+        ["assets/models/" + asset.kind + ".obj", asset.files["model.obj"]],
+        ["assets/models/" + asset.kind + ".mtl", asset.files["model.mtl"]],
+        ["assets/models/" + asset.kind + ".json", asset.files["asset.json"]]
+      ];
+      for (const [path, content] of entries) {
+        if (typeof content !== "string" || content.length > 490_000 || !isSafeProjectPath(path)) continue;
+        generatedAssetFiles.push({ path, content });
+      }
+    }
+    const assetPaths = new Set(generatedAssetFiles.map(file => file.path));
+    result.files = [...result.files.filter((file: any) => !assetPaths.has(file.path)), ...generatedAssetFiles];
+    result.reply += "\n\nGENE Forge tool run: generated " + forgeToolAssets.length + " validated 3D asset recipe(s) (" + forgeToolAssets.map(asset => asset.kind + ": " + asset.partCount + " parts").join(", ") + "). OBJ/MTL/JSON source assets are included under assets/models/.";
+  }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }
