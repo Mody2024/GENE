@@ -866,6 +866,49 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // GENE Forge 2D bridge: generate native vector assets during ordinary 2D game builds,
+  // pass the real asset paths into the model context, and return the actual files with the game.
+  let forge2DAssets: Array<{ kind: string; name: string; svg: string; manifest: any; qualityReport: any }> = [];
+  const wants2DForge = ["build", "surprise"].includes(body.operation) && projectKind === "game" && !wants3DForge &&
+    (body.project?.preferredEngine === "canvas2d" || body.project?.plan?.engine === "canvas2d" ||
+      (!body.project?.preferredEngine && !body.project?.plan?.engine && !/\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(forgePrompt)));
+  if (wants2DForge && !request.signal.aborted) {
+    const lowerPrompt = forgePrompt.toLowerCase();
+    const kinds: Array<{ kind: string; prompt: string }> = [
+      { kind: "character", prompt: "Create the main recognizable 2D playable character sprite for this game. " + forgePrompt },
+      { kind: /city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt)
+        ? "tileset" : "background",
+        prompt: "Create a matching 2D " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt) ? "game tileset" : "game background") + " for this game. " + forgePrompt }
+    ];
+    const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
+    const results = await Promise.all(kinds.map(async item => {
+      try {
+        const response = await fetch(new URL("/api/forge/2d", request.url), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" }),
+          signal: request.signal,
+          cache: "no-store"
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        const asset = data?.ok ? data.asset : null;
+        if (!asset || typeof asset.svg !== "string" || !asset.manifest || !asset.qualityReport) return null;
+        return { kind: item.kind, name: String(asset.name || item.kind), svg: asset.svg, manifest: asset.manifest, qualityReport: asset.qualityReport };
+      } catch {
+        return null;
+      }
+    }));
+    forge2DAssets = results.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
+    if (forge2DAssets.length) {
+      userInput += "\n\nGENE FORGE 2D TOOL RESULTS — THESE ARE GENERATED VECTOR ASSETS, NOT SUGGESTIONS. Integrate the exact provided local files into the actual playable game where appropriate: " +
+        JSON.stringify(forge2DAssets.map(asset => ({ kind: asset.kind, name: asset.name, svg: "assets/forge2d/" + asset.kind + ".svg", manifest: "assets/forge2d/" + asset.kind + ".json", dimensions: { width: asset.manifest.width, height: asset.manifest.height, frames: asset.manifest.frames } })) ) +
+        "\nUse these local assets in game.js (for example by loading the local SVG as an Image and drawing it to the canvas); do not put executable code in game.html, do not use remote URLs, and do not claim an asset is integrated unless game.js actually loads and renders it. The exact generated files will be included in the project.";
+    } else {
+      userInput += "\n\nGENE FORGE 2D STATUS: The native 2D generator did not return validated artwork. Continue with the best playable game possible and do not claim Forge artwork was generated.";
+    }
+  }
+
   const parts: Array<Record<string, unknown>> = [{ text: userInput }];
   const references = Array.isArray(body.project?.references) ? body.project.references : [];
   const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -906,7 +949,21 @@ export async function POST(request: NextRequest) {
   const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
-    if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+    if (forge2DAssets.length && Array.isArray(result.files)) {
+    const generatedAssetFiles: Array<{ path: string; content: string }> = [];
+    for (const asset of forge2DAssets) {
+      const base = "assets/forge2d/" + asset.kind;
+      const manifest = JSON.stringify({ ...asset.manifest, kind: asset.kind, name: asset.name, source: "GENE Native 2D Forge", qualityReport: asset.qualityReport }, null, 2);
+      if (asset.svg.length <= 300_000 && isSafeProjectPath(base + ".svg")) generatedAssetFiles.push({ path: base + ".svg", content: asset.svg });
+      if (manifest.length <= 100_000 && isSafeProjectPath(base + ".json")) generatedAssetFiles.push({ path: base + ".json", content: manifest });
+    }
+    const paths = new Set(generatedAssetFiles.map(file => file.path));
+    result.files = [...result.files.filter((file: any) => !paths.has(file.path)), ...generatedAssetFiles];
+    result.reply += "\n\nGENE Forge 2D — generated " + forge2DAssets.length + " native vector asset(s): " +
+      forge2DAssets.map(asset => asset.kind + " (" + asset.qualityReport.svgBytes + " SVG bytes)").join(", ") +
+      ". Source SVG and manifest files are included under assets/forge2d/. The build prompt received their exact paths; verify game.js loads and renders them before claiming in-game integration.";
+  }
+  if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
     const attempt = queued.shift()!;
     const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
