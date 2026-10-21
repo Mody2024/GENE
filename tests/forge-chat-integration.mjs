@@ -10,7 +10,8 @@ assert.match(agent, /body\.project\?\.preferredEngine === "webgl3d"/, "WebGL3D p
 assert.match(agent, /nativeOnly: true/, "agent tool calls must use bounded native mode to avoid recursive provider calls");
 assert.match(agent, /assets\/models\/" \+ asset\.kind \+ "\.obj"/, "generated OBJ meshes must be added to the project");
 assert.match(agent, /assets\/models\/" \+ asset\.kind \+ "\.mtl"/, "generated materials must be added to the project");
-assert.match(agent, /GENE Forge tool run: generated/, "the final agent response must disclose the actual Forge run");
+assert.match(agent, /GENE Forge — completed stages/, "the final agent response must disclose completed Forge stages");
+assert.match(agent, /assets\/models\/" \+ asset\.kind \+ "\.obj".*replace\(\/mtllib/, "OBJ material-library references must match exported MTL filenames");
 assert.match(forge, /body\.nativeOnly === true/, "Forge must expose a bounded native-only internal tool mode");
 assert.match(forge, /nativeAssetResponse\(prompt, kind, quality/, "native-only mode must use the validated native asset generator");
 console.log("GENE Chat ↔ Forge integration contract tests passed.");
