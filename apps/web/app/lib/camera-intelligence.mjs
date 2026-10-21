@@ -12,7 +12,9 @@ const CAMERA_PROFILES = [
 
 export function recommendCamera({ intent = "", engine = "canvas2d", platform = "desktop" } = {}) {
   const text = String(intent).slice(0, 12000);
-  const profile = CAMERA_PROFILES.find(item => item.match.test(text));
+  const profile = /rhythm|geometry.?dash|runner|endless runner/i.test(text)
+    ? CAMERA_PROFILES.find(item => item.profile === "forward-runner")
+    : CAMERA_PROFILES.find(item => item.match.test(text));
   const is3d = engine === "webgl3d";
   const mobile = platform === "mobile" || /mobile|android|touch/i.test(text);
   const selected = profile || (is3d
