@@ -13,7 +13,7 @@ for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
 }
 const character = buildNative2DAsset({ prompt: "A skeleton player sprite", kind: "character" });
 assert.equal(character.manifest.frames, 4);
-assert.match(character.svg, /walk-left/);
+assert.ok(character.manifest.frameNames.includes("walk-left"));
 assert.match(character.qualityReport.warnings[0].code, /NO_SKELETON_RIG/);
 const tiles = buildNative2DAsset({ prompt: "A city street tileset", kind: "tileset" });
 assert.equal(tiles.manifest.frames, 4);
