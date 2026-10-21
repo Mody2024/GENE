@@ -159,7 +159,9 @@ export function parseGoogleSearchResults(data, topic, limit = 5) {
   return scored.sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
 }
 
-/** Assemble the single research bundle that is shown on the message and sent to GENE. */
+/** Assemble the single research bundle that is shown on the message and sent to GENE.
+ * @param {{ id?: string, topic: string, createdAt?: string, wiki?: any[], commonsImages?: any[], commonsAudio?: any[], models?: any[], webResults?: any[], links?: any[], unavailable?: string[] }} input
+ */
 export function buildResearchBundle(input) {
   const topic = cleanQuery(input.topic);
   const wiki = Array.isArray(input.wiki) ? input.wiki : [];
