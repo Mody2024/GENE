@@ -109,7 +109,6 @@ export async function POST(request: NextRequest) {
   ]);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
-  const researchIsGeometryDash = /\\b(geo\\s*dash|geodash|geometry\\s*dash)\\b/i.test(topic);
   const links = buildSearchLinks(researchIsGeometryDash
     ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
     : wantsCharacterArt ? topic + " game sprite" : topic + " game design mechanics level design");
