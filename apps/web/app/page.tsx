@@ -642,11 +642,14 @@ export default function Home() {
     if (!operationOverride) {
       const hasSource = Object.keys(project.files).length > 0;
       const asksForChange = /\b(add|make|change|fix|improve|remove|replace|implement|create|update|rewrite|refactor|optimize|increase|decrease|move|redesign|build|generate|modify|adjust|remap|integrate|repair|polish)\b/i.test(prompt);
+      const explicitBuildIntent = /\b(build|implement|generate|code|start building|apply (?:the )?(?:plan|changes)|make the changes|edit the files)\b/i.test(prompt);
       if (searchMode) operation = "research";
+      // Workspace mode is authoritative: plan updates must not fall through into build/edit.
+      else if (interactionMode === "plan" || project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
+      // Chat is conversational by default. Explicit implementation can still mutate source.
+      else if (interactionMode === "chat" && !explicitBuildIntent) operation = "chat";
       else if (isConversationOnly(prompt)) operation = "chat";
       else if (hasSource && asksForChange) operation = "edit";
-      else if (interactionMode === "chat") operation = "chat";
-      else if (interactionMode === "plan" || project.mode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview";
       else if (!hasSource) operation = "build";
       else operation = "edit";
     }
