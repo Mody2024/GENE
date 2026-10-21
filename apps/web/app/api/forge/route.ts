@@ -318,7 +318,11 @@ export async function POST(request: NextRequest) {
     process.env.GEMINI_API_KEY_5,
     ...(process.env.GEMINI_API_KEYS || "").split(/[,;\\n]+/)
   ].map(value => value?.trim()).filter((value): value is string => Boolean(value)).filter((value, index, all) => all.indexOf(value) === index);
-  if (!apiKeys.length) {\n    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));\n    if (native) return native;\n    return fail(503, "GEMINI_NOT_CONFIGURED", "No AI provider is configured and the native modeller could not safely generate this asset. No mesh files were saved.");\n  }
+  if (!apiKeys.length) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(503, "GEMINI_NOT_CONFIGURED", "No AI provider is configured and the native modeller could not safely generate this asset. No mesh files were saved.");
+  }
 
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
@@ -442,6 +446,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!text) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
     return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
       (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
       "No mesh files were saved. Try Performance quality or simplify the requested asset. Detail: " + lastDetail);
