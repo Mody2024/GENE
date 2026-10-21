@@ -118,12 +118,13 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, links, unavailable, createdAt: new Date().toISOString() });
+  if (!wantsImages) bundle.images = [];
   if (researchIsGeometryDash) {
     bundle.facts = [
       ...bundle.facts,
-      { id: "genre-1", title: "Core loop to study", text: "Geometry Dash is a rhythm-based precision platformer: one-touch input, timed obstacle sequences, repeated attempts, checkpoints or practice mode, and instant restart are central genre expectations. Build original level layouts and art.", source: "Genre analysis", url: "https://www.robtopgames.com/" },
-      { id: "genre-2", title: "Level-design reference", text: "Study beat-synchronized obstacle spacing, readable silhouettes, visual anticipation before jumps, difficulty curves, and short feedback loops. Do not copy proprietary levels, music, icons, or branding.", source: "GENE game-design checklist", url: "https://www.robtopgames.com/" },
-      { id: "genre-3", title: "Research priority", text: "For this request, prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", source: "GENE game-design checklist", url: "https://www.robtopgames.com/" }
+      { title: "Core loop to study", extract: "Geometry Dash is a rhythm-based precision platformer: one-touch input, timed obstacle sequences, repeated attempts, practice/checkpoint options, and instant restart are central genre expectations. Build original level layouts and art.", url: "https://www.robtopgames.com/" },
+      { title: "Level-design reference", extract: "Study beat-synchronized obstacle spacing, readable silhouettes, visual anticipation before jumps, difficulty curves, and short feedback loops. Do not copy proprietary levels, music, icons, or branding.", url: "https://www.robtopgames.com/" },
+      { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
   const imageData = wantsImages
