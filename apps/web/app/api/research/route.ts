@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     imageData,
     notes: formatResearchNotes(bundle),
     // Kept for older clients.
-    sources: { wikipedia: wiki.length, google: bundle.webResults.length, polyhaven: models.length, images: bundle.images.length, audio: commonsAudio.length },
+    sources: { wikipedia: wiki.length, google: bundle.webResults?.length || 0, polyhaven: models.length, images: bundle.images.length, audio: commonsAudio.length },
     models,
     links,
     partial: unavailable.length > 0
