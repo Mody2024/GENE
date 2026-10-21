@@ -1849,24 +1849,21 @@ export default function Home() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  async function addReferences(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget;
-    const selected = Array.from(input.files || []);
-    input.value = "";
+  async function addReferenceFiles(selected: File[]) {
     if (!project || !selected.length) return;
     const current = project.references || [];
     let totalBytes = current.reduce((sum, ref) => sum + ref.size, 0);
     const added: GeneProject["references"] = [];
     const skipped: string[] = [];
     for (const file of selected) {
-      if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB)"); continue; }
+      if (file.size > 450 * 1024) { skipped.push(file.name + " (over 450 KB; resize it and try again)"); continue; }
       if (totalBytes + file.size > 950 * 1024) { skipped.push(file.name + " (project reference budget reached)"); continue; }
       if (/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
         try {
           const dataUrl = await readDataUrl(file);
           const dataBase64 = dataUrl.split(",")[1] || "";
           if (!dataBase64) { skipped.push(file.name + " (image data unreadable)"); continue; }
-          added.push({ id: uid(), name: file.name, mimeType: file.type, kind: "image", dataBase64, size: file.size });
+          added.push({ id: uid(), name: file.name || "pasted-image-" + (added.length + 1) + ".png", mimeType: file.type, kind: "image", dataBase64, size: file.size });
           totalBytes += file.size;
         } catch { skipped.push(file.name + " (could not read)"); }
       } else if (ALLOWED_REFERENCE_TEXT.test(file.name) || file.type.startsWith("text/") || file.type === "application/json") {
@@ -1881,10 +1878,33 @@ export default function Home() {
       }
     }
     if (added.length) {
-      setProject({ ...project, references: [...current, ...added], updatedAt: now() });
-      setNotice("Attached " + added.length + " reference file(s). The selected AI provider will receive these references with the next request.");
+      setProject(currentProject => currentProject && currentProject.id === project.id
+        ? { ...currentProject, references: [...(currentProject.references || []), ...added], updatedAt: now() }
+        : currentProject);
+      setNotice("Attached " + added.length + " file(s). They'll be sent to GENE with your next message.");
     }
     if (skipped.length) setNotice((added.length ? "Attached " + added.length + ". " : "") + "Skipped: " + skipped.join(", "));
+  }
+
+  async function addReferences(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const selected = Array.from(input.files || []);
+    input.value = "";
+    await addReferenceFiles(selected);
+  }
+
+  function pasteReferenceImages(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(event.clipboardData.items || []);
+    const images = items
+      .filter(item => item.kind === "file" && /^image\/(jpeg|png|webp|gif)$/.test(item.type))
+      .map(item => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    if (!images.length) return;
+    event.preventDefault();
+    void addReferenceFiles(images.map((file, index) => {
+      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/gif" ? "gif" : "jpg";
+      return new File([file], "pasted-image-" + (index + 1) + "." + extension, { type: file.type, lastModified: Date.now() });
+    }));
   }
 
   function removeReference(id: string) {
@@ -2834,7 +2854,7 @@ export default function Home() {
                 {showActivity && activity.length > 0 && <div className="activity-list">{activity.map(line => <div key={line}>{line}</div>)}</div>}
                 <div ref={chatEnd} />
               </div>
-              <form className="composer studio-composer" onSubmit={onSubmit}>
+              <form className="composer studio-composer" onSubmit={onSubmit} onDragOver={event => { if (Array.from(event.dataTransfer.types).includes("Files")) event.preventDefault(); }} onDrop={event => { if (Array.from(event.dataTransfer.types).includes("Files")) { event.preventDefault(); void addReferenceFiles(Array.from(event.dataTransfer.files || [])); } }}>
                 <div className="composer-context-label"><span className="composer-context-dot" /> {interactionMode === "chat" ? "Chat with GENE" : interactionMode === "plan" ? "Plan your project" : "Build and edit"}<span className="composer-context-hint">{interactionMode === "chat" ? "Ideas, questions, and edits" : interactionMode === "plan" ? "Shape scope before building" : "Apply changes to real files"}</span></div>
                 <div className="composer-toolbar">
                   <div className="composer-mode-switch" role="group" aria-label="Conversation mode">
@@ -2857,14 +2877,14 @@ export default function Home() {
                   <button type="button" className={planIntent === "update" ? "tool-active" : ""} aria-pressed={planIntent === "update"} onClick={() => { setPlanIntent("update"); if (project.question) setProject({ ...project, question: null }); }}><span>↻</span> Update plan</button>
                 </div>}
                 {(project.references || []).length > 0 && <div className="reference-chips">{project.references.map(ref => <div key={ref.id} className="reference-chip"><span>{ref.kind === "image" ? "▧" : "▤"}</span><span title={ref.name}>{ref.name}</span><button type="button" title={"Remove " + ref.name} onClick={() => removeReference(ref.id)}>×</button></div>)}</div>}
-                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 128) : 46) + "px"; }} placeholder={interactionMode === "chat" ? "Ask anything. Talk through ideas, get explanations, or explore options…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add to this project…" : "Describe what you want to create and we'll plan it together…") : hasGame ? "Describe the change you want GENE to make…" : "Describe the app or game to build…"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
+                <textarea value={draft} onChange={e => { setDraft(e.target.value); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = (e.currentTarget.value ? Math.min(e.currentTarget.scrollHeight, 128) : 46) + "px"; }} onPaste={pasteReferenceImages} placeholder={interactionMode === "chat" ? "Ask anything. Paste an image or drop files here…" : interactionMode === "plan" ? (planIntent === "update" ? "Describe what to update, fix, or add… (paste an image or drop files)" : "Describe what you want to create… (paste an image or drop files)") : hasGame ? "Describe the change… (paste an image or drop files)" : "Describe the app or game… (paste an image or drop files)"} rows={1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (draft.trim() && (!busy || canQueueBuildRequests)) void runAgent(draft); } }} />
                 <input ref={referenceInputRef} className="visually-hidden" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.ts,.css,.gd,.html" onChange={addReferences} />
                 <div className="composer-bottom"><div className="composer-tools composer-quick-tools">
                     <button type="button" className="icon-only-tool" title="Attach reference images, documentation, or source files" aria-label="Attach reference files" onClick={() => referenceInputRef.current?.click()}>＋</button>
                     <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning. Native: no external AI calls." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
                       <option value="native">Gene Native · no external AI</option><option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
-                    <span className="key-hint">Enter · Shift+Enter for a new line</span>
+                    <span className="key-hint">Drop files or paste an image · Enter to send</span>
                   </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
