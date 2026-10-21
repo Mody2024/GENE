@@ -949,21 +949,7 @@ export async function POST(request: NextRequest) {
   const geminiBudgetMs = process.env.GROQ_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() ? 25_000 : totalBudgetMs;
 
   while (queued.length > 0 && attempts < 8) {
-    if (forge2DAssets.length && Array.isArray(result.files)) {
-    const generatedAssetFiles: Array<{ path: string; content: string }> = [];
-    for (const asset of forge2DAssets) {
-      const base = "assets/forge2d/" + asset.kind;
-      const manifest = JSON.stringify({ ...asset.manifest, kind: asset.kind, name: asset.name, source: "GENE Native 2D Forge", qualityReport: asset.qualityReport }, null, 2);
-      if (asset.svg.length <= 300_000 && isSafeProjectPath(base + ".svg")) generatedAssetFiles.push({ path: base + ".svg", content: asset.svg });
-      if (manifest.length <= 100_000 && isSafeProjectPath(base + ".json")) generatedAssetFiles.push({ path: base + ".json", content: manifest });
-    }
-    const paths = new Set(generatedAssetFiles.map(file => file.path));
-    result.files = [...result.files.filter((file: any) => !paths.has(file.path)), ...generatedAssetFiles];
-    result.reply += "\n\nGENE Forge 2D — generated " + forge2DAssets.length + " native vector asset(s): " +
-      forge2DAssets.map(asset => asset.kind + " (" + asset.qualityReport.svgBytes + " SVG bytes)").join(", ") +
-      ". Source SVG and manifest files are included under assets/forge2d/. The build prompt received their exact paths; verify game.js loads and renders them before claiming in-game integration.";
-  }
-  if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+
     const attempt = queued.shift()!;
     const remainingMs = geminiBudgetMs - (Date.now() - startedAt);
     if (remainingMs < 1_500) break;
@@ -1483,6 +1469,20 @@ export async function POST(request: NextRequest) {
     }, { status: 422 });
   }
 
+  if (forge2DAssets.length && Array.isArray(result.files) && body.operation !== "buildPart") {
+    const generatedAssetFiles: Array<{ path: string; content: string }> = [];
+    for (const asset of forge2DAssets) {
+      const base = "assets/forge2d/" + asset.kind;
+      const manifest = JSON.stringify({ ...asset.manifest, kind: asset.kind, name: asset.name, source: "GENE Native 2D Forge", qualityReport: asset.qualityReport }, null, 2);
+      if (asset.svg.length <= 300_000 && isSafeProjectPath(base + ".svg")) generatedAssetFiles.push({ path: base + ".svg", content: asset.svg });
+      if (manifest.length <= 100_000 && isSafeProjectPath(base + ".json")) generatedAssetFiles.push({ path: base + ".json", content: manifest });
+    }
+    const paths = new Set(generatedAssetFiles.map(file => file.path));
+    result.files = [...result.files.filter((file: any) => !paths.has(file.path)), ...generatedAssetFiles];
+    result.reply += "\n\nGENE Forge 2D — generated " + forge2DAssets.length + " native vector asset(s): " +
+      forge2DAssets.map(asset => asset.kind + " (" + asset.qualityReport.svgBytes + " SVG bytes)").join(", ") +
+      ". Source SVG and manifest files are included under assets/forge2d/. The build prompt received their exact paths; verify game.js loads and renders them before claiming in-game integration.";
+  }
   if (forgeToolAssets.length && Array.isArray(result.files)) {
     const generatedAssetFiles: Array<{ path: string; content: string }> = [];
     for (const asset of forgeToolAssets) {
