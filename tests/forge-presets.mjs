@@ -25,6 +25,17 @@ for (const item of cases) {
     assert.ok(part.rotation.every(n => Number.isFinite(n) && Math.abs(n) <= 360));
   }
 }
+const city = buildNativeForgeRecipe({ prompt: "A detailed city street with a zebra crossing", kind: "environment", quality: "standard" });
+const cityNames = city.parts.map(part => part.name);
+assert.ok(cityNames.includes("left sidewalk"), "city environments include a pedestrian sidewalk");
+assert.ok(cityNames.includes("right curb"), "city environments include a curb boundary");
+assert.ok(cityNames.includes("left street lamp pole"), "city environments include street lighting");
+assert.ok(cityNames.some(name => name.startsWith("crosswalk stripe")), "crossing requests produce visible zebra stripes");
+assert.ok(cityNames.includes("bench seat"), "standard city environments include street furniture");
+assert.equal(new Set(cityNames).size, cityNames.length, "generated city part names remain unique");
+assert.ok(city.parts.length <= 54, "detailed city stays within the standard part budget");
+const smallCity = buildNativeForgeRecipe({ prompt: "A city street", kind: "environment", quality: "performance" });
+assert.ok(smallCity.parts.length <= 32, "mobile city variant respects the performance budget");
 const blank = buildNativeForgeRecipe({ prompt: "   ", kind: "prop" });
 assert.equal(blank.name, "GENE asset");
 assert.ok(blank.parts.length >= 3);
