@@ -11,7 +11,7 @@
     "build": "npm run build --workspace=@gene/web",
     "start": "npm run start --workspace=@gene/web",
     "typecheck": "npx tsc --noEmit -p apps/web/tsconfig.json",
-    "test": "node tests/smoke.mjs && node tests/gene2.mjs && node tests/cancellation-contract.mjs && node tests/workspace-file-ops-contract.mjs && node tests/native-brain.mjs && node tests/native-generator.mjs && node tests/forge-presets.mjs && node tests/forge-quality.mjs && node tests/forge-2d.mjs && node tests/forge-route-contract.mjs && node tests/camera-intelligence.mjs && node tests/forge-chat-integration.mjs && node tests/reliability-regression.mjs",
+    "test": "node tests/smoke.mjs && node tests/gene2.mjs && node tests/cancellation-contract.mjs && node tests/workspace-file-ops-contract.mjs && node tests/native-brain.mjs && node tests/native-generator.mjs && node tests/forge-presets.mjs && node tests/forge-quality.mjs && node tests/forge-2d.mjs && node tests/forge-route-contract.mjs && node tests/research-evidence.mjs && node tests/camera-intelligence.mjs && node tests/forge-chat-integration.mjs && node tests/reliability-regression.mjs",
     "test:native-brain": "node tests/native-brain.mjs && node tests/native-generator.mjs",
     "agent:dev": "npm run start --workspace=@gene/local-agent",
     "test:browser": "node tests/browser-smoke.mjs",
