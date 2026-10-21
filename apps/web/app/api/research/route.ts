@@ -83,20 +83,23 @@ export async function POST(request: NextRequest) {
   if (!bucket || bucket.resetAt <= now) buckets.set(clientKey, { count: 1, resetAt: now + 60_000 });
   else if (++bucket.count > 20) return NextResponse.json({ ok: false, error: { code: "GENE_RATE_LIMIT", message: "Research limit reached. Please wait a minute." } }, { status: 429 });
 
-  const words = keywords(topic);
-  const searchText = words.slice(0, 5).join(" ") || topic;
   const lowerTopic = topic.toLowerCase();
+  // Normalize common spellings so game-specific research targets the real game.
+  const researchIsGeometryDash = /\b(geo\s*dash|geodash|geometry\s*dash)\b/i.test(topic);
+  const normalizedTopic = researchIsGeometryDash ? "Geometry Dash video game gameplay mechanics level editor" : topic;
+  const searchText = researchIsGeometryDash ? normalizedTopic : (keywords(topic).slice(0, 7).join(" ") || topic);
   const arabic = /[؀-ۿ]/.test(topic);
   const wikiHost = arabic ? "ar.wikipedia.org" : "en.wikipedia.org";
-  const wantsImages = body?.images !== false;
+  const explicitlyRequestsImages = body?.images === true || /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(topic);
+  const wantsImages = explicitlyRequestsImages;
   const wants3DModels = /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
   const wantsCharacterArt = /\b(character|player sprite|hero sprite|enemy|npc|creature|character design|sprite sheet)\b/i.test(lowerTopic);
   const wantsAudio = !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
   const assetQuery = wantsCharacterArt
-    ? topic + " 2D game character sprite"
+    ? normalizedTopic + " 2D game character sprite"
     : /\b(background|environment|world|level|landscape|scene|tileset|terrain)\b/i.test(lowerTopic)
-      ? topic + " game environment background"
-      : topic + " game level art environment";
+      ? normalizedTopic + " game environment background"
+      : normalizedTopic + " game level art environment";
 
   const [wiki, catalog, commonsImages, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
