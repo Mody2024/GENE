@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
+import { buildNativeForgeRecipe } from "../../lib/forge-presets.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -268,6 +269,34 @@ function buildMesh(recipe: Recipe) {
   };
   return { obj: obj.join("\n") + "\n", mtl: mtl.join("\n") + "\n", asset };
 }
+
+function nativeAssetResponse(prompt: string, kind: string, quality: string, projectStyle: string): NextResponse | null {
+  if (kind === "weapon") return null;
+  try {
+    const recipe = normalizeRecipe(buildNativeForgeRecipe({ prompt, kind, quality, projectStyle }), kind, quality);
+    const mesh = buildMesh(recipe);
+    const files = {
+      "model.obj": mesh.obj,
+      "model.mtl": mesh.mtl,
+      "asset.json": JSON.stringify(mesh.asset, null, 2)
+    };
+    if (files["model.obj"].length > 1_500_000) return null;
+    return json(200, {
+      ok: true,
+      aiMode: "native",
+      model: "gene-native-forge-v1",
+      asset: {
+        name: recipe.name, kind: recipe.kind, style: recipe.style,
+        partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount,
+        vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "",
+        recipe, files
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
 function extractJson(text: string) {
   let clean = text.trim();
   if (clean.startsWith("```")) clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -289,7 +318,11 @@ export async function POST(request: NextRequest) {
     process.env.GEMINI_API_KEY_5,
     ...(process.env.GEMINI_API_KEYS || "").split(/[,;\\n]+/)
   ].map(value => value?.trim()).filter((value): value is string => Boolean(value)).filter((value, index, all) => all.indexOf(value) === index);
-  if (!apiKeys.length) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires a Gemini API key to create a structured mesh recipe. No model or mesh was generated.");
+  if (!apiKeys.length) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(503, "GEMINI_NOT_CONFIGURED", "No AI provider is configured and the native modeller could not safely generate this asset. No mesh files were saved.");
+  }
 
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
@@ -413,6 +446,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!text) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
     return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
       (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
       "No mesh files were saved. Try Performance quality or simplify the requested asset. Detail: " + lastDetail);
