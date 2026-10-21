@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
   if (wantsImages && !commonsImages.length) unavailable.push("Wikimedia Commons returned no licensed images for the selected art query");
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
-  const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() });
+  const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() } as any);
   if (!wantsImages) bundle.images = [];
   if (researchIsGeometryDash) {
     bundle.facts = [
