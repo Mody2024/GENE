@@ -102,7 +102,7 @@ function makeProp(prompt, palette) {
   if (/chair|seat|stool/.test(t)) {
     p.push(part("seat cushion","beveledBox",[0,.9,0],[1.05,.18,.95],palette[0]),part("backrest","beveledBox",[0,1.5,-.38],[1.05,1,.18],palette[0]));
     for(const x of [-.4,.4]) for(const z of [-.35,.35]) p.push(part(`chair leg ${x} ${z}`,"beveledBox",[x,.42,z],[.12,.8,.12],palette[1]));
-    p.push(part("seat seam","box",[0,1,.48],[.82,.025,.02],palette[2]));
+    p.push(part("seat seam","box",[0,1,.48],[.82,.04,.04],palette[2]));
   } else if (/table|desk|workbench/.test(t)) {
     p.push(part("tabletop","beveledBox",[0,1,0],[2,.18,1.1],palette[0]));
     for(const x of [-.82,.82]) for(const z of [-.38,.38]) p.push(part(`table leg ${x} ${z}`,"beveledBox",[x,.48,z],[.14,.9,.14],palette[1]));
@@ -124,7 +124,7 @@ function makeEnvironment(prompt, quality, palette) {
   const t=prompt.toLowerCase(), p=[part("ground tile","beveledBox",[0,-.15,0],[8,.3,8],palette[2])];
   if (/city|street|urban|town/.test(t)) {
     p.push(part("road","box",[0,.02,0],[8,.05,2.5],"#424950"));
-    for(const x of [-2.5,-.8,.8,2.5]) p.push(part("road marking "+x,"box",[x,.055,0],[.75,.015,.08],"#e8dca5","emissive"));
+    for(const x of [-2.5,-.8,.8,2.5]) p.push(part("road marking "+x,"box",[x,.055,0],[.75,.04,.08],"#e8dca5","emissive"));
     p.push(...makeBuilding("city apartment building",quality,PALETTES.city).slice(0,quality==="performance"?12:24).map((item,i)=>({...item,name:"background building "+(i+1),position:[item.position[0]-2.2,item.position[1],item.position[2]-2],scale:[item.scale[0]*.35,item.scale[1]*.7,item.scale[2]*.35]})));
     p.push(part("street sign post","cylinder",[3,.8,1.3],[.08,1.6,.08],palette[3],"metal"),part("street sign","beveledBox",[3,1.55,1.3],[.75,.35,.08],palette[0],"metal"));
   } else {
