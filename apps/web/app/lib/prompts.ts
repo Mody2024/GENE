@@ -3,6 +3,7 @@ import type { GamePlan, GeneProject, Mode } from "./types";
 import { buildStudioContract } from "./studio-contract";
 import { formatCanonicalProjectMemory } from "./project-memory";
 import { formatBrain } from "./game-knowledge.mjs";
+import { formatCameraContract } from "./camera-intelligence.mjs";
 import { buildDesignDoc, formatDesignDoc } from "./design-doc";
 
 const GENE_FORGE_COURSE = `
@@ -193,12 +194,14 @@ export function makeAgentInput(input: {
     : /story|narrative|dialogue|choice.?driven|adventure/i.test(gameIntent)
     ? "STORY ADVENTURE CONTRACT: Represent quests, dialogue choices and scene transitions as explicit state/flags with stable IDs. Ensure every choice leads to a defined consequence, every mission can be entered/recovered, and save/load preserves the relevant flags. Build an opening, a meaningful choice, varied mission beats and a clear ending; never present disconnected placeholder dialogue as a complete branching story."
     : "";
+  const cameraContract = projectKind === "game" ? formatCameraContract(gameIntent, selectedEngine) : "";
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
     "USER-SELECTED PROJECT TARGET: " + selectedTarget + ". " + targetGuidance + " This selection is authoritative across planning, research, file generation, validation and preview. If the requested feature exceeds the selected runtime, explain the constraint and offer a compatible implementation instead of changing target silently.",
     ...(p?.preferredEngine ? ["USER-SELECTED ENGINE: " + p.preferredEngine + ". Respect this choice in the plan, game-spec.json, renderer and controls. Do not silently switch between 2D and 3D."] : []),
     ...(guide ? ["GENRE-SPECIFIC IMPLEMENTATION GUIDE AND ACCEPTANCE CHECKLIST:\\n" + formatGameGuide(guide)] : ["WEB APP ACCEPTANCE CHECKLIST: polished responsive layout; semantic HTML; keyboard-accessible controls; working navigation/actions/forms; useful visual hierarchy; proper loading/empty/success/error states; field-level validation and actionable error messages; guard duplicate submits; preserve user input on failure; handle offline/timeout/HTTP errors; no fake backend, no external CDN, no hard-coded credentials; avoid dead controls and placeholder-only screens. For every visible control, identify its action and state transition; never render inert buttons or fake success. If persistence or authentication is not wired, label the limitation honestly and do not simulate saved/server data."]),
     ...(gameArchetypeContract ? [gameArchetypeContract] : []),
+    ...(cameraContract ? [cameraContract] : []),
     ...(projectKind === "game" && ["build", "buildPart", "surprise", "edit"].includes(input.operation) ? [
       "GENE PRO-GAME QUALITY BAR (highest-priority implementation contract): Treat the result as a shippable indie-game vertical slice, not a code demo. Before coding, silently decide the core 30-second loop, player verb, readable goal, fail/recovery loop, progression beat, visual identity, and genre-specific feel. Every mechanic must support this loop. Preserve the user's requested genre, camera, controls and mood; never downgrade 3D to 2D or simulate unimplemented systems.",
       "GAMEPLAY FIRST: Deliver immediate playable action after a short title/start screen. Implement real input, collision/interaction, scoring or world-state changes, escalating challenge, clear success/failure, pause/resume, restart, and a meaningful end condition. Controls must feel intentional: acceleration/deceleration, jump buffering/coyote time, aim smoothing, camera follow, hit feedback, or interaction range as appropriate to genre. Avoid fake buttons, decorative-only gameplay, automatic wins, placeholder enemies, and levels that cannot be completed.",
