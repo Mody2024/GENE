@@ -23,7 +23,7 @@ assert.match(quality, /DUPLICATE_PART_NAMES/, "QA must flag duplicate part names
 assert.match(quality, /POSSIBLE_FLOATING_ASSET/, "QA must flag likely floating assets");
 assert.match(route, /files\["model\.obj"\]\.length > 1_500_000/, "Forge must enforce the mesh output size cap");
 assert.match(twoDRoute, /buildNative2DAsset/, "2D Forge API must use the native asset generator");
-assert.match(twoDRoute, /sprite\\.svg/, "2D Forge API must return an SVG asset file");
+assert.match(twoDRoute, /sprite\.svg/, "2D Forge API must return an SVG asset file");
 assert.match(twoDRoute, /GENE_2D_RATE_LIMIT/, "2D Forge API must have a request rate limit");
 assert.match(twoDModule, /gene-forge-2d-v1/, "2D assets must have a versioned manifest format");
 assert.match(twoDModule, /NO_SKELETON_RIG/, "2D character output must disclose that it is not a rigged model");
