@@ -92,7 +92,7 @@ assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API s
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(page.includes("let stagePaths = recovery") && page.includes(': ["game-spec.json", "game.html", "game.css", "game.js"]'), "builds begin with four boot stages and can expand into dependency-aware project-specific files");
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
-assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.includes("LAST-RESORT SAFE SLICE"), "failed file stages retry twice plus a compact last-resort playable slice");
+assert.ok(page.includes("stageAttempt <= 5") && page.includes("RETRY ") && page.includes("ALTERNATE IMPLEMENTATION") && page.includes("FINAL RECOVERY"), "failed file stages use five bounded attempts with changing recovery strategies");
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
