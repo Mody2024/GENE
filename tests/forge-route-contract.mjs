@@ -16,7 +16,7 @@ assert.match(route, /"asset\.json": JSON\.stringify\(mesh\.asset, null, 2\)/, "F
 assert.match(route, /files\["model\.obj"\]\.length > 1_500_000/, "Forge must enforce the mesh output size cap");
 assert.match(presets, /part\("left upper arm","capsule"/, "native characters must use capsule limbs instead of purely cylindrical limbs");
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
-assert.match(presets, /kind === "weapon"\) throw new Error/, "unsupported native categories must fail explicitly");
+assert.match(presets, /kind\s*===\s*"weapon"\)\s*throw new Error/, "unsupported native categories must fail explicitly");
 assert.match(prompt, /GENE FORGE MANDATORY WORKFLOW/, "the unified agent must be instructed to route 3D requests through Forge");
 assert.match(prompt, /GENE FORGE — MANDATORY MODELLING COURSE/, "the detailed modelling curriculum must be present in the agent system prompt");
 
