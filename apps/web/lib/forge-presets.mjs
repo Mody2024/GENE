@@ -125,7 +125,7 @@ function makeEnvironment(prompt, quality, palette) {
   if (/city|street|urban|town/.test(t)) {
     p.push(part("road","box",[0,.02,0],[8,.05,2.5],"#424950"));
     for(const x of [-2.5,-.8,.8,2.5]) p.push(part("road marking "+x,"box",[x,.055,0],[.75,.04,.08],"#e8dca5","emissive"));
-    p.push(...makeBuilding("city apartment building",quality,PALETTES.city).slice(0,quality==="performance"?12:24).map((item,i)=>({...item,name:"background building "+(i+1),position:[item.position[0]-2.2,item.position[1],item.position[2]-2],scale:[item.scale[0]*.35,item.scale[1]*.7,item.scale[2]*.35]})));
+    p.push(...makeBuilding("city apartment building",quality,PALETTES.city).slice(0,quality==="performance"?12:24).map((item,i)=>({...item,name:"background building "+(i+1),position:[item.position[0]-2.2,item.position[1],item.position[2]-2],scale:[Math.max(.04,item.scale[0]*.35),Math.max(.04,item.scale[1]*.7),Math.max(.04,item.scale[2]*.35)]})));
     p.push(part("street sign post","cylinder",[3,.8,1.3],[.08,1.6,.08],palette[3],"metal"),part("street sign","beveledBox",[3,1.55,1.3],[.75,.35,.08],palette[0],"metal"));
   } else {
     p.push(part("tree trunk","cylinder",[-1.4,.8,-.8],[.35,1.6,.35],palette[3]),part("tree crown","sphere",[-1.4,2,-.8],[1.7,1.7,1.7],palette[0]),part("tree highlight","sphere",[-1.75,2.2,-.5],[.75,.85,.75],palette[1]),part("rock cluster","beveledBox",[1.8,.3,1.2],[1,.6,.8],palette[4],"matte",[0,14,8]),part("path","beveledBox",[.5,.03,2],[3.4,.08,.75],palette[4]));
