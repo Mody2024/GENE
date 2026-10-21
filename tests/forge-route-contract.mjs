@@ -8,6 +8,7 @@ const quality = readFileSync(new URL("../apps/web/lib/forge-quality.mjs", import
 const twoDRoute = readFileSync(new URL("../apps/web/app/api/forge/2d/route.ts", import.meta.url), "utf8");
 const twoDModule = readFileSync(new URL("../apps/web/lib/forge-2d.mjs", import.meta.url), "utf8");
 const studioPage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
 
 assert.match(route, /from "\.\.\/\.\.\/\.\.\/lib\/forge-presets\.mjs"/, "Forge route must import native presets from the correct workspace-relative path");
 assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetResponse/, "native generation must work when Gemini keys are absent");
@@ -32,6 +33,9 @@ assert.match(studioPage, /fetch\("\/api\/forge\/2d"/, "asset workshop must call 
 assert.match(studioPage, /generateForge2DAsset/, "asset workshop must save native 2D output");
 assert.match(studioPage, /Integrate the generated 2D asset/, "2D assets must offer a game-integration action");
 assert.match(studioPage, /Saved artwork/, "asset workshop must list saved 2D assets");
+assert.match(runtimeAssets, /asset-2d\\\\\.json/, "runtime asset bootstrap must include 2D manifests");
+assert.match(runtimeAssets, /sprite\\\\\.svg/, "runtime asset bootstrap must expose generated sprite sheets");
+assert.match(runtimeAssets, /A\.draw=function\(ctx,p,x,y,w,h\)/, "generated SVG assets must be drawable by Canvas games");
 assert.match(presets, /part\("left upper arm","capsule"/, "native characters must use capsule limbs instead of purely cylindrical limbs");
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
 assert.match(presets, /kind\s*===\s*"weapon"\)\s*throw new Error/, "unsupported native categories must fail explicitly");
