@@ -659,7 +659,7 @@ assert.ok(page.includes('(moduleScripts ? "<script>" + moduleScripts + "<\\/scri
 // GENE 1.4 regressions: the builder must grow beyond the four boot files,
 // run a real one-question-at-a-time interview, and recover rather than restart.
 assert.ok(page.includes('interactionMode === "plan") operation = planIntent === "update" && project.initialPrompt ? "plan" : project.plan ? "plan" : "interview"') && page.includes('else if (interactionMode === "chat" && !explicitBuildIntent) operation = "chat"'), "Plan mode remains planning-only and Chat stays conversational unless an explicit build intent is selected");
-assert.ok(page.includes("renderer:\\'dom-text-game\\'") && page.includes("controls:!!controls"), "DOM-based text and quiz games can pass live preview detection without a canvas");
+assert.ok(page.includes("renderer:\'dom-text-game\'") && page.includes("controls:!!controls"), "DOM-based text and quiz games can pass live preview detection without a canvas");
 assert.ok(page.includes("GAMEPLAY CONTROLS ARE REQUIRED") && page.includes("four clickable answers") && page.includes("Never render a nonfunctional control"), "game generation requires functional quiz choices, progression and wired controls");
 assert.ok(page.includes("const plannedModules: string[] = []") && page.includes("src/systems/progression.js"), "game scope automatically derives meaningful modules beyond the four core files");
 assert.ok(page.includes('new Set(["json","js","svg"') && page.includes("test(stagePath)"), "JavaScript modules are accepted and scheduled as real generation stages");
