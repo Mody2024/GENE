@@ -1372,7 +1372,7 @@ export async function POST(request: NextRequest) {
     const generatedAssetFiles: Array<{ path: string; content: string }> = [];
     for (const asset of forgeToolAssets) {
       const entries: Array<[string, string]> = [
-        ["assets/models/" + asset.kind + ".obj", asset.files["model.obj"]],
+        ["assets/models/" + asset.kind + ".obj", asset.files["model.obj"].replace(/mtllib\s+model\.mtl/g, "mtllib " + asset.kind + ".mtl")],
         ["assets/models/" + asset.kind + ".mtl", asset.files["model.mtl"]],
         ["assets/models/" + asset.kind + ".json", asset.files["asset.json"]]
       ];
