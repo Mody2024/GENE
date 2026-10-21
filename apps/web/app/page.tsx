@@ -835,6 +835,10 @@ export default function Home() {
               if (!stageResponse.ok || !stagePayload?.ok) {
                 stageError = stagePayload?.error?.message || ("HTTP " + stageResponse.status + " from staged generation");
                 addActivity("Stage " + stagePath + " attempt " + stageAttempt + "/5 failed: " + stageError.slice(0, 180));
+                if (/API key|account access|OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|unauthorized|invalid api key/i.test(stageError)) {
+                  addActivity("Stopping duplicate attempts because the configured provider credentials were rejected; provider fallback has already run for this request.");
+                  break;
+                }
                 continue;
               }
               const stageResult = stagePayload.result as AgentResponse;
