@@ -944,7 +944,9 @@ export default function Home() {
                         continue;
                       }
                       try {
-                        addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "connecting", detail: "Calling the native modelling tool · " + quality + " detail" } } : current);
+                        addActivity("Connecting to GENE Forge for " + assetId + " (" + quality + " detail); requesting a structured mesh recipe.");
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "modelling", detail: "Building mesh parts, assigning colours/materials, and validating geometry" } } : current);
                         const forgeResponse = await runFetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -976,8 +978,10 @@ export default function Home() {
                         stagedFiles[prefix + "asset.json"] = JSON.stringify(manifest, null, 2);
                         safeManifest.push(prefix + "model.obj", prefix + "model.mtl", prefix + "asset.json");
                         generatedModels.push({ id: assetId, role: String(request?.role || request?.kind || "asset"), name: manifest.name, quality, files: { obj: prefix + "model.obj", mtl: prefix + "model.mtl", manifest: prefix + "asset.json" } });
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "done", detail: Number(forgeData.asset.partCount || 0) + " parts · " + Number(forgeData.asset.triangleCount || 0) + " triangles · OBJ/MTL/JSON exported" } } : current);
                         addActivity("Forge produced actual OBJ/MTL geometry for " + assetId + " (" + Number(forgeData.asset.triangleCount || 0) + " triangles).");
                       } catch (modelError) {
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "failed", detail: (modelError instanceof Error ? modelError.message : "unknown modelling error").slice(0, 180) } } : current);
                         addActivity("Forge request failed for " + assetId + ": " + (modelError instanceof Error ? modelError.message : "unknown modelling error") + ". No fake asset was added.");
                       }
                     }
