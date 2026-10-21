@@ -339,6 +339,12 @@ export async function POST(request: NextRequest) {
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
   if (!prompt || prompt.length > 4000) return fail(400, "PROMPT_REQUIRED", "Write a concrete asset request (maximum 4,000 characters).");
+  // Internal bounded tool mode lets GENE Chat invoke the modeller without spending a second full provider budget.
+  if (body.nativeOnly === true) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(422, "NATIVE_ASSET_UNAVAILABLE", "GENE Forge could not safely generate a native recipe for this asset.");
+  }
   const apiKeys = [
     process.env.GEMINI_API_KEY,
     process.env.GEMINI_API_KEY_2,
