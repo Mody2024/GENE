@@ -1,0 +1,5 @@
+# GENE Forge Runtime Contract
+
+All 3D creation/edit requests must route through Forge. Prefer valid provider-backed recipes; fall back to native recipes when providers are absent or fail, only for supported kinds. Validate output, then persist model.obj, model.mtl and asset.json through safe workspace operations. Do not invent asset paths or claim output until files exist. Include the exact source mode in status. Blender is optional and automatically managed only when a real worker is available. Unsupported fidelity or categories must be disclosed. Runtime prompts teach the modelling course, but code enforces it through routing, schema checks, bounded retries, safe persistence and regression tests.
+
+POST /api/forge accepts { prompt, kind, quality, projectStyle? }. A success response includes ok, aiMode, model, and asset metadata plus files.

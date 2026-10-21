@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
+import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus";
+type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus" | "capsule";
 type Surface = "matte" | "metal" | "rubber" | "glass" | "emissive";
 type Vec3 = [number, number, number];
 type Part = {
@@ -19,7 +20,7 @@ type Part = {
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"]);
+const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule"]);
 const SURFACES = new Set<Surface>(["matte", "metal", "rubber", "glass", "emissive"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
@@ -158,6 +159,35 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
       const d = nextI * tubeSegments + j + 1;
       faces.push([a,b,d],[b,c,d]);
     }
+  } else if (shape === "capsule") {
+    // UV-style capsule: two hemispheres connected by a cylindrical middle.
+    // Keep the radius bounded by X/Z and the total length by Y.
+    const segments = 12;
+    const radiusX = scale[0] / 2;
+    const radiusZ = scale[2] / 2;
+    const radius = Math.min(radiusX, radiusZ);
+    const halfCylinder = Math.max(0, scale[1] / 2 - radius);
+    const profile: Array<[number, number]> = [];
+    for (const angle of [-Math.PI / 2, -Math.PI / 3, -Math.PI / 6, 0]) {
+      profile.push([radius * Math.cos(angle), -halfCylinder + radius * Math.sin(angle)]);
+    }
+    for (const angle of [0, Math.PI / 6, Math.PI / 3, Math.PI / 2]) {
+      profile.push([radius * Math.cos(angle), halfCylinder + radius * Math.sin(angle)]);
+    }
+    for (const [radial, y] of profile) {
+      for (let i = 0; i < segments; i++) {
+        const angle = i / segments * Math.PI * 2;
+        vertices.push([Math.cos(angle) * (radial / radius * radiusX), y, Math.sin(angle) * (radial / radius * radiusZ)]);
+      }
+    }
+    for (let ring = 0; ring < profile.length - 1; ring++) for (let i = 0; i < segments; i++) {
+      const next = (i + 1) % segments;
+      const a = ring * segments + i + 1;
+      const b = ring * segments + next + 1;
+      const c = (ring + 1) * segments + next + 1;
+      const d = (ring + 1) * segments + i + 1;
+      faces.push([a, d, b], [b, d, c]);
+    }
   } else if (shape === "sphere") {
     const rings = 5;
     const segments = 10;
@@ -268,6 +298,34 @@ function buildMesh(recipe: Recipe) {
   };
   return { obj: obj.join("\n") + "\n", mtl: mtl.join("\n") + "\n", asset };
 }
+
+function nativeAssetResponse(prompt: string, kind: string, quality: string, projectStyle: string): NextResponse | null {
+  if (kind === "weapon") return null;
+  try {
+    const recipe = normalizeRecipe(buildNativeForgeRecipe({ prompt, kind, quality, projectStyle }), kind, quality);
+    const mesh = buildMesh(recipe);
+    const files = {
+      "model.obj": mesh.obj,
+      "model.mtl": mesh.mtl,
+      "asset.json": JSON.stringify(mesh.asset, null, 2)
+    };
+    if (files["model.obj"].length > 1_500_000) return null;
+    return json(200, {
+      ok: true,
+      aiMode: "native",
+      model: "gene-native-forge-v1",
+      asset: {
+        name: recipe.name, kind: recipe.kind, style: recipe.style,
+        partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount,
+        vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "",
+        recipe, files
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
 function extractJson(text: string) {
   let clean = text.trim();
   if (clean.startsWith("```")) clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -281,6 +339,12 @@ export async function POST(request: NextRequest) {
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
   if (!prompt || prompt.length > 4000) return fail(400, "PROMPT_REQUIRED", "Write a concrete asset request (maximum 4,000 characters).");
+  // Internal bounded tool mode lets GENE Chat invoke the modeller without spending a second full provider budget.
+  if (body.nativeOnly === true) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(422, "NATIVE_ASSET_UNAVAILABLE", "GENE Forge could not safely generate a native recipe for this asset.");
+  }
   const apiKeys = [
     process.env.GEMINI_API_KEY,
     process.env.GEMINI_API_KEY_2,
@@ -289,16 +353,20 @@ export async function POST(request: NextRequest) {
     process.env.GEMINI_API_KEY_5,
     ...(process.env.GEMINI_API_KEYS || "").split(/[,;\\n]+/)
   ].map(value => value?.trim()).filter((value): value is string => Boolean(value)).filter((value, index, all) => all.indexOf(value) === index);
-  if (!apiKeys.length) return fail(503, "GEMINI_NOT_CONFIGURED", "Forge requires a Gemini API key to create a structured mesh recipe. No model or mesh was generated.");
+  if (!apiKeys.length) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(503, "GEMINI_NOT_CONFIGURED", "No AI provider is configured and the native modeller could not safely generate this asset. No mesh files were saved.");
+  }
 
   const model = process.env.GENE_FAST_MODEL || "gemini-3.8-flash";
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'capsule',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use beveledBox for light-catching chamfered panels, torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels, rubber for tires/grips, glass for windows, metal for exposed hardware and emissive for small lights. Use spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration. Vary material response intentionally: metal should have higher specular and shininess, rubber should be dark and matte, glass should be translucent in MTL, and emissive should identify small lights rather than large surfaces.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus, capsule. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
@@ -413,6 +481,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!text) {
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
     return fail(502, sawTruncation ? "ASSET_OUTPUT_TRUNCATED" : "ASSET_OUTPUT_INVALID",
       (sawTruncation ? "GENE Forge detected a cut-off model response and retried compact recipes and fallback models, but none completed. " : "GENE Forge retried invalid/empty model responses, but none returned a valid recipe. ") +
       "No mesh files were saved. Try Performance quality or simplify the requested asset. Detail: " + lastDetail);
@@ -433,6 +503,10 @@ export async function POST(request: NextRequest) {
       asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
     });
   } catch (e) {
-    return fail(422, "ASSET_VALIDATION_FAILED", "GENE Forge rejected the generated recipe: " + (e instanceof Error ? e.message : String(e)) + ". No mesh files were saved.");
+    // Provider output is untrusted: if its recipe fails validation or mesh construction,
+    // try the bounded native generator before returning an error.
+    const native = nativeAssetResponse(prompt, kind, quality, String(body.projectStyle || "").slice(0, 1600));
+    if (native) return native;
+    return fail(422, "ASSET_VALIDATION_FAILED", "GENE Forge rejected the generated recipe and the native fallback could not safely replace it: " + (e instanceof Error ? e.message : String(e)) + ". No mesh files were saved.");
   }
 }
