@@ -18,11 +18,20 @@ for (const item of cases) {
   for (const part of recipe.parts) {
     assert.match(part.color, /^#[0-9a-f]{6}$/i);
     assert.ok(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"].includes(part.shape));
-    assert.ok(part.scale.every(n => n > 0.03 && n <= 20));
-    assert.ok(part.position.every(n => Math.abs(n) <= 40));
-    assert.ok(part.rotation.every(n => Math.abs(n) <= 360));
+    assert.ok(part.name.trim().length > 0, "parts need meaningful names");
+    assert.ok(["matte", "metal", "rubber", "glass", "emissive"].includes(part.surface));
+    assert.ok(part.scale.every(n => Number.isFinite(n) && n > 0.03 && n <= 20));
+    assert.ok(part.position.every(n => Number.isFinite(n) && Math.abs(n) <= 40));
+    assert.ok(part.rotation.every(n => Number.isFinite(n) && Math.abs(n) <= 360));
   }
 }
+const blank = buildNativeForgeRecipe({ prompt: "   ", kind: "prop" });
+assert.equal(blank.name, "GENE asset");
+assert.ok(blank.parts.length >= 3);
+const mobile = buildNativeForgeRecipe({ prompt: "A delivery truck", kind: "vehicle", quality: "performance" });
+assert.ok(mobile.parts.length <= 32);
+const bounded = buildNativeForgeRecipe({ prompt: "A city environment", kind: "environment", quality: "unknown-quality" });
+assert.ok(bounded.parts.length <= 54);
 const highRise = buildNativeForgeRecipe({ prompt: "A glass office tower", kind: "building", quality: "high" });
 assert.ok(highRise.parts.length > buildNativeForgeRecipe({ prompt: "A glass office tower", kind: "building", quality: "performance" }).parts.length);
 assert.match(buildNativeForgeRecipe({ prompt: "A voxel city", kind: "environment" }).style, /voxel/i);
