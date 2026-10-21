@@ -7,6 +7,7 @@ const prompt = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.met
 const quality = readFileSync(new URL("../apps/web/lib/forge-quality.mjs", import.meta.url), "utf8");
 const twoDRoute = readFileSync(new URL("../apps/web/app/api/forge/2d/route.ts", import.meta.url), "utf8");
 const twoDModule = readFileSync(new URL("../apps/web/lib/forge-2d.mjs", import.meta.url), "utf8");
+const studioPage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 
 assert.match(route, /from "\.\.\/\.\.\/\.\.\/lib\/forge-presets\.mjs"/, "Forge route must import native presets from the correct workspace-relative path");
 assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetResponse/, "native generation must work when Gemini keys are absent");
@@ -27,6 +28,10 @@ assert.match(twoDRoute, /sprite\.svg/, "2D Forge API must return an SVG asset fi
 assert.match(twoDRoute, /GENE_2D_RATE_LIMIT/, "2D Forge API must have a request rate limit");
 assert.match(twoDModule, /gene-forge-2d-v1/, "2D assets must have a versioned manifest format");
 assert.match(twoDModule, /NO_SKELETON_RIG/, "2D character output must disclose that it is not a rigged model");
+assert.match(studioPage, /fetch\("\/api\/forge\/2d"/, "asset workshop must call the native 2D endpoint");
+assert.match(studioPage, /generateForge2DAsset/, "asset workshop must save native 2D output");
+assert.match(studioPage, /Integrate the generated 2D asset/, "2D assets must offer a game-integration action");
+assert.match(studioPage, /Saved artwork/, "asset workshop must list saved 2D assets");
 assert.match(presets, /part\("left upper arm","capsule"/, "native characters must use capsule limbs instead of purely cylindrical limbs");
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
 assert.match(presets, /kind\s*===\s*"weapon"\)\s*throw new Error/, "unsupported native categories must fail explicitly");
