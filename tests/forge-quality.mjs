@@ -29,7 +29,7 @@ const rotated = analyzeForgeRecipe({ parts: [
   part("beam", [0, 0.5, 0], { scale: [4, 0.2, 0.2], rotation: [0, 0, 45] })
 ] });
 assert.ok(rotated.bounds.size[0] > 2.8, "bounds should account for rotation");
-assert.ok(rotated.bounds.size[2] > 2.8, "rotated beam should expand its world-space bounds");
+assert.ok(rotated.bounds.size[1] > 2.8, "rotated beam should expand its world-space bounds");
 
 const palette = analyzeForgeRecipe({ parts: Array.from({ length: 14 }, (_, i) =>
   part("color-" + i, [i * 0.5, 0.5, 0], { color: "#" + i.toString(16).padStart(6, "0") })
