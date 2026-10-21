@@ -9,7 +9,7 @@ for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
   assert.match(asset.svg, /<title>/);
   assert.ok(asset.qualityReport.svgBytes > 100);
   assert.equal(asset.manifest.source, "GENE native procedural 2D generator");
-  assert.ok(!/<script|https?:\/\//i.test(asset.svg), "asset should not contain scripts or external references");
+  assert.ok(!/<script|<image|href=/i.test(asset.svg), "asset should not contain scripts or externally embedded resources");
 }
 const character = buildNative2DAsset({ prompt: "A skeleton player sprite", kind: "character" });
 assert.equal(character.manifest.frames, 4);
