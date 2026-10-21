@@ -8,6 +8,7 @@ import {
   keywords,
   musicSearchTerms,
   parseCommonsFiles,
+  parseGoogleSearchResults,
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
 
@@ -30,6 +31,24 @@ async function getJson(url: string, timeoutMs = 6_000): Promise<any | null> {
     return await response.json().catch(() => null);
   } catch {
     return null;
+  }
+}
+
+async function googleSearch(query: string): Promise<{ items: any[]; configured: boolean; error?: string }> {
+  const key = process.env.GOOGLE_CSE_API_KEY;
+  const cx = process.env.GOOGLE_CSE_ID;
+  if (!key || !cx) return { items: [], configured: false };
+  try {
+    const params = new URLSearchParams({ key, cx, q: query.slice(0, 240), num: "5" });
+    const response = await fetch("https://www.googleapis.com/customsearch/v1?" + params.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6_000)
+    });
+    if (!response.ok) return { items: [], configured: true, error: "Google Custom Search returned HTTP " + response.status };
+    const data = await response.json().catch(() => null);
+    return { items: Array.isArray(data?.items) ? data.items.slice(0, 5) : [], configured: true };
+  } catch {
+    return { items: [], configured: true, error: "Google Custom Search timed out or could not be reached" };
   }
 }
 
@@ -101,10 +120,14 @@ export async function POST(request: NextRequest) {
       ? normalizedTopic + " game environment background"
       : normalizedTopic + " game level art environment";
 
-  const [wiki, catalog, commonsImages, ...audioSets] = await Promise.all([
+  const googleQuery = researchIsGeometryDash
+    ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
+    : normalizedTopic + " game design mechanics level design official documentation";
+  const [wiki, catalog, commonsImages, google, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
     wants3DModels ? polyHavenCatalog() : Promise.resolve(null),
     wantsImages ? commons(assetQuery, "image", 6) : Promise.resolve([]),
+    googleSearch(googleQuery),
     ...(wantsAudio ? musicSearchTerms(topic).map(term => commons(term, "audio", 3)) : [])
   ]);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
@@ -116,10 +139,13 @@ export async function POST(request: NextRequest) {
 
   const unavailable: string[] = [];
   if (!wiki.length) unavailable.push((arabic ? "Arabic " : "") + "Wikipedia returned nothing for this topic or could not be reached");
+  if (!google.configured) unavailable.push("Google Custom Search is not configured; the research used available public sources instead");
+  else if (google.error) unavailable.push(google.error);
+  else if (!google.items.length) unavailable.push("Google Custom Search returned no web results for this query");
   if (wantsImages && !commonsImages.length) unavailable.push("Wikimedia Commons returned no licensed images for the selected art query");
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
-  const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, links, unavailable, createdAt: new Date().toISOString() });
+  const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() });
   if (!wantsImages) bundle.images = [];
   if (researchIsGeometryDash) {
     bundle.facts = [
@@ -140,7 +166,7 @@ export async function POST(request: NextRequest) {
     imageData,
     notes: formatResearchNotes(bundle),
     // Kept for older clients.
-    sources: { wikipedia: wiki.length, polyhaven: models.length, images: bundle.images.length, audio: commonsAudio.length },
+    sources: { wikipedia: wiki.length, google: bundle.webResults.length, polyhaven: models.length, images: bundle.images.length, audio: commonsAudio.length },
     models,
     links,
     partial: unavailable.length > 0
