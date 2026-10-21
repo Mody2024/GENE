@@ -1195,7 +1195,8 @@ export async function POST(request: NextRequest) {
         return jsonError(summary + "The request exceeded a backup model context/request-size limit. GENE skipped incompatible models, but this task still needs a smaller staged request. Existing project files were preserved. Retry by building one stage/file at a time or shorten the design brief. Detail: " + detail, 413, "GENE_REQUEST_TOO_LARGE");
       }
       if (lastFailure.status === 401 || lastFailure.status === 403) {
-        return jsonError(summary + "A provider rejected its API key or account access. Verify OPENROUTER_API_KEY / GROQ_API_KEY in the deployment environment and redeploy. Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_KEY_REJECTED");
+        const providerKeyName = /groq/i.test(lastFailureProvider) ? "GROQ_API_KEY" : /openrouter/i.test(lastFailureProvider) ? "OPENROUTER_API_KEY" : "the selected provider key";
+        return jsonError(summary + lastFailureProvider + " rejected its API key or account access. Check only " + providerKeyName + " in the deployment environment; remove that key only if you intentionally no longer use that provider. GENE will not delete secrets automatically. Your existing project files were preserved. Detail: " + detail, 503, "AI_PROVIDER_KEY_REJECTED");
       }
       if (lastFailure.status === 429 || /rate.?limit|too many requests|quota|capacity/i.test(detail)) {
         return jsonError(summary + "Free routes are rate-limited or out of capacity right now. Wait a minute and retry, or add another free Gemini key (GEMINI_API_KEY_2). Your existing project files were preserved. Detail: " + detail, 503, "OPENROUTER_RATE_LIMITED");
