@@ -951,6 +951,7 @@ export default function Home() {
                         setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "connecting", detail: "Calling the native modelling tool · " + quality + " detail" } } : current);
                         addActivity("Connecting to GENE Forge for " + assetId + " (" + quality + " detail); requesting a structured mesh recipe.");
                         setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "modelling", detail: "Building mesh parts, assigning colours/materials, and validating geometry" } } : current);
+                        addActivity("GENE Forge is modelling " + assetId + ": building mesh parts, assigning per-part colours/materials, and validating geometry.");
                         const forgeResponse = await runFetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
