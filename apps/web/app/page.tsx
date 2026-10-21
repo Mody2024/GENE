@@ -704,7 +704,17 @@ export default function Home() {
     setSection("chat");
     try {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
-      const needsResearch = !silent && (operation === "research" || ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md")));
+      const chatNeedsResearch = operation === "chat" && (
+        /\\b(search|research|look up|find sources|sources for|check online|browse the web|verify online|latest|current|today|this week|recent|up[- ]to[- ]date|documentation|what changed|release date|version of|news about)\\b/i.test(prompt)
+      );
+      // Research runs automatically for planning/building and chat questions that
+      // depend on current or externally verifiable facts. The explicit web-research
+      // toggle can still force a search for any prompt.
+      const needsResearch = !silent && (
+        operation === "research" ||
+        chatNeedsResearch ||
+        ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
+      );
       if (needsResearch) {
         const researchQuery = operation === "research"
           ? prompt.slice(0, 900)
