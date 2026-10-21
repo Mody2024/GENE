@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
+import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -284,8 +285,10 @@ function buildMesh(recipe: Recipe) {
     }
     vertexOffset += mesh.vertices.length;
   });
+  const qualityReport = analyzeForgeRecipe(recipe);
   const asset = {
     format: "gene-forge-asset-v1",
+    qualityReport,
     name: recipe.name,
     kind: recipe.kind,
     style: recipe.style,
@@ -318,7 +321,7 @@ function nativeAssetResponse(prompt: string, kind: string, quality: string, proj
         name: recipe.name, kind: recipe.kind, style: recipe.style,
         partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount,
         vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "",
-        recipe, files
+        qualityReport: mesh.asset.qualityReport, recipe, files
       }
     });
   } catch {
@@ -500,7 +503,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       aiMode: successfulProvider,
       model: successfulModel,
-      asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", recipe, files }
+      asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", qualityReport: mesh.asset.qualityReport, recipe, files }
     });
   } catch (e) {
     // Provider output is untrusted: if its recipe fails validation or mesh construction,

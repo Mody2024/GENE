@@ -123,10 +123,39 @@ function makeProp(prompt, palette) {
 function makeEnvironment(prompt, quality, palette) {
   const t=prompt.toLowerCase(), p=[part("ground tile","beveledBox",[0,-.15,0],[8,.3,8],palette[2])];
   if (/city|street|urban|town/.test(t)) {
-    p.push(part("road","box",[0,.02,0],[8,.05,2.5],"#424950"));
+    p.push(
+      part("road","box",[0,.02,0],[8,.05,2.5],"#424950"),
+      part("left sidewalk","beveledBox",[0,.04,-1.72],[8,.12,.82],"#c7c1b4"),
+      part("right sidewalk","beveledBox",[0,.04,1.72],[8,.12,.82],"#c7c1b4"),
+      part("left curb","beveledBox",[0,.11,-1.27],[8,.16,.12],"#e3ded2"),
+      part("right curb","beveledBox",[0,.11,1.27],[8,.16,.12],"#e3ded2")
+    );
     for(const x of [-2.5,-.8,.8,2.5]) p.push(part("road marking "+x,"box",[x,.055,0],[.75,.04,.08],"#e8dca5","emissive"));
-    p.push(...makeBuilding("city apartment building",quality,PALETTES.city).slice(0,quality==="performance"?12:24).map((item,i)=>({...item,name:"background building "+(i+1),position:[item.position[0]-2.2,item.position[1],item.position[2]-2],scale:[Math.max(.04,item.scale[0]*.35),Math.max(.04,item.scale[1]*.7),Math.max(.04,item.scale[2]*.35)]})));
-    p.push(part("street sign post","cylinder",[3,.8,1.3],[.08,1.6,.08],palette[3],"metal"),part("street sign","beveledBox",[3,1.55,1.3],[.75,.35,.08],palette[0],"metal"));
+    if (/crosswalk|crossing|intersection|zebra/.test(t)) {
+      for (const z of [-.95,-.57,-.19,.19,.57,.95]) p.push(part("crosswalk stripe "+z,"box",[3.15,.058,z],[1.05,.035,.19],"#f3f0e6","emissive"));
+    }
+    p.push(...makeBuilding("city apartment building",quality,PALETTES.city).slice(0,quality==="performance"?10:18).map((item,i)=>({...item,name:"background building "+(i+1),position:[item.position[0]-2.2,item.position[1],item.position[2]-2.45],scale:[Math.max(.04,item.scale[0]*.32),Math.max(.04,item.scale[1]*.68),Math.max(.04,item.scale[2]*.32)]})));
+    p.push(
+      part("street sign post","cylinder",[3,.8,1.3],[.08,1.6,.08],palette[3],"metal"),
+      part("street sign","beveledBox",[3,1.55,1.3],[.75,.35,.08],palette[0],"metal"),
+      part("left street lamp pole","cylinder",[-3,1.65,2.65],[.09,3.3,.09],"#424950","metal"),
+      part("left street lamp arm","cylinder",[-2.72,3.2,2.65],[.06,.55,.06],"#424950","metal",[0,0,90]),
+      part("left street lamp head","beveledBox",[-2.48,3.12,2.65],[.42,.14,.22],"#f4dca0","emissive"),
+      part("right street lamp pole","cylinder",[2.1,1.65,-2.65],[.09,3.3,.09],"#424950","metal"),
+      part("right street lamp head","beveledBox",[2.1,3.12,-2.65],[.42,.14,.22],"#f4dca0","emissive"),
+      part("street bin body","beveledBox",[3.35,.42,-.9],[.42,.82,.42],"#5c7775","metal"),
+      part("street bin lid","beveledBox",[3.35,.86,-.9],[.48,.1,.48],"#303b40","metal")
+    );
+    if (quality !== "performance") {
+      p.push(
+        part("bench seat","beveledBox",[-2.8,.55,2.05],[1.25,.12,.38],"#9b7655"),
+        part("bench back","beveledBox",[-2.8,.88,2.22],[1.25,.5,.1],"#9b7655"),
+        part("bench left leg","cylinder",[-3.2,.28,2.05],[.08,.55,.08],"#41494d","metal"),
+        part("bench right leg","cylinder",[-2.4,.28,2.05],[.08,.55,.08],"#41494d","metal"),
+        part("street planter","beveledBox",[1.55,.24,2.65],[.9,.48,.72],"#8b7961"),
+        part("planter shrub","sphere",[1.55,.67,2.65],[.82,.55,.65],"#6e9b72")
+      );
+    }
   } else {
     p.push(part("tree trunk","cylinder",[-1.4,.8,-.8],[.35,1.6,.35],palette[3]),part("tree crown","sphere",[-1.4,2,-.8],[1.7,1.7,1.7],palette[0]),part("tree highlight","sphere",[-1.75,2.2,-.5],[.75,.85,.75],palette[1]),part("rock cluster","beveledBox",[1.8,.3,1.2],[1,.6,.8],palette[4],"matte",[0,14,8]),part("path","beveledBox",[.5,.03,2],[3.4,.08,.75],palette[4]));
     if(quality!=="performance") p.push(part("small shrub","sphere",[2.1,.45,-1.7],[.85,.75,.8],palette[1]));

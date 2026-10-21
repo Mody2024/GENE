@@ -2,9 +2,11 @@ export type ResearchLink = { id: string; label: string; kind: string; license: s
 export type ResearchImage = { id: string; title: string; thumb: string; full: string; page: string; license: string; credit: string; source: string };
 export type ResearchAudio = { id: string; title: string; url: string; page: string; license: string; credit: string; source: string };
 export type ResearchModel = { id: string; name: string; tags: string[]; url: string; license: string; thumb?: string; source?: string; score?: number };
+export type ResearchWebResult = { title: string; snippet: string; url: string; source: string; relevance: number };
 export type ResearchBundle = {
   id: string; topic: string; createdAt: string;
   facts: Array<{ title: string; extract: string; url: string; thumb?: string }>;
+  webResults?: ResearchWebResult[];
   images: ResearchImage[];
   models: ResearchModel[];
   engineModels: Array<{ name: string; call: string; dims: string }>;
@@ -23,5 +25,6 @@ export function parseWikipediaPages(data: unknown, host?: string): Array<{ title
 export function parseCommonsFiles(data: unknown, kind?: "image" | "audio"): any[];
 export function polyHavenThumb(id: string): string;
 export function musicSearchTerms(topic: string): string[];
-export function buildResearchBundle(input: { id?: string; topic: string; createdAt?: string; wiki?: any[]; commonsImages?: any[]; commonsAudio?: any[]; models?: any[]; links?: ResearchLink[]; unavailable?: string[] }): ResearchBundle;
+export function parseGoogleSearchResults(data: unknown, topic: string, limit?: number): ResearchWebResult[];
+export function buildResearchBundle(input: { id?: string; topic: string; createdAt?: string; wiki?: any[]; commonsImages?: any[]; commonsAudio?: any[]; models?: any[]; webResults?: any[]; links?: ResearchLink[]; unavailable?: string[] }): ResearchBundle;
 export function formatResearchNotes(input: any): string;

@@ -260,6 +260,8 @@ export default function Home() {
   const [forgePrompt, setForgePrompt] = useState("");
   const [forgeKind, setForgeKind] = useState<"character" | "vehicle" | "building" | "environment" | "prop" | "weapon">("prop");
   const [forgeQuality, setForgeQuality] = useState<"performance" | "standard" | "high">("standard");
+  const [forgeMode, setForgeMode] = useState<"3d" | "2d">("3d");
+  const [forge2DKind, setForge2DKind] = useState<"character" | "tileset" | "ui" | "background" | "icon">("character");
   const [forgeBusy, setForgeBusy] = useState(false);
   const [forgeTargetId, setForgeTargetId] = useState<string | null>(null);
   const [forgeNotice, setForgeNotice] = useState("");
@@ -564,6 +566,18 @@ export default function Home() {
           mtlPath: prefix + "model.mtl",
           manifestPath: path
         };
+      });
+  }, [project?.files, project?.id]);
+
+  const saved2DAssets = useMemo(() => {
+    if (!project) return [];
+    return Object.entries(project.files)
+      .filter(([path]) => /^assets\/[a-zA-Z0-9_-]+\/asset-2d\.json$/.test(path))
+      .map(([path, source]) => {
+        const id = path.split("/")[1];
+        let manifest: any = {};
+        try { manifest = JSON.parse(source); } catch {}
+        return { id, name: String(manifest.name || id), kind: String(manifest.kind || "character"), svgPath: "assets/" + id + "/sprite.svg", manifestPath: path, width: Number(manifest.width || 0), height: Number(manifest.height || 0), frames: Number(manifest.frames || 1) };
       });
   }, [project?.files, project?.id]);
 
@@ -1609,7 +1623,8 @@ export default function Home() {
 
   function downloadAssetFile(path: string) {
     if (!project || !project.files[path]) return;
-    const blob = new Blob([project.files[path]], { type: path.endsWith(".mtl") || path.endsWith(".obj") ? "text/plain" : "application/json" });
+    const mime = path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".mtl") || path.endsWith(".obj") ? "text/plain" : "application/json";
+    const blob = new Blob([project.files[path]], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1709,6 +1724,51 @@ export default function Home() {
       const why = error instanceof Error ? error.message : "unknown Forge error";
       setForgeNotice("Forge failed: " + why + ". No asset files were marked as generated.");
       addActivity("Forge failed: " + why);
+    } finally {
+      setForgeBusy(false);
+    }
+  }
+
+  async function generateForge2DAsset() {
+    if (!project || forgeBusy || !forgePrompt.trim()) return;
+    setForgeBusy(true);
+    setForgeNotice("");
+    addActivity("Generating native procedural 2D " + forge2DKind + " artwork through GENE Forge");
+    try {
+      const response = await fetch("/api/forge/2d", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: forgePrompt.trim(), kind: forge2DKind, quality: forgeQuality, style: "project-matched stylized game art" })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok || typeof data?.asset?.svg !== "string" || typeof data?.files?.["asset.json"] !== "string") {
+        throw new Error(data?.error?.message || "GENE Forge returned no valid 2D SVG asset.");
+      }
+      const assetId = "art-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+      const prefix = "assets/" + assetId + "/";
+      const manifest = { ...JSON.parse(data.files["asset.json"]), assetId, name: data.asset.name, kind: data.asset.kind, width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider };
+      const files = { ...project.files, [prefix + "sprite.svg"]: String(data.asset.svg), [prefix + "asset-2d.json"]: JSON.stringify(manifest, null, 2) };
+      const versionNumber = (project.versions[0]?.number || 0) + 1;
+      const version: BuildVersion = { number: versionNumber, label: "Generated 2D asset: " + String(data.asset.name), files: { ...files }, createdAt: now(), testSummary: "Generated a self-contained procedural SVG and a versioned 2D manifest. Visual integration into the running game and raster conversion are not yet verified." };
+      const reply = message("assistant", "Generated **" + data.asset.name + "** as native procedural SVG artwork. Saved " + prefix + "sprite.svg and the asset manifest. This generator uses vector shapes and curated palettes; it is not an external image model, and the asset has not been automatically inserted into the game scene.", "build");
+      const updated: GeneProject = { ...project, files, versions: [version, ...project.versions].slice(0, 8), messages: [...project.messages, reply], updatedAt: now() };
+      setProject(updated);
+      setForgePrompt("");
+      setSection("assets");
+      setForgeNotice("2D artwork saved in version " + versionNumber + ". Use the asset's integration action to request insertion into the playable game; scene integration must be tested separately.");
+      addActivity("Saved " + prefix + "sprite.svg (" + data.asset.qualityReport.svgBytes + " bytes) and asset-2d.json");
+      if (localAgentStatus === "connected" && localAgentToken && updated.files["game.html"] && updated.files["game.js"]) {
+        try {
+          const diskResult = await writeProjectToDisk(updated, localAgentUrl, localAgentToken);
+          setForgeNotice("2D artwork saved in version " + versionNumber + " and synced to disk: " + diskResult.projectPath);
+        } catch (error) {
+          setForgeNotice("2D artwork saved in GENE, but disk sync failed: " + (error instanceof Error ? error.message : "unknown error") + ". Use Sync files to retry.");
+        }
+      }
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "unknown 2D generation error";
+      setForgeNotice("2D Forge failed: " + why + ". No asset files were marked as generated.");
+      addActivity("2D Forge failed: " + why);
     } finally {
       setForgeBusy(false);
     }
@@ -2814,18 +2874,20 @@ export default function Home() {
   <div className="tool-view-heading">
     <div className="eyebrow">GENE FORGE · REAL MESH FILES</div>
     <h2>Asset workshop</h2>
-    <p>Describe an asset or request changes to a saved one. The selected AI provider returns a structured part recipe; GENE turns it into actual OBJ geometry and MTL materials, then validates and saves the files in this project.</p>
+    <p>Create a 3D OBJ/MTL mesh or native procedural 2D SVG artwork. GENE validates the generated files and saves them in this project; inserting an asset into a playable scene remains a separate, testable step.</p>
   </div>
   <div className="forge-form">
     <div className="forge-form-top">
-      <label>Asset type<select value={forgeKind} onChange={e => setForgeKind(e.target.value as typeof forgeKind)}><option value="prop">Prop</option><option value="character">Character</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="environment">Environment</option><option value="weapon">Weapon</option></select></label>
+      <label>Asset format<select value={forgeMode} onChange={e => { setForgeMode(e.target.value as typeof forgeMode); setForgeTargetId(null); }}><option value="3d">3D mesh · OBJ/MTL</option><option value="2d">2D artwork · SVG</option></select></label>
+      {forgeMode === "3d" ? <label>Asset type<select value={forgeKind} onChange={e => setForgeKind(e.target.value as typeof forgeKind)}><option value="prop">Prop</option><option value="character">Character</option><option value="vehicle">Vehicle</option><option value="building">Building</option><option value="environment">Environment</option><option value="weapon">Weapon</option></select></label> : <label>2D asset type<select value={forge2DKind} onChange={e => setForge2DKind(e.target.value as typeof forge2DKind)}><option value="character">Character sprite sheet</option><option value="tileset">Tileset</option><option value="ui">UI panels and buttons</option><option value="background">Background</option><option value="icon">Icon</option></select></label>}
       <label>Detail budget<select value={forgeQuality} onChange={e => setForgeQuality(e.target.value as typeof forgeQuality)}><option value="performance">Performance · up to 32 parts</option><option value="standard">Standard · up to 54 parts</option><option value="high">High detail · up to 76 parts</option></select></label>
     </div>
-    {forgeTargetId && <div className="forge-editing"><span className="status-dot online" /> Editing the saved asset <strong>{savedAssets.find(asset => asset.id === forgeTargetId)?.name || forgeTargetId}</strong><button onClick={() => { setForgeTargetId(null); setForgePrompt(""); setForgeNotice(""); }}>Create new asset instead</button></div>}
-    <textarea className="forge-prompt" value={forgePrompt} onChange={e => setForgePrompt(e.target.value)} placeholder={forgeTargetId ? "Describe the changes to this exact mesh — e.g. make the wheels larger, lower the cabin, and add protective side panels." : "Describe the mesh — e.g. a compact metro maintenance rover with four chunky wheels, a sloped glass cabin, protective bumpers, yellow safety markings and a coherent industrial silhouette."} rows={3} />
-    <div className="forge-form-bottom"><span>{apiReady ? "AI connected · mesh generation uses the selected model" : "Connect GENE to enable AI-powered asset generation · no fake local generation"}</span><button className="primary-button" onClick={() => void generateForgeAsset()} disabled={forgeBusy || !forgePrompt.trim() || apiReady !== true}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating mesh…</> : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
+    {forgeMode === "3d" && forgeTargetId && <div className="forge-editing"><span className="status-dot online" /> Editing the saved asset <strong>{savedAssets.find(asset => asset.id === forgeTargetId)?.name || forgeTargetId}</strong><button onClick={() => { setForgeTargetId(null); setForgePrompt(""); setForgeNotice(""); }}>Create new asset instead</button></div>}
+    <textarea className="forge-prompt" value={forgePrompt} onChange={e => setForgePrompt(e.target.value)} placeholder={forgeMode === "2d" ? "Describe the artwork — e.g. a four-frame cartoon skeleton sprite sheet, a city road tileset, or a clean game menu panel." : forgeTargetId ? "Describe the changes to this exact mesh — e.g. make the wheels larger, lower the cabin, and add protective side panels." : "Describe the mesh — e.g. a compact metro maintenance rover with four chunky wheels, a sloped glass cabin, protective bumpers, yellow safety markings and a coherent industrial silhouette."} rows={3} />
+    <div className="forge-form-bottom"><span>{forgeMode === "2d" ? "Native procedural vector generation · no external image model required" : apiReady ? "AI connected · mesh generation uses the selected model" : "Connect GENE to enable AI-powered 3D asset generation"}</span><button className="primary-button" onClick={() => void (forgeMode === "2d" ? generateForge2DAsset() : generateForgeAsset())} disabled={forgeBusy || !forgePrompt.trim() || (forgeMode === "3d" && apiReady !== true)}>{forgeBusy ? <><span className="spinner small-spinner" /> Generating {forgeMode === "2d" ? "artwork" : "mesh"}…</> : forgeMode === "2d" ? "Generate 2D artwork" : forgeTargetId ? "Apply mesh edits" : "Generate 3D mesh"} <span>↗</span></button></div>
     {forgeNotice && <div className="forge-notice">{forgeNotice}</div>}
   </div>
+  {saved2DAssets.length > 0 && <><div className="forge-assets-heading"><div><div className="eyebrow">2D PROJECT ASSETS</div><h3>Saved artwork <span>{saved2DAssets.length}</span></h3></div><span>SVG · JSON manifest</span></div><div className="forge-asset-grid">{saved2DAssets.map(asset => <article className="forge-asset-card" key={asset.id}><div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.kind} · {asset.width}×{asset.height} · {asset.frames} frame(s)</small></div><button className="icon-button" title="Remove this 2D asset" onClick={() => removeForgeAsset(asset.id)}>×</button></div><div className="forge-2d-preview"><img alt={asset.name + " generated vector artwork"} src={"data:image/svg+xml;charset=utf-8," + encodeURIComponent(project.files[asset.svgPath] || "")} /></div><div className="forge-asset-actions"><button className="primary-button" onClick={() => { setSection("chat"); setDraft("Integrate the generated 2D asset at " + asset.svgPath + " into the actual playable game. Read its manifest at " + asset.manifestPath + ". The isolated runtime exposes the SVG through window.GENE_ART.list(), window.GENE_ART.image(path), and window.GENE_ART.draw(ctx,path,x,y,w,h); use these helpers or a verified equivalent. Use the correct asset kind (" + asset.kind + "), preserve current controls and responsive layout, and crop sprite-sheet frames when needed. Do not claim integration until the live preview visibly uses the saved SVG and a browser test passes."); setNotice("Prepared a specific 2D asset integration request for " + asset.name + ". Review it in Chat and send it to apply."); }}>Integrate into game</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.svgPath)}>SVG ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.manifestPath)}>Manifest ↓</button></div></article>)}</div></>}
   <div className="forge-assets-heading"><div><div className="eyebrow">PROJECT ASSETS</div><h3>Saved meshes <span>{savedAssets.length}</span></h3></div><span>OBJ · MTL · JSON recipe</span></div>
   {savedAssets.length === 0 ? <div className="empty-state forge-empty"><div className="asset-symbol">◇</div><strong>No generated meshes yet</strong><p>Start with a prop, vehicle, character, weapon, or building. A successful result creates real files under <code>assets/&lt;asset-id&gt;/</code>. Mesh generation is not the same thing as importing it into a game scene; integration is a separate, testable change.</p></div> : <div className="forge-asset-grid">
     {savedAssets.map(asset => <article className="forge-asset-card" key={asset.id}>
