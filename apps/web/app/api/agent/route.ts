@@ -542,9 +542,10 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           .map(([, content]) => content).join("\n");
         const recoveredControls: string[] = [];
         if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(allRuntimeSource)) recoveredControls.push("Keyboard controls: use the movement/action keys shown in the game.");
+        if (/(addEventListener\s*\(\s*[\'"](?:click|submit|change|input)[\'"]|\.onclick\s*=|onClick\s*=)/i.test(allRuntimeSource)) recoveredControls.push("Interactive game UI: click or tap the on-screen choices and controls.");
         if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(allRuntimeSource)) recoveredControls.push("Touch and pointer controls: use the visible on-screen controls.");
         if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(allRuntimeSource)) recoveredControls.push("Gamepad/controller controls: use the mapped buttons and sticks.");
-        if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, or controller handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
+        if (!recoveredControls.length) throw new Error("Build rejected: game controls are missing and no keyboard, touch, controller, or interactive UI handlers were found. Repair game.js to implement real input handlers, then declare those controls in game-spec.json.");
         spec.controls = recoveredControls;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
         // Persist deterministic contract repairs into the actual returned files.
@@ -657,10 +658,11 @@ export async function POST(request: NextRequest) {
         const source = Object.entries(byPath).filter(([path, content]) => /\.js$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n");
         const inferred: string[] = [];
         if (/(keydown|keyup|event\.key|event\.code|keyCode)/i.test(source)) inferred.push("Keyboard controls: use the displayed movement/action keys.");
+        if (/(addEventListener\s*\(\s*[\'"](?:click|submit|change|input)[\'"]|\.onclick\s*=|onClick\s*=)/i.test(source)) inferred.push("Interactive game UI: click or tap the on-screen choices and controls.");
         if (/(pointerdown|pointermove|touchstart|touchmove|pointerup|touchend)/i.test(source)) inferred.push("Touch/pointer controls: use the on-screen controls or tap/drag the play area.");
         if (/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(source)) inferred.push("Gamepad/controller controls: use the mapped controller buttons and sticks.");
         if (!inferred.length) {
-          throw new Error("Build rejected: game controls are missing because no keyboard, touch, or controller input handlers were found in the assembled JavaScript. Implement real input handlers in game.js or a runtime module, then declare the supported controls in game-spec.json.");
+          throw new Error("Build rejected: game controls are missing because no keyboard, touch, controller, or interactive UI handlers were found in the assembled JavaScript. Implement real input handlers in game.js or a runtime module, then declare the supported controls in game-spec.json.");
         }
         spec.controls = inferred;
         byPath["game-spec.json"] = JSON.stringify(spec, null, 2);
