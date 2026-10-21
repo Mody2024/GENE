@@ -50,6 +50,8 @@ export default function LiveRunPanel({ run, logOpen, onToggleLog }: { run: LiveR
   return (
     <div className="live-run" role="status" aria-live="polite">
       <div className="live-run-head"><strong>{TITLES[run.operation] || "Working"}</strong><span>{seconds}s{onToggleLog && <button type="button" className="live-run-log" aria-expanded={!!logOpen} onClick={onToggleLog}>{logOpen ? "Hide log" : "Activity"}</button>}</span></div>
+      <div className="live-run-progress-meta"><span>{steps[at]?.label || "Preparing next step"}</span><span>Step {Math.max(1, at + 1)} of {order.length}</span></div>
+      <div className="live-run-progress-track" role="progressbar" aria-label="GENE task progress" aria-valuemin={0} aria-valuemax={order.length} aria-valuenow={Math.max(0, at)}><span style={{ width: (Math.max(0, at) / Math.max(1, order.length)) * 100 + "%" }} /></div>
       <blockquote className="live-run-ask">{run.prompt.length > 220 ? run.prompt.slice(0, 220) + "…" : run.prompt}</blockquote>
       <ol className="live-run-steps">
         {steps.map(step => {
