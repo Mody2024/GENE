@@ -769,6 +769,51 @@ export default function Home() {
           : ["game-spec.json", "game.html", "game.css", "game.js"];
         if (!stagePaths.length) stagePaths = ["game-spec.json", "game.html", "game.css", "game.js"];
         const stagedFiles: Record<string, string> = { ...(recovery?.files || nextProject.files) };
+        let forge2DStageContext = "";
+        // Stage actual Forge artwork into the same staged project before game.js is authored.
+        // This is the client coordinator path used by normal builds (which call buildPart, not build).
+        const buildEngine = nextProject.plan?.engine || nextProject.preferredEngine || "canvas2d";
+        if (!recovery && nextProject.kind !== "app" && buildEngine === "canvas2d") {
+          const promptText = String(nextProject.initialPrompt || nextProject.name || "2D game");
+          const lowerPrompt = promptText.toLowerCase();
+          const requestedAssets = [
+            { kind: "character", prompt: "Main playable 2D character sprite for: " + promptText },
+            { kind: /city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt) ? "tileset" : "background",
+              prompt: "Matching 2D game " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt) ? "tileset" : "background") + " for: " + promptText }
+          ];
+          try {
+            addActivity("Connecting GENE Forge 2D to the staged game build");
+            const forgeResults = await Promise.all(requestedAssets.map(async assetRequest => {
+              try {
+                const response = await runFetch("/api/forge/2d", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ prompt: assetRequest.prompt.slice(0, 300), kind: assetRequest.kind, quality: nextProject.thinking === "fast" ? "performance" : nextProject.thinking === "deep" ? "high" : "standard", style: "project-matched stylized game art" })
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data?.ok || typeof data?.asset?.svg !== "string" || !data?.asset?.manifest) return null;
+                return { ...assetRequest, asset: data.asset };
+              } catch { return null; }
+            }));
+            for (const item of forgeResults) {
+              if (!item) continue;
+              const base = "assets/forge2d/" + item.kind;
+              stagedFiles[base + ".svg"] = String(item.asset.svg);
+              stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport }, null, 2);
+            }
+            const generated = forgeResults.filter(Boolean) as Array<{kind:string;asset:any}>;
+            if (generated.length) {
+              forge2DStageContext = "\n\nGENE FORGE 2D GENERATED ASSETS (already added to this staged project): " +
+                JSON.stringify(generated.map(item => ({ kind: item.kind, name: item.asset.name, svg: "assets/forge2d/" + item.kind + ".svg", manifest: "assets/forge2d/" + item.kind + ".json", width: item.asset.manifest.width, height: item.asset.manifest.height, frames: item.asset.manifest.frames }))) +
+                "\nActually load and render these local SVG assets in game.js (canvas Image/drawImage or equivalent), with graceful onerror fallback. Do not put executable code in game.html. Do not claim Forge integration unless the source loads and uses these assets.";
+              addActivity("GENE Forge 2D generated and staged " + generated.map(item => item.kind).join(" and ") + "; wiring them into game.js");
+            } else {
+              addActivity("GENE Forge 2D did not return a validated asset; continuing without claiming generated artwork");
+            }
+          } catch {
+            addActivity("GENE Forge 2D unavailable for this build; preserving the staged build and continuing without generated assets");
+          }
+        }
         let stagedPlan = nextProject.plan || null;
         let modelUsed = aiModel;
         const buildTasks = [
@@ -825,7 +870,7 @@ export default function Home() {
           let stageError = "";
           for (let stageAttempt = 1; stageAttempt <= 5 && !stageSucceeded; stageAttempt++) {
             const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
-            const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
+            const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " + (stagePath === "game.js" ? forge2DStageContext : "") + " " +
               "Use the original project idea in the project context as the source of truth. " +
               (index === 0
                 ? "This is stage 1. Return only game-spec.json and include the complete structured implementation plan in the JSON response. Include additionalFiles as an optional array of safe relative file paths required by this project (do not list the four core files there); use it for genuinely needed data, SVG, model/material, audio, text or module files, not filler. For webgl3d, include up to two useful modelRequests with stable id, kind, prompt and quality fields so GENE can generate real OBJ/MTL meshes through Forge; describe exact game-specific silhouettes and use performance for low-poly requests, high for explicit high-detail requests. Keep the spec concise and valid. Choose a small but polished first playable version; defer secondary features. Also return an architecture blueprint in the spec: architecture.modules must list each planned file with its exact path, responsibility, provided API, required APIs, and dependency order; architecture.dataFlow must explain how player input reaches gameplay state, rendering, and save/progression systems. Choose names and a hierarchy that fit this specific game instead of copying a universal template. Every declared JavaScript module must own a meaningful feature, be connected to game.js, and have a concrete acceptance check. Prefer fewer complete, connected systems over many empty modules."
