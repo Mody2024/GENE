@@ -45,7 +45,7 @@ export function backoffMs(kind, attempt) {
 export function retryGuidance(kind, failure, attempt) {
   const detail = String(failure || "").replace(/\s+/g, " ").trim().slice(0, 800);
   const because = detail ? " The previous attempt failed with: " + detail + "." : "";
-  if (kind === "validation" || kind === "runtime") return " FIX THE REJECTED RESULT:" + because + " Correct exactly that problem, keep everything that already works, and re-check every referenced file, id and function before returning.";
+  if (kind === "validation" || kind === "runtime") return " FIX THE REJECTED RESULT:" + because + " Treat the exact validator/runtime message as an acceptance test. Identify the smallest set of affected files using repairTargetsFor, preserve all unrelated files and already-working behavior, and return complete replacements only for affected paths. Do not repeat the failed architecture; simplify the algorithm, split oversized logic into a declared dependency-aware module only when the runtime can load it, then verify syntax, identifiers, paths, controls, and the project contract before returning.";
   if (kind === "bad-output" || kind === "timeout") return " The previous reply was incomplete or too slow." + because + " Return a smaller but complete implementation with valid JSON.";
   if (kind === "conflict") return " The project changed while you were working. Re-read the current files and apply the change to the latest source." + because;
   return because;
