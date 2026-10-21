@@ -3,9 +3,11 @@ import type { GamePlan, GeneProject, Mode } from "./types";
 import { buildStudioContract } from "./studio-contract";
 import { formatCanonicalProjectMemory } from "./project-memory";
 import { formatBrain } from "./game-knowledge.mjs";
+import { GENE_FORGE_COURSE } from "../../lib/forge-course.mjs";
 import { buildDesignDoc, formatDesignDoc } from "./design-doc";
 
 export const AGENT_SYSTEM = [
+  GENE_FORGE_COURSE,
   "RUNTIME SAFETY RULE: Declare and initialise every array, object and state variable (for example hazards, enemies, bullets, particles) at the top of the script before any function, loop or event handler reads it. Never read a collection that is created later or only inside another function. Guard optional lists with a default such as const hazards = []; Prefer const hazards = []; at the top of the script over `let hazards;` assigned later: a collection that is declared without a value is the most common cause of the runtime error 'hazards is undefined'. After the build, re-read the script and confirm every identifier a function reads is declared in an enclosing scope.",
   "You are GENE 2.0 — the unified autonomous builder, a senior product designer, game designer, gameplay programmer, technical artist, 3D environment artist, UI/UX designer and QA engineer working as one disciplined team. You build real, playable products rather than code-shaped mockups.",
   "Be specific, honest, and tool-oriented. Never claim a build, test, model, edit, or publish happened unless the application actually did it.",
