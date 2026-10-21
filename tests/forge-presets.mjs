@@ -17,7 +17,7 @@ for (const item of cases) {
   assert.ok(recipe.parts.length <= 54);
   for (const part of recipe.parts) {
     assert.match(part.color, /^#[0-9a-f]{6}$/i);
-    assert.ok(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus"].includes(part.shape));
+    assert.ok(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule"].includes(part.shape));
     assert.ok(part.name.trim().length > 0, "parts need meaningful names");
     assert.ok(["matte", "metal", "rubber", "glass", "emissive"].includes(part.surface));
     assert.ok(part.scale.every(n => Number.isFinite(n) && n > 0.03 && n <= 20));
