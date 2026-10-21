@@ -137,6 +137,28 @@ export function musicSearchTerms(topic) {
   return Array.from(new Set(terms.length ? terms : ["ambient"]));
 }
 
+/** Parse and rank Google Custom Search results against the actual research topic. */
+export function parseGoogleSearchResults(data, topic, limit = 5) {
+  const queryTerms = keywords(topic);
+  const items = Array.isArray(data && data.items) ? data.items : [];
+  const scored = [];
+  for (const item of items) {
+    const url = typeof item?.link === "string" ? item.link : "";
+    if (!/^https:\/\//i.test(url)) continue;
+    let hostname = "";
+    try { hostname = new URL(url).hostname.toLowerCase(); } catch { continue; }
+    const title = String(item?.title || "").replace(/\s+/g, " ").trim().slice(0, 180);
+    const snippet = String(item?.snippet || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+    if (!title || !snippet) continue;
+    const haystack = (title + " " + snippet + " " + hostname).toLowerCase();
+    const matched = queryTerms.filter(term => haystack.includes(term));
+    const phraseBonus = cleanQuery(topic).length > 4 && haystack.includes(cleanQuery(topic).toLowerCase()) ? 20 : 0;
+    const relevance = Math.min(100, Math.round((queryTerms.length ? matched.length / queryTerms.length * 80 : 0) + phraseBonus));
+    scored.push({ title, snippet, url, source: hostname, relevance });
+  }
+  return scored.sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
+}
+
 /** Assemble the single research bundle that is shown on the message and sent to GENE. */
 export function buildResearchBundle(input) {
   const topic = cleanQuery(input.topic);
@@ -148,11 +170,13 @@ export function buildResearchBundle(input) {
   for (const file of (Array.isArray(input.commonsImages) ? input.commonsImages : [])) pushImage(file);
   const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" }));
   const matches = matchGameKnowledge(topic, 3);
+  const webResults = parseGoogleSearchResults({ items: Array.isArray(input.webResults) ? input.webResults : [] }, topic, 5);
   return {
     id: String(input.id || "research-" + Date.now().toString(36)),
     topic,
     createdAt: String(input.createdAt || new Date().toISOString()),
     facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
+    webResults,
     images: images.slice(0, 8),
     models,
     engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")).filter(model => {
@@ -193,6 +217,11 @@ export function formatResearchNotes(input) {
       lines.push("## Visual references (" + bundle.images.length + ")");
       for (const image of bundle.images) lines.push("- " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
       lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition.", "");
+    }
+    if (Array.isArray(bundle.webResults) && bundle.webResults.length) {
+      lines.push("## Web research (ranked by topic relevance)");
+      for (const result of bundle.webResults.slice(0, 5)) lines.push("- **" + result.title + "** — " + result.snippet + " (" + result.url + "; relevance " + result.relevance + "/100; source " + result.source + ")");
+      lines.push("");
     }
     if (bundle.facts.length) {
       lines.push("## Real-world context (Wikipedia)");
