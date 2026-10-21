@@ -26,7 +26,7 @@ Choose a restrained, coherent palette: dominant base, neutral support, and small
 - Unsupported categories: do not fabricate support; narrow the task or return an honest limitation.
 
 ## 7. Recipe validation
-Recipes contain name, kind, style, notes and parts. Every part must have a supported shape, finite 3D position, positive bounded scale, bounded rotation, safe name, valid hex colour, and supported surface. Reject malformed JSON, extreme coordinates, excessive part counts and oversized meshes. Keep generated paths inside the project.
+Recipes contain name, kind, style, notes and parts. Every part must have a supported shape (including the capsule primitive for smoother limb-like forms), finite 3D position, positive bounded scale, bounded rotation, safe name, valid hex colour, and supported surface. Reject malformed JSON, extreme coordinates, excessive part counts and oversized meshes. Keep generated paths inside the project.
 
 ## 8. Export and integrate
 The current first export is OBJ geometry, MTL materials and asset.json manifest. Keep the files together. Record source mode, style, counts and notes. Persist through safe workspace operations and never overwrite unrelated files without explicit approval. glTF/GLB, Godot scenes, UVs, texture baking, rigging and Blender scenes are future adapters unless implemented and tested.
