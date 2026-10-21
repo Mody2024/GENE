@@ -53,7 +53,7 @@ assert.ok(api.includes("GEMINI_NOT_CONFIGURED"), "missing Gemini key is explicit
 assert.ok(api.includes("GEMINI_API_KEY_2") && api.includes("GEMINI_API_KEY_3"), "Gemini failover supports multiple independently configured keys");
 assert.ok(api.includes("gemini-3.6-flash") && api.includes("gemini-3.5-flash-lite"), "Gemini failover includes supported stable fallback models");
 assert.ok(api.includes("GEMINI_QUOTA_EXHAUSTED") && api.includes("GEMINI_CAPACITY_BUSY"), "quota and overload errors are reported distinctly");
-assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED"), "OpenRouter key, rate-limit and exhaustion failures are reported distinctly");
+assert.ok(api.includes("OPENROUTER_KEY_REJECTED") && api.includes("OPENROUTER_RATE_LIMITED") && api.includes("providerKeyName"), "provider key, rate-limit and exhaustion failures are reported distinctly with provider-specific key guidance");
 assert.ok(api.includes("runAlternateChain") && !api.includes("GENE_OPENROUTER_MODEL"), "OpenRouter fallback uses the free-model router, not a hard-coded model override");
 assert.ok(api.includes("perCallMs: isBuild ? 12_000 : 7_000") && api.includes("maxAttempts: isBuild ? 4 : 7"), "whole-game builds get longer bounded fallback calls while other requests retain broader model coverage");
 assert.ok(api.includes("? 25_000 : totalBudgetMs"), "Gemini primary attempts leave a larger reserved window for backup providers");
