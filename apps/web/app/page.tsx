@@ -1623,7 +1623,8 @@ export default function Home() {
 
   function downloadAssetFile(path: string) {
     if (!project || !project.files[path]) return;
-    const blob = new Blob([project.files[path]], { type: path.endsWith(".mtl") || path.endsWith(".obj") ? "text/plain" : "application/json" });
+    const mime = path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".mtl") || path.endsWith(".obj") ? "text/plain" : "application/json";
+    const blob = new Blob([project.files[path]], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
