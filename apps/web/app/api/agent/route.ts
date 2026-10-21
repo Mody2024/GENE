@@ -452,7 +452,7 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
             kitControls ? "" : "  function mountAudioPanel() {",
             kitControls ? "" : "    var host = document.createElement('div'); host.id = 'gene-audio-settings-host'; host.setAttribute('data-gene-audio-settings', 'true'); host.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:50;font:12px system-ui,sans-serif';",
             kitControls ? "" : "    /* Reuse an existing settings control; never inject a second Audio panel. */",
-            kitControls ? "" : "    if (document.querySelector('[aria-label=\\"Audio settings\\"], [data-gene-audio-settings], #gene-audio-settings')) return;",
+            kitControls ? "" : "    if (document.querySelector('[data-gene-audio-settings], #gene-audio-settings, #gene-audio-settings-host')) return;",
             kitControls ? "" : "    var toggle = document.createElement('button'); toggle.type = 'button'; toggle.id = 'gene-audio-settings'; toggle.setAttribute('data-gene-audio-settings', 'true'); toggle.textContent = 'Audio'; toggle.setAttribute('aria-label', 'Audio settings');",
             kitControls ? "" : "    toggle.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,20,.8);color:#eaf2f7;cursor:pointer';",
             kitControls ? "" : "    var slot = document.createElement('div'); slot.style.cssText = 'display:none;margin-bottom:6px'; window.GeneAudio.createSettingsPanel(slot);",
