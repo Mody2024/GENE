@@ -9,10 +9,12 @@ assert.match(route, /from "\.\.\/\.\.\/\.\.\/lib\/forge-presets\.mjs"/, "Forge r
 assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetResponse/, "native generation must work when Gemini keys are absent");
 assert.match(route, /if \(!text\)\s*\{\s*const native = nativeAssetResponse/, "native generation must recover from provider failures");
 assert.match(route, /try the bounded native generator before returning an error/, "invalid provider recipes must attempt native fallback");
+assert.match(route, /shape === "capsule"/, "mesh builder must generate capsule geometry for better limbs and organic forms");
 assert.match(route, /"model\.obj": mesh\.obj/, "Forge must export real OBJ geometry");
 assert.match(route, /"model\.mtl": mesh\.mtl/, "Forge must export material definitions");
 assert.match(route, /"asset\.json": JSON\.stringify\(mesh\.asset, null, 2\)/, "Forge must export a machine-readable asset manifest");
 assert.match(route, /files\["model\.obj"\]\.length > 1_500_000/, "Forge must enforce the mesh output size cap");
+assert.match(presets, /part\("left upper arm","capsule"/, "native characters must use capsule limbs instead of purely cylindrical limbs");
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
 assert.match(presets, /kind === "weapon"\) throw new Error/, "unsupported native categories must fail explicitly");
 assert.match(prompt, /GENE FORGE MANDATORY WORKFLOW/, "the unified agent must be instructed to route 3D requests through Forge");
