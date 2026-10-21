@@ -617,6 +617,11 @@ assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.inc
 assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
+const genePrompts = read("apps/web/app/lib/prompts.ts");
+assert.match(genePrompts, /AUTONOMOUS TOOL ORCHESTRATION/, "GENE prompt explains transparent tool orchestration and consent boundaries");
+assert.match(genePrompts, /LARGE REQUEST DECOMPOSITION/, "GENE prompt decomposes long requests into dependency-aware stages");
+assert.match(genePrompts, /SINGLE AUDIO OWNER \/ NO DUPLICATE SETTINGS/, "GENE prompt prevents duplicate audio controls and loops");
+assert.match(api, /data-gene-audio-settings/, "automatic audio repair has an idempotent guard against duplicate settings panels");
 assert.ok(page.includes('aria-label="Planning intent"') && page.includes("Update plan") && page.includes('className="composer-toolbar"'), "plan intent controls and composer toolbar are present in the workspace JSX");
 
 assert.ok(api.includes("app declares interactive controls but game.js contains no detectable event handlers"), "app validation rejects fake interactive controls without handlers");
