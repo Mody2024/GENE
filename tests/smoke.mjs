@@ -92,7 +92,7 @@ assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API s
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(page.includes("let stagePaths = recovery") && page.includes(': ["game-spec.json", "game.html", "game.css", "game.js"]'), "builds begin with four boot stages and can expand into dependency-aware project-specific files");
 assert.ok(page.includes('operation: "buildPart"') && page.includes('operation: "validateBuild"'), "client orchestrates file stages and validates the assembled project before saving");
-assert.ok(page.includes("stageAttempt <= 3") && page.includes("RETRY ") && page.includes("LAST-RESORT SAFE SLICE"), "failed file stages retry twice plus a compact last-resort playable slice");
+assert.ok(page.includes("stageAttempt <= 5") && page.includes("RETRY ") && page.includes("ALTERNATE IMPLEMENTATION") && page.includes("FINAL RECOVERY"), "failed file stages use five bounded attempts with changing recovery strategies");
 assert.ok(page.includes("GENE_BUILD_STAGE_FAILED"), "failed stages produce a clear error without committing partial project files");
 assert.ok(page.includes("TARGETED FINAL-VALIDATION REPAIR") && page.includes("validationAttempt < 3"), "final structural validation failures trigger bounded targeted file repairs before rejecting a build");
 assert.ok(prompts.includes("STAGED BUILD MODE: Return exactly ONE requested file"), "model receives a strict one-file staged-generation contract");
@@ -138,7 +138,7 @@ assert.ok(api.includes('body.operation === "research" ? {} : { responseMimeType:
 assert.ok(prompts.includes("GENE 1.3 QUALITY BAR") && prompts.includes("PROFESSIONAL 3D ART DIRECTION") && prompts.includes("AUTOMATIC STAGED BUILD STRATEGY"), "GENE 1.3 enforces professional art direction and staged vertical-slice development");
 assert.ok(prompts.includes("LOCAL MULTIPLAYER QUALITY") && prompts.includes("map by stable index") && prompts.includes("mixed keyboard/controller"), "multiplayer generation requires independent player input ownership and mixed input support");
 assert.ok(api.includes('body.operation === "buildPart"') && api.includes("attempt.fallback ? 5_120 : 6_144") && api.includes("runAlternateChain"), "agent uses a larger single-file token budget with bounded fallback through the free-model router");
-assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 3') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file three times and explicitly expand chat when preview is hidden");
+assert.ok(page.includes('for (let stageAttempt = 1; stageAttempt <= 5') && page.includes('workspace" + (!previewOpen ? " preview-minimized"'), "staged builds retry each file five times and explicitly expand chat when preview is hidden");
 assert.ok(css.includes(".workspace.preview-minimized .conversation-scroll") && css.includes(".workspace.preview-minimized .composer"), "minimized preview widens both chat content and composer");
 assert.ok(forge.includes('"wedge" | "torus"') && forge.includes("senior hard-surface/prop artist"), "Forge produces additional wedge/torus geometry with stronger professional modelling guidance");
 assert.ok(api.includes("finishReason === \"MAX_TOKENS\""), "Gemini MAX_TOKENS finish reason is detected before parsing");
@@ -400,7 +400,7 @@ assert.ok(api.indexOf('finishReason === "MAX_TOKENS"') < api.indexOf("if (candid
 assert.ok(api.includes('body.operation === "buildPart"') && api.includes('attempt.fallback ? 5_120 : 6_144'), "single-file generation uses an adaptive larger output budget to reduce truncation");
 assert.ok(forge.includes("beveledBox") && forge.includes("cornerIndices.values()") && forge.includes('"wedge"') && forge.includes('"torus"'), "Forge builds actual chamfered hard-surface, sloped and ring meshes");
 assert.ok(gameGuides.includes("PROFESSIONAL MODELING PASS") && gameGuides.includes("up to four local player slots"), "game guides require professional 3D forms and scalable local multiplayer");
-assert.ok(page.includes("GENE BUILD SYSTEM") && page.includes("reduce this file output by at least 35 percent") && page.includes("setShowActivity(true)"), "GENE 1.9 retains build progress and adapts retries after output cutoff");
+assert.ok(page.includes("GENE BUILD SYSTEM") && page.includes("shrink this file by at least 35%") && page.includes("setShowActivity(true)"), "GENE 1.9 retains build progress and adapts retries after output cutoff");
 assert.ok(css.includes(".workspace:has(.preview-reopen-tab){grid-template-columns:minmax(0,1fr)}") && css.includes(".preview-reopen-tab{position:fixed;right:14px;top:auto;bottom:88px"), "minimized preview leaves the chat full-width and moves restore control out of the center");
 
 assert.ok(forge.includes("type Surface =") && forge.includes("surface:'matte'|'metal'|'rubber'|'glass'|'emissive'") && forge.includes("const specular") && forge.includes("Ke "), "Forge exports material-aware metal, rubber, glass and emissive surface properties");

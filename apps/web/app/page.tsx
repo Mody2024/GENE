@@ -698,7 +698,7 @@ export default function Home() {
         setLiveRun(current => current ? { ...current, stage: "research", research: { topic: researchQuery, status: "running" } } : current);
         addActivity("Researching “" + researchQuery.slice(0, 70) + "” (Wikipedia, Wikimedia Commons, Poly Haven)");
         try {
-          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game" }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", images: /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(researchQuery) }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
@@ -809,7 +809,7 @@ export default function Home() {
           addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
           let stageSucceeded = false;
           let stageError = "";
-          for (let stageAttempt = 1; stageAttempt <= 3 && !stageSucceeded; stageAttempt++) {
+          for (let stageAttempt = 1; stageAttempt <= 5 && !stageSucceeded; stageAttempt++) {
             const stageProject: GeneProject = { ...nextProject, files: { ...stagedFiles }, plan: stagedPlan };
             const stageMessage = "Create one complete file for staged build " + (index + 1) + " of " + stagePaths.length + ". Requested file path: " + stagePath + ". " +
               "Use the original project idea in the project context as the source of truth. " +
@@ -818,7 +818,7 @@ export default function Home() {
                 : /\.(?:m?js|cjs)$/i.test(stagePath) && stagePath !== "game.js"
                   ? "The approved plan and earlier staged files are in project context. Return only the requested module " + stagePath + ". It must be a browser-compatible classic script (no import/export), initialize window.GeneModules if absent, and expose its real reusable API as window.GeneModules[" + JSON.stringify(stagePath.split("/").pop()?.replace(/\.(?:m?js|cjs)$/i, "")) + "]. The key must match this filename exactly so the final runtime can call it. Keep it self-contained and safe if initialized before game.js. Match the project's actual features; do not add fake placeholder APIs. Implement the responsibility named for this path, expose a small documented API under the filename-derived GeneModules key, and keep private variables scoped inside an IIFE. Do not access another module's private state directly; communicate through its declared API. Include safe initialization and return a meaningful result or explicit error for invalid input."
                   : "The approved plan and earlier staged files are in project context. Return only " + stagePath + " with complete, compact, working source consistent with all previous files and every path in game-spec.json.additionalFiles. For game.js, wire the declared module APIs into actual gameplay rather than leaving them unused. Initialize and validate the shared module registry, call each required API in the planned dependency order, and make missing APIs fail visibly rather than silently skipping mechanics. Keep the main loop, input, state updates, collision/rules, rendering, win/loss flow and reset coherent; keep state ownership explicit between systems. Do not repeat other files or return partial snippets. Preserve the core request; prefer reliable core mechanics over scope.") +
-              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/3: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " LAST-RESORT SAFE SLICE: reduce this file output by at least 35 percent and prioritize the shortest runnable version of this exact file. No optional features, no long comments, no large data tables or asset arrays. Keep the essential game identity, correct controls and a reliable boot path." : "");
+              (stageAttempt > 1 ? " RETRY " + stageAttempt + "/5: the previous attempt for this file failed: " + stageError.slice(0, 500) + ". " + (stageAttempt === 2 ? "DIAGNOSE FIRST: identify the specific missing contract or syntax issue from the failure, then produce a complete smaller file. Preserve the requested path and exact module API." : "CHANGE APPROACH: do not repeat the failed structure. Simplify the algorithm or split responsibilities into declared modules, preserve the core behavior, and verify every identifier and referenced path.") + " Remove secondary details, not required functionality. Ensure strict valid JSON around the file content and valid syntax inside the file." + (/truncat|MAX_TOKENS|unterminated string|output limit/i.test(stageError) ? " OUTPUT-CUTOFF RECOVERY: the previous response exceeded the output limit; shrink this file by at least 35%, omit optional effects and verbose comments, reduce repeated objects, and close every JSON/code string and brace while preserving core mechanics." : "") : "") + (stageAttempt === 3 ? " ALTERNATE IMPLEMENTATION: replace the failed algorithm with a simpler but complete one; remove optional effects and verify every identifier." : stageAttempt === 4 ? " SECOND ALTERNATE: use a different state layout or control flow from previous attempts, keep only essential mechanics, and ensure all dependencies exist." : stageAttempt === 5 ? " FINAL RECOVERY: return the smallest complete, bootable implementation of this exact file; no optional systems, repeated data, or unconnected modules." : "");
             try {
               const stageResponse = await runFetch("/api/agent", {
                 method: "POST",
@@ -834,7 +834,11 @@ export default function Home() {
               const stagePayload = await stageResponse.json().catch(() => null);
               if (!stageResponse.ok || !stagePayload?.ok) {
                 stageError = stagePayload?.error?.message || ("HTTP " + stageResponse.status + " from staged generation");
-                addActivity("Stage " + stagePath + " attempt " + stageAttempt + " failed: " + stageError.slice(0, 180));
+                addActivity("Stage " + stagePath + " attempt " + stageAttempt + "/5 failed: " + stageError.slice(0, 180));
+                if (/API key|account access|OPENROUTER_KEY_REJECTED|GEMINI_KEY_REJECTED|unauthorized|invalid api key/i.test(stageError)) {
+                  addActivity("Stopping duplicate attempts because the configured provider credentials were rejected; provider fallback has already run for this request.");
+                  break;
+                }
                 continue;
               }
               const stageResult = stagePayload.result as AgentResponse;
@@ -944,7 +948,10 @@ export default function Home() {
                         continue;
                       }
                       try {
-                        addActivity("GENE Forge is modelling " + assetId + " (" + quality + " detail) from a structured mesh recipe.");
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "connecting", detail: "Calling the native modelling tool · " + quality + " detail" } } : current);
+                        addActivity("Connecting to GENE Forge for " + assetId + " (" + quality + " detail); requesting a structured mesh recipe.");
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "modelling", detail: "Building mesh parts, assigning colours/materials, and validating geometry" } } : current);
+                        addActivity("GENE Forge is modelling " + assetId + ": building mesh parts, assigning per-part colours/materials, and validating geometry.");
                         const forgeResponse = await runFetch("/api/forge", {
                           method: "POST", headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -976,8 +983,10 @@ export default function Home() {
                         stagedFiles[prefix + "asset.json"] = JSON.stringify(manifest, null, 2);
                         safeManifest.push(prefix + "model.obj", prefix + "model.mtl", prefix + "asset.json");
                         generatedModels.push({ id: assetId, role: String(request?.role || request?.kind || "asset"), name: manifest.name, quality, files: { obj: prefix + "model.obj", mtl: prefix + "model.mtl", manifest: prefix + "asset.json" } });
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "done", detail: Number(forgeData.asset.partCount || 0) + " parts · " + Number(forgeData.asset.triangleCount || 0) + " triangles · OBJ/MTL/JSON exported" } } : current);
                         addActivity("Forge produced actual OBJ/MTL geometry for " + assetId + " (" + Number(forgeData.asset.triangleCount || 0) + " triangles).");
                       } catch (modelError) {
+                        setLiveRun(current => current ? { ...current, stage: "forge", forge: { asset: assetId, status: "failed", detail: (modelError instanceof Error ? modelError.message : "unknown modelling error").slice(0, 180) } } : current);
                         addActivity("Forge request failed for " + assetId + ": " + (modelError instanceof Error ? modelError.message : "unknown modelling error") + ". No fake asset was added.");
                       }
                     }
@@ -1256,10 +1265,10 @@ export default function Home() {
         // Retry transient provider failures and incomplete model outputs automatically.
         // Keep this bounded: one initial request plus two compact retries.
         let lastFailure: { kind: ReturnType<typeof classifyFailure>["kind"]; message: string } = { kind: "unknown", message: "" };
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 5; attempt++) {
           if (attempt > 0) {
             const waitMs = backoffMs(lastFailure.kind, attempt);
-            addActivity("Automatic recovery retry " + (attempt + 1) + "/3 after: " + classifyFailure(lastFailure.message, "").title.toLowerCase() + " (waiting " + Math.round(waitMs / 100) / 10 + "s)");
+            addActivity("Automatic recovery retry " + (attempt + 1) + "/5 after: " + classifyFailure(lastFailure.message, "").title.toLowerCase() + " (waiting " + Math.round(waitMs / 100) / 10 + "s)");
             setNotice("GENE is retrying. Your current project files remain safe.");
             await new Promise(resolve => window.setTimeout(resolve, waitMs));
           }
@@ -1281,13 +1290,13 @@ export default function Home() {
             });
           } catch (networkError) {
             const detail = networkError instanceof Error ? networkError.message : "network connection lost";
-            addActivity("Network failure on request attempt " + (attempt + 1) + "/3: " + detail);
+            addActivity("Network failure on request attempt " + (attempt + 1) + "/5: " + detail);
             lastFailure = { kind: "network", message: detail };
-            if (attempt < 2) {
+            if (attempt < 4) {
               setNotice("GENE lost the connection to its server. It will retry with a different recovery strategy; saved files remain untouched.");
               continue;
             }
-            payload = { ok: false, error: { code: "GENE_NETWORK_RETRY_EXHAUSTED", message: "The connection failed on all three request attempts. No unconfirmed changes were applied. Retry when the connection is stable." } };
+            payload = { ok: false, error: { code: "GENE_NETWORK_RETRY_EXHAUSTED", message: "The connection failed on all five request attempts. No unconfirmed changes were applied. Retry when the connection is stable." } };
             responseOk = false;
             break;
           }
@@ -1299,7 +1308,7 @@ export default function Home() {
           const failureMessage = String(payload?.error?.message || "");
           const failure = classifyFailure(failureMessage, code, status);
           lastFailure = { kind: failure.kind, message: failureMessage };
-          if (!failure.retryable || attempt >= 2) break;
+          if (!failure.retryable || attempt >= 4) break;
         }
       }
       if (!responseOk || !payload?.ok) {

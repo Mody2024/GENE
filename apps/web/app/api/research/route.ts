@@ -83,20 +83,23 @@ export async function POST(request: NextRequest) {
   if (!bucket || bucket.resetAt <= now) buckets.set(clientKey, { count: 1, resetAt: now + 60_000 });
   else if (++bucket.count > 20) return NextResponse.json({ ok: false, error: { code: "GENE_RATE_LIMIT", message: "Research limit reached. Please wait a minute." } }, { status: 429 });
 
-  const words = keywords(topic);
-  const searchText = words.slice(0, 5).join(" ") || topic;
   const lowerTopic = topic.toLowerCase();
+  // Normalize common spellings so game-specific research targets the real game.
+  const researchIsGeometryDash = /\b(geo\s*dash|geodash|geometry\s*dash)\b/i.test(topic);
+  const normalizedTopic = researchIsGeometryDash ? "Geometry Dash video game gameplay mechanics level editor" : topic;
+  const searchText = researchIsGeometryDash ? normalizedTopic : (keywords(topic).slice(0, 7).join(" ") || topic);
   const arabic = /[؀-ۿ]/.test(topic);
   const wikiHost = arabic ? "ar.wikipedia.org" : "en.wikipedia.org";
-  const wantsImages = body?.images !== false;
+  const explicitlyRequestsImages = body?.images === true || /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(topic);
+  const wantsImages = explicitlyRequestsImages;
   const wants3DModels = /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
   const wantsCharacterArt = /\b(character|player sprite|hero sprite|enemy|npc|creature|character design|sprite sheet)\b/i.test(lowerTopic);
   const wantsAudio = !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
   const assetQuery = wantsCharacterArt
-    ? topic + " 2D game character sprite"
+    ? normalizedTopic + " 2D game character sprite"
     : /\b(background|environment|world|level|landscape|scene|tileset|terrain)\b/i.test(lowerTopic)
-      ? topic + " game environment background"
-      : topic + " game level art environment";
+      ? normalizedTopic + " game environment background"
+      : normalizedTopic + " game level art environment";
 
   const [wiki, catalog, commonsImages, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
@@ -106,7 +109,10 @@ export async function POST(request: NextRequest) {
   ]);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
-  const links = buildSearchLinks(wantsCharacterArt ? topic + " game sprite" : topic + " 2D game design");
+  const links = buildSearchLinks(researchIsGeometryDash
+    ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
+    : wantsCharacterArt ? topic + " game sprite" : topic + " game design mechanics level design");
+
 
   const unavailable: string[] = [];
   if (!wiki.length) unavailable.push((arabic ? "Arabic " : "") + "Wikipedia returned nothing for this topic or could not be reached");
@@ -114,6 +120,15 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, links, unavailable, createdAt: new Date().toISOString() });
+  if (!wantsImages) bundle.images = [];
+  if (researchIsGeometryDash) {
+    bundle.facts = [
+      ...bundle.facts,
+      { title: "Core loop to study", extract: "Geometry Dash is a rhythm-based precision platformer: one-touch input, timed obstacle sequences, repeated attempts, practice/checkpoint options, and instant restart are central genre expectations. Build original level layouts and art.", url: "https://www.robtopgames.com/" },
+      { title: "Level-design reference", extract: "Study beat-synchronized obstacle spacing, readable silhouettes, visual anticipation before jumps, difficulty curves, and short feedback loops. Do not copy proprietary levels, music, icons, or branding.", url: "https://www.robtopgames.com/" },
+      { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
+    ];
+  }
   const imageData = wantsImages
     ? (await Promise.all(bundle.images.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
