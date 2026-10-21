@@ -705,7 +705,8 @@ export default function Home() {
     try {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
       const chatNeedsResearch = operation === "chat" && (
-        /\b(search|research|look up|find sources|sources for|check online|browse the web|verify online|latest|current|today|this week|recent|up[- ]to[- ]date|documentation|what changed|release date|version of|news about)\b/i.test(prompt)
+        /\b(search|research|look up|find sources|sources for|check online|browse the web|verify online|latest|current|today|this week|recent|up[- ]to[- ]date|documentation|what changed|release date|version of|news about|who is|what is|what are|when is|when did|where is|why does|why is|how does|how do|how much|how many|which is|compare|versus|vs\.?|price|cost|available|supported|compatible)\b/i.test(prompt) ||
+        (prompt.trim().length >= 55 && /[?؟]/.test(prompt) && !/\b(write me|make me|create me|tell me a story|roleplay|brainstorm|imagine)\b/i.test(prompt))
       );
       // Research runs automatically for planning/building and chat questions that
       // depend on current or externally verifiable facts. The explicit web-research
