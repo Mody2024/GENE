@@ -33,6 +33,26 @@ assert.equal(planVisualReferenceQueries({ topic: "x" }).length, 0);
 
 const coverA = createProjectCoverSvg({ name: "Skeleton City", kind: "game", engine: "webgl3d", prompt: "third person skeleton in a city" });
 const coverB = createProjectCoverSvg({ name: "Budget Board", kind: "app", engine: "webapp", prompt: "dashboard and budget charts" });
+const coverWithSprite = createProjectCoverSvg({
+  name: "Hero Platformer", kind: "game", engine: "canvas2d",
+  files: {
+    "assets/forge2d/character.json": JSON.stringify({ kind: "character", name: "character" }),
+    "assets/forge2d/character.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="5" r="4" fill="#f00"/><rect x="6" y="9" width="8" height="10" fill="#00f"/></svg>'
+  }
+});
+assert.match(coverWithSprite, /data-gene-cover-character="sprite"/, "the cover must reuse the actual project-owned character sprite when available");
+assert.match(coverWithSprite, /data:image\/svg\+xml;charset=utf-8,%3Csvg/, "the sprite is embedded locally, without an image model");
+const coverWithMesh = createProjectCoverSvg({
+  name: "3D Hero", kind: "game", engine: "webgl3d",
+  files: {
+    "assets/hero/asset.json": JSON.stringify({ kind: "character", name: "hero" }),
+    "assets/hero/model.obj": "v -1 0 0\nv 1 0 0\nv 0 2 0\nf 1 2 3\n",
+    "assets/hero/model.mtl": "newmtl hero\nKd 0.4 0.7 0.9\n"
+  }
+});
+assert.match(coverWithMesh, /data-gene-cover-character="obj"/, "3D covers can project the original OBJ character mesh locally");
+assert.match(coverWithMesh, /<polygon points=/, "the cover renderer uses actual mesh faces");
+
 assert.match(coverA, /<svg[^>]+data-gene-cover="local-v1"/);
 assert.match(coverA, /Skeleton City/);
 assert.match(coverA, /3D GAME/);
