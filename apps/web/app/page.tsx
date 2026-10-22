@@ -719,6 +719,7 @@ export default function Home() {
       const needsResearch = !silent && (
         operation === "research" ||
         chatNeedsResearch ||
+        (operation === "interview" && !(nextProject.references || []).some(item => item.name === "research-notes.md")) ||
         ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
       );
       if (needsResearch) {
