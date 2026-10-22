@@ -32,8 +32,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         return {
           id, name,
           type: typeof raw.type === "string" ? raw.type.slice(0, 60) : "mesh",
-          modelPath: typeof raw.modelPath === "string" && /^assets\/[a-zA-Z0-9_-]+\/model\.obj$/i.test(raw.modelPath) ? raw.modelPath : "",
-          modelPath: typeof raw.modelPath === "string" && /^(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(raw.modelPath) ? raw.modelPath.slice(0, 240) : "",
+          modelPath: typeof raw.modelPath === "string" && /^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(raw.modelPath) ? raw.modelPath.slice(0, 240) : "",
           position: vector(raw.position ?? raw.position3d ?? raw.translation, { x: 0, y: 0, z: 0 }),
           rotation: vector(raw.rotation ?? raw.rotation3d, { x: 0, y: 0, z: 0 }),
           scale: vector(raw.scale ?? raw.scale3d, { x: 1, y: 1, z: 1 }),
