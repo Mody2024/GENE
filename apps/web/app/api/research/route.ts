@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
     ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
-    : wantsCharacterArt ? topic + " game sprite" : topic + " game design mechanics level design");
+    : topic + " game design mechanics level design");
 
 
   const unavailable: string[] = [];
