@@ -173,13 +173,25 @@ export function buildResearchBundle(input) {
   const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" }));
   const matches = matchGameKnowledge(topic, 3);
   const webResults = parseGoogleSearchResults({ items: Array.isArray(input.webResults) ? input.webResults : [] }, topic, 5);
+  // Round-robin category-tagged references so UI, gameplay, characters and environments
+  // each get a chance to reach the model before any one category fills the image budget.
+  const categorized = images.filter(image => image.category);
+  const categoryOrder = Array.from(new Set(categorized.map(image => image.category)));
+  const balancedImages = [];
+  for (let offset = 0; offset < 4; offset++) {
+    for (const category of categoryOrder) {
+      const candidate = categorized.filter(image => image.category === category)[offset];
+      if (candidate) balancedImages.push(candidate);
+    }
+  }
+  const visualImages = [...balancedImages, ...images.filter(image => !image.category)];
   return {
     id: String(input.id || "research-" + Date.now().toString(36)),
     topic,
     createdAt: String(input.createdAt || new Date().toISOString()),
     facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
     webResults,
-    images: images.slice(0, 8),
+    images: visualImages.slice(0, 12),
     models,
     engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")).filter(model => {
       const explicit = /\b(character|player|hero|person|human|ninja|knight|mario|runner|run|enemy|enemies|monster|goomba|slime|zombie|ghost|boss|creature|npc|avatar)\b/i.test(topic);
