@@ -62,12 +62,28 @@ export function auditSceneLayout({ objects = [], bounds, spawnId, goalId, camera
     }
   }
   const spawn = byId.get(spawnId);
+  const goal = byId.get(goalId);
+  if (spawnId && !spawn) warnings.push({ code: "MISSING_SPAWN_OBJECT", id: String(spawnId), message: "The declared player spawn does not match an object in the scene." });
+  if (goalId && !goal) warnings.push({ code: "MISSING_GOAL_OBJECT", id: String(goalId), message: "The declared goal does not match an object in the scene." });
   if (spawn) {
     for (const [id, item] of byId) {
       if (id === spawnId || item.object?.solid === false || item.object?.role === "decoration") continue;
       if (aabbIntersects(spawn.aabb, item.aabb)) {
         warnings.push({ code: item.object?.role === "hazard" ? "HAZARD_OVERLAPS_SPAWN" : "SPAWN_OVERLAP", id, message: "Spawn intersects another gameplay object; verify the start is safe and playable." });
       }
+    }
+  }
+  if (goal) {
+    for (const [id, item] of byId) {
+      if (id === goalId || id === spawnId || item.object?.solid === false || item.object?.role === "decoration") continue;
+      const role = String(item.object?.role || "").toLowerCase();
+      const blocksGoal = item.object?.solid === true || ["hazard", "obstacle", "blocker", "wall", "barrier"].includes(role);
+      if (blocksGoal && aabbIntersects(goal.aabb, item.aabb)) {
+        warnings.push({ code: role === "hazard" ? "HAZARD_OVERLAPS_GOAL" : "GOAL_BLOCKED", id, message: "A solid obstacle or hazard overlaps the goal; verify the objective can be reached." });
+      }
+    }
+    if (spawn && aabbIntersects(spawn.aabb, goal.aabb)) {
+      warnings.push({ code: "GOAL_OVERLAPS_SPAWN", id: String(goalId), message: "The goal overlaps the player spawn; verify the opening objective and route are intentional." });
     }
   }
   const cameraData = camera && typeof camera === "object" ? {
