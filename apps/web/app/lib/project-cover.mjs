@@ -42,9 +42,114 @@ function findPalette(seed) {
   return PALETTES[hashText(seed) % PALETTES.length];
 }
 
+function safeProjectSvg(source) {
+  let svg = String(source || "").slice(0, 400_000).trim();
+  if (!/^<svg\b/i.test(svg)) return "";
+  svg = svg
+    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<foreignObject\b[\s\S]*?<\/foreignObject\s*>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*(["']).*?\1/gi, "")
+    .replace(/\s(?:href|src)\s*=\s*(["'])https?:[^"']*\1/gi, "")
+    .replace(/url\(\s*(["']?)https?:[^)]*\)/gi, "none");
+  return svg;
+}
+
+function characterManifest(files) {
+  const entries = Object.entries(files || {});
+  for (const [path, source] of entries) {
+    if (!/\.json$/i.test(path) || !path.startsWith("assets/")) continue;
+    try {
+      const data = JSON.parse(String(source));
+      const kind = String(data?.kind || data?.asset?.kind || data?.recipe?.kind || "").toLowerCase();
+      const name = String(data?.name || data?.asset?.name || data?.recipe?.name || "").toLowerCase();
+      if (kind === "character" || /\b(player|hero|character|avatar|skeleton|npc)\b/.test(name)) {
+        const dir = path.slice(0, path.lastIndexOf("/"));
+        return { dir, name, kind, entries };
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function renderObjCharacter(objSource, mtlSource, box = { x: 330, y: 54, w: 170, h: 196 }) {
+  const vertices = [];
+  const faces = [];
+  const materialColors = new Map();
+  let currentMaterial = "#b9c8c2";
+  let materialName = "";
+  for (const line of String(mtlSource || "").split(/\r?\n/)) {
+    const m = line.trim().match(/^newmtl\s+(.+)$/);
+    if (m) { materialName = m[1].trim(); continue; }
+    const kd = line.trim().match(/^Kd\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)/);
+    if (kd && materialName) {
+      const rgb = kd.slice(1).map(value => Math.max(0, Math.min(255, Math.round(Number(value) * 255))));
+      materialColors.set(materialName, "#" + rgb.map(value => value.toString(16).padStart(2, "0")).join(""));
+    }
+  }
+  for (const line of String(objSource || "").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("v ")) {
+      const values = trimmed.slice(2).trim().split(/\s+/).slice(0, 3).map(Number);
+      if (values.length === 3 && values.every(Number.isFinite)) vertices.push(values);
+      if (vertices.length > 6000) return "";
+    } else if (trimmed.startsWith("usemtl ")) {
+      const name = trimmed.slice(7).trim();
+      currentMaterial = materialColors.get(name) || currentMaterial;
+    } else if (trimmed.startsWith("f ")) {
+      const indices = trimmed.slice(2).trim().split(/\s+/).map(token => {
+        const raw = Number(token.split("/")[0]);
+        return raw < 0 ? vertices.length + raw : raw - 1;
+      });
+      if (indices.length >= 3 && indices.every(index => Number.isInteger(index) && index >= 0 && index < vertices.length)) {
+        for (let i = 1; i < indices.length - 1; i++) faces.push({ indices: [indices[0], indices[i], indices[i + 1]], color: currentMaterial });
+      }
+      if (faces.length > 12_000) return "";
+    }
+  }
+  if (vertices.length < 3 || !faces.length) return "";
+  const projected = vertices.map(([x, y, z]) => [x - z * 0.72, -y + (x + z) * 0.22]);
+  const xs = projected.map(point => point[0]), ys = projected.map(point => point[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const width = Math.max(0.01, maxX - minX), height = Math.max(0.01, maxY - minY);
+  const scale = Math.min(box.w / width, box.h / height) * 0.88;
+  const offsetX = box.x + (box.w - width * scale) / 2;
+  const offsetY = box.y + (box.h - height * scale) / 2;
+  const polygons = faces.map(face => {
+    const points = face.indices.map(index => {
+      const point = projected[index];
+      return (offsetX + (point[0] - minX) * scale).toFixed(2) + "," + (offsetY + (point[1] - minY) * scale).toFixed(2);
+    }).join(" ");
+    return '<polygon points="' + points + '" fill="' + face.color + '" stroke="#17201d" stroke-opacity=".24" stroke-width=".55" stroke-linejoin="round"/>';
+  }).join("");
+  return '<g data-gene-cover-character="obj">' + polygons + "</g>";
+}
+
+function renderProjectCharacter(files) {
+  const projectFiles = files && typeof files === "object" ? files : {};
+  const manifest = characterManifest(projectFiles);
+  const entries = Object.entries(projectFiles);
+  if (manifest) {
+    const spritePath = manifest.dir + "/sprite.svg";
+    const sprite = safeProjectSvg(projectFiles[spritePath]);
+    if (sprite) {
+      const data = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sprite);
+      return '<image data-gene-cover-character="sprite" x="324" y="48" width="190" height="205" preserveAspectRatio="xMidYMid meet" href="' + data + '"/>';
+    }
+    const obj = projectFiles[manifest.dir + "/model.obj"];
+    if (typeof obj === "string") return renderObjCharacter(obj, projectFiles[manifest.dir + "/model.mtl"] || "", { x: 330, y: 52, w: 175, h: 202 });
+  }
+  const spriteEntry = entries.find(([path, source]) => /(?:character|hero|player|skeleton|avatar)[^/]*\.svg$/i.test(path) && safeProjectSvg(source));
+  if (spriteEntry) {
+    const data = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(safeProjectSvg(spriteEntry[1]));
+    return '<image data-gene-cover-character="sprite" x="324" y="48" width="190" height="205" preserveAspectRatio="xMidYMid meet" href="' + data + '"/>';
+  }
+  return "";
+}
+
 /**
- * Credit-free deterministic project-cover artwork. It uses only local vector shapes,
- * project metadata and system fonts; no image-model/API request is made.
+ * Credit-free deterministic project-cover artwork. It uses project-owned character
+ * sprites or OBJ meshes when available, then falls back to local vector art. No image
+ * generation model or external asset request is used.
  */
 export function createProjectCoverSvg(input = {}) {
   const name = String(input.name || input.title || "New project").trim().slice(0, 80) || "New project";
@@ -112,6 +217,8 @@ export function createProjectCoverSvg(input = {}) {
       '<g transform="translate(335 122)"><path d="M-42 47 L-23 13 L20 13 L42 47 Z" fill="' + accent + '"/><rect x="-22" y="20" width="44" height="13" rx="5" fill="' + highlight + '"/><circle cx="-23" cy="48" r="9" fill="' + bg1 + '"/><circle cx="23" cy="48" r="9" fill="' + bg1 + '"/></g>' +
       '<g fill="' + highlight + '"><rect x="80" y="190" width="34" height="34" rx="3" transform="rotate(15 97 207)"/><rect x="440" y="146" width="28" height="28" rx="3" transform="rotate(20 454 160)"/></g>';
   }
+  const characterMarkup = renderProjectCharacter(input.files);
+  if (characterMarkup) art += characterMarkup;
   const titleY = titleLines.length > 1 ? 299 : 320;
   return '<svg xmlns="http://www.w3.org/2000/svg" width="560" height="360" viewBox="0 0 560 360" role="img" aria-label="' + escapeXml(name) + ' cover" data-gene-cover="local-v1">' +
     '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + bg1 + '"/><stop offset="1" stop-color="' + bg2 + '"/></linearGradient><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + bg1 + '" stop-opacity="0"/><stop offset="1" stop-color="' + bg1 + '" stop-opacity=".97"/></linearGradient></defs>' +
