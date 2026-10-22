@@ -25,7 +25,7 @@ export function buildRuntimeAudioBootstrap(files: Record<string, string> | undef
   for (const item of Array.isArray(audio.voiceOvers) ? audio.voiceOvers : []) {
     if (!item || typeof item.id !== "string" || typeof item.path !== "string") continue;
     const src = (files || {})[item.path];
-    if (typeof src !== "string" || !/^data:audio\\/[a-z0-9.+-]+;base64,/i.test(src)) continue;
+    if (typeof src !== "string" || !/^data:audio\/[a-z0-9.+-]+;base64,/i.test(src)) continue;
     const approximateBytes = Math.floor(src.length * 0.75);
     if (approximateBytes > 1_500_000 || voiceBytes + approximateBytes > 2_000_000) continue;
     voiceBytes += approximateBytes;
