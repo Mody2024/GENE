@@ -38,14 +38,17 @@ export default function ProjectGallery({ projects, currentProjectId, onOpen, onC
       {ordered.length === 0 ? <div className="empty-state">Your projects will appear here when you create one.</div> :
         <div className="project-library-grid">
           {ordered.map(project => {
-            const cover = projectCoverDataUrl({
-              name: project.plan?.title || project.name,
-              kind: project.kind,
-              engine: project.plan?.engine || project.preferredEngine,
-              prompt: project.initialPrompt,
-              files: project.files,
-              plan: project.plan
-            });
+            const savedCover = project.files?.["assets/project-cover.svg"];
+            const cover = typeof savedCover === "string" && savedCover.trim().startsWith("<svg")
+              ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(savedCover)
+              : projectCoverDataUrl({
+                  name: project.plan?.title || project.name,
+                  kind: project.kind,
+                  engine: project.plan?.engine || project.preferredEngine,
+                  prompt: project.initialPrompt,
+                  files: project.files,
+                  plan: project.plan
+                });
             return (
               <button
                 type="button"
