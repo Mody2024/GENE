@@ -104,6 +104,35 @@ export function auditSceneLayout({ objects = [], bounds, spawnId, goalId, camera
   };
 }
 
+/**
+ * Estimate a conservative equal-height jump gap from the game's movement physics.
+ * This is a planning estimate, not a replacement for collision-aware playtesting.
+ */
+export function recommendJumpLayout({
+  horizontalSpeed = 5,
+  jumpVelocity = 8,
+  gravity = 18,
+  playerWidth = 0.8,
+  safetyMargin = 0.35
+} = {}) {
+  const speed = Math.max(0, finite(horizontalSpeed, 5));
+  const impulse = Math.max(0, finite(jumpVelocity, 8));
+  const pull = Math.max(0.001, Math.abs(finite(gravity, 18)));
+  const width = Math.max(0, finite(playerWidth, 0.8));
+  const margin = Math.max(0, finite(safetyMargin, 0.35));
+  const airtime = (2 * impulse) / pull;
+  const theoreticalDistance = speed * airtime;
+  const safeGap = Math.max(0, theoreticalDistance - width - margin);
+  return {
+    assumptions: "equal-height takeoff and landing; constant horizontal speed; no mid-air acceleration or collision losses",
+    airtimeSeconds: Number(airtime.toFixed(3)),
+    theoreticalDistance: Number(theoreticalDistance.toFixed(3)),
+    recommendedMaximumGap: Number(safeGap.toFixed(3)),
+    safetyMargin: margin,
+    warning: "Treat this as a conservative layout estimate; validate with the actual player collider, movement code, and deterministic gameplay tests."
+  };
+}
+
 /** Estimate a useful perspective camera distance from a known scene bounding box. */
 export function recommendCameraFraming({ bounds, fov = 68, aspectRatio = 16 / 9, margin = 1.18 } = {}) {
   const min = vec3(bounds?.min);
@@ -133,7 +162,7 @@ export function formatSpatialContract(intent = "", engine = "canvas2d") {
       ? "3D sizing: use consistent world units; estimate model bounds from transformed mesh dimensions; match collider extents to visible geometry; use ground-contact positions and stable Y-up orientation; keep camera near/far planes and field of view consistent with world scale."
       : "2D sizing: define one world-to-screen transform; size sprites and colliders in world units; derive screen positions from the same camera offset/scale used for drawing; preserve tile alignment and resize-safe HUD margins.",
     "Placement: use a deterministic layout pass with IDs and roles. Spawn must be visible, grounded where appropriate, and clear of hazards; the opening route must be unobstructed; goals and pickups must lie inside bounds; decoration cannot block critical gameplay.",
-    "Reachability: derive gap/obstacle spacing from movement speed, gravity, jump impulse, collider width, and reaction time. Keep a safety margin. If reachability cannot be calculated exactly, simplify the route and validate it with deterministic movement tests.",
+    "Reachability: derive gap/obstacle spacing from movement speed, gravity, jump impulse, collider width, and reaction time. For equal-height jumps, estimate airtime as 2 * jumpVelocity / gravity and horizontal distance as horizontalSpeed * airtime; subtract collider width and a safety margin to get a conservative gap. This is only a planning estimate; validate with actual collision-aware movement tests. If reachability cannot be calculated exactly, simplify the route.",
     "Camera: fit the playable area and important objectives; avoid near/far clipping, wall penetration, sudden snapping, jitter, hidden hazards and HUD overlap. For mobile, reserve touch-control safe areas and size touch targets for fingers.",
     "Before completion, inspect actual transformed bounds and run a layout audit for objects outside bounds, duplicate IDs, hidden critical objects, spawn collisions, and unreachable objectives. Treat automated geometry checks as warnings to verify, not as proof of full gameplay. Do not claim a layout or camera test ran unless it did.",
     "Game intent: " + String(intent).slice(0, 900)
