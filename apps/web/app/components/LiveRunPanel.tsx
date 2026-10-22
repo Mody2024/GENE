@@ -14,6 +14,7 @@ export type LiveRun = {
   forge?: { asset: string; status: "connecting" | "modelling" | "done" | "failed"; detail?: string };
   attempt?: number;
   model?: string;
+  build?: { tasks: Array<{ id: string; title: string; status: "queued" | "running" | "passed" | "failed" | "blocked" | "skipped" }>; total: number; passed: number; activeTask?: string };
 };
 
 const TITLES: Record<string, string> = {
@@ -53,6 +54,13 @@ export default function LiveRunPanel({ run, logOpen, onToggleLog }: { run: LiveR
       <div className="live-run-progress-meta"><span>{steps[at]?.label || "Preparing next step"}</span><span>Step {Math.max(1, at + 1)} of {order.length}</span></div>
       <div className="live-run-progress-track" role="progressbar" aria-label="GENE task progress" aria-valuemin={0} aria-valuemax={order.length} aria-valuenow={Math.max(0, at)}><span style={{ width: (Math.max(0, at) / Math.max(1, order.length)) * 100 + "%" }} /></div>
       <blockquote className="live-run-ask">{run.prompt.length > 220 ? run.prompt.slice(0, 220) + "…" : run.prompt}</blockquote>
+      {run.build && run.build.total > 0 && <section className="live-run-build-tasks" aria-label="Build task progress">
+        <div className="live-run-build-heading"><strong>Build progress</strong><span>{run.build.passed}/{run.build.total} tasks passed</span></div>
+        <div className="live-run-build-track" role="progressbar" aria-label="Verified build tasks" aria-valuemin={0} aria-valuemax={run.build.total} aria-valuenow={run.build.passed}><span style={{ width: (run.build.passed / run.build.total) * 100 + "%" }} /></div>
+        {run.build.activeTask && <p className="live-run-active-task"><span className="lr-active-dot" /> Current task: <strong>{run.build.activeTask}</strong></p>}
+        <ol className="live-run-task-list">{run.build.tasks.slice(0, 8).map(task => <li key={task.id} className={"lrt-" + task.status}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "●" : task.status === "failed" || task.status === "blocked" ? "!" : "○"}</span><strong>{task.title}</strong><small>{task.status}</small></li>)}</ol>
+        {run.build.total > 8 && <small className="live-run-task-more">+{run.build.total - 8} additional tasks in the project ledger</small>}
+      </section>}
       <ol className="live-run-steps">
         {steps.map(step => {
           const index = order.indexOf(step.key as LiveRunStage);
