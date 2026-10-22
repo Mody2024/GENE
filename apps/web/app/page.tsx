@@ -2364,6 +2364,56 @@ export default function Home() {
         ? spec.engine === "webapp" && typeof spec.summary === "string" && Boolean(spec.summary.trim()) && ["features", "routes", "userFlows"].every((key: string) => Array.isArray(spec[key]) && spec[key].length > 0)
         : typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim()));
     add(isAppSpec ? "App specification" : "Game specification", specValid ? "pass" : "fail", specValid ? (isAppSpec ? "Title, app engine, summary, features, routes and user flows are declared." : "Title, engine, mechanics, controls, objective and end states are declared.") : "The JSON or required project-spec fields are missing or malformed.");
+    if (!isAppSpec && specParsed && spec && typeof spec === "object") {
+      const sceneObjects: any[] = Array.isArray(spec.scene?.objects) ? spec.scene.objects : [];
+      const sceneIssues: string[] = [];
+      const sceneIds = new Set<string>();
+      for (const [index, object] of sceneObjects.entries()) {
+        if (!object || typeof object !== "object" || Array.isArray(object)) {
+          sceneIssues.push("Scene entry " + (index + 1) + " is not an object.");
+          continue;
+        }
+        const id = typeof object.id === "string" ? object.id.trim() : "";
+        if (!id) sceneIssues.push("Scene entry " + (index + 1) + " has no stable ID.");
+        else if (sceneIds.has(id)) sceneIssues.push("Duplicate scene ID: " + id);
+        else sceneIds.add(id);
+        for (const key of ["position", "rotation", "scale"]) {
+          if (object[key] != null) {
+            const vector = object[key];
+            const values = Array.isArray(vector) ? vector : [vector.x, vector.y, vector.z];
+            if (values.length < 3 || values.slice(0, 3).some((value: unknown) => !Number.isFinite(Number(value)))) {
+              sceneIssues.push((id || "Scene entry " + (index + 1)) + " has invalid " + key + " coordinates.");
+            }
+          }
+        }
+        if (String(object.type || "").toLowerCase() === "mesh" && object.modelPath) {
+          const modelPath = String(object.modelPath);
+          if (!Object.prototype.hasOwnProperty.call(files, modelPath)) {
+            sceneIssues.push((id || "Scene entry " + (index + 1)) + " references missing model file " + modelPath + ".");
+          } else if (!/\.obj$/i.test(modelPath)) {
+            sceneIssues.push((id || "Scene entry " + (index + 1)) + " modelPath must point to an OBJ file.");
+          } else {
+            const modelSource = files[modelPath] || "";
+            const hasVertices = /^\s*v\s+[-+\d.]/m.test(modelSource);
+            const hasFaces = /^\s*f\s+\S+\s+\S+\s+\S+/m.test(modelSource);
+            if (!hasVertices || !hasFaces) sceneIssues.push((id || "Scene entry " + (index + 1)) + " references an OBJ without recognizable vertex/face data.");
+            const mtlMatch = modelSource.match(/^\s*mtllib\s+(.+)\s*$/m);
+            if (mtlMatch) {
+              const folder = modelPath.includes("/") ? modelPath.slice(0, modelPath.lastIndexOf("/") + 1) : "";
+              const materialPath = folder + mtlMatch[1].trim();
+              if (!Object.prototype.hasOwnProperty.call(files, materialPath)) sceneIssues.push((id || "Scene entry " + (index + 1)) + " references missing material file " + materialPath + ".");
+            }
+          }
+        }
+      }
+      const sceneStatus = sceneIssues.length ? "fail" : "pass";
+      add("Scene and OBJ asset integrity", sceneStatus, sceneIssues.length
+        ? sceneIssues.slice(0, 8).join(" | ")
+        : sceneObjects.length
+          ? sceneObjects.length + " scene entries have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
+          : "No scene objects are declared; the scene manifest is structurally valid but contains no placed objects.");
+    }
+
     const syntaxFiles = Object.entries(files)
       .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string");
     const syntaxFailures: string[] = [];
