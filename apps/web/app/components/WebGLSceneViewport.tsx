@@ -70,8 +70,8 @@ function buildPrimitive(kind: PrimitiveKind, segments = 18): Float32Array {
     ];
     for (const q of faces) { pushTriangle(out,q[0],q[1],q[2]); pushTriangle(out,q[0],q[2],q[3]); }
   } else if (kind === "plane") {
-    pushTriangle(out,[-.5,0,-.5],[.5,0,-.5],[.5,0,.5]);
-    pushTriangle(out,[-.5,0,-.5],[.5,0,.5],[-.5,0,.5]);
+    pushTriangle(out,[-.5,0,-.5],[.5,0,.5],[.5,0,-.5]);
+    pushTriangle(out,[-.5,0,-.5],[-.5,0,.5],[.5,0,.5]);
   } else if (kind === "sphere") {
     const rings = Math.max(8, Math.floor(segments / 2));
     for (let y = 0; y < rings; y++) {
@@ -95,7 +95,7 @@ function buildPrimitive(kind: PrimitiveKind, segments = 18): Float32Array {
       if (kind === "cylinder") {
         const q0=[Math.cos(a)*.5,.5,Math.sin(a)*.5], q1=[Math.cos(b)*.5,.5,Math.sin(b)*.5];
         pushTriangle(out,p0,q0,q1); pushTriangle(out,p0,q1,p1);
-        pushTriangle(out,[0,.5,0],q0,q1);
+        pushTriangle(out,[0,.5,0],q1,q0);
       }
     }
   }
@@ -133,7 +133,8 @@ export default function WebGLSceneViewport({ objects, selectedId, onSelect, read
     const canvas=canvasRef.current, gl=canvas?.getContext("webgl", { antialias: true, alpha: false });
     if (!canvas || !gl) return;
     let program: WebGLProgram | null = null, raf=0;
-    const buffers = new Map<PrimitiveKind, WebGLBuffer>();\n    const normalBuffers = new Map<PrimitiveKind, WebGLBuffer>();
+    const buffers = new Map<PrimitiveKind, WebGLBuffer>();
+    const normalBuffers = new Map<PrimitiveKind, WebGLBuffer>();
     try {
       program=gl.createProgram(); if(!program) throw new Error("Unable to allocate WebGL program");
       gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,VS)); gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,FS)); gl.linkProgram(program);
