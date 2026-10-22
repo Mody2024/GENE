@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { planVisualReferenceQueries } from "../apps/web/app/lib/visual-reference-planner.mjs";
+import { buildResearchBundle } from "../apps/web/app/lib/research-sources.mjs";
 import { createProjectCoverSvg, projectCoverDataUrl } from "../apps/web/app/lib/project-cover.mjs";
 import { readFileSync } from "node:fs";
 
@@ -13,6 +14,18 @@ assert.ok(gameQueries.every(item => item.query.includes("3D skeleton city advent
 assert.ok(gameQueries.every(item => item.query.length <= 220));
 assert.match(gameQueries.find(item => item.id === "characters").query, /character design|animation pose/i);
 
+const categoryIds = ["ui-menus", "gameplay", "characters", "environments"];
+const categorizedBundle = buildResearchBundle({
+  topic: "3D city adventure",
+  commonsImages: categoryIds.flatMap(category => [0, 1].map(index => ({
+    id: category + "-" + index, title: category + " " + index, thumb: "https://upload.wikimedia.org/" + category + "-" + index + ".jpg",
+    full: "https://upload.wikimedia.org/" + category + "-" + index + ".jpg", page: "https://commons.wikimedia.org/wiki/File:" + category + "-" + index,
+    license: "CC0", credit: "Test", source: "Wikimedia Commons", category, categoryLabel: category
+  }))),
+  links: []
+});
+assert.deepEqual(categorizedBundle.images.slice(0, 4).map(image => image.category), categoryIds, "one image per category should be prioritized before repeats");
+assert.ok(categorizedBundle.images.length <= 12);
 const appQueries = planVisualReferenceQueries({ topic: "Project dashboard and task manager", kind: "app", engine: "webapp" });
 assert.deepEqual(appQueries.map(item => item.id), ["ui-layout", "interaction-patterns", "visual-style", "illustrations-icons"]);
 assert.equal(planVisualReferenceQueries({ topic: "City runner", images: false }).length, 0);
