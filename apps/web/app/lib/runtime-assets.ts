@@ -13,7 +13,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const assets: Record<string, string> = {};
   let totalBytes = 0;
   for (const [path, content] of Object.entries(files || {})) {
-    if (!/^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json|asset-2d\.json)$/i.test(path) && !/^assets\/forge2d\/(?:character|tileset|background)\.json$/i.test(path) && !RUNTIME_ART_PATH.test(path)) continue;
+    if (!/^assets\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.(?:obj|mtl)$/i.test(path) && !/^assets\/[a-zA-Z0-9_-]+\/(?:asset\.json|asset-2d\.json)$/i.test(path) && !/^assets\/forge2d\/(?:character|tileset|background)\.json$/i.test(path) && !RUNTIME_ART_PATH.test(path)) continue;
     if (typeof content !== "string" || totalBytes + content.length > MAX_RUNTIME_ASSET_BYTES) continue;
     assets[path] = content;
     totalBytes += content.length;
