@@ -2438,7 +2438,7 @@ export default function Home() {
       }
       const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
       if (audioConfig.enabled !== false && !isAppSpec) {
-        const audioConnected = /GeneAudio\.(?:sfx|play|playSfx|music\.start|startMusic)|GeneAudio\\[/.test(allRuntimeSource);
+        const audioConnected = /GeneAudio\.(?:sfx|play|playSfx|music\.start|startMusic)|GeneAudio\[/.test(allRuntimeSource);
         add("Audio runtime integration", audioConnected ? "pass" : "warn", audioConnected
           ? "Game source references the shared GeneAudio runtime; event coverage and audible output are not inferred from source alone."
           : "Audio is enabled in game-spec.json, but game source does not reference GeneAudio. The runtime exists, but the game may remain silent.");
