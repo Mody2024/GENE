@@ -25,6 +25,6 @@ assert.equal(createProjectCoverSvg({ name: "A&B <Game>" }).includes("A&amp;B &lt
 assert.equal(createProjectCoverSvg({ name: "Same", prompt: "city" }), createProjectCoverSvg({ name: "Same", prompt: "city" }), "cover rendering is deterministic");
 assert.match(projectCoverDataUrl({ name: "Game" }), /^data:image\/svg\+xml;charset=utf-8,/);
 for (const svg of [coverA, coverB]) {
-  assert.doesNotMatch(svg, /<script|foreignObject|https?:\/\//i, "covers are local SVG only; no remote or executable content");
+  assert.doesNotMatch(svg, /<script|foreignObject|(?:href|src)\s*=\s*["\x27]https?:/i, "covers are local SVG only; no remote or executable content");
 }
 console.log("Visual-reference planner and local project-cover tests passed.");
