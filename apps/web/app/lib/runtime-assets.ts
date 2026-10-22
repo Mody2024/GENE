@@ -32,7 +32,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const art = [
     "window.GENE_ART=window.GENE_ART||{};",
     "(function(A){var cache={};",
-    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\\/(?:art\\/[^/]+\\.svg|[^/]+\\/sprite\\.svg)$/i.test(p);});};",
+    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\\/(?:art\\/[^/]+\\.svg|[^/]+\\/sprite\\.svg|forge2d\\/(?:character|tileset|background)\\.svg)$/i.test(p);});};",
     "A.svg=function(p){var s=(window.__GENE_ASSETS__||{})[p];return typeof s===\"string\"?s:null;};",
     "A.image=function(p){if(cache[p])return cache[p];var s=A.svg(p);if(s===null)return null;var img=new Image();img.decoding=\"async\";img.src=\"data:image/svg+xml;charset=utf-8,\"+encodeURIComponent(s);cache[p]=img;return img;};",
     "A.ready=function(p){var i=A.image(p);return !!(i&&i.complete&&i.naturalWidth>0);};",
