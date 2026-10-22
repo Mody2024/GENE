@@ -22,6 +22,7 @@ import { buildRuntimeAssetBootstrap } from "./lib/runtime-assets";
 import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
+import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/project-persistence";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
@@ -246,6 +247,7 @@ export default function Home() {
   const [fileDirty, setFileDirty] = useState(false);
   const [notice, setNotice] = useState("");
   const [persistenceWarning, setPersistenceWarning] = useState("");
+  const [persistenceReady, setPersistenceReady] = useState(false);
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
   const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
   const [showActivity, setShowActivity] = useState(false);
@@ -281,34 +283,56 @@ export default function Home() {
   const lastRuntimeError = useRef("");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
-      const list: GeneProject[] = stored.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
-      const activeId = localStorage.getItem(ACTIVE_KEY);
-      setProjects(list);
+    let cancelled = false;
+    const hydrate = async () => {
+      let list: GeneProject[] = [];
+      let activeId = "";
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
+        list = stored.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+        activeId = localStorage.getItem(ACTIVE_KEY) || "";
+      } catch {
+        list = [];
+      }
+
+      // Restore the durable IndexedDB snapshot when localStorage is empty or unreadable.
+      if (!list.length) {
+        try {
+          const snapshot = await readDurableProjectSnapshot();
+          if (snapshot?.projects.length) {
+            list = snapshot.projects.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+            activeId = snapshot.activeProjectId;
+          }
+        } catch {
+          // Continue with the localStorage compatibility path when IndexedDB is unavailable.
+        }
+      }
+      if (cancelled) return;
       const active = list.find(p => p.id === activeId) || list[0] || newProject();
+      setProjects(list.length ? list : [active]);
       setProject(active);
-      if (!list.some(p => p.id === active.id)) setProjects([active]);
-      const savedTheme = localStorage.getItem("gene.theme");
-      if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
-    } catch {
-      const fresh = newProject();
-      setProject(fresh);
-      setProjects([fresh]);
-    }
-    setThemeReady(true);
-    fetch("/api/health").then(r => r.json()).then(d => {
-      setApiReady(Boolean(d.aiConfigured));
-      setPublishConfigured(Boolean(d.publishConfigured));
-      setBinaryBuildConfigured(Boolean(d.binaryBuildConfigured));
-      if (d.model) setAiModel(d.model);
-      if (Array.isArray(d.freeModels?.openrouter)) setFreeModels(d.freeModels.openrouter.slice(0, 4));
-    }).catch(() => setApiReady(false));
+      try {
+        const savedTheme = localStorage.getItem("gene.theme");
+        if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
+      } catch {}
+      setPersistenceReady(true);
+      setThemeReady(true);
+      fetch("/api/health").then(r => r.json()).then(d => {
+        if (cancelled) return;
+        setApiReady(Boolean(d.aiConfigured));
+        setPublishConfigured(Boolean(d.publishConfigured));
+        setBinaryBuildConfigured(Boolean(d.binaryBuildConfigured));
+        if (d.model) setAiModel(d.model);
+        if (Array.isArray(d.freeModels?.openrouter)) setFreeModels(d.freeModels.openrouter.slice(0, 4));
+      }).catch(() => { if (!cancelled) setApiReady(false); });
+    };
+    void hydrate();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    if (!project) return;
+    if (!project || !persistenceReady) return;
     const merged = [project, ...projects.filter(p => p.id !== project.id)].slice(0, 8);
     setProjects(prev => [project, ...prev.filter(p => p.id !== project.id)].slice(0, 8));
 
@@ -328,17 +352,20 @@ export default function Home() {
       savedStrategy = null;
     }
 
-    if (savedStrategy === "full") {
-      setPersistenceWarning("");
-    } else if (savedStrategy === "trim-history") {
-      setPersistenceWarning("Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.");
-    } else if (savedStrategy === "active-project") {
-      setPersistenceWarning("Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.");
-    } else if (savedStrategy === "active-project-minimal") {
-      setPersistenceWarning("Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export a project ZIP now to create a separate backup.");
-    } else {
-      setPersistenceWarning("GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.");
-    }
+    // Prefer the full IndexedDB snapshot when localStorage is unavailable or over quota.
+    const warningForStrategy = (strategy: string | null) => {
+      if (strategy === "full") return "";
+      if (strategy === "trim-history") return "Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.";
+      if (strategy === "active-project") return "Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.";
+      if (strategy === "active-project-minimal") return "Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export the project ZIP now to create a separate backup.";
+      return "GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.";
+    };
+    void writeDurableProjectSnapshot(merged, project.id).then(() => {
+      setPersistenceWarning(savedStrategy === null ? "" : warningForStrategy(savedStrategy));
+    }).catch(() => {
+      setPersistenceWarning(warningForStrategy(savedStrategy));
+    });
+
   }, [project]);
 
   useEffect(() => {
