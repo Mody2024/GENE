@@ -352,22 +352,20 @@ export default function Home() {
       savedStrategy = null;
     }
 
-    // Keep a full durable IndexedDB snapshot independent of localStorage quota trimming.
-    void writeDurableProjectSnapshot(merged, project.id).catch(() => {
-      // localStorage remains the compatibility fallback if IndexedDB is unavailable.
+    // Prefer the full IndexedDB snapshot when localStorage is unavailable or over quota.
+    const warningForStrategy = (strategy: string | null) => {
+      if (strategy === "full") return "";
+      if (strategy === "trim-history") return "Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.";
+      if (strategy === "active-project") return "Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.";
+      if (strategy === "active-project-minimal") return "Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export the project ZIP now to create a separate backup.";
+      return "GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.";
+    };
+    void writeDurableProjectSnapshot(merged, project.id).then(() => {
+      setPersistenceWarning(savedStrategy === null ? "" : warningForStrategy(savedStrategy));
+    }).catch(() => {
+      setPersistenceWarning(warningForStrategy(savedStrategy));
     });
 
-    if (savedStrategy === "full") {
-      setPersistenceWarning("");
-    } else if (savedStrategy === "trim-history") {
-      setPersistenceWarning("Browser storage was nearly full. GENE saved your current source but trimmed older chat, versions, and checkpoints. Export a project ZIP as an extra backup.");
-    } else if (savedStrategy === "active-project") {
-      setPersistenceWarning("Browser storage was full. GENE kept the active project and its current source, but trimmed older projects and history. Export a project ZIP to back it up.");
-    } else if (savedStrategy === "active-project-minimal") {
-      setPersistenceWarning("Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export a project ZIP now to create a separate backup.");
-    } else {
-      setPersistenceWarning("GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.");
-    }
   }, [project]);
 
   useEffect(() => {
