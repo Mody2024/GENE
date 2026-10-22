@@ -232,18 +232,21 @@ export default function WebGLSceneViewport({ objects, files, selectedId, onSelec
       for (const [path, source] of Object.entries(files)) {
         if (!/\.obj$/i.test(path) || !source || source.length > 2_000_000) continue;
         try {
-          const geometry = parseObjGeometry(source);
-          const meshBuffer = gl.createBuffer(), meshNormalBuffer = gl.createBuffer();
-          if (!meshBuffer || !meshNormalBuffer) {
+          const geometry = parseObjGeometry(source, path, files);
+          const meshBuffer = gl.createBuffer(), meshNormalBuffer = gl.createBuffer(), meshColorBuffer = gl.createBuffer();
+          if (!meshBuffer || !meshNormalBuffer || !meshColorBuffer) {
             if (meshBuffer) gl.deleteBuffer(meshBuffer);
             if (meshNormalBuffer) gl.deleteBuffer(meshNormalBuffer);
+            if (meshColorBuffer) gl.deleteBuffer(meshColorBuffer);
             continue;
           }
           gl.bindBuffer(gl.ARRAY_BUFFER, meshBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, geometry, gl.STATIC_DRAW);
+          gl.bufferData(gl.ARRAY_BUFFER, geometry.positions, gl.STATIC_DRAW);
           gl.bindBuffer(gl.ARRAY_BUFFER, meshNormalBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, buildFlatNormals(geometry), gl.STATIC_DRAW);
-          meshBuffers.set(path, { buffer: meshBuffer, normalBuffer: meshNormalBuffer, vertexCount: geometry.length / 3 });
+          gl.bufferData(gl.ARRAY_BUFFER, buildFlatNormals(geometry.positions), gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, meshColorBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, geometry.colors, gl.STATIC_DRAW);
+          meshBuffers.set(path, { buffer: meshBuffer, normalBuffer: meshNormalBuffer, colorBuffer: meshColorBuffer, vertexCount: geometry.positions.length / 3 });
         } catch {
           // Invalid or oversized OBJ files are skipped; primitive editing remains available.
         }
