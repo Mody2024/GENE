@@ -155,8 +155,11 @@ export async function POST(request: NextRequest) {
       { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
+  // Prefer category-tagged Commons results first so the model sees a varied reference set
+  // instead of four near-duplicate encyclopedia thumbnails.
+  const imageCandidates = [...bundle.images.filter((image: any) => image.category), ...bundle.images.filter((image: any) => !image.category)];
   const imageData = wantsImages
-    ? (await Promise.all(bundle.images.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
+    ? (await Promise.all(imageCandidates.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
 
   return NextResponse.json({
