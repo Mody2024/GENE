@@ -31,7 +31,7 @@ export function buildRuntimeAudioBootstrap(files: Record<string, string> | undef
   ga.manifest=cfg;
   ga.enabled=cfg.enabled;
   ga.events=cfg.events;
-  if(typeof ga.setVolume==="function"){
+  if(typeof ga.setVolume==="function"&&!(typeof ga.hasSavedSettings==="function"&&ga.hasSavedSettings())){
     ga.setVolume("master",cfg.volumes.master);
     ga.setVolume("music",cfg.volumes.music);
     ga.setVolume("sfx",cfg.volumes.sfx);
