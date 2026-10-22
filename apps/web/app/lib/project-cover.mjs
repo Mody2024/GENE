@@ -43,11 +43,11 @@ function findPalette(seed) {
 }
 
 function projectFontFamily(files) {
-  const css = Object.entries(files || {}).filter(([path, content]) => /\\.css$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\\n").slice(0, 500_000);
-  const match = css.match(/font-family\\s*:\\s*([^;{}]+)/i);
+  const css = Object.entries(files || {}).filter(([path, content]) => /\.css$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\n").slice(0, 500_000);
+  const match = css.match(/font-family\s*:\s*([^;{}]+)/i);
   if (!match) return "system-ui,Segoe UI,Arial,sans-serif";
   const first = match[1].split(",")[0].trim().replace(/^["']|["']$/g, "");
-  return /^[\\w\\s-]{1,48}$/.test(first) ? first + ",system-ui,Segoe UI,Arial,sans-serif" : "system-ui,Segoe UI,Arial,sans-serif";
+  return /^[\w\s-]{1,48}$/.test(first) ? first + ",system-ui,Segoe UI,Arial,sans-serif" : "system-ui,Segoe UI,Arial,sans-serif";
 }
 
 function safeProjectSvg(source) {
