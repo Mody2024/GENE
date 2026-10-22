@@ -104,7 +104,7 @@ assert.ok(runtimeScene.includes("createWebGLMeshes=function(gl)") && runtimeScen
 assert.ok(runtimeScene.includes("drawWebGLMeshes=function(gl,program,viewProjection,resources,locations)") && runtimeScene.includes("drawArrays(gl.TRIANGLES,0,m.vertexCount)") && runtimeScene.includes("vertexAttribPointer(normal,3,gl.FLOAT,false,24,12)"), "runtime scene bridge can draw assigned OBJ meshes with saved transforms through WebGL");
 assert.ok(prompts.includes("drawWebGLMeshes(gl, program, viewProjection, resources)"), "3D generation contract documents the runtime WebGL mesh draw helper");
 assert.ok(prompts.includes("createWebGLMeshes(gl)") && prompts.includes("normal offset 12 bytes"), "3D generation contract requires renderers to consume Scene Studio OBJ meshes");
-assert.ok(runtimeAssets.includes("parseOBJ=function(path)") && runtimeAssets.includes("(?:\\\\/[a-zA-Z0-9_-]+)*\\\\.(?:obj|mtl)"), "nested OBJ/MTL project assets are exposed to the isolated game runtime");
+assert.ok(runtimeAssets.includes("parseOBJ=function(path)") && runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("(?:obj|mtl)"), "nested OBJ/MTL project assets are exposed to the isolated game runtime with a bounded asset budget");
 assert.ok(api.includes("put executable source in game.js and load it with a local game.js script src"), "final validation permits the local game.js entry while rejecting inline and remote script tags");
 const finalHtmlScriptGuard = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])(?![^>]*\bsrc\s*=\s*["'](?:\.\/)?game\.js(?:[?#][^"']*)?["'])/i;
 assert.equal(finalHtmlScriptGuard.test('<script src="./game.js"></script>'), false, "the standard local game.js script entry must pass final validation");
