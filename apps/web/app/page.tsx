@@ -1009,7 +1009,7 @@ export default function Home() {
                   } else {
                     // Every game gets one real, reusable audio runtime unless the user explicitly asks for silence.
                     // The module must be integrated by the staged architecture rather than existing as an unused file.
-                    if (!/\\b(?:no sound|without sound|silent game|no audio|mute by default)\\b/.test(scopeText)) {
+                    if (!/(?:no sound|without sound|silent game|no audio|mute by default)/.test(scopeText)) {
                       plannedModules.push("src/systems/audio-manager.js");
                     }
                     if (spec.engine === "webgl3d") plannedModules.push("src/systems/camera-controller.js");
