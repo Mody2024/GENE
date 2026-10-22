@@ -260,7 +260,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
-    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: is2D ? "box" : "mesh", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
+    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
     setStatus("New scene entry added. Save it to write the manifest.");
@@ -339,7 +339,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
           {selected ? <>
             <label className="scene-field">Name<input value={selected.name} onChange={event => updateSelected({ name: event.target.value })} disabled={readOnly} /></label>
             <label className="scene-field">Type<select value={selected.type} onChange={event => updateSelected({ type: event.target.value })} disabled={readOnly}>
-              <option value="mesh">Mesh / imported model</option><option value="box">Box</option><option value="sphere">Sphere</option><option value="plane">Plane</option><option value="light">Light</option><option value="camera">Camera marker</option><option value="custom">Custom</option>
+              <option value="mesh">Mesh / imported model</option><option value="box">Box</option><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="plane">Plane</option><option value="light">Light</option><option value="camera">Camera marker</option><option value="custom">Custom</option>
             </select></label>
             {(["position", "rotation", "scale"] as const).map(key => <fieldset className="scene-vector" key={key}>
               <legend>{key}</legend>
