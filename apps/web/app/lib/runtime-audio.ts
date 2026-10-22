@@ -20,7 +20,18 @@ export function buildRuntimeAudioBootstrap(files: Record<string, string> | undef
     },
     events: audio.events && typeof audio.events === "object" ? audio.events : {}
   };
-  const serialized = JSON.stringify(config).replace(/</g, "\\u003c");
+  const voiceOvers: Array<{ id: string; name: string; src: string }> = [];
+  let voiceBytes = 0;
+  for (const item of Array.isArray(audio.voiceOvers) ? audio.voiceOvers : []) {
+    if (!item || typeof item.id !== "string" || typeof item.path !== "string") continue;
+    const src = (files || {})[item.path];
+    if (typeof src !== "string" || !/^data:audio\\/[a-z0-9.+-]+;base64,/i.test(src)) continue;
+    const approximateBytes = Math.floor(src.length * 0.75);
+    if (approximateBytes > 1_500_000 || voiceBytes + approximateBytes > 2_000_000) continue;
+    voiceBytes += approximateBytes;
+    voiceOvers.push({ id: item.id, name: typeof item.name === "string" ? item.name : item.id, src });
+  }
+  const serialized = JSON.stringify({ ...config, voiceOvers }).replace(/</g, "\\u003c");
   return `<script>
 (function(){
   "use strict";
@@ -29,6 +40,20 @@ export function buildRuntimeAudioBootstrap(files: Record<string, string> | undef
   ga.__manifestConfigured=true;
   var cfg=${serialized};
   ga.manifest=cfg;
+  ga.voiceOvers=cfg.voiceOvers||[];
+  ga.playVoiceOver=function(id,options){
+    var item=ga.voiceOvers.find(function(v){return v.id===id||v.name===id;});
+    if(!item||!item.src||!cfg.enabled)return false;
+    try{
+      var player=new Audio(item.src);
+      var opts=options&&typeof options==="object"?options:{};
+      player.volume=Math.max(0,Math.min(1,Number(opts.volume==null?1:opts.volume)*cfg.volumes.master));
+      if(typeof opts.playbackRate==="number")player.playbackRate=Math.max(0.5,Math.min(2,opts.playbackRate));
+      var promise=player.play();
+      if(promise&&typeof promise.catch==="function")promise.catch(function(){});
+      return player;
+    }catch(e){return false;}
+  };
   ga.enabled=cfg.enabled;
   ga.events=cfg.events;
   if(typeof ga.setVolume==="function"&&!(typeof ga.hasSavedSettings==="function"&&ga.hasSavedSettings())){
