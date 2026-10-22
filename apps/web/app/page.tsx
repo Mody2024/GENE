@@ -11,6 +11,7 @@ import ArtStudio from "./components/ArtStudio";
 import DesignDocPanel from "./components/DesignDocPanel";
 import InterviewCard from "./components/InterviewCard";
 import ResearchCard from "./components/ResearchCard";
+import ProjectGallery from "./components/ProjectGallery";
 import LiveRunPanel, { type LiveRun } from "./components/LiveRunPanel";
 import { describeChanges, summarizeChanges } from "./lib/diff-stats.mjs";
 import { backoffMs, classifyFailure, repairTargetsFor, retryGuidance } from "./lib/error-recovery.mjs";
@@ -235,7 +236,7 @@ export default function Home() {
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
   const [freeModels, setFreeModels] = useState<string[]>([]);
   const researchedProjects = useRef<Set<string>>(new Set());
-  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
+  const [section, setSection] = useState<"chat" | "projects" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
   const [fileSearch, setFileSearch] = useState("");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
@@ -726,7 +727,7 @@ export default function Home() {
         setLiveRun(current => current ? { ...current, stage: "research", research: { topic: researchQuery, status: "running" } } : current);
         addActivity("Researching “" + researchQuery.slice(0, 70) + "” (Wikipedia, Wikimedia Commons, Poly Haven)");
         try {
-          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", images: /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(researchQuery) }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", engine: nextProject.plan?.engine || nextProject.preferredEngine || "auto", images: true }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
@@ -2699,6 +2700,7 @@ export default function Home() {
   const activeMessages = project.messages;
   const nav = [
     { id: "chat" as const, icon: "◉", label: "Chat" },
+    { id: "projects" as const, icon: "▦", label: "Projects" },
     { id: "files" as const, icon: "▤", label: "Files" },
     { id: "tasks" as const, icon: "☷", label: "Plan & tasks" },
     { id: "assets" as const, icon: "◇", label: "Assets" },
@@ -2904,6 +2906,7 @@ export default function Home() {
               </form>
             </>}
 
+            {section === "projects" && <ProjectGallery projects={projects} currentProjectId={project.id} onOpen={selected => { setProject(selected); setSection("chat"); setNotice(""); setPreviewKey(value => value + 1); setRuntimeState("idle"); }} onCreate={createNewProject} />}
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
               {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><div className="file-editor-header"><div className="file-editor-path"><span className="file-editor-type">{(project.activeFile.split(".").pop() || "txt").slice(0,4).toUpperCase()}</span><span title={project.activeFile}>{project.activeFile}</span></div><div className="file-editor-state"><span className={"file-editor-dot" + (fileDirty ? " dirty" : "")} />{fileDirty ? "Unsaved" : "Saved"}</div></div><textarea aria-label={"Edit " + project.activeFile} className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}
