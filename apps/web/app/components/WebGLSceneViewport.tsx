@@ -112,7 +112,8 @@ export default function WebGLSceneViewport({ objects, selectedId, onSelect, read
   useEffect(() => {
     const canvas=canvasRef.current, gl=canvas?.getContext("webgl", { antialias: true, alpha: false });
     if (!canvas || !gl) return;
-    let program: WebGLProgram | null = null, raf=0;\n    const buffers = new Map<PrimitiveKind, WebGLBuffer>();
+    let program: WebGLProgram | null = null, raf=0;
+    const buffers = new Map<PrimitiveKind, WebGLBuffer>();
     try {
       program=gl.createProgram(); if(!program) throw new Error("Unable to allocate WebGL program");
       gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,VS)); gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,FS)); gl.linkProgram(program);
@@ -128,7 +129,7 @@ export default function WebGLSceneViewport({ objects, selectedId, onSelect, read
       const render=()=>{
         const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight),dpr=Math.min(2,window.devicePixelRatio||1);
         if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr)}
-        gl!.viewport(0,0,canvas.width,canvas.height);gl!.clearColor(.035,.055,.085,1);gl!.clear(gl!.COLOR_BUFFER_BIT|gl!.DEPTH_BUFFER_BIT);gl!.enable(gl!.DEPTH_TEST);gl!.enable(gl!.CULL_FACE);
+        gl!.viewport(0,0,canvas.width,canvas.height);gl!.clearColor(.035,.055,.085,1);gl!.clear(gl!.COLOR_BUFFER_BIT|gl!.DEPTH_BUFFER_BIT);gl!.enable(gl!.DEPTH_TEST);gl!.disable(gl!.CULL_FACE);
         gl!.useProgram(program);gl!.enableVertexAttribArray(position);
         const cam=camera.current, target=[0,0,0], eye=[Math.sin(cam.yaw)*Math.cos(cam.pitch)*cam.distance,Math.sin(cam.pitch)*cam.distance,Math.cos(cam.yaw)*Math.cos(cam.pitch)*cam.distance];
         const vp=multiply(perspective(Math.PI/3,width/height,.1,500),view(eye,target));
