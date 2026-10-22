@@ -224,7 +224,7 @@ assert.ok(runtimeAssets.includes("forge2d") && runtimeAssets.includes("GENE_ART.
 assert.ok(runtimeScene.includes("window.GENE_SCENE") && runtimeScene.includes("getVisibleObjects") && runtimeScene.includes("getTransform"), "runtime scene bridge exposes validated object transforms and visibility");
 assert.ok(runtimeScene.includes("roughness") && runtimeScene.includes("metalness") && runtimeScene.includes("intensity") && runtimeScene.includes("fov"), "runtime scene bridge preserves material, light and camera settings");
 assert.ok(runtimeScene.includes("window.GENE_SCENE.draw2D") && runtimeScene.includes("getVisibleObjects"), "runtime scene bridge can draw visible authored objects into a Canvas 2D renderer");
-assert.ok(prompts.includes("SCENE STUDIO RUNTIME CONTRACT") && prompts.includes("convert each visible object into real GPU geometry"), "generation prompts require renderers to consume authored scene transforms");
+assert.ok(prompts.includes("SCENE STUDIO RUNTIME CONTRACT") && prompts.includes("createWebGLMeshes(gl)") && prompts.includes("draw2D(ctx"), "generation prompts require renderers to consume authored scene transforms through the current runtime APIs");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
 assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)") && page.includes("buildRuntimeSceneBootstrap(version.files)"), "standalone and ZIP exports include the scene manifest");
