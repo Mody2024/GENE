@@ -2,7 +2,7 @@ import { buildRuntimeKitScript } from "./runtime-kit.mjs";
 
 export const MAX_RUNTIME_ASSET_BYTES = 1_500_000;
 /** Illustration SVGs live at assets/art/<name>.svg and are exposed to the game as window.GENE_ART. */
-export const RUNTIME_ART_PATH = /^assets\/(?:art\/[a-zA-Z0-9_-]+\.svg|[a-zA-Z0-9_-]+\/sprite\.svg)$/i;
+export const RUNTIME_ART_PATH = /^assets\/(?:art\/[a-zA-Z0-9_-]+\.svg|[a-zA-Z0-9_-]+\/sprite\.svg|forge2d\/(?:character|tileset|background)\.svg)$/i;
 
 /**
  * Exposes saved GENE Forge text assets and a small dependency-free OBJ/MTL
@@ -13,7 +13,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const assets: Record<string, string> = {};
   let totalBytes = 0;
   for (const [path, content] of Object.entries(files || {})) {
-    if (!/^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json|asset-2d\.json)$/i.test(path) && !RUNTIME_ART_PATH.test(path)) continue;
+    if (!/^assets\/[a-zA-Z0-9_-]+\/(?:model\.obj|model\.mtl|asset\.json|asset-2d\.json)$/i.test(path) && !/^assets\/forge2d\/(?:character|tileset|background)\.json$/i.test(path) && !RUNTIME_ART_PATH.test(path)) continue;
     if (typeof content !== "string" || totalBytes + content.length > MAX_RUNTIME_ASSET_BYTES) continue;
     assets[path] = content;
     totalBytes += content.length;
@@ -32,7 +32,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const art = [
     "window.GENE_ART=window.GENE_ART||{};",
     "(function(A){var cache={};",
-    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\\/(?:art\\/[^/]+\\.svg|[^/]+\\/sprite\\.svg|forge2d\\/(?:character|tileset|background)\\.svg)$/i.test(p);});};",
+    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\/(?:art\/[^/]+\.svg|[^/]+\/sprite\.svg|forge2d\/(?:character|tileset|background)\.svg)$/i.test(p);});};",
     "A.svg=function(p){var s=(window.__GENE_ASSETS__||{})[p];return typeof s===\"string\"?s:null;};",
     "A.image=function(p){if(cache[p])return cache[p];var s=A.svg(p);if(s===null)return null;var img=new Image();img.decoding=\"async\";img.src=\"data:image/svg+xml;charset=utf-8,\"+encodeURIComponent(s);cache[p]=img;return img;};",
     "A.ready=function(p){var i=A.image(p);return !!(i&&i.complete&&i.naturalWidth>0);};",
