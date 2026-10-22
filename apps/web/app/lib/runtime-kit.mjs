@@ -246,7 +246,7 @@ export const GENE_AUDIO_SOURCE = [
 "  GA.setMuted = function (flag) { settings.muted = !!flag; applyGains(); save(); };",
 "  GA.toggleMute = function () { GA.setMuted(!settings.muted); return settings.muted; };",
 "  GA.getSettings = function () { return { master: settings.master, music: settings.music, sfx: settings.sfx, muted: settings.muted }; };",
-"  GA.hasSavedSettings = function () { return settingsLoaded; },
+"  GA.hasSavedSettings = function () { return settingsLoaded; };",
 "  GA.pause = function () { paused = true; try { if (ctx) ctx.suspend(); } catch (e) {} };",
 "  GA.resume = function () { paused = false; resumeContext(); };",
 "  GA.dispose = function () {",
