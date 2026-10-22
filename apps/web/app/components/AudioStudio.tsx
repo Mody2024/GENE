@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import VoiceOverStudio from "./VoiceOverStudio";
 
 type Props = {
   files: Record<string, string>;
@@ -191,5 +192,6 @@ export default function AudioStudio({ files, readOnly = false, onSave }: Props) 
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save audio settings.</p>}
     </>}
+    <VoiceOverStudio files={files} readOnly={readOnly} onSave={onSave} />
   </div>;
 }
