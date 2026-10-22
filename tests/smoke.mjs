@@ -25,6 +25,7 @@ const health = read("apps/web/app/api/health/route.ts");
 const prompts = read("apps/web/app/lib/prompts.ts");
 const forge = read("apps/web/app/api/forge/route.ts");
 const runtimeAssets = read("apps/web/app/lib/runtime-assets.ts");
+assert.ok(runtimeAssets.includes("install(\"localStorage\")") && runtimeAssets.includes("Object.defineProperty(window,name"), "sandboxed previews should gracefully handle blocked localStorage without adding allow-same-origin");
 const runtimeScene = read("apps/web/app/lib/runtime-scene.ts");
 const starterGameSource = read("apps/web/app/lib/starter-game.ts");
 const gameGuides = read("apps/web/app/lib/game-guides.ts");
