@@ -12,6 +12,7 @@ import DesignDocPanel from "./components/DesignDocPanel";
 import InterviewCard from "./components/InterviewCard";
 import ResearchCard from "./components/ResearchCard";
 import ProjectGallery from "./components/ProjectGallery";
+import { createProjectCoverSvg } from "./lib/project-cover.mjs";
 import LiveRunPanel, { type LiveRun } from "./components/LiveRunPanel";
 import { describeChanges, summarizeChanges } from "./lib/diff-stats.mjs";
 import { backoffMs, classifyFailure, repairTargetsFor, retryGuidance } from "./lib/error-recovery.mjs";
@@ -1414,6 +1415,19 @@ export default function Home() {
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
+      // Every newly built game/app receives a deterministic local cover file from GENE tools.
+      // No image-model call or external asset download is required for this fallback artwork.
+      if ((operation === "build" || operation === "surprise") && !files["assets/project-cover.svg"]) {
+        files["assets/project-cover.svg"] = createProjectCoverSvg({
+          name: result.plan?.title || nextProject.name,
+          kind: nextProject.kind,
+          engine: result.plan?.engine || nextProject.preferredEngine || (nextProject.kind === "app" ? "webapp" : "canvas2d"),
+          prompt: nextProject.initialPrompt || prompt,
+          files
+        });
+        changedPaths.push("assets/project-cover.svg");
+        addActivity("Created a no-credit local SVG cover and saved it to assets/project-cover.svg");
+      }
       let versions = nextProject.versions;
       if (changedPaths.length) {
         if (operation === "build" || operation === "surprise") autoRepairAttempts.current = 0;
