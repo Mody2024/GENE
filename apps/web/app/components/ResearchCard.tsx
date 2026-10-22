@@ -37,7 +37,7 @@ export default function ResearchCard({ bundle }: Props) {
         <div className="rc-grid">{bundle.images.map(image => <a key={image.id} className="rc-image" href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{image.title}</span><small>{image.license} · {image.source}</small>
+          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
         </a>)}</div>
       </section>}
 

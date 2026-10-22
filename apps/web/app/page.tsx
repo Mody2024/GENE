@@ -11,6 +11,8 @@ import ArtStudio from "./components/ArtStudio";
 import DesignDocPanel from "./components/DesignDocPanel";
 import InterviewCard from "./components/InterviewCard";
 import ResearchCard from "./components/ResearchCard";
+import ProjectGallery from "./components/ProjectGallery";
+import { createProjectCoverSvg } from "./lib/project-cover.mjs";
 import LiveRunPanel, { type LiveRun } from "./components/LiveRunPanel";
 import { describeChanges, summarizeChanges } from "./lib/diff-stats.mjs";
 import { backoffMs, classifyFailure, repairTargetsFor, retryGuidance } from "./lib/error-recovery.mjs";
@@ -235,7 +237,7 @@ export default function Home() {
   const [aiModel, setAiModel] = useState("gemini-3.8-flash");
   const [freeModels, setFreeModels] = useState<string[]>([]);
   const researchedProjects = useRef<Set<string>>(new Set());
-  const [section, setSection] = useState<"chat" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
+  const [section, setSection] = useState<"chat" | "projects" | "files" | "tasks" | "assets" | "scene" | "audio" | "versions">("chat");
   const [fileSearch, setFileSearch] = useState("");
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
@@ -717,6 +719,7 @@ export default function Home() {
       const needsResearch = !silent && (
         operation === "research" ||
         chatNeedsResearch ||
+        (operation === "interview" && !(nextProject.references || []).some(item => item.name === "research-notes.md")) ||
         ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
       );
       if (needsResearch) {
@@ -726,7 +729,7 @@ export default function Home() {
         setLiveRun(current => current ? { ...current, stage: "research", research: { topic: researchQuery, status: "running" } } : current);
         addActivity("Researching “" + researchQuery.slice(0, 70) + "” (Wikipedia, Wikimedia Commons, Poly Haven)");
         try {
-          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", images: /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(researchQuery) }) });
+          const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", engine: nextProject.plan?.engine || nextProject.preferredEngine || "auto", images: true }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
             const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
@@ -869,6 +872,7 @@ export default function Home() {
         const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
           activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
+          setLiveRun(current => current ? { ...current, build: { tasks: run.tasks.map(task => ({ id: task.id, title: task.title, status: task.status })), total: run.tasks.length, passed: run.tasks.filter(task => task.status === "passed").length, activeTask: run.tasks.find(task => task.status === "running")?.title } } : current);
         };
         let finalContentPassSucceeded = false;
         let autoSplitGameJs = false;
@@ -878,6 +882,7 @@ export default function Home() {
           const stagePath = stagePaths[index];
           if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") continue;
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
+          setLiveRun(current => current ? { ...current, build: { tasks: activeBuildRun!.tasks.map(task => ({ id: task.id, title: task.title, status: task.status })), total: activeBuildRun!.tasks.length, passed: activeBuildRun!.tasks.filter(task => task.status === "passed").length, activeTask: activeBuildRun!.tasks.find(task => task.status === "running")?.title } } : current);
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
           let stageSucceeded = false;
@@ -1413,6 +1418,19 @@ export default function Home() {
       let files = { ...nextProject.files };
       const changedPaths: string[] = [];
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
+      // Every newly built game/app receives a deterministic local cover file from GENE tools.
+      // No image-model call or external asset download is required for this fallback artwork.
+      if ((operation === "build" || operation === "surprise") && !nextProject.files["assets/project-cover.svg"]) {
+        files["assets/project-cover.svg"] = createProjectCoverSvg({
+          name: result.plan?.title || nextProject.name,
+          kind: nextProject.kind,
+          engine: result.plan?.engine || nextProject.preferredEngine || (nextProject.kind === "app" ? "webapp" : "canvas2d"),
+          prompt: nextProject.initialPrompt || prompt,
+          files
+        });
+        if (!changedPaths.includes("assets/project-cover.svg")) changedPaths.push("assets/project-cover.svg");
+        addActivity("Created a no-credit local SVG cover and saved it to assets/project-cover.svg");
+      }
       let versions = nextProject.versions;
       if (changedPaths.length) {
         if (operation === "build" || operation === "surprise") autoRepairAttempts.current = 0;
@@ -1435,7 +1453,7 @@ export default function Home() {
       const assistantMessage = message("assistant", result.reply || "Done.", changedPaths.length ? "build" : (operation === "plan" || operation === "interview") && result.plan ? "plan" : result.question ? "question" : undefined, undefined, { changes: fileChanges });
       const updated: GeneProject = {
         ...nextProject,
-        name: (nextProject.name === "Untitled game" || nextProject.name === "Untitled app") ? (result.plan?.title || (isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name)) : nextProject.name,
+        name: (["New project", "Untitled project", "Untitled game", "Untitled app"].includes(nextProject.name)) ? (result.plan?.title || (isFirstIdea && operation !== "chat" && operation !== "research" ? prompt.split(/[.!?]/)[0].slice(0, 38) : nextProject.name)) : nextProject.name,
         mode: operation === "build" || operation === "edit" || operation === "surprise" ? "build" : nextProject.mode,
         answers: nextAnswers,
         question: operation === "research" || operation === "chat" ? nextProject.question : (result.question || null),
@@ -2699,6 +2717,7 @@ export default function Home() {
   const activeMessages = project.messages;
   const nav = [
     { id: "chat" as const, icon: "◉", label: "Chat" },
+    { id: "projects" as const, icon: "▦", label: "Projects" },
     { id: "files" as const, icon: "▤", label: "Files" },
     { id: "tasks" as const, icon: "☷", label: "Plan & tasks" },
     { id: "assets" as const, icon: "◇", label: "Assets" },
@@ -2904,6 +2923,7 @@ export default function Home() {
               </form>
             </>}
 
+            {section === "projects" && <ProjectGallery projects={projects} currentProjectId={project.id} onOpen={selected => { setProject(selected); setSection("chat"); setNotice(""); setPreviewKey(value => value + 1); setRuntimeState("idle"); }} onCreate={createNewProject} />}
             {section === "files" && <div className="tool-view">
               <div className="tool-view-heading"><div className="eyebrow">SOURCE CONTROL</div><h2>Project files</h2><p>These are the actual files saved with this project in this browser.</p></div>
               {!Object.keys(project.files).length ? <><div className="empty-state">{project.kind === "app" ? "No source files yet. Describe the app, review the plan, then switch to Build mode to generate the real interface." : "No source files yet. Plan the game, then switch to Build mode and ask GENE to build it."}</div><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button></div></> : <><div className="file-ops-toolbar"><button type="button" onClick={createProjectFile} disabled={project.mode === "plan" || busy}>＋ New file</button><button type="button" onClick={moveOrRenameProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Move / rename</button><button type="button" onClick={deleteProjectFile} disabled={project.mode === "plan" || busy || !Object.prototype.hasOwnProperty.call(project.files, project.activeFile)}>Delete file</button></div><div className="file-tree-layout"><ProjectFileTree nodes={buildProjectFileTree(Object.keys(project.files))} activeFile={project.activeFile} onSelect={selectProjectFile} /><div className="file-editor-main"><div className="file-editor-header"><div className="file-editor-path"><span className="file-editor-type">{(project.activeFile.split(".").pop() || "txt").slice(0,4).toUpperCase()}</span><span title={project.activeFile}>{project.activeFile}</span></div><div className="file-editor-state"><span className={"file-editor-dot" + (fileDirty ? " dirty" : "")} />{fileDirty ? "Unsaved" : "Saved"}</div></div><textarea aria-label={"Edit " + project.activeFile} className="code-editor" spellCheck={false} value={editedFile} onChange={e => { setEditedFile(e.target.value); setFileDirty(true); }} /><div className="editor-footer"><span>{fileDirty ? "Unsaved editor changes" : "Saved in local project state"} · {editedFile.length.toLocaleString()} characters</span><button className="primary-button" onClick={saveManualEdit} disabled={!fileDirty || project.mode === "plan"}>{project.mode === "plan" ? "Build mode required" : "Save as version"}</button></div></div></div></>}

@@ -10,6 +10,7 @@ import {
   parseCommonsFiles,
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
+import { planVisualReferenceQueries } from "../../lib/visual-reference-planner.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,7 +22,7 @@ const buckets = new Map<string, { count: number; resetAt: number }>();
 /** Only these hosts are ever fetched for image bytes, so research can never be used to reach other servers. */
 const IMAGE_HOSTS = new Set(["upload.wikimedia.org", "cdn.polyhaven.com"]);
 const MAX_IMAGE_BYTES = 180_000;
-const MAX_IMAGES_SENT = 3;
+const MAX_IMAGES_SENT = 4;
 
 async function getJson(url: string, timeoutMs = 6_000): Promise<any | null> {
   try {
@@ -108,32 +109,32 @@ export async function POST(request: NextRequest) {
   const searchText = researchIsGeometryDash ? normalizedTopic : (keywords(topic).slice(0, 7).join(" ") || topic);
   const arabic = /[؀-ۿ]/.test(topic);
   const wikiHost = arabic ? "ar.wikipedia.org" : "en.wikipedia.org";
-  const explicitlyRequestsImages = body?.images === true || /\b(images?|screenshots?|concept art|visual references?|reference pictures?)\b/i.test(topic);
-  const wantsImages = explicitlyRequestsImages;
-  const wants3DModels = /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
-  const wantsCharacterArt = /\b(character|player sprite|hero sprite|enemy|npc|creature|character design|sprite sheet)\b/i.test(lowerTopic);
-  const wantsAudio = !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
-  const assetQuery = wantsCharacterArt
-    ? normalizedTopic + " 2D game character sprite"
-    : /\b(background|environment|world|level|landscape|scene|tileset|terrain)\b/i.test(lowerTopic)
-      ? normalizedTopic + " game environment background"
-      : normalizedTopic + " game level art environment";
+  const wantsImages = body?.images !== false;
+  const visualQueries = planVisualReferenceQueries({
+    topic: normalizedTopic,
+    kind: body?.kind === "app" ? "app" : "game",
+    engine: typeof body?.engine === "string" ? body.engine : "auto",
+    images: wantsImages
+  });
+  const wants3DModels = body?.engine === "webgl3d" || /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
+  const wantsAudio = body?.kind !== "app" && !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
 
   const googleQuery = researchIsGeometryDash
     ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
     : normalizedTopic + " game design mechanics level design official documentation";
-  const [wiki, catalog, commonsImages, google, ...audioSets] = await Promise.all([
+  const [wiki, catalog, visualImageSets, google, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
     wants3DModels ? polyHavenCatalog() : Promise.resolve(null),
-    wantsImages ? commons(assetQuery, "image", 6) : Promise.resolve([]),
+    wantsImages ? Promise.all(visualQueries.map(async visual => (await commons(visual.query, "image", 3)).map(image => ({ ...image, category: visual.id, categoryLabel: visual.label })))) : Promise.resolve([]),
     googleSearch(googleQuery),
     ...(wantsAudio ? musicSearchTerms(topic).map(term => commons(term, "audio", 3)) : [])
   ]);
+  const commonsImages = (visualImageSets as any[][]).flat().filter((image, index, all) => all.findIndex(other => other.thumb === image.thumb || other.full === image.full) === index);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
     ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
-    : wantsCharacterArt ? topic + " game sprite" : topic + " game design mechanics level design");
+    : topic + " game design mechanics level design");
 
 
   const unavailable: string[] = [];
@@ -154,8 +155,11 @@ export async function POST(request: NextRequest) {
       { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
+  // Prefer category-tagged Commons results first so the model sees a varied reference set
+  // instead of four near-duplicate encyclopedia thumbnails.
+  const imageCandidates = [...bundle.images.filter((image: any) => image.category), ...bundle.images.filter((image: any) => !image.category)];
   const imageData = wantsImages
-    ? (await Promise.all(bundle.images.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
+    ? (await Promise.all(imageCandidates.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
 
   return NextResponse.json({

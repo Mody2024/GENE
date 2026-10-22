@@ -91,6 +91,8 @@ assert.ok(api.includes("GEMINI_OUTPUT_TRUNCATED"), "truncated Gemini JSON gets a
 assert.ok(api.includes('"buildPart"') && api.includes('"validateBuild"'), "API supports single-file build stages and offline final assembly validation");
 assert.ok(api.includes("GENE_STAGED_BUILD_VALIDATION_FAILED"), "assembled staged projects receive explicit final validation errors");
 assert.ok(api.includes("GENE FORGE 2D TOOL RESULTS") && api.includes("/api/forge/2d") && api.includes("assets/forge2d/"), "normal 2D game builds invoke Forge, pass generated asset paths to the model, and include the actual SVG/manifest files");
+assert.ok(runtimeAssets.includes("const sandboxStorage") && runtimeAssets.includes("getItem:function(k)") && runtimeAssets.includes("return sandboxStorage + buildRuntimeKitScript()"), "sandboxed game previews receive an in-memory Web Storage shim before the game runtime without granting same-origin access");
+assert.ok(runtimeAssets.includes("forge2d") && runtimeAssets.includes("character|tileset|background") && runtimeAssets.includes(".svg") && runtimeAssets.includes(".json") && runtimeAssets.includes("RUNTIME_ART_PATH"), "Forge 2D SVG assets and manifests are exposed to the isolated game runtime");
 assert.ok(api.includes("put executable source in game.js and load it with a local game.js script src"), "final validation permits the local game.js entry while rejecting inline and remote script tags");
 const finalHtmlScriptGuard = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])(?![^>]*\bsrc\s*=\s*["'](?:\.\/)?game\.js(?:[?#][^"']*)?["'])/i;
 assert.equal(finalHtmlScriptGuard.test('<script src="./game.js"></script>'), false, "the standard local game.js script entry must pass final validation");
@@ -206,6 +208,7 @@ assert.ok(page.includes("buildRuntimeAssetBootstrap(project.files)"), "live game
 assert.ok(playPage.includes("buildRuntimeAssetBootstrap(project?.files)"), "fullscreen play route exposes generated model assets");
 assert.ok(runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("window.__GENE_ASSETS__"), "asset runtime bridge has a size cap and explicit namespace");
 assert.ok(runtimeAssets.includes("window.GENE3D.parseOBJ") && runtimeAssets.includes("window.GENE3D.parseMTL"), "asset runtime bridge provides real OBJ geometry and MTL material parsers");
+assert.ok(runtimeAssets.includes("forge2d") && runtimeAssets.includes("GENE_ART.draw"), "native Forge 2D character, tileset, and background assets must be exposed to the preview runtime");
 assert.ok(runtimeScene.includes("window.GENE_SCENE") && runtimeScene.includes("getVisibleObjects") && runtimeScene.includes("getTransform"), "runtime scene bridge exposes validated object transforms and visibility");
 assert.ok(runtimeScene.includes("roughness") && runtimeScene.includes("metalness") && runtimeScene.includes("intensity") && runtimeScene.includes("fov"), "runtime scene bridge preserves material, light and camera settings");
 assert.ok(runtimeScene.includes("window.GENE_SCENE.draw2D") && runtimeScene.includes("getVisibleObjects"), "runtime scene bridge can draw visible authored objects into a Canvas 2D renderer");
@@ -864,7 +867,8 @@ assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interfa
 
 const researchRouteSource = read("apps/web/app/api/research/route.ts");
 assert.ok(researchRouteSource.includes("wikipedia(searchText, wikiHost)") && researchRouteSource.includes("wants3DModels ? polyHavenCatalog()") && researchRouteSource.includes("Promise.all(["), "research route gathers facts and only searches 3D catalogues for explicit 3D requests");
-assert.ok(researchRouteSource.includes("commons(assetQuery") && researchRouteSource.includes("musicSearchTerms(topic)") && researchRouteSource.includes("wantsCharacterArt") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData"), "research targets requested asset types and only downloads image bytes from allow-listed hosts");
+const visualReferencePlannerSource = read("apps/web/app/lib/visual-reference-planner.mjs");
+assert.ok(researchRouteSource.includes("visualQueries.map") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData") && visualReferencePlannerSource.includes("ui-menus") && visualReferencePlannerSource.includes("characters") && visualReferencePlannerSource.includes("environments"), "research gathers categorized visual references and only downloads image bytes from allow-listed hosts");
 assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelling") && page.includes("generatedModels"), "3D build pipeline requests real Forge meshes and records actual generated asset paths");
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");

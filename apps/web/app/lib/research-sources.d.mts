@@ -1,5 +1,5 @@
 export type ResearchLink = { id: string; label: string; kind: string; license: string; url: string };
-export type ResearchImage = { id: string; title: string; thumb: string; full: string; page: string; license: string; credit: string; source: string };
+export type ResearchImage = { id: string; title: string; thumb: string; full: string; page: string; license: string; credit: string; source: string; category?: string; categoryLabel?: string };
 export type ResearchAudio = { id: string; title: string; url: string; page: string; license: string; credit: string; source: string };
 export type ResearchModel = { id: string; name: string; tags: string[]; url: string; license: string; thumb?: string; source?: string; score?: number };
 export type ResearchWebResult = { title: string; snippet: string; url: string; source: string; relevance: number };
