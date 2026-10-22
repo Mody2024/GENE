@@ -56,6 +56,8 @@ export type GeneProject = {
   /** User-selected engine for a new project; reused by planning, generation and the scene editor. */
   preferredEngine?: GamePlan["engine"];
   initialPrompt: string;
+  /** Whether GENE should automatically fetch external visual references for this project. Manual research commands still work when disabled. */
+  visualResearch?: boolean;
   mode: Mode;
   thinking: Thinking;
   messages: ChatMessage[];
