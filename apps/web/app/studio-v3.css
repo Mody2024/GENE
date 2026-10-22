@@ -378,3 +378,21 @@ h1,h2,h3{font-family:Manrope,"DM Sans",sans-serif;letter-spacing:-.025em}
 .studio-v2 .project-library-footer{justify-content:space-between;padding-top:8px;border-top:1px solid var(--studio-line)}
 .studio-v2 .project-library-footer time{white-space:nowrap}
 @media(max-width:600px){.studio-v2 .project-library{padding:16px}.studio-v2 .project-library-heading{flex-direction:column}.studio-v2 .project-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.studio-v2 .project-library-card-body{padding:9px}.studio-v2 .project-library-card-body>strong{font-size:12px}.studio-v2 .project-library-meta,.studio-v2 .project-library-footer{font-size:10px;flex-wrap:wrap}}
+
+/* Live task ledger: verified work, not guessed overall percentages */
+.studio-v2 .live-run-build-tasks{margin:12px 0 4px;padding:11px 12px;border:1px solid var(--studio-line);border-radius:11px;background:var(--studio-panel)}
+.studio-v2 .live-run-build-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px}
+.studio-v2 .live-run-build-heading>span{color:var(--studio-muted);font-size:10px;white-space:nowrap}
+.studio-v2 .live-run-build-track{height:5px;margin:8px 0;border-radius:8px;background:var(--studio-soft);overflow:hidden}
+.studio-v2 .live-run-build-track>span{display:block;height:100%;border-radius:8px;background:var(--studio-accent);transition:width .18s ease}
+.studio-v2 .live-run-active-task{display:flex;align-items:center;gap:5px;margin:8px 0;color:var(--studio-muted);font-size:10px;line-height:1.4}
+.studio-v2 .live-run-active-task strong{color:var(--studio-ink);font-weight:650}
+.studio-v2 .lr-active-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--studio-accent)}
+.studio-v2 .live-run-task-list{display:grid;gap:3px;list-style:none;margin:7px 0 0;padding:0}
+.studio-v2 .live-run-task-list li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:6px;padding:4px 5px;border-radius:6px;font-size:10px;min-width:0}
+.studio-v2 .live-run-task-list li>strong{font-weight:550;overflow-wrap:anywhere}
+.studio-v2 .live-run-task-list li>small{color:var(--studio-muted);font-size:9px}
+.studio-v2 .live-run-task-list li.lrt-passed>span{color:var(--studio-accent)}
+.studio-v2 .live-run-task-list li.lrt-running{background:var(--studio-soft)}
+.studio-v2 .live-run-task-list li.lrt-failed,.studio-v2 .live-run-task-list li.lrt-blocked{background:rgba(190,65,65,.07)}
+.studio-v2 .live-run-task-more{display:block;margin-top:6px;color:var(--studio-muted);font-size:9px}
