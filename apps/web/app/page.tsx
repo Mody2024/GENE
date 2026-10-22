@@ -2420,6 +2420,29 @@ export default function Home() {
         : sceneObjects.length
           ? sceneObjects.length + " scene entries have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
           : "No scene objects are declared; the scene manifest is structurally valid but contains no placed objects.");
+
+      const mainSource = typeof files["game.js"] === "string" ? files["game.js"] : "";
+      const moduleSource = Object.entries(files).filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
+      const allRuntimeSource = mainSource + "\n" + moduleSource;
+      const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && String(object.type || "").toLowerCase() === "mesh" && typeof object.modelPath === "string" && object.modelPath.length > 0);
+      if (assignedMeshes.length) {
+        const meshConnected = /getRenderableObject|getMeshData|GENE3D\.parseOBJ|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
+        add("Scene renderer integration", meshConnected ? "pass" : "warn", meshConnected
+          ? "Game source references the scene/mesh runtime API; visual correctness still requires actual gameplay inspection."
+          : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. The editor manifest alone does not draw them.");
+      } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "canvas2d") {
+        const sceneDrawn = /GENE_SCENE\.draw2D|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
+        add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
+          ? "Game source references the Canvas 2D scene API; verify layering and collision behavior in gameplay."
+          : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API.");
+      }
+      const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
+      if (audioConfig.enabled !== false && !isAppSpec) {
+        const audioConnected = /GeneAudio\.(?:sfx|play|playSfx|music\.start|startMusic)|GeneAudio\[/.test(allRuntimeSource);
+        add("Audio runtime integration", audioConnected ? "pass" : "warn", audioConnected
+          ? "Game source references the shared GeneAudio runtime; event coverage and audible output are not inferred from source alone."
+          : "Audio is enabled in game-spec.json, but game source does not reference GeneAudio. The runtime exists, but the game may remain silent.");
+      }
     }
 
     const syntaxFiles = Object.entries(files)
