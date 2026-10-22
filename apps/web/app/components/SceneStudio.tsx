@@ -8,6 +8,7 @@ type SceneObject = {
   id: string;
   name: string;
   type: string;
+  modelPath?: string;
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
@@ -40,6 +41,7 @@ function normalizeObject(value: unknown, index: number): SceneObject {
     id: typeof raw.id === "string" ? raw.id : "scene-object-" + (index + 1),
     name: typeof raw.name === "string" ? raw.name : "Object " + (index + 1),
     type,
+    modelPath: typeof raw.modelPath === "string" ? raw.modelPath : undefined,
     position: safeVector(raw.position ?? raw.position3d ?? raw.translation, zero()),
     rotation: safeVector(raw.rotation ?? raw.rotation3d, zero()),
     scale: safeVector(raw.scale ?? raw.scale3d, one()),
@@ -195,6 +197,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   }, [objects, selectedId, is2D]);
 
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
+  const objFiles = useMemo(() => Object.keys(files).filter(path => /\.obj$/i.test(path)).sort((a, b) => a.localeCompare(b)), [files]);
   const commitObjects = (next: SceneObject[]) => {
     const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale }, material: { ...object.material }, light: { ...object.light }, camera: { ...object.camera } }));
     setUndoStack(current => [...current, snapshot].slice(-40));
@@ -275,7 +278,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const saveScene = () => {
     if (readOnly) return;
     const nextSpec = { ...rawSpec, scene: { ...sceneMetadata, objects: objects.map(object => ({
-      id: object.id, name: object.name, type: object.type,
+      id: object.id, name: object.name, type: object.type, ...(object.modelPath ? { modelPath: object.modelPath } : {}),
       position: object.position, rotation: object.rotation, scale: object.scale,
       color: object.color, visible: object.visible, material: object.material, light: object.light, camera: object.camera
     })) } };
@@ -312,7 +315,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
         </div>
       </div>
       {readOnly && <p className="scene-studio-hint">Switch to Build mode to save scene changes.</p>}
-      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE VIEWPORT</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div>{is2D ? <div className="scene-studio-actions scene-view-mode"><span className="scene-engine-pill">2D canvas · XY grid</span><span className="scene-studio-hint">No 3D renderer loaded for this project</span></div> : <div className="scene-studio-actions scene-view-mode"><button className={viewportMode === "webgl" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("webgl")}>WebGL 3D</button><button className={viewportMode === "isometric" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("isometric")}>Isometric editor</button></div>}{viewportMode === "webgl" ? <WebGLSceneViewport objects={objects} selectedId={selectedId} onSelect={setSelectedId} readOnly={readOnly} /> : <><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label={is2D ? "Interactive 2D scene viewport" : "Interactive isometric scene viewport"} onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend">{is2D ? <><span>↔ X position</span><span>↕ Y position</span><span>↻ Z rotation</span><span>Drag to move · Inspector for precise transforms</span></> : <><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></>}</div></>}</div>
+      <div className="scene-viewport-wrap"><div className="scene-viewport-top"><span>LIVE SCENE VIEWPORT</span><span>{objects.filter(object => object.visible).length} visible · {selected ? selected.name : "nothing selected"}</span></div>{is2D ? <div className="scene-studio-actions scene-view-mode"><span className="scene-engine-pill">2D canvas · XY grid</span><span className="scene-studio-hint">No 3D renderer loaded for this project</span></div> : <div className="scene-studio-actions scene-view-mode"><button className={viewportMode === "webgl" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("webgl")}>WebGL 3D</button><button className={viewportMode === "isometric" ? "primary-button" : "secondary-button"} onClick={() => setViewportMode("isometric")}>Isometric editor</button></div>}{viewportMode === "webgl" ? <WebGLSceneViewport objects={objects} files={files} selectedId={selectedId} onSelect={setSelectedId} readOnly={readOnly} /> : <><canvas ref={viewportRef} className={"scene-viewport-canvas" + (readOnly ? " readonly" : "")} aria-label={is2D ? "Interactive 2D scene viewport" : "Interactive isometric scene viewport"} onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} /><div className="scene-viewport-legend">{is2D ? <><span>↔ X position</span><span>↕ Y position</span><span>↻ Z rotation</span><span>Drag to move · Inspector for precise transforms</span></> : <><span>↔ X axis</span><span>↗ Z axis</span><span>↕ Y height</span><span>Drag to move · Inspector for precise transforms</span></>}</div></>}</div>
       {selected && <div className="scene-studio-toolbar" aria-label="Selected object transform controls">
         <span>TRANSFORM GIZMO · {selected.name}</span>
         <div className="scene-studio-actions">
@@ -341,6 +344,10 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
             <label className="scene-field">Type<select value={selected.type} onChange={event => updateSelected({ type: event.target.value })} disabled={readOnly}>
               <option value="mesh">Mesh / imported model</option><option value="box">Box</option><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="plane">Plane</option><option value="light">Light</option><option value="camera">Camera marker</option><option value="custom">Custom</option>
             </select></label>
+            {selected.type === "mesh" && <label className="scene-field">OBJ model file<select value={selected.modelPath || ""} onChange={event => updateSelected({ modelPath: event.target.value || undefined })} disabled={readOnly || objFiles.length === 0}>
+              <option value="">Choose a project OBJ file</option>
+              {objFiles.map(path => <option value={path} key={path}>{path}</option>)}
+            </select><small>{objFiles.length ? "Selected OBJ geometry is previewed in this scene. MTL materials and texture maps are not yet applied here." : "No OBJ files found in this project's files yet. Generate or import a model in Forge first."}</small></label>}
             {(["position", "rotation", "scale"] as const).map(key => <fieldset className="scene-vector" key={key}>
               <legend>{key}</legend>
               {editAxes.map(axis => <label key={axis}>{axis.toUpperCase()}<input type="number" step={key === "rotation" ? 5 : 0.1} value={selected[key][axis]} onChange={event => updateVector(key, axis, Number(event.target.value))} disabled={readOnly} /></label>)}
