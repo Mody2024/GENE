@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { planVisualReferenceQueries } from "../apps/web/app/lib/visual-reference-planner.mjs";
 import { createProjectCoverSvg, projectCoverDataUrl } from "../apps/web/app/lib/project-cover.mjs";
+import { readFileSync } from "node:fs";
+
+const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
+const workspace = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+const prompts = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
 
 const gameQueries = planVisualReferenceQueries({ topic: "3D skeleton city adventure", kind: "game", engine: "webgl3d" });
 assert.deepEqual(gameQueries.map(item => item.id), ["ui-menus", "gameplay", "characters", "environments"]);
@@ -27,4 +32,12 @@ assert.match(projectCoverDataUrl({ name: "Game" }), /^data:image\/svg\+xml;chars
 for (const svg of [coverA, coverB]) {
   assert.doesNotMatch(svg, /<script|foreignObject|(?:href|src)\s*=\s*["\x27]https?:/i, "covers are local SVG only; no remote or executable content");
 }
-console.log("Visual-reference planner and local project-cover tests passed.");
+assert.match(researchRoute, /body\?\.images !== false/, "visual references are enabled by default");
+assert.match(researchRoute, /visualQueries\.map/, "research executes category-specific image searches");
+assert.match(researchRoute, /Prefer category-tagged Commons results first/, "multimodal references should favor category diversity");
+assert.match(workspace, /images: true/, "the build workspace always requests visual references by default");
+assert.match(workspace, /assets\/project-cover\.svg/, "new builds save a local cover inside the project");
+assert.match(workspace, /section === "projects"/, "the workspace exposes a dedicated Projects page");
+assert.match(prompts, /invoke configured, in-scope tools automatically/, "configured routine tools run autonomously");
+assert.doesNotMatch(prompts, /Before each optional external or specialist tool is used[\s\S]{0,300}ask for approval with Use \/ Skip/, "routine research and Forge operations should not prompt for each approval");
+console.log("Visual-reference planner, autonomous-tool contract, Projects gallery, and local cover tests passed.");
