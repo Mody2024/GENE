@@ -79,5 +79,32 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     }catch(e){}
   });
   return{meshes:meshes,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
+};window.GENE_SCENE.drawWebGLMeshes=function(gl,program,viewProjection,resources,locations){
+  if(!gl||!program||!viewProjection||!resources||!Array.isArray(resources.meshes))return 0;
+  locations=locations||{};
+  var pos=locations.position==null?gl.getAttribLocation(program,"aPosition"):locations.position;
+  var normal=locations.normal==null?gl.getAttribLocation(program,"aNormal"):locations.normal;
+  var mvpLoc=locations.mvp==null?gl.getUniformLocation(program,"uMVP"):locations.mvp;
+  var modelLoc=locations.model==null?gl.getUniformLocation(program,"uModel"):locations.model;
+  var colorLoc=locations.color==null?gl.getUniformLocation(program,"uColor"):locations.color;
+  if(pos<0||normal<0||!mvpLoc)return 0;
+  function model(o){
+    var r=o.rotation||{},p=o.position||{},s=o.scale||{},rx=(Number(r.x)||0)*Math.PI/180,ry=(Number(r.y)||0)*Math.PI/180,rz=(Number(r.z)||0)*Math.PI/180;
+    var sx=Math.max(.001,Math.min(100,Math.abs(Number(s.x)||1))),sy=Math.max(.001,Math.min(100,Math.abs(Number(s.y)||1))),sz=Math.max(.001,Math.min(100,Math.abs(Number(s.z)||1))),cx=Math.cos(rx),sxr=Math.sin(rx),cy=Math.cos(ry),syr=Math.sin(ry),cz=Math.cos(rz),szr=Math.sin(rz);
+    var r00=cy*cz,r01=cy*szr,r02=-syr,r10=sxr*syr*cz-cx*szr,r11=sxr*syr*szr+cx*cz,r12=sxr*cy,r20=cx*syr*cz+sxr*szr,r21=cx*syr*szr-sxr*cz,r22=cx*cy;
+    return new Float32Array([r00*sx,r10*sx,r20*sx,0,r01*sy,r11*sy,r21*sy,0,r02*sz,r12*sz,r22*sz,0,Number(p.x)||0,Number(p.y)||0,Number(p.z)||0,1]);
+  }
+  function mul(a,b){var out=new Float32Array(16);for(var col=0;col<4;col++)for(var row=0;row<4;row++)out[col*4+row]=a[row]*b[col*4]+a[4+row]*b[col*4+1]+a[8+row]*b[col*4+2]+a[12+row]*b[col*4+3];return out;}
+  var drawn=0;gl.useProgram(program);gl.enableVertexAttribArray(pos);gl.enableVertexAttribArray(normal);
+  resources.meshes.forEach(function(m){
+    if(!m.buffer||!m.vertexCount)return;
+    var mat=model(m),hex=/^#[0-9a-f]{6}$/i.test(m.color)?m.color:"#8b9bb4",kd=m.material&&m.material.kd;
+    if(kd&&kd.length>=3)hex="#"+kd.slice(0,3).map(function(v){return Math.round(Math.max(0,Math.min(1,Number(v)||0))*255).toString(16).padStart(2,"0");}).join("");
+    var rgb=hex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;});
+    gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(normal,3,gl.FLOAT,false,24,12);
+    gl.uniformMatrix4fv(mvpLoc,false,mul(viewProjection,mat));if(modelLoc)gl.uniformMatrix4fv(modelLoc,false,mat);if(colorLoc)gl.uniform4f(colorLoc,rgb[0],rgb[1],rgb[2],1);
+    gl.drawArrays(gl.TRIANGLES,0,m.vertexCount);drawn++;
+  });
+  return drawn;
 };window.GENE_SCENE.draw2D=function(ctx,opts){if(!ctx)return 0;opts=opts||{};var unit=Number.isFinite(opts.unit)?Math.max(1,Math.min(200,opts.unit)):24,ox=Number.isFinite(opts.originX)?opts.originX:ctx.canvas.width/2,oy=Number.isFinite(opts.originY)?opts.originY:ctx.canvas.height/2,count=0;this.getVisibleObjects().forEach(function(o){var p=o.position||{},r=o.rotation||{},s=o.scale||{},x=ox+(Number(p.x)||0)*unit,y=oy-(Number(p.y)||0)*unit-(Number(p.z)||0)*unit*.35,sx=Math.max(.05,Math.min(100,Math.abs(Number(s.x)||1))),sy=Math.max(.05,Math.min(100,Math.abs(Number(s.y)||1))),sz=Math.max(.05,Math.min(100,Math.abs(Number(s.z)||1))),color=/^#[0-9a-f]{6}$/i.test(o.color)?o.color:"#8b9bb4",type=String(o.type||"mesh").toLowerCase();if(o.modelPath&&this.drawMesh2D(ctx,o,unit,ox,oy)){count++;return;}ctx.save();ctx.translate(x,y);ctx.rotate((Number(r.z)||0)*Math.PI/180);ctx.scale(sx,sy);ctx.fillStyle=color;ctx.strokeStyle="rgba(255,255,255,.8)";ctx.lineWidth=1/Math.max(sx,sy);ctx.globalAlpha=.25+.75*(1-(Number(o.material&&o.material.roughness)||0)*.18);if(type.indexOf("light")>=0){ctx.beginPath();ctx.arc(0,0,unit*.32,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-unit*.5,0);ctx.lineTo(unit*.5,0);ctx.moveTo(0,-unit*.5);ctx.lineTo(0,unit*.5);ctx.stroke()}else if(type.indexOf("camera")>=0){ctx.beginPath();ctx.moveTo(-unit*.3,-unit*.2);ctx.lineTo(unit*.3,-unit*.2);ctx.lineTo(unit*.5,unit*.2);ctx.lineTo(-unit*.5,unit*.2);ctx.closePath();ctx.fill();ctx.stroke()}else if(type.indexOf("sphere")>=0){ctx.beginPath();ctx.ellipse(0,0,unit*.34*sz,unit*.34*sy,0,0,Math.PI*2);ctx.fill();ctx.stroke()}else if(type.indexOf("plane")>=0){ctx.fillRect(-unit*.5,-unit*.08,unit,unit*.16);ctx.strokeRect(-unit*.5,-unit*.08,unit,unit*.16)}else{ctx.fillRect(-unit*.35,-unit*.35,unit*.7,unit*.7);ctx.strokeRect(-unit*.35,-unit*.35,unit*.7,unit*.7)}ctx.restore();count++});return count};</script>`;
 }
