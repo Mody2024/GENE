@@ -100,6 +100,8 @@ assert.ok(page.includes("buildRuntimeAudioBootstrap(project.files)") && page.inc
 assert.ok(prompts.includes("AUDIO MANIFEST RUNTIME INTEGRATION") && prompts.includes("GeneAudio.sfx(eventName)"), "generated games receive explicit shared audio runtime integration guidance");
 assert.ok(runtimeScene.includes("modelPath: typeof raw.modelPath") && runtimeScene.includes("model.obj"), "Scene Studio OBJ assignments are preserved into the isolated runtime scene manifest");
 assert.ok(runtimeScene.includes("getMesh=function(id)") && runtimeScene.includes("drawMesh2D=function") && runtimeScene.includes("this.drawMesh2D(ctx,o,unit,ox,oy)"), "runtime scene bridge resolves assigned OBJ geometry and draws it into Canvas 2D scene layers");
+assert.ok(runtimeScene.includes("createWebGLMeshes=function(gl)") && runtimeScene.includes("positionOffset:0,normalOffset:12") && runtimeScene.includes("deleteBuffer(m.buffer)"), "runtime scene bridge exposes bounded OBJ GPU buffers with transforms and explicit cleanup");
+assert.ok(prompts.includes("createWebGLMeshes(gl)") && prompts.includes("normal offset 12 bytes"), "3D generation contract requires renderers to consume Scene Studio OBJ meshes");
 assert.ok(runtimeAssets.includes("parseOBJ=function(path)") && runtimeAssets.includes("(?:\\\\/[a-zA-Z0-9_-]+)*\\\\.(?:obj|mtl)"), "nested OBJ/MTL project assets are exposed to the isolated game runtime");
 assert.ok(api.includes("put executable source in game.js and load it with a local game.js script src"), "final validation permits the local game.js entry while rejecting inline and remote script tags");
 const finalHtmlScriptGuard = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])(?![^>]*\bsrc\s*=\s*["'](?:\.\/)?game\.js(?:[?#][^"']*)?["'])/i;
