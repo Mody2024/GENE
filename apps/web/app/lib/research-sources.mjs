@@ -217,7 +217,7 @@ export function formatResearchNotes(input) {
     }
     if (bundle.images.length) {
       lines.push("## Visual references (" + bundle.images.length + ")");
-      for (const image of bundle.images) lines.push("- " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
+      for (const image of bundle.images) lines.push("- [" + (image.categoryLabel || "Visual reference") + "] " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
       lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition.", "");
     }
     if (Array.isArray(bundle.webResults) && bundle.webResults.length) {
