@@ -99,6 +99,8 @@ assert.ok(read("apps/web/app/lib/runtime-kit.mjs").includes("GA.hasSavedSettings
 assert.ok(page.includes("buildRuntimeAudioBootstrap(project.files)") && page.includes("buildRuntimeAudioBootstrap(version.files)"), "live preview, standalone export, and version exports inject the audio manifest bridge");
 assert.ok(prompts.includes("AUDIO MANIFEST RUNTIME INTEGRATION") && prompts.includes("GeneAudio.sfx(eventName)"), "generated games receive explicit shared audio runtime integration guidance");
 assert.ok(runtimeScene.includes("modelPath: typeof raw.modelPath") && runtimeScene.includes("model.obj"), "Scene Studio OBJ assignments are preserved into the isolated runtime scene manifest");
+assert.ok(runtimeScene.includes("getMesh=function(id)") && runtimeScene.includes("drawMesh2D=function") && runtimeScene.includes("this.drawMesh2D(ctx,o,unit,ox,oy)"), "runtime scene bridge resolves assigned OBJ geometry and draws it into Canvas 2D scene layers");
+assert.ok(runtimeAssets.includes("parseOBJ=function(path)") && runtimeAssets.includes("(?:\\\\/[a-zA-Z0-9_-]+)*\\\\.(?:obj|mtl)"), "nested OBJ/MTL project assets are exposed to the isolated game runtime");
 assert.ok(api.includes("put executable source in game.js and load it with a local game.js script src"), "final validation permits the local game.js entry while rejecting inline and remote script tags");
 const finalHtmlScriptGuard = /<script\b(?![^>]*\btype\s*=\s*["'](?:application\/json|application\/ld\+json)["'])(?![^>]*\bsrc\s*=\s*["'](?:\.\/)?game\.js(?:[?#][^"']*)?["'])/i;
 assert.equal(finalHtmlScriptGuard.test('<script src="./game.js"></script>'), false, "the standard local game.js script entry must pass final validation");
