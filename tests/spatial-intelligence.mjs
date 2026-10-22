@@ -19,6 +19,21 @@ assert.equal(audit.passed, false);
 assert.ok(audit.warnings.some(item => item.code === "HAZARD_OVERLAPS_SPAWN"));
 assert.ok(audit.warnings.some(item => item.code === "OUTSIDE_PLAYABLE_BOUNDS"));
 
+const objectiveAudit = auditSceneLayout({
+  objects: [
+    { id: "spawn", role: "player", position: [0, 1, 0], scale: [1, 2, 1] },
+    { id: "goal", role: "goal", position: [5, 1, 0], scale: [1, 2, 1] },
+    { id: "wall", role: "obstacle", solid: true, position: [5, 1, 0], scale: [2, 3, 2] }
+  ],
+  bounds: { min: [-10, -2, -10], max: [10, 10, 10] },
+  spawnId: "spawn",
+  goalId: "goal"
+});
+assert.ok(objectiveAudit.warnings.some(item => item.code === "GOAL_BLOCKED"), "solid blockers intersecting the goal are reported");
+const missingObjectiveAudit = auditSceneLayout({ objects: [], spawnId: "missing-spawn", goalId: "missing-goal" });
+assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_SPAWN_OBJECT"));
+assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_GOAL_OBJECT"));
+
 const camera = recommendCameraFraming({ bounds: { min: [-10, 0, -10], max: [10, 8, 10] }, fov: 68 });
 assert.ok(camera.distance > 10 && camera.far > camera.distance);
 assert.match(formatSpatialContract("third person city game", "webgl3d"), /3D sizing/);
