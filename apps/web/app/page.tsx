@@ -1007,6 +1007,12 @@ export default function Home() {
                     if (/search|filter|sort|catalog|marketplace|products|library/.test(scopeText)) plannedModules.push("src/app/search.js");
                     if (/chart|analytics|metrics|report|statistics/.test(scopeText)) plannedModules.push("src/app/analytics.js");
                   } else {
+                    // Every game gets one real, reusable audio runtime unless the user explicitly asks for silence.
+                    // The module must be integrated by the staged architecture rather than existing as an unused file.
+                    if (!/\\b(?:no sound|without sound|silent game|no audio|mute by default)\\b/.test(scopeText)) {
+                      plannedModules.push("src/systems/audio-manager.js");
+                    }
+                    if (spec.engine === "webgl3d") plannedModules.push("src/systems/camera-controller.js");
                     // A module is justified by a feature, not by a fixed template.
                     if (/touch|mobile|keyboard|wasd|arrow keys|controller|gamepad|input/.test(scopeText)) plannedModules.push("src/systems/input.js");
                     if (/progression|upgrade|unlock|level up|score chase|campaign|wave|difficulty/.test(scopeText)) plannedModules.push("src/systems/progression.js");
