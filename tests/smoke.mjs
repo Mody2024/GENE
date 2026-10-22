@@ -864,7 +864,8 @@ assert.ok(targetIntentRegressionStyles.includes("professional, low-noise interfa
 
 const researchRouteSource = read("apps/web/app/api/research/route.ts");
 assert.ok(researchRouteSource.includes("wikipedia(searchText, wikiHost)") && researchRouteSource.includes("wants3DModels ? polyHavenCatalog()") && researchRouteSource.includes("Promise.all(["), "research route gathers facts and only searches 3D catalogues for explicit 3D requests");
-assert.ok(researchRouteSource.includes("commons(assetQuery") && researchRouteSource.includes("musicSearchTerms(topic)") && researchRouteSource.includes("wantsCharacterArt") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData"), "research targets requested asset types and only downloads image bytes from allow-listed hosts");
+const visualReferencePlannerSource = read("apps/web/app/lib/visual-reference-planner.mjs");
+assert.ok(researchRouteSource.includes("visualQueries.map") && researchRouteSource.includes("IMAGE_HOSTS") && researchRouteSource.includes("imageData") && visualReferencePlannerSource.includes("ui-menus") && visualReferencePlannerSource.includes("characters") && visualReferencePlannerSource.includes("environments"), "research gathers categorized visual references and only downloads image bytes from allow-listed hosts");
 assert.ok(page.includes("modelRequests") && page.includes("GENE Forge is modelling") && page.includes("generatedModels"), "3D build pipeline requests real Forge meshes and records actual generated asset paths");
 assert.ok(page.includes("shouldSplitLongGameTask") && page.includes("Automatically split oversized game.js"), "long game generation failures are decomposed into two modules before retrying");
 assert.ok(page.includes("hasSource && asksForChange") && page.includes('operation = "edit"'), "chat edit requests are applied to existing project source");
