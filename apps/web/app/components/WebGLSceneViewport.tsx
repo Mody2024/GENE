@@ -8,13 +8,22 @@ type Props = { objects: WebGLSceneObject[]; selectedId: string; onSelect: (id: s
 
 const VS = `
 attribute vec3 aPosition;
+attribute vec3 aNormal;
 uniform mat4 uMVP;
-void main(){ gl_Position = uMVP * vec4(aPosition, 1.0); }
+uniform mat4 uModel;
+varying float vLight;
+void main(){
+  vec3 normal = normalize(mat3(uModel) * aNormal);
+  vec3 lightDir = normalize(vec3(-0.45, 0.8, 0.6));
+  vLight = 0.32 + 0.68 * max(dot(normal, lightDir), 0.0);
+  gl_Position = uMVP * vec4(aPosition, 1.0);
+}
 `;
 const FS = `
 precision mediump float;
 uniform vec4 uColor;
-void main(){ gl_FragColor = uColor; }
+varying float vLight;
+void main(){ gl_FragColor = vec4(uColor.rgb * vLight, uColor.a); }
 `;
 function shader(gl: WebGLRenderingContext, type: number, source: string) {
   const value = gl.createShader(type);
@@ -61,8 +70,8 @@ function buildPrimitive(kind: PrimitiveKind, segments = 18): Float32Array {
     ];
     for (const q of faces) { pushTriangle(out,q[0],q[1],q[2]); pushTriangle(out,q[0],q[2],q[3]); }
   } else if (kind === "plane") {
-    pushTriangle(out,[-.5,0,-.5],[.5,0,-.5],[.5,0,.5]);
-    pushTriangle(out,[-.5,0,-.5],[.5,0,.5],[-.5,0,.5]);
+    pushTriangle(out,[-.5,0,-.5],[.5,0,.5],[.5,0,-.5]);
+    pushTriangle(out,[-.5,0,-.5],[-.5,0,.5],[.5,0,.5]);
   } else if (kind === "sphere") {
     const rings = Math.max(8, Math.floor(segments / 2));
     for (let y = 0; y < rings; y++) {
@@ -86,11 +95,22 @@ function buildPrimitive(kind: PrimitiveKind, segments = 18): Float32Array {
       if (kind === "cylinder") {
         const q0=[Math.cos(a)*.5,.5,Math.sin(a)*.5], q1=[Math.cos(b)*.5,.5,Math.sin(b)*.5];
         pushTriangle(out,p0,q0,q1); pushTriangle(out,p0,q1,p1);
-        pushTriangle(out,[0,.5,0],q0,q1);
+        pushTriangle(out,[0,.5,0],q1,q0);
       }
     }
   }
   return new Float32Array(out);
+}
+function buildFlatNormals(positions: Float32Array): Float32Array {
+  const normals = new Float32Array(positions.length);
+  for (let i = 0; i + 8 < positions.length; i += 9) {
+    const ax=positions[i+3]-positions[i], ay=positions[i+4]-positions[i+1], az=positions[i+5]-positions[i+2];
+    const bx=positions[i+6]-positions[i], by=positions[i+7]-positions[i+1], bz=positions[i+8]-positions[i+2];
+    let nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
+    const length=Math.hypot(nx,ny,nz)||1; nx/=length; ny/=length; nz/=length;
+    for(let vertex=0;vertex<3;vertex++){const at=i+vertex*3;normals[at]=nx;normals[at+1]=ny;normals[at+2]=nz;}
+  }
+  return normals;
 }
 const PRIMITIVES: Record<PrimitiveKind, Float32Array> = {
   box: buildPrimitive("box"), sphere: buildPrimitive("sphere"),
@@ -114,6 +134,7 @@ export default function WebGLSceneViewport({ objects, selectedId, onSelect, read
     if (!canvas || !gl) return;
     let program: WebGLProgram | null = null, raf=0;
     const buffers = new Map<PrimitiveKind, WebGLBuffer>();
+    const normalBuffers = new Map<PrimitiveKind, WebGLBuffer>();
     try {
       program=gl.createProgram(); if(!program) throw new Error("Unable to allocate WebGL program");
       gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,VS)); gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,FS)); gl.linkProgram(program);
@@ -124,25 +145,30 @@ export default function WebGLSceneViewport({ objects, selectedId, onSelect, read
         buffers.set(kind, geometryBuffer);
         gl.bindBuffer(gl.ARRAY_BUFFER, geometryBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, PRIMITIVES[kind], gl.STATIC_DRAW);
+        const normalBuffer = gl.createBuffer();
+        if (!normalBuffer) throw new Error("Unable to allocate " + kind + " normal buffer");
+        normalBuffers.set(kind, normalBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, buildFlatNormals(PRIMITIVES[kind]), gl.STATIC_DRAW);
       }
-      const position=gl.getAttribLocation(program,"aPosition"), mvpLoc=gl.getUniformLocation(program,"uMVP"), colorLoc=gl.getUniformLocation(program,"uColor");
+      const position=gl.getAttribLocation(program,"aPosition"), normal=gl.getAttribLocation(program,"aNormal"), mvpLoc=gl.getUniformLocation(program,"uMVP"), modelLoc=gl.getUniformLocation(program,"uModel"), colorLoc=gl.getUniformLocation(program,"uColor");
       const render=()=>{
         const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight),dpr=Math.min(2,window.devicePixelRatio||1);
         if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr)}
         gl!.viewport(0,0,canvas.width,canvas.height);gl!.clearColor(.035,.055,.085,1);gl!.clear(gl!.COLOR_BUFFER_BIT|gl!.DEPTH_BUFFER_BIT);gl!.enable(gl!.DEPTH_TEST);gl!.disable(gl!.CULL_FACE);
-        gl!.useProgram(program);gl!.enableVertexAttribArray(position);
+        gl!.useProgram(program);gl!.enableVertexAttribArray(position);gl!.enableVertexAttribArray(normal);
         const cam=camera.current, target=[0,0,0], eye=[Math.sin(cam.yaw)*Math.cos(cam.pitch)*cam.distance,Math.sin(cam.pitch)*cam.distance,Math.cos(cam.yaw)*Math.cos(cam.pitch)*cam.distance];
         const vp=multiply(perspective(Math.PI/3,width/height,.1,500),view(eye,target));
         // Draw a lightweight grid in world space as thin cubes.
-        for(let i=-10;i<=10;i++){for(const axis of ["x","z"]){const o:WebGLSceneObject={id:"grid",name:"grid",type:"box",position:axis==="x"?{x:i,y:-.53,z:0}:{x:0,y:-.53,z:i},rotation:{x:0,y:0,z:0},scale:axis==="x"?{x:.012,y:.01,z:20}:{x:20,y:.01,z:.012},color:"#24374a",visible:true};gl!.bindBuffer(gl!.ARRAY_BUFFER,buffers.get("box")!);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,model(o)));gl!.uniform4f(colorLoc,.12,.18,.24,1);gl!.drawArrays(gl!.TRIANGLES,0,PRIMITIVES.box.length/3)}}
-        for(const o of objects){if(!o.visible)continue;const kind=primitiveFor(o.type),geometry=PRIMITIVES[kind],geometryBuffer=buffers.get(kind);if(!geometryBuffer)continue;gl!.bindBuffer(gl!.ARRAY_BUFFER,geometryBuffer);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,model(o)));const hex=/^#[0-9a-f]{6}$/i.test(o.color)?o.color:"#8496ad";let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;if(o.id===selectedId){r=Math.min(1,r*.6+.4);g=Math.min(1,g*.6+.4);b=Math.min(1,b*.6+.4)}gl!.uniform4f(colorLoc,r,g,b,1);gl!.drawArrays(gl!.TRIANGLES,0,geometry.length/3)}
+        for(let i=-10;i<=10;i++){for(const axis of ["x","z"]){const o:WebGLSceneObject={id:"grid",name:"grid",type:"box",position:axis==="x"?{x:i,y:-.53,z:0}:{x:0,y:-.53,z:i},rotation:{x:0,y:0,z:0},scale:axis==="x"?{x:.012,y:.01,z:20}:{x:20,y:.01,z:.012},color:"#24374a",visible:true};gl!.bindBuffer(gl!.ARRAY_BUFFER,buffers.get("box")!);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.bindBuffer(gl!.ARRAY_BUFFER,normalBuffers.get("box")!);gl!.vertexAttribPointer(normal,3,gl!.FLOAT,false,0,0);const gridModel=model(o);gl!.uniformMatrix4fv(modelLoc,false,gridModel);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,gridModel));gl!.uniform4f(colorLoc,.12,.18,.24,1);gl!.drawArrays(gl!.TRIANGLES,0,PRIMITIVES.box.length/3)}}
+        for(const o of objects){if(!o.visible)continue;const kind=primitiveFor(o.type),geometry=PRIMITIVES[kind],geometryBuffer=buffers.get(kind),normalBuffer=normalBuffers.get(kind);if(!geometryBuffer||!normalBuffer)continue;const objectModel=model(o);gl!.bindBuffer(gl!.ARRAY_BUFFER,geometryBuffer);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.bindBuffer(gl!.ARRAY_BUFFER,normalBuffer);gl!.vertexAttribPointer(normal,3,gl!.FLOAT,false,0,0);gl!.uniformMatrix4fv(modelLoc,false,objectModel);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,objectModel));const hex=/^#[0-9a-f]{6}$/i.test(o.color)?o.color:"#8496ad";let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;if(o.id===selectedId){r=Math.min(1,r*.6+.4);g=Math.min(1,g*.6+.4);b=Math.min(1,b*.6+.4)}gl!.uniform4f(colorLoc,r,g,b,1);gl!.drawArrays(gl!.TRIANGLES,0,geometry.length/3)}
         raf=requestAnimationFrame(render);
       };
       render();
     } catch (error) {
       const ctx=canvas.getContext("2d"); if(ctx){ctx.fillStyle="#101722";ctx.fillRect(0,0,canvas.width||640,canvas.height||360);ctx.fillStyle="#f4a6a6";ctx.fillText("WebGL unavailable: "+(error instanceof Error?error.message:"initialization failed"),16,28)}
     }
-    return ()=>{cancelAnimationFrame(raf);for(const value of buffers.values())gl?.deleteBuffer(value);if(program)gl?.deleteProgram(program)};
+    return ()=>{cancelAnimationFrame(raf);for(const value of buffers.values())gl?.deleteBuffer(value);for(const value of normalBuffers.values())gl?.deleteBuffer(value);if(program)gl?.deleteProgram(program)};
   },[objects,selectedId]);
   const point=(e:React.PointerEvent<HTMLCanvasElement>)=>{const rect=e.currentTarget.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top}};
   const onDown=(e:React.PointerEvent<HTMLCanvasElement>)=>{const p=point(e);drag.current={x:p.x,y:p.y,orbit:e.button===2||e.shiftKey,id:null};e.currentTarget.setPointerCapture(e.pointerId)};
