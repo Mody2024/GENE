@@ -197,7 +197,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   }, [objects, selectedId, is2D]);
 
   const selected = useMemo(() => objects.find(object => object.id === selectedId) || null, [objects, selectedId]);
-  const objFiles = useMemo(() => Object.keys(files).filter(path => /\.obj$/i.test(path)).sort((a, b) => a.localeCompare(b)), [files]);
+  const objFiles = useMemo(() => Object.keys(files).filter(path => /^assets\/[a-zA-Z0-9_-]+\/model\.obj$/i.test(path)).sort((a, b) => a.localeCompare(b)), [files]);
   const commitObjects = (next: SceneObject[]) => {
     const snapshot = objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale }, material: { ...object.material }, light: { ...object.light }, camera: { ...object.camera } }));
     setUndoStack(current => [...current, snapshot].slice(-40));
@@ -347,7 +347,7 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
             {selected.type === "mesh" && <label className="scene-field">OBJ model file<select value={selected.modelPath || ""} onChange={event => updateSelected({ modelPath: event.target.value || undefined })} disabled={readOnly || objFiles.length === 0}>
               <option value="">Choose a project OBJ file</option>
               {objFiles.map(path => <option value={path} key={path}>{path}</option>)}
-            </select><small>{selected.modelPath && !objFiles.includes(selected.modelPath) ? "The saved model path is missing from project files; the viewport will use a primitive fallback until it is restored." : objFiles.length ? "Selected OBJ geometry is previewed in this scene. MTL materials and texture maps are not yet applied here." : "No OBJ files found in this project's files yet. Generate or import a model in Forge first."}</small></label>}
+            </select><small>{selected.modelPath && !objFiles.includes(selected.modelPath) ? "The saved model path is missing from project files; the viewport will use a primitive fallback until it is restored." : objFiles.length ? "Selected OBJ geometry is previewed in this scene. MTL materials and texture maps are not yet applied here." : "No runtime-ready assets/id/model.obj files found. Generate or import a model in Forge first."}</small></label>}
             {(["position", "rotation", "scale"] as const).map(key => <fieldset className="scene-vector" key={key}>
               <legend>{key}</legend>
               {editAxes.map(axis => <label key={axis}>{axis.toUpperCase()}<input type="number" step={key === "rotation" ? 5 : 0.1} value={selected[key][axis]} onChange={event => updateVector(key, axis, Number(event.target.value))} disabled={readOnly} /></label>)}
