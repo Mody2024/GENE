@@ -1,0 +1,2 @@
+export function createProjectCoverSvg(input?: { name?: string; title?: string; prompt?: string; initialPrompt?: string; engine?: string; preferredEngine?: string; kind?: "game" | "app"; files?: Record<string, string>; plan?: { engine?: string; title?: string } }): string;
+export function projectCoverDataUrl(project?: { name?: string; title?: string; prompt?: string; initialPrompt?: string; engine?: string; preferredEngine?: string; kind?: "game" | "app"; files?: Record<string, string>; plan?: { engine?: string; title?: string } }): string;
