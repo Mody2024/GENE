@@ -633,6 +633,26 @@ export default function Home() {
     setNotice("Stopped. No new AI stages will be scheduled. The last saved project version is preserved.");
     addActivity("Stopped the active run and cleared queued requests.");
   }, []);
+
+  // A run belongs to the project it started in. Switching/creating a project must cancel
+  // its in-flight requests so a stale generation cannot keep running in the background.
+  const lastRunProjectId = useRef(project?.id || "");
+  useEffect(() => {
+    const nextProjectId = project?.id || "";
+    const previousProjectId = lastRunProjectId.current;
+    lastRunProjectId.current = nextProjectId;
+    if (!previousProjectId || previousProjectId === nextProjectId) return;
+    for (const controller of activeRunControllers.current) controller.abort();
+    activeRunControllers.current.clear();
+    pendingBuildRequests.current = [];
+    setQueuedRequestCount(0);
+    setBusy(false);
+    setParallelChatInProgress(false);
+    setBuildInProgress(false);
+    setCanQueueBuildRequests(false);
+    setNotice("Switched projects. Work from the previous project was cancelled; its last saved version remains available.");
+    addActivity("Project changed; aborted previous project requests and cleared its queue.");
+  }, [project?.id, addActivity]);
   
   const runAgent = useCallback(async (text: string, operationOverride?: string, silent = false) => {
     if (!project || !text.trim()) return;
