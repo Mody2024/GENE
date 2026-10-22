@@ -129,14 +129,20 @@ function renderProjectCharacter(files) {
   const manifest = characterManifest(projectFiles);
   const entries = Object.entries(projectFiles);
   if (manifest) {
-    const spritePath = manifest.dir + "/sprite.svg";
-    const sprite = safeProjectSvg(projectFiles[spritePath]);
-    if (sprite) {
-      const data = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sprite);
-      return '<image data-gene-cover-character="sprite" x="324" y="48" width="190" height="205" preserveAspectRatio="xMidYMid meet" href="' + data + '"/>';
+    const basename = manifest.name && /character|hero|player|avatar|skeleton|npc/.test(manifest.name) ? manifest.name : "asset";
+    const spritePaths = [manifest.dir + "/sprite.svg", manifest.dir + "/" + basename + ".svg", manifest.dir + "/character.svg", manifest.dir + "/hero.svg", manifest.dir + "/player.svg"];
+    for (const spritePath of spritePaths) {
+      const sprite = safeProjectSvg(projectFiles[spritePath]);
+      if (sprite) {
+        const data = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sprite);
+        return '<image data-gene-cover-character="sprite" x="324" y="48" width="190" height="205" preserveAspectRatio="xMidYMid meet" href="' + data + '"/>';
+      }
     }
-    const obj = projectFiles[manifest.dir + "/model.obj"];
-    if (typeof obj === "string") return renderObjCharacter(obj, projectFiles[manifest.dir + "/model.mtl"] || "", { x: 330, y: 52, w: 175, h: 202 });
+    const objPaths = [manifest.dir + "/model.obj", manifest.dir + "/" + basename + ".obj", manifest.dir + "/character.obj", manifest.dir + "/hero.obj", manifest.dir + "/player.obj"];
+    for (const objPath of objPaths) {
+      const obj = projectFiles[objPath];
+      if (typeof obj === "string") return renderObjCharacter(obj, projectFiles[objPath.replace(/\\.obj$/i, ".mtl")] || projectFiles[manifest.dir + "/model.mtl"] || "", { x: 330, y: 52, w: 175, h: 202 });
+    }
   }
   const spriteEntry = entries.find(([path, source]) => /(?:character|hero|player|skeleton|avatar)[^/]*\.svg$/i.test(path) && safeProjectSvg(source));
   if (spriteEntry) {
