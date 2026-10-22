@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { aabbIntersects, auditSceneLayout, getWorldAabb, recommendCameraFraming, formatSpatialContract } from "../apps/web/app/lib/spatial-intelligence.mjs";
+import { aabbIntersects, auditSceneLayout, getWorldAabb, recommendCameraFraming, recommendJumpLayout, formatSpatialContract } from "../apps/web/app/lib/spatial-intelligence.mjs";
 
 const a = getWorldAabb({ position: [0, 1, 0], scale: [2, 2, 2] });
 const b = getWorldAabb({ position: [1, 1, 0], scale: [2, 2, 2] });
@@ -34,8 +34,15 @@ const missingObjectiveAudit = auditSceneLayout({ objects: [], spawnId: "missing-
 assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_SPAWN_OBJECT"));
 assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_GOAL_OBJECT"));
 
+const jump = recommendJumpLayout({ horizontalSpeed: 5, jumpVelocity: 8, gravity: 16, playerWidth: 1, safetyMargin: 0.5 });
+assert.equal(jump.airtimeSeconds, 1);
+assert.equal(jump.theoreticalDistance, 5);
+assert.equal(jump.recommendedMaximumGap, 3.5);
+const noJump = recommendJumpLayout({ horizontalSpeed: 5, jumpVelocity: 0, gravity: 16 });
+assert.equal(noJump.recommendedMaximumGap, 0, "a game with no jump impulse must not recommend a positive jump gap");
+
 const camera = recommendCameraFraming({ bounds: { min: [-10, 0, -10], max: [10, 8, 10] }, fov: 68 });
 assert.ok(camera.distance > 10 && camera.far > camera.distance);
 assert.match(formatSpatialContract("third person city game", "webgl3d"), /3D sizing/);
 assert.match(formatSpatialContract("platformer", "canvas2d"), /world-to-screen transform/);
-console.log("Spatial intelligence tests passed (rotated bounds, layout warnings, camera framing, and 2D/3D contracts).");
+console.log("Spatial intelligence tests passed (rotated bounds, layout warnings, jump-gap estimates, camera framing, and 2D/3D contracts).");
