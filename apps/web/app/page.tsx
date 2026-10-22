@@ -872,6 +872,7 @@ export default function Home() {
         const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
           activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
+          setLiveRun(current => current ? { ...current, build: { tasks: run.tasks.map(task => ({ id: task.id, title: task.title, status: task.status })), total: run.tasks.length, passed: run.tasks.filter(task => task.status === "passed").length, activeTask: run.tasks.find(task => task.status === "running")?.title } } : current);
         };
         let finalContentPassSucceeded = false;
         let autoSplitGameJs = false;
@@ -881,6 +882,7 @@ export default function Home() {
           const stagePath = stagePaths[index];
           if (activeBuildRun.tasks.find(task => task.id === "stage-" + index)?.status === "passed") continue;
           activeBuildRun = setTaskStatus(activeBuildRun, "stage-" + index, "running");
+          setLiveRun(current => current ? { ...current, build: { tasks: activeBuildRun!.tasks.map(task => ({ id: task.id, title: task.title, status: task.status })), total: activeBuildRun!.tasks.length, passed: activeBuildRun!.tasks.filter(task => task.status === "passed").length, activeTask: activeBuildRun!.tasks.find(task => task.status === "running")?.title } } : current);
           setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun } : current);
           addActivity("Build stage " + (index + 1) + ": generating " + stagePath + " (" + stagePaths.length + " files in the current manifest)");
           let stageSucceeded = false;
