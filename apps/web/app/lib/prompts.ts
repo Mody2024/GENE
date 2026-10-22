@@ -207,7 +207,7 @@ export function makeAgentInput(input: {
     : "";
   const cameraContract = projectKind === "game" ? formatCameraContract(gameIntent, selectedEngine) : "";
   const spatialContract = projectKind === "game" ? formatSpatialContract(gameIntent, selectedEngine) : "";
-  const gameplayDirectorContract = projectKind === "game" ? formatGameplayDirectorContract(gameIntent, selectedEngine, input.platform || "desktop") : "";
+  const gameplayDirectorContract = projectKind === "game" ? formatGameplayDirectorContract(gameIntent, selectedEngine, p?.answers?.platform || "desktop") : "";
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
     "USER-SELECTED PROJECT TARGET: " + selectedTarget + ". " + targetGuidance + " This selection is authoritative across planning, research, file generation, validation and preview. If the requested feature exceeds the selected runtime, explain the constraint and offer a compatible implementation instead of changing target silently.",
