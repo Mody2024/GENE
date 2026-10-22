@@ -8,13 +8,16 @@ type Props = { objects: WebGLSceneObject[]; files: Record<string, string>; selec
 const VS = `
 attribute vec3 aPosition;
 attribute vec3 aNormal;
+attribute vec3 aColor;
 uniform mat4 uMVP;
 uniform mat4 uModel;
 varying float vLight;
+varying vec3 vMeshColor;
 void main(){
   vec3 normal = normalize(mat3(uModel) * aNormal);
   vec3 lightDir = normalize(vec3(-0.45, 0.8, 0.6));
   vLight = 0.32 + 0.68 * max(dot(normal, lightDir), 0.0);
+  vMeshColor = aColor;
   gl_Position = uMVP * vec4(aPosition, 1.0);
 }
 `;
@@ -22,7 +25,8 @@ const FS = `
 precision mediump float;
 uniform vec4 uColor;
 varying float vLight;
-void main(){ gl_FragColor = vec4(uColor.rgb * vLight, uColor.a); }
+varying vec3 vMeshColor;
+void main(){ gl_FragColor = vec4(uColor.rgb * vMeshColor * vLight, uColor.a); }
 `;
 function shader(gl: WebGLRenderingContext, type: number, source: string) {
   const value = gl.createShader(type);
@@ -100,10 +104,41 @@ function buildPrimitive(kind: PrimitiveKind, segments = 18): Float32Array {
   }
   return new Float32Array(out);
 }
-function parseObjGeometry(source: string): Float32Array {
+function parseMtlColors(source: string): Map<string, [number, number, number]> {
+  const colors = new Map<string, [number, number, number]>();
+  let current = "";
+  for (const raw of source.split(/\r?\n/)) {
+    const parts = raw.trim().split(/\s+/);
+    if (parts[0] === "newmtl") {
+      current = parts.slice(1).join(" ");
+      colors.set(current, [0.82, 0.84, 0.88]);
+    } else if (parts[0] === "Kd" && current && parts.length >= 4) {
+      const rgb = parts.slice(1, 4).map(Number);
+      if (rgb.every(Number.isFinite)) colors.set(current, rgb.map(value => Math.max(0, Math.min(1, value))) as [number, number, number]);
+    }
+  }
+  return colors;
+}
+
+function parseObjGeometry(source: string, path: string, files: Record<string, string>): { positions: Float32Array; colors: Float32Array } {
   if (source.length > 2_000_000) throw new Error("OBJ exceeds the 2 MB scene preview limit.");
   const vertices: number[][] = [];
   const output: number[] = [];
+  const outputColors: number[] = [];
+  const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "";
+  let mtlPath = "";
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const parts = line.split(/\s+/);
+    if (parts[0] === "mtllib" && parts.length > 1) mtlPath = folder + parts.slice(1).join(" ");
+  }
+  if (!mtlPath || !files[mtlPath]) {
+    const siblingMtl = folder + "model.mtl";
+    if (files[siblingMtl]) mtlPath = siblingMtl;
+  }
+  const materials = parseMtlColors(mtlPath ? files[mtlPath] || "" : "");
+  let activeColor: [number, number, number] = [0.82, 0.84, 0.88];
   for (const raw of source.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
@@ -111,6 +146,8 @@ function parseObjGeometry(source: string): Float32Array {
     if (parts[0] === "v" && parts.length >= 4) {
       const vertex = parts.slice(1, 4).map(Number);
       if (vertex.every(Number.isFinite)) vertices.push(vertex);
+    } else if (parts[0] === "usemtl") {
+      activeColor = materials.get(parts.slice(1).join(" ")) || activeColor;
     } else if (parts[0] === "f" && parts.length >= 4) {
       const indices = parts.slice(1).map(token => {
         const index = Number(token.split("/")[0]);
@@ -121,12 +158,13 @@ function parseObjGeometry(source: string): Float32Array {
           const point = vertices[index];
           if (!point) continue;
           output.push(point[0], point[1], point[2]);
+          outputColors.push(...activeColor);
         }
       }
       if (output.length / 3 > 180_000) throw new Error("OBJ exceeds the 60,000-triangle scene preview limit.");
     }
   }
-  if (output.length < 9 || output.length % 9 !== 0) throw new Error("OBJ contains no valid triangle faces.");
+  if (output.length < 9 || output.length % 9 !== 0 || outputColors.length !== output.length) throw new Error("OBJ contains no valid triangle faces.");
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < output.length; i += 3) for (let axis = 0; axis < 3; axis++) {
     min[axis] = Math.min(min[axis], output[i + axis]);
@@ -134,7 +172,10 @@ function parseObjGeometry(source: string): Float32Array {
   }
   const center = min.map((value, axis) => (value + max[axis]) / 2);
   const span = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2], 0.01);
-  return new Float32Array(output.map((value, index) => (value - center[index % 3]) * 2 / span));
+  return {
+    positions: new Float32Array(output.map((value, index) => (value - center[index % 3]) * 2 / span)),
+    colors: new Float32Array(outputColors)
+  };
 }
 
 function buildFlatNormals(positions: Float32Array): Float32Array {
@@ -171,7 +212,7 @@ export default function WebGLSceneViewport({ objects, files, selectedId, onSelec
     let program: WebGLProgram | null = null, raf=0;
     const buffers = new Map<PrimitiveKind, WebGLBuffer>();
     const normalBuffers = new Map<PrimitiveKind, WebGLBuffer>();
-    const meshBuffers = new Map<string, { buffer: WebGLBuffer; normalBuffer: WebGLBuffer; vertexCount: number }>();
+    const meshBuffers = new Map<string, { buffer: WebGLBuffer; normalBuffer: WebGLBuffer; vertexCount: number; colorBuffer: WebGLBuffer }>();
     try {
       program=gl.createProgram(); if(!program) throw new Error("Unable to allocate WebGL program");
       gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,VS)); gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,FS)); gl.linkProgram(program);
@@ -207,24 +248,24 @@ export default function WebGLSceneViewport({ objects, files, selectedId, onSelec
           // Invalid or oversized OBJ files are skipped; primitive editing remains available.
         }
       }
-      const position=gl.getAttribLocation(program,"aPosition"), normal=gl.getAttribLocation(program,"aNormal"), mvpLoc=gl.getUniformLocation(program,"uMVP"), modelLoc=gl.getUniformLocation(program,"uModel"), colorLoc=gl.getUniformLocation(program,"uColor");
+      const position=gl.getAttribLocation(program,"aPosition"), normal=gl.getAttribLocation(program,"aNormal"), meshColor=gl.getAttribLocation(program,"aColor"), mvpLoc=gl.getUniformLocation(program,"uMVP"), modelLoc=gl.getUniformLocation(program,"uModel"), colorLoc=gl.getUniformLocation(program,"uColor");
       const render=()=>{
         const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight),dpr=Math.min(2,window.devicePixelRatio||1);
         if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr)}
         gl!.viewport(0,0,canvas.width,canvas.height);gl!.clearColor(.035,.055,.085,1);gl!.clear(gl!.COLOR_BUFFER_BIT|gl!.DEPTH_BUFFER_BIT);gl!.enable(gl!.DEPTH_TEST);gl!.disable(gl!.CULL_FACE);
-        gl!.useProgram(program);gl!.enableVertexAttribArray(position);gl!.enableVertexAttribArray(normal);
+        gl!.useProgram(program);gl!.enableVertexAttribArray(position);gl!.enableVertexAttribArray(normal);gl!.enableVertexAttribArray(meshColor);
         const cam=camera.current, target=[0,0,0], eye=[Math.sin(cam.yaw)*Math.cos(cam.pitch)*cam.distance,Math.sin(cam.pitch)*cam.distance,Math.cos(cam.yaw)*Math.cos(cam.pitch)*cam.distance];
         const vp=multiply(perspective(Math.PI/3,width/height,.1,500),view(eye,target));
         // Draw a lightweight grid in world space as thin cubes.
         for(let i=-10;i<=10;i++){for(const axis of ["x","z"]){const o:WebGLSceneObject={id:"grid",name:"grid",type:"box",position:axis==="x"?{x:i,y:-.53,z:0}:{x:0,y:-.53,z:i},rotation:{x:0,y:0,z:0},scale:axis==="x"?{x:.012,y:.01,z:20}:{x:20,y:.01,z:.012},color:"#24374a",visible:true};gl!.bindBuffer(gl!.ARRAY_BUFFER,buffers.get("box")!);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.bindBuffer(gl!.ARRAY_BUFFER,normalBuffers.get("box")!);gl!.vertexAttribPointer(normal,3,gl!.FLOAT,false,0,0);const gridModel=model(o);gl!.uniformMatrix4fv(modelLoc,false,gridModel);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,gridModel));gl!.uniform4f(colorLoc,.12,.18,.24,1);gl!.drawArrays(gl!.TRIANGLES,0,PRIMITIVES.box.length/3)}}
-        for(const o of objects){if(!o.visible)continue;const mesh=o.type.toLowerCase()==="mesh"&&o.modelPath?meshBuffers.get(o.modelPath):undefined;const kind=primitiveFor(o.type),geometryBuffer=mesh?.buffer||buffers.get(kind),normalBuffer=mesh?.normalBuffer||normalBuffers.get(kind),vertexCount=mesh?.vertexCount||PRIMITIVES[kind].length/3;if(!geometryBuffer||!normalBuffer)continue;const objectModel=model(o);gl!.bindBuffer(gl!.ARRAY_BUFFER,geometryBuffer);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.bindBuffer(gl!.ARRAY_BUFFER,normalBuffer);gl!.vertexAttribPointer(normal,3,gl!.FLOAT,false,0,0);gl!.uniformMatrix4fv(modelLoc,false,objectModel);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,objectModel));const hex=/^#[0-9a-f]{6}$/i.test(o.color)?o.color:"#8496ad";let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;if(o.id===selectedId){r=Math.min(1,r*.6+.4);g=Math.min(1,g*.6+.4);b=Math.min(1,b*.6+.4)}gl!.uniform4f(colorLoc,r,g,b,1);gl!.drawArrays(gl!.TRIANGLES,0,vertexCount)}
+        for(const o of objects){if(!o.visible)continue;const mesh=o.type.toLowerCase()==="mesh"&&o.modelPath?meshBuffers.get(o.modelPath):undefined;const kind=primitiveFor(o.type),geometryBuffer=mesh?.buffer||buffers.get(kind),normalBuffer=mesh?.normalBuffer||normalBuffers.get(kind),vertexCount=mesh?.vertexCount||PRIMITIVES[kind].length/3;if(!geometryBuffer||!normalBuffer)continue;const objectModel=model(o);gl!.bindBuffer(gl!.ARRAY_BUFFER,geometryBuffer);gl!.vertexAttribPointer(position,3,gl!.FLOAT,false,0,0);gl!.bindBuffer(gl!.ARRAY_BUFFER,normalBuffer);gl!.vertexAttribPointer(normal,3,gl!.FLOAT,false,0,0);if(mesh){gl!.bindBuffer(gl!.ARRAY_BUFFER,mesh.colorBuffer);gl!.vertexAttribPointer(meshColor,3,gl!.FLOAT,false,0,0)}else{gl!.disableVertexAttribArray(meshColor);gl!.vertexAttrib3f(meshColor,1,1,1)}gl!.uniformMatrix4fv(modelLoc,false,objectModel);gl!.uniformMatrix4fv(mvpLoc,false,multiply(vp,objectModel));const hex=/^#[0-9a-f]{6}$/i.test(o.color)?o.color:"#8496ad";let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;if(o.id===selectedId){r=Math.min(1,r*.6+.4);g=Math.min(1,g*.6+.4);b=Math.min(1,b*.6+.4)}gl!.uniform4f(colorLoc,r,g,b,1);gl!.drawArrays(gl!.TRIANGLES,0,vertexCount)}
         raf=requestAnimationFrame(render);
       };
       render();
     } catch (error) {
       const ctx=canvas.getContext("2d"); if(ctx){ctx.fillStyle="#101722";ctx.fillRect(0,0,canvas.width||640,canvas.height||360);ctx.fillStyle="#f4a6a6";ctx.fillText("WebGL unavailable: "+(error instanceof Error?error.message:"initialization failed"),16,28)}
     }
-    return ()=>{cancelAnimationFrame(raf);for(const value of buffers.values())gl?.deleteBuffer(value);for(const value of normalBuffers.values())gl?.deleteBuffer(value);for(const value of meshBuffers.values()){gl?.deleteBuffer(value.buffer);gl?.deleteBuffer(value.normalBuffer)}if(program)gl?.deleteProgram(program)};
+    return ()=>{cancelAnimationFrame(raf);for(const value of buffers.values())gl?.deleteBuffer(value);for(const value of normalBuffers.values())gl?.deleteBuffer(value);for(const value of meshBuffers.values()){gl?.deleteBuffer(value.buffer);gl?.deleteBuffer(value.normalBuffer);gl?.deleteBuffer(value.colorBuffer)}if(program)gl?.deleteProgram(program)};
   },[objects,files,selectedId]);
   const point=(e:React.PointerEvent<HTMLCanvasElement>)=>{const rect=e.currentTarget.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top}};
   const onDown=(e:React.PointerEvent<HTMLCanvasElement>)=>{const p=point(e);drag.current={x:p.x,y:p.y,orbit:e.button===2||e.shiftKey,id:null};e.currentTarget.setPointerCapture(e.pointerId)};
