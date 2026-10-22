@@ -1,4 +1,6 @@
 /**
+ * OBJ compatibility note: modelPath validation accepts assets/.../model.obj and other
+ * safe .obj paths, preserving Scene Studio OBJ assignments in the isolated manifest.
  * Bridges the saved Scene Studio manifest into the isolated playable runtime.
  * The bridge is renderer-agnostic: generated Canvas/WebGL engines can consume the
  * same validated transforms without relying on editor-only React state.
