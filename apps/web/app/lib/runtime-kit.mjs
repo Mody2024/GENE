@@ -22,8 +22,8 @@ export const GENE_AUDIO_SOURCE = [
 "  var AC = root.AudioContext || root.webkitAudioContext;",
 "  var GA = {};",
 "  var ctx = null, master = null, musicBus = null, sfxBus = null, noiseBuffer = null;",
-"  var settings = { master: 0.8, music: 0.5, sfx: 0.8, muted: false };
-  var settingsLoaded = false;",
+"  var settings = { master: 0.8, music: 0.5, sfx: 0.8, muted: false };",
+"  var settingsLoaded = false;",
 "  var STORE = 'gene.audio.v1:' + ((root.location && root.location.pathname) || 'game');",
 "  var voices = 0, MAX_VOICES = 20, unlocked = false, paused = false;",
 "  var music = { on: false, wanted: null, mood: 'calm', timer: null, step: 0, next: 0, seed: 1 };",
@@ -33,8 +33,8 @@ export const GENE_AUDIO_SOURCE = [
 "    try {",
 "      var raw = root.localStorage && root.localStorage.getItem(STORE);",
 "      if (!raw) return;",
-"      var saved = JSON.parse(raw);
-      settingsLoaded = true;",
+"      var saved = JSON.parse(raw);",
+"      settingsLoaded = true;",
 "      ['master', 'music', 'sfx'].forEach(function (k) { if (typeof saved[k] === 'number') settings[k] = clamp(saved[k]); });",
 "      settings.muted = !!saved.muted;",
 "    } catch (e) {}",
@@ -245,8 +245,8 @@ export const GENE_AUDIO_SOURCE = [
 "  GA.setSfxVolume = function (v) { GA.setVolume('sfx', v); };",
 "  GA.setMuted = function (flag) { settings.muted = !!flag; applyGains(); save(); };",
 "  GA.toggleMute = function () { GA.setMuted(!settings.muted); return settings.muted; };",
-"  GA.getSettings = function () { return { master: settings.master, music: settings.music, sfx: settings.sfx, muted: settings.muted }; };
-  GA.hasSavedSettings = function () { return settingsLoaded; };",
+"  GA.getSettings = function () { return { master: settings.master, music: settings.music, sfx: settings.sfx, muted: settings.muted }; };",
+"  GA.hasSavedSettings = function () { return settingsLoaded; },
 "  GA.pause = function () { paused = true; try { if (ctx) ctx.suspend(); } catch (e) {} };",
 "  GA.resume = function () { paused = false; resumeContext(); };",
 "  GA.dispose = function () {",
