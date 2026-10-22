@@ -1420,7 +1420,7 @@ export default function Home() {
       (result.files || []).forEach(file => { files[file.path] = file.content; changedPaths.push(file.path); });
       // Every newly built game/app receives a deterministic local cover file from GENE tools.
       // No image-model call or external asset download is required for this fallback artwork.
-      if ((operation === "build" || operation === "surprise") && !files["assets/project-cover.svg"]) {
+      if ((operation === "build" || operation === "surprise") && !nextProject.files["assets/project-cover.svg"]) {
         files["assets/project-cover.svg"] = createProjectCoverSvg({
           name: result.plan?.title || nextProject.name,
           kind: nextProject.kind,
@@ -1428,7 +1428,7 @@ export default function Home() {
           prompt: nextProject.initialPrompt || prompt,
           files
         });
-        changedPaths.push("assets/project-cover.svg");
+        if (!changedPaths.includes("assets/project-cover.svg")) changedPaths.push("assets/project-cover.svg");
         addActivity("Created a no-credit local SVG cover and saved it to assets/project-cover.svg");
       }
       let versions = nextProject.versions;
