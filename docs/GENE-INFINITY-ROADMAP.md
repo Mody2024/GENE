@@ -36,6 +36,10 @@ This document records the next implementation sequence for the existing GENE wor
 - [ ] Add scene-derived spatial bounds, playable-route checks, camera obstruction checks, and engine-specific collision validation.
 - [ ] Expand modular 2D art, tilesets, sprites, and animations with integration tests.
 - [ ] Improve 3D geometry, materials, UV/texture workflows, rigging, and animation only through capabilities that actually exist.
+- [ ] Add imported rigged-model animation playback/retargeting with explicit format support, skeleton compatibility checks, state transitions, and real browser acceptance tests.
+- [ ] Complete Audio Studio voice-over workflow: provider-backed TTS, voice/language/emotion selection, line-by-line recording and retakes, captions, per-dialogue mapping, asset licensing metadata, and exported-game end-to-end tests.
+- [ ] Verify saved/imported voice-over assets through project persistence, preview, standalone export, and playback; browser SpeechSynthesis remains preview/fallback rather than a claimed professional rendered voice.
+- [ ] Expand contextual SFX/music generation and sound asset research, with source/license metadata and tests proving events trigger only at actual gameplay transitions.
 - [ ] Develop Gene Imagine with vector editing, sprite tools, UI composition, texture tools, and export.
 - [ ] Develop Gene Music Studio with procedural composition, sound design, editing, and direct game integration.
 
