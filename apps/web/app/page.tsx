@@ -745,9 +745,11 @@ export default function Home() {
       // toggle can still force a search for any prompt.
       const needsResearch = !silent && (
         operation === "research" ||
-        chatNeedsResearch ||
-        (operation === "interview" && !(nextProject.references || []).some(item => item.name === "research-notes.md")) ||
-        ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
+        (nextProject.visualResearch !== false && (
+          chatNeedsResearch ||
+          (operation === "interview" && !(nextProject.references || []).some(item => item.name === "research-notes.md")) ||
+          ((operation === "build" || operation === "surprise" || operation === "plan") && !(nextProject.references || []).some(item => item.name === "research-notes.md"))
+        ))
       );
       if (needsResearch) {
         const researchQuery = operation === "research"
@@ -2945,7 +2947,7 @@ export default function Home() {
                     <select className="thinking-select composer-thinking" value={project.thinking} aria-label="GENE model and reasoning mode" title="GENE Fast: quickest. Thinking: balanced reasoning. GENE BH (Black Hole): strongest, slower reasoning. Native: no external AI calls." onChange={e => setProject({ ...project, thinking: e.target.value as Thinking })}>
                       <option value="native">Gene Native · no external AI</option><option value="fast">GENE Fast</option><option value="balanced">Thinking</option><option value="deep">GENE BH</option>
                     </select>
-                    <span className="key-hint">Drop files or paste an image · Enter to send</span>
+                    <button type="button" className="icon-only-tool" title={project.visualResearch === false ? "Automatic visual research is off for this project" : "Automatic visual research is on for this project"} aria-label={project.visualResearch === false ? "Enable automatic visual research" : "Disable automatic visual research"} aria-pressed={project.visualResearch !== false} onClick={() => setProject(current => current ? { ...current, visualResearch: current.visualResearch === false ? true : false, updatedAt: now() } : current)}>{project.visualResearch === false ? "Research off" : "Research on"}</button><span className="key-hint">Drop files or paste an image · Enter to send</span>
                   </div>{(busy || buildInProgress || parallelChatInProgress) && <button type="button" className="icon-only-tool" title="Stop current AI work and clear queued requests" aria-label="Stop current AI work" onClick={stopActiveRun}>■</button>}<button className="send-button" type="submit" aria-label={buildInProgress && canQueueBuildRequests ? "Queue request" : "Send message"} disabled={(busy && !canQueueBuildRequests) || !draft.trim()}>{buildInProgress && canQueueBuildRequests ? "Queue" : busy ? "Working…" : "Send"} <span>↑</span></button></div>
               </form>
             </>}
