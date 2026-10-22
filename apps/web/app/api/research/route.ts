@@ -116,8 +116,8 @@ export async function POST(request: NextRequest) {
     engine: typeof body?.engine === "string" ? body.engine : "auto",
     images: wantsImages
   });
-  const wants3DModels = /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
-  const wantsAudio = !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
+  const wants3DModels = body?.engine === "webgl3d" || /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
+  const wantsAudio = body?.kind !== "app" && !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
 
   const googleQuery = researchIsGeometryDash
     ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
