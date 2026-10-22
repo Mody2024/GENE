@@ -5,6 +5,7 @@ import { formatCanonicalProjectMemory } from "./project-memory";
 import { formatBrain } from "./game-knowledge.mjs";
 import { formatCameraContract } from "./camera-intelligence.mjs";
 import { formatSpatialContract } from "./spatial-intelligence.mjs";
+import { formatGameplayDirectorContract } from "./gameplay-director.mjs";
 import { buildDesignDoc, formatDesignDoc } from "./design-doc";
 
 const GENE_FORGE_COURSE = `
@@ -206,6 +207,7 @@ export function makeAgentInput(input: {
     : "";
   const cameraContract = projectKind === "game" ? formatCameraContract(gameIntent, selectedEngine) : "";
   const spatialContract = projectKind === "game" ? formatSpatialContract(gameIntent, selectedEngine) : "";
+  const gameplayDirectorContract = projectKind === "game" ? formatGameplayDirectorContract(gameIntent, selectedEngine, input.platform || "desktop") : "";
   const parts = [
     "PROJECT KIND: " + projectKind + ". " + (projectKind === "app" ? "Build a web application, not a game. Use accessible semantic DOM and working interactions; engine=webapp. Required app spec fields: kind=app, engine=webapp, title, summary, features[], routes[], userFlows[], performanceBudget." : "Build a playable browser game. Engine is canvas2d or webgl3d and the game spec must describe real mechanics and win/loss behavior."),
     "USER-SELECTED PROJECT TARGET: " + selectedTarget + ". " + targetGuidance + " This selection is authoritative across planning, research, file generation, validation and preview. If the requested feature exceeds the selected runtime, explain the constraint and offer a compatible implementation instead of changing target silently.",
@@ -222,6 +224,7 @@ export function makeAgentInput(input: {
       "ENGINE INTEGRITY: For canvas2d, use a stable update loop with delta-time, resize-aware coordinates, input cleanup, collision/state separation, and pause-safe timing. For webgl3d, implement a real perspective camera, depth-tested geometry, lights/materials, spatial transforms and 3D movement/collision; use instancing or bounded geometry for repeated objects. If WebGL is unavailable, show a recoverable error rather than a fake 3D scene. Avoid per-frame allocation, unbounded entities, runaway particles, and work that grows every frame.",
       "QA BEFORE RETURN: Trace boot -> start -> active play -> pause/resume -> damage/failure -> restart -> victory/ending. Check every referenced DOM ID, asset path, function, input binding and state variable; ensure game loop starts once and timers/listeners are cleaned up. Verify game-spec.json matches actual files, engine, controls, mechanics, objective, win/loss and limitations. Repair obvious defects before returning. Prefer fewer integrated systems that work over many shallow features. Never claim browser playtesting unless the test actually ran."
     ] : []),
+    gameplayDirectorContract,
     buildStudioContract(projectKind, selectedEngine, input.operation),
     "OPERATION: " + input.operation,
     "MODE: " + input.mode,
