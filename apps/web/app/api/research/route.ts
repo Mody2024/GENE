@@ -10,6 +10,7 @@ import {
   parseCommonsFiles,
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
+import { planVisualReferenceQueries } from "../../lib/visual-reference-planner.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,7 +22,7 @@ const buckets = new Map<string, { count: number; resetAt: number }>();
 /** Only these hosts are ever fetched for image bytes, so research can never be used to reach other servers. */
 const IMAGE_HOSTS = new Set(["upload.wikimedia.org", "cdn.polyhaven.com"]);
 const MAX_IMAGE_BYTES = 180_000;
-const MAX_IMAGES_SENT = 3;
+const MAX_IMAGES_SENT = 4;
 
 async function getJson(url: string, timeoutMs = 6_000): Promise<any | null> {
   try {
@@ -122,13 +123,14 @@ export async function POST(request: NextRequest) {
   const googleQuery = researchIsGeometryDash
     ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
     : normalizedTopic + " game design mechanics level design official documentation";
-  const [wiki, catalog, commonsImages, google, ...audioSets] = await Promise.all([
+  const [wiki, catalog, visualImageSets, google, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
     wants3DModels ? polyHavenCatalog() : Promise.resolve(null),
-    wantsImages ? commons(assetQuery, "image", 6) : Promise.resolve([]),
+    wantsImages ? Promise.all(visualQueries.map(async visual => (await commons(visual.query, "image", 3)).map(image => ({ ...image, category: visual.id, categoryLabel: visual.label })))) : Promise.resolve([]),
     googleSearch(googleQuery),
     ...(wantsAudio ? musicSearchTerms(topic).map(term => commons(term, "audio", 3)) : [])
   ]);
+  const commonsImages = (visualImageSets as any[][]).flat().filter((image, index, all) => all.findIndex(other => other.thumb === image.thumb || other.full === image.full) === index);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
