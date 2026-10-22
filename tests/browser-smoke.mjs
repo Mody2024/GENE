@@ -78,7 +78,7 @@ try {
   await capabilityContext.close();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const fatalErrors = [];
-  page.on("pageerror", error => fatalErrors.push(error.message + " @ " + String(error.stack || "").split("\n")[1]));
+  page.on("pageerror", error => fatalErrors.push(error.message));
   await page.addInitScript(({ project, storageKey, activeKey }) => {
     if (window.top !== window.self) return;
     localStorage.setItem(storageKey, JSON.stringify([project]));
@@ -131,8 +131,8 @@ try {
     }
   };
   const quizPage = await browser.newPage({ viewport: { width: 1100, height: 800 } });
-  quizPage.on("pageerror", error => fatalErrors.push("DOM quiz: " + error.message + " @ " + String(error.stack || "").split("\n")[1]));
-  await quizPage.addInitScript(({ project, storageKey, activeKey }) => { localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: quizFixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
+  quizPage.on("pageerror", error => fatalErrors.push("DOM quiz: " + error.message));
+  await quizPage.addInitScript(({ project, storageKey, activeKey }) => { if (window.top !== window.self) return; localStorage.setItem(storageKey, JSON.stringify([project])); localStorage.setItem(activeKey, project.id); }, { project: quizFixture, storageKey: "gene.projects.v1", activeKey: "gene.active-project.v1" });
   await quizPage.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
   const quizFrame = quizPage.frameLocator('iframe[title="GENE live game preview"]');
   await quizFrame.getByRole("button", { name: "Mars" }).waitFor({ timeout: 10_000 });
@@ -162,7 +162,7 @@ try {
     }
   };
   const multiPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  multiPage.on("pageerror", error => fatalErrors.push("multiplayer: " + error.message + " @ " + String(error.stack || "").split("\n")[1]));
+  multiPage.on("pageerror", error => fatalErrors.push("multiplayer: " + error.message));
   await multiPage.addInitScript(({ project, storageKey, activeKey }) => {
     if (window.top !== window.self) return;
     localStorage.setItem(storageKey, JSON.stringify([project]));
