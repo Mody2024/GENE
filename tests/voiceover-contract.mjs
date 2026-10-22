@@ -16,7 +16,7 @@ assert.ok(prompts.includes("GeneAudio.playVoiceOver(id"), "game generation knows
 const runtime = read("apps/web/app/lib/runtime-audio.ts");
 assert.ok(runtime.includes("playVoiceOver"), "runtime exposes voice-over playback");
 assert.ok(runtime.includes("voiceOvers.push({ id: item.id"), "runtime maps saved voice-over metadata");
-assert.ok(runtime.includes("data:audio\\\\/[a-z0-9.+-]+;base64,"), "runtime only embeds base64 audio data URLs");
+assert.ok(runtime.includes("data:audio\\/[a-z0-9.+-]+;base64,"), "runtime only embeds base64 audio data URLs");
 assert.ok(runtime.includes("voiceBytes + approximateBytes > 2_000_000"), "runtime enforces a combined voice-over asset size budget");
 assert.ok(runtime.includes("if(!item||!item.src||!cfg.enabled)return false"), "runtime respects the game's audio-disabled setting");
 console.log("Voice-over asset workflow contract passed.\n");
