@@ -42,6 +42,14 @@ function findPalette(seed) {
   return PALETTES[hashText(seed) % PALETTES.length];
 }
 
+function projectFontFamily(files) {
+  const css = Object.entries(files || {}).filter(([path, content]) => /\\.css$/i.test(path) && typeof content === "string").map(([, content]) => content).join("\\n").slice(0, 500_000);
+  const match = css.match(/font-family\\s*:\\s*([^;{}]+)/i);
+  if (!match) return "system-ui,Segoe UI,Arial,sans-serif";
+  const first = match[1].split(",")[0].trim().replace(/^["']|["']$/g, "");
+  return /^[\\w\\s-]{1,48}$/.test(first) ? first + ",system-ui,Segoe UI,Arial,sans-serif" : "system-ui,Segoe UI,Arial,sans-serif";
+}
+
 function safeProjectSvg(source) {
   let svg = String(source || "").slice(0, 400_000).trim();
   if (!/^<svg\b/i.test(svg)) return "";
@@ -164,6 +172,7 @@ export function createProjectCoverSvg(input = {}) {
   const kind = input.kind === "app" || engine === "webapp" ? "app" : "game";
   const source = (name + " " + prompt + " " + engine).toLowerCase();
   const palette = findPalette(source);
+  const fontFamily = projectFontFamily(input.files);
   const bg1 = palette[0], bg2 = palette[1], accent = palette[2], highlight = palette[3];
   const is3d = engine === "webgl3d" || /3d|three dimensional|first person|third person|open world|simulation|racing|driving/i.test(source);
   const theme = /skeleton|bones|undead/i.test(source) ? "skeleton"
@@ -232,8 +241,8 @@ export function createProjectCoverSvg(input = {}) {
     '<circle cx="70" cy="60" r="95" fill="' + accent + '" opacity=".10"/><circle cx="512" cy="42" r="112" fill="' + highlight + '" opacity=".08"/>' +
     '<g opacity=".12" stroke="#ffffff" stroke-width="1"><path d="M0 40 H560 M0 80 H560 M0 120 H560 M0 160 H560 M0 200 H560 M0 240 H560"/><path d="M40 0 V280 M80 0 V280 M120 0 V280 M160 0 V280 M200 0 V280 M240 0 V280 M280 0 V280 M320 0 V280 M360 0 V280 M400 0 V280 M440 0 V280 M480 0 V280 M520 0 V280"/></g>' +
     art + '<rect x="0" y="260" width="560" height="100" fill="url(#shade)"/>' +
-    '<text x="32" y="' + titleY + '" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="26" font-weight="750" fill="#ffffff" letter-spacing="-.6">' + titleMarkup + '</text>' +
-    '<rect x="32" y="337" width="' + Math.max(84, mode.length * 7 + 24) + '" height="15" rx="7" fill="' + accent + '" opacity=".92"/><text x="44" y="348" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="8" font-weight="800" letter-spacing="1.15" fill="' + bg1 + '">' + escapeXml(mode) + '</text>' +
+    '<text x="32" y="' + titleY + '" font-family="" + escapeXml(fontFamily) + "" font-size="26" font-weight="750" fill="#ffffff" letter-spacing="-.6">' + titleMarkup + '</text>' +
+    '<rect x="32" y="337" width="' + Math.max(84, mode.length * 7 + 24) + '" height="15" rx="7" fill="' + accent + '" opacity=".92"/><text x="44" y="348" font-family="" + escapeXml(fontFamily) + "" font-size="8" font-weight="800" letter-spacing="1.15" fill="' + bg1 + '">' + escapeXml(mode) + '</text>' +
     '<text x="526" y="348" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="8" fill="#ffffff" opacity=".8">GENE · LOCAL COVER</text>' +
     '</svg>';
 }
