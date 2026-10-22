@@ -22,7 +22,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const serialized = JSON.stringify(assets).replace(/</g, "\\u003c");
   const runtime = [
     // Sandboxed previews intentionally omit allow-same-origin. Provide an in-memory fallback when browser storage throws SecurityError, rather than weakening iframe isolation.
-    `(function(){function makeStore(){var data=Object.create(null);return {get length(){return Object.keys(data).length;},key:function(i){return Object.keys(data)[i]||null;},getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(data,k)?data[k]:null;},setItem:function(k,v){data[String(k)]=String(v);},removeItem:function(k){delete data[String(k)];},clear:function(){data=Object.create(null);}};}function install(name){try{var store=window[name];var probe="__gene_storage_probe__";store.getItem(probe);return;}catch(e){try{Object.defineProperty(window,name,{configurable:true,value:makeStore()});}catch(defineError){window["__GENE_"+name.toUpperCase()+"_FALLBACK"]=makeStore();}}}install("localStorage");install("sessionStorage");})();`,
+    \`const __geneStorage=(function(){function makeStore(){var data=Object.create(null);return {get length(){return Object.keys(data).length;},key:function(i){return Object.keys(data)[i]||null;},getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(data,k)?data[k]:null;},setItem:function(k,v){data[String(k)]=String(v);},removeItem:function(k){delete data[String(k)];},clear:function(){data=Object.create(null);}};}function safeStore(name){try{var store=window[name];store.getItem("__gene_storage_probe__");return store;}catch(e){return makeStore();}}return {localStorage:safeStore("localStorage"),sessionStorage:safeStore("sessionStorage")};})();const localStorage=__geneStorage.localStorage;const sessionStorage=__geneStorage.sessionStorage;\`,
     "window.__GENE_ASSETS__=" + serialized + ";",
     "window.GENE3D=window.GENE3D||{};",
     "window.GENE3D.parseMTL=function(path){var src=window.__GENE_ASSETS__[path];if(typeof src!==\"string\")throw new Error(\"Missing material asset: \"+path);var out={},current=null;src.split(/\\r?\\n/).forEach(function(line){var p=line.trim().split(/\\s+/);if(p[0]===\"newmtl\"){current=p.slice(1).join(\" \");out[current]={kd:[0.7,0.7,0.7]};}else if(p[0]===\"Kd\"&&current&&p.length>=4){var rgb=p.slice(1,4).map(Number);if(rgb.every(Number.isFinite))out[current].kd=rgb.map(function(n){return Math.max(0,Math.min(1,n));});}});return out;};",
@@ -32,7 +32,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   const art = [
     "window.GENE_ART=window.GENE_ART||{};",
     "(function(A){var cache={};",
-    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\/(?:art\/[^/]+\.svg|[^/]+\/sprite\.svg|forge2d\/(?:character|tileset|background)\.svg)$/i.test(p);});};",
+    "A.list=function(){return Object.keys(window.__GENE_ASSETS__||{}).filter(function(p){return /^assets\\/(?:art\\/[^/]+\\.svg|[^/]+\\/sprite\\.svg|forge2d\\/(?:character|tileset|background)\\.svg)$/i.test(p);});};",
     "A.svg=function(p){var s=(window.__GENE_ASSETS__||{})[p];return typeof s===\"string\"?s:null;};",
     "A.image=function(p){if(cache[p])return cache[p];var s=A.svg(p);if(s===null)return null;var img=new Image();img.decoding=\"async\";img.src=\"data:image/svg+xml;charset=utf-8,\"+encodeURIComponent(s);cache[p]=img;return img;};",
     "A.ready=function(p){var i=A.image(p);return !!(i&&i.complete&&i.naturalWidth>0);};",
