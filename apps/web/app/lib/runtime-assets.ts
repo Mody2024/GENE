@@ -38,5 +38,9 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
     "})(window.GENE_ART);"
   ].join("");
   // The runtime kit (GeneAudio) is injected with the bootstrap so preview, /play, export, publish and cloud builds all get it.
-  return buildRuntimeKitScript() + "<script>" + runtime + art + "</script>";
+  // Sandboxed preview documents may expose a throwing localStorage getter. Give the game a
+  // per-frame in-memory Web Storage implementation before any runtime/game script executes.
+  // This does not grant same-origin access or persist data outside this isolated frame.
+  const sandboxStorage = '<script>(function(w){function makeStore(){var data=Object.create(null);return {getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(data,k)?data[k]:null;},setItem:function(k,v){data[String(k)]=String(v);},removeItem:function(k){delete data[String(k)];},clear:function(){data=Object.create(null);},key:function(i){var keys=Object.keys(data);return keys[i]===undefined?null:keys[i];}};}function install(name){var store=makeStore();try{Object.defineProperty(store,"length",{get:function(){return Object.keys(data).length;},enumerable:true});Object.defineProperty(w,name,{configurable:true,enumerable:true,value:store});}catch(e){try{w[name]=store;}catch(ignore){}}}try{void w.localStorage;}catch(e){install("localStorage");}try{void w.sessionStorage;}catch(e){install("sessionStorage");}})(window);</script>';
+  return sandboxStorage + buildRuntimeKitScript() + "<script>" + runtime + art + "</script>";
 }
