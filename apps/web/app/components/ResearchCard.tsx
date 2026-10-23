@@ -41,7 +41,7 @@ export default function ResearchCard({ bundle, onImportImage }: Props) {
             <span>{image.title}</span>
           </a>
           <small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
-          {onImportImage && <button type="button" className="rc-import-image" onClick={() => onImportImage(image)} disabled={!image.full || !image.page}>Import to project</button>}
+          {onImportImage && <button type="button" className="rc-import-image" style={{ display: "block", marginTop: "8px", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: "8px", background: "#fff", color: "#334155", fontSize: "12px", cursor: "pointer" }} onClick={() => onImportImage(image)} disabled={!image.full || !image.page}>Import to project</button>}
         </div>)}</div>
       </section>}
 
