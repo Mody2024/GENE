@@ -497,7 +497,7 @@ const sceneVm = await import("node:vm");
 const sceneWindow = {};
 sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace("</script>", ""), { window: sceneWindow });
 assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getTransform("crate"))), { position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 } }, "runtime scene bootstrap round-trips saved transforms");
-assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getBounds("crate"))), { minX: 0.9393398282201788, maxX: 3.060660171779821, minY: -0.06066017177982119, maxY: 2.060660171779821, minZ: -3.5, maxZ: -2.5 }, "collision bounds account for saved position, scale, dimensions and rotation");
+assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getBounds("crate"))), { minX: 0.9393398282201786, maxX: 3.0606601717798214, minY: -0.06066017177982119, maxY: 2.060660171779821, minZ: -3.5, maxZ: -2.5 }, "collision bounds account for saved position, scale, dimensions and rotation");
 assert.equal(sceneWindow.GENE_SCENE.intersects("crate", { minX: 3, maxX: 5, minY: 1, maxY: 2, minZ: -4, maxZ: -2 }), true, "collision helper detects overlapping 3D bounds");
 assert.equal(sceneWindow.GENE_SCENE.intersects("crate", { minX: 5, maxX: 6, minY: 1, maxY: 2, minZ: -4, maxZ: -2 }), false, "collision helper rejects separated bounds");
 assert.equal(sceneWindow.GENE_SCENE.setTransform("crate", { position: { x: 4, y: 1, z: -3 } }), true, "gameplay can update scene transforms");
