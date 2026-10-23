@@ -28,3 +28,8 @@ assert.match(source, /targets\.map\(async function\(o\)\{var status=await scene\
 assert.match(source, /collisionProxyCount:collisionProxies\.length/, "scene mesh readiness reports collision proxy metadata availability");
 assert.match(source, /physicsColliderInstantiated:false/, "scene reports never mistake collision metadata for an instantiated physics collider");
 assert.match(source, /No collision proxy metadata is available/, "scene readiness warns when a visible mesh has no collision metadata");
+
+assert.match(source, /getCollisionProxyData=function\(id\)/, "runtime scene exposes collision proxy data for each assigned mesh");
+assert.match(source, /PROXY_DATA_READY_NOT_INSTANTIATED/, "proxy generation explicitly does not claim to instantiate physics colliders");
+assert.match(source, /center:\{x:center\[0\]\+o\.position\.x,y:center\[1\]\+o\.position\.y,z:center\[2\]\+o\.position\.z\}/, "proxy centers are transformed into scene coordinates");
+assert.match(source, /rotation:\{x:o\.rotation\.x,y:o\.rotation\.y,z:o\.rotation\.z\}/, "scene object rotation is retained for oriented-box adapters");
