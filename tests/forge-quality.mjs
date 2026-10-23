@@ -62,3 +62,10 @@ assert.ok(incompleteMaterials.warnings.some(w => w.code === "INVALID_COLOR"));
 const forgeRouteSource = readFileSync(new URL("../apps/web/app/api/forge/route.ts", import.meta.url), "utf8");
 assert.match(forgeRouteSource, /if \(qualityReport\.status === "invalid"\)/, "Forge API must stop invalid geometry from being exported");
 assert.match(forgeRouteSource, /Forge structural QA rejected this recipe/, "Forge API must return a meaningful failure to its existing safe fallback");
+
+const architecture = analyzeForgeRecipe({ parts: [
+  part("staircase", [0, 0.5, 0], { shape: "stairs", scale: [3, 2, 4] }),
+  part("door-arch", [0, 1, 0], { shape: "arch", scale: [2.4, 2.4, 0.4] })
+] });
+assert.equal(architecture.estimatedTriangles, 252, "stair and arch meshes receive explicit complexity estimates");
+assert.equal(architecture.status, "structurally-clean", "new architectural forms pass structural checks with valid transforms");
