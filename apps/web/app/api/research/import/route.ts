@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     return fail(403, "TOOL_APPROVAL_REQUIRED", "Explicit approval for these exact research-import inputs is required.");
   }
   const validated = validateResearchImportRequest(body);
-  if (!validated.ok) return fail(400, validated.code, validated.message);
+  if (!validated.ok) return fail(400, validated.code ?? "INVALID_RESEARCH_IMPORT", validated.message ?? "The research import request is invalid.");
   let response: Response;
   try {
     response = await fetch(validated.candidate.sourceUrl, {
