@@ -33,7 +33,7 @@ assert.equal(spriteController.update(1, 0), "walk-right", "horizontal movement s
 assert.equal(spriteController.getFacing(), "right", "controller retains the direction the character is facing");
 assert.equal(spriteController.update(-1, 0), "walk-left", "leftward movement selects the left clip");
 assert.equal(spriteController.update(0, 0), "idle", "stopping returns the controller to idle");
-assert.deepEqual(spriteController.clips(), ["idle", "walk", "walk-left", "walk-right"], "controller exposes the manifest's actual clips");
+assert.equal(spriteController.clips().join(","), "idle,walk,walk-left,walk-right", "controller exposes the manifest's actual clips");
 
 assert.equal(runtimeRegistry.list().length, 3, "runtime registry should index 2D, direct 3D, and assets/models Forge manifests");
 assert.equal(runtimeRegistry.findById("gene3d-skeleton-1234").path, "assets/skeleton/asset.json", "stable 3D asset IDs should resolve to the current manifest path");
