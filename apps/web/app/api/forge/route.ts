@@ -304,7 +304,7 @@ function buildMesh(recipe: Recipe) {
 }
 
 function stableForgeAssetId(kind: string, prompt: string, style: string) {
-  const input = [kind, prompt, style].join("\\u001f");
+  const input = [kind, prompt, style].join("\u001f");
   let hash = 2166136261;
   for (let index = 0; index < input.length; index++) {
     hash ^= input.charCodeAt(index);
