@@ -137,3 +137,19 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 ## Implementation order
 
 Start with the highest-risk correctness fixes and shared contracts, then wire them into the actual endpoints and UI. Implement in coherent batches, reusing existing modules/tests and avoiding parallel duplicate systems. This roadmap is the target; completed work must be recorded separately with code, commits and verification evidence.
+
+
+## Implementation log — current branch
+
+The following code changes have been started on `gene-infinity-overhaul` (not yet merged to `main`):
+
+- Added exact-input, expiring, call-scoped approval fingerprints and API enforcement for direct research, 2D Forge and 3D Forge calls.
+- Added explicit browser confirmation for direct specialist calls and an enumerated approval batch for nested Forge calls made during a game build. Nested calls are skipped when the user cancels or when a matching approval is absent.
+- AI interview/planning now returns a clear provider-unavailable error if configured providers fail instead of silently substituting the deterministic interview tree.
+- Added Canvas/WebGL source contracts that reject builds with no detectable visible drawing operations, no WebGL draw submission, or no WebGL viewport setup. Renderer checks inspect the assembled module graph rather than only one file.
+- Native 2D Forge now exports cropped frame SVG files and animation clip metadata in addition to the source atlas. The runtime exposes `GENE_SPRITES.draw` / `GENE_SPRITES.clips`, and generated frame files are included in the runtime asset allowlist.
+- Updated the AI build instructions to use frame-based animation clips and not stretch the full sprite sheet into a static character.
+- Tightened visual-reference queries and added topic/category relevance filtering before image references are handed to the research bundle.
+- Added focused regression tests for sprite slicing, runtime animation support, visible-renderer contracts, image relevance, and call-scoped tool approvals.
+
+Verification status: repository files and branch commits were inspected through GitHub. A local build/test run has not yet been completed in this environment because the repository could not be cloned from the container network. CI should be used to verify the branch before merge. Do not interpret this log as a claim that the full overhaul is complete.
