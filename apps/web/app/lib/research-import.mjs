@@ -9,6 +9,11 @@ export const RESEARCH_IMPORT_HOSTS = new Set([
 ]);
 export const RESEARCH_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
 export const RESEARCH_SOURCE_PAGE_HOSTS = new Set([...RESEARCH_IMPORT_HOSTS, "commons.wikimedia.org", "unsplash.com", "polyhaven.com"]);
+const SOURCE_PAGE_HOSTS_BY_IMAGE_HOST = new Map([
+  ["upload.wikimedia.org", new Set(["commons.wikimedia.org", "wikipedia.org"])],
+  ["images.unsplash.com", new Set(["unsplash.com"])],
+  ["cdn.polyhaven.com", new Set(["polyhaven.com"])]
+]);
 
 export function validateResearchImportRequest(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, code: "BAD_REQUEST", message: "An asset candidate is required." };
@@ -29,6 +34,10 @@ export function validateResearchImportRequest(input) {
   if (sourcePage.protocol !== "https:" || sourcePage.username || sourcePage.password || !(RESEARCH_SOURCE_PAGE_HOSTS.has(sourcePage.hostname.toLowerCase()) || sourcePage.hostname.toLowerCase().endsWith(".wikipedia.org")) || sourcePage.port && sourcePage.port !== "443") {
     return { ok: false, code: "SOURCE_PAGE_NOT_ALLOWED", message: "The source page must be HTTPS on an approved research host." };
   }
+  const allowedPageHosts = SOURCE_PAGE_HOSTS_BY_IMAGE_HOST.get(sourceUrl.hostname.toLowerCase());
+  const pageHost = sourcePage.hostname.toLowerCase();
+  const pageHostMatches = allowedPageHosts && [...allowedPageHosts].some(host => pageHost === host || pageHost.endsWith("." + host));
+  if (!pageHostMatches) return { ok: false, code: "SOURCE_PAGE_MISMATCH", message: "The source page must belong to the same approved provider as the direct image URL." };
   if (!license) return { ok: false, code: "LICENSE_REQUIRED", message: "Record the reviewed license before importing." };
   return {
     ok: true,
