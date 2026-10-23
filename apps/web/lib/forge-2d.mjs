@@ -107,7 +107,10 @@ export function buildNative2DAsset({ prompt = "", kind = "character", quality = 
   if (cleanPrompt.length < 3) warnings.push({ code: "GENERIC_BRIEF", severity: "info", message: "A short prompt produced a generic procedural asset; add visual details for a more tailored result." });
   if (kind === "character") warnings.push({ code: "NO_SKELETON_RIG", severity: "info", message: "This is a 2D sprite sheet, not a skeletal animation rig; frame names are suggested animation labels." });
   const report = { version: 1, scope: "procedural-2d-structural", status: warnings.some(w => w.severity === "warning") ? "review-recommended" : "structurally-clean", score: Math.max(60, 100 - warnings.length * 10), width: built.width, height: built.height, frameWidth: built.frameWidth, frameHeight: built.frameHeight, frames: built.frames, partCount, svgBytes: Buffer.byteLength(svg), warnings };
+  const assetId = stableAssetId(kind, cleanPrompt, params.style);
   return {
+    assetId,
+    version: 1,
     format: "gene-forge-2d-v1",
     name: (cleanPrompt || "GENE " + kind).slice(0, 80),
     kind, style: params.style, quality: safeLevel,
