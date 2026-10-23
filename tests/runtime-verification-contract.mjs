@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const page = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
 assert.match(page, /const persistRun = \(run: BuildRun, previewStatus: "booting" \| "stale" \| "error"/, "source validation/build checkpoints cannot set gameplay-verified status");
 assert.match(page, /livingPreview: \{ status: previewStatus[\s\S]{0,260}canContinuePlaying: false/, "a build checkpoint must not claim the game is playable before runtime verification");
 assert.match(page, /livingPreview: \{ status: "rendered"[\s\S]{0,260}Verify player controls, interaction, and the core gameplay loop/, "a visible render is explicitly not the same as verified gameplay");
 assert.match(page, /state === "rendered"/, "runtime render telemetry remains the separate preview-state transition");
+assert.match(runtimeAssets, /state:'input-observed'/, "the isolated runtime reports first input separately from render status");
+assert.match(runtimeAssets, /inputEvents:state.inputEvents/, "runtime diagnostics expose observed input counts");
+assert.match(page, /event\.data\.state === "input-observed"/, "the workspace handles input telemetry without promoting it to gameplay-verified");
+assert.match(page, /not that gameplay responded/, "the UI explicitly distinguishes input arrival from actual gameplay response");
 console.log("Runtime verification contract passed (build/source checks cannot masquerade as gameplay verification).");
