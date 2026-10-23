@@ -157,6 +157,14 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Added regression assertions for the provenance/integration-state contract in `tests/research-evidence.mjs`.
 - These latest provenance commits still require CI and Playground verification. This is a focused Wave 2 increment, not completion of the full research or Forge roadmap.
 
+## Continued implementation increment (2026-10-23)
+
+- Forge's actual mesh-export path now rejects a recipe when structural QA marks it invalid instead of attaching a warning and exporting it anyway. The existing safe fallback can then handle the failed provider recipe.
+- Sprite animation manifests now have a runtime validator that reports missing/invalid manifests, duplicate clip names, invalid frame indices or timing, missing referenced frames, and missing asset identity. Three-digit frame filenames are accepted consistently by both the runtime allowlist and the drawing helper.
+- The runtime asset registry now validates manifests against actual OBJ/MTL files, reports broken geometry, missing materials, static-only limitations and required collision integration; resolving an asset includes the validation report.
+- Scene integration now reports mesh readiness per scene object, including missing OBJ files, unrenderable geometry, and absent material files. Scene manifest normalization disambiguates duplicate object IDs and prevents zero/negative initial scales from silently making scene objects invisible.
+- These are integration/diagnostic improvements, not proof of visual fidelity or playable gameplay. User-side web checks remain outstanding as requested.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
