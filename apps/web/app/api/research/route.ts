@@ -121,9 +121,12 @@ export async function POST(request: NextRequest) {
   const wants3DModels = body?.engine === "webgl3d" || /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
   const wantsAudio = body?.kind !== "app" && !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
 
+  const isAppResearch = body?.kind === "app";
   const googleQuery = researchIsGeometryDash
     ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
-    : normalizedTopic + " game design mechanics level design official documentation";
+    : isAppResearch
+      ? normalizedTopic + " UI design interaction patterns accessibility official documentation"
+      : normalizedTopic + " game design mechanics level design official documentation";
   const [wiki, catalog, visualImageSets, google, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
     wants3DModels ? polyHavenCatalog() : Promise.resolve(null),
@@ -137,7 +140,9 @@ export async function POST(request: NextRequest) {
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
     ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
-    : topic + " game design mechanics level design");
+    : isAppResearch
+      ? topic + " interface UI design interaction patterns accessibility"
+      : topic + " game design mechanics level design");
 
 
   const unavailable: string[] = [];
