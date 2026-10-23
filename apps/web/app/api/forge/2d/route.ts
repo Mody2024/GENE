@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
       asset,
       files: {
         "sprite.svg": asset.svg,
-        "asset.json": JSON.stringify({ ...asset.manifest, qualityReport: asset.qualityReport }, null, 2)
+        "asset.json": JSON.stringify({ ...asset.manifest, qualityReport: asset.qualityReport }, null, 2),
+        ...Object.fromEntries(Object.entries(asset.frameFiles || {}).map(([name, svg]) => ["frames/" + name, svg]))
       }
     });
   } catch (error) {
