@@ -236,6 +236,11 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - `GENE_SCENE.getCollisionProxyData(id)` now reads the mesh manifest and transforms each proxy center and dimensions through the scene object's scale, position, and rotation. It returns oriented-box adapter data and a status that explicitly says the data is ready but no physics collider has been instantiated.
 - This gives a future/current game-engine adapter a stable contract without pretending GENE has already connected a physics backend. Proxy fidelity remains conservative; curved and rotated source primitives may need tighter collision geometry for production.
 
+## Research-to-Forge image handoff increment (2026-10-23)
+
+- Project research references now retain source URL/page, license, attribution, source identifier, byte size, and image SHA-256 alongside the actual image pixels. Both automatic game builds and manual 3D Forge requests send up to two image references alongside up to two text notes; the Forge API already enforces the aggregate decoded-byte and signature checks and records provenance in generated manifests.
+- User-supplied image attachments remain in the same reference pool and are preferred by insertion order; source metadata is optional for user-owned images. Forge's reference manifest fingerprints the exact validated bytes it received, and no automatic third-party license approval is implied.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
