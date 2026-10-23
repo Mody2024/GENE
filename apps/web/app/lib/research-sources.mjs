@@ -156,8 +156,25 @@ export function parseGoogleSearchResults(data, topic, limit = 5) {
     const relevance = Math.min(100, Math.round((queryTerms.length ? matched.length / queryTerms.length * 80 : 0) + phraseBonus));
     scored.push({ title, snippet, url, source: hostname, relevance, resultType: "technical-evidence", integrationState: "reference-only" });
   }
-  // Suppress zero-relevance noise instead of filling the research panel with unrelated results.
-  return scored.filter(item => item.relevance >= 15).sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
+  // Suppress zero-relevance noise and syndicated duplicates before filling the research panel.
+  // Strip fragments and common tracking parameters so one article cannot occupy multiple slots.
+  const seenUrls = new Set();
+  const ranked = scored.filter(item => item.relevance >= 15).sort((a, b) => b.relevance - a.relevance);
+  const unique = ranked.filter(item => {
+    let key = item.url.toLowerCase();
+    try {
+      const url = new URL(item.url);
+      url.hash = "";
+      for (const param of Array.from(url.searchParams.keys())) {
+        if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid|ref_src)$/i.test(param)) url.searchParams.delete(param);
+      }
+      key = url.toString().replace(/\/$/, "").toLowerCase();
+    } catch {}
+    if (seenUrls.has(key)) return false;
+    seenUrls.add(key);
+    return true;
+  });
+  return unique.slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
 }
 
 /** Assemble the single research bundle that is shown on the message and sent to GENE.
