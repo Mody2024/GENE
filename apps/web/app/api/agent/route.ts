@@ -1164,7 +1164,7 @@ export async function POST(request: NextRequest) {
     // Interview and planning are explicitly AI operations. Never silently substitute
     // the deterministic interview tree when all configured providers fail.
     return jsonError(
-      "GENE could not complete this AI " + body.operation + " because every configured AI provider failed. Your answers and existing project are preserved. Retry when a provider is available, or explicitly choose Gene Native if you want a deterministic outline instead.",
+      "GENE could not complete this AI " + body.operation + " because every configured AI provider failed. Your answers and existing project are preserved. Retry when a provider is available. Native mode is intentionally unavailable for interview and planning.",
       503,
       "GENE_AI_PROVIDER_UNAVAILABLE"
     );
