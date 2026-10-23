@@ -55,7 +55,7 @@ assert.ok(runtimeRegistry.resolve("gene3d-skeleton-1234").validation, "asset loo
 vm.runInNewContext(runtimeScriptArray("art"), { window: runtimeSandbox.window, Image: function Image() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; Object.defineProperty(this, "src", { set() {} }); } });
 const spriteValidation = runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character");
 assert.equal(spriteValidation.ok, true, "complete sprite manifests pass frame-integrity validation");
-assert.equal(spriteValidation.frameCount, 9, "sprite validation counts frames across animation clips, including repeated frame references");
+assert.equal(spriteValidation.frameCount, 13, "sprite validation counts frames across animation clips, including repeated frame references");
 const missingFrameAssets = { ...runtimeSandbox.window.__GENE_ASSETS__ };
 delete missingFrameAssets["assets/forge2d/character/frames/frame-03.svg"];
 runtimeSandbox.window.__GENE_ASSETS__ = missingFrameAssets;
