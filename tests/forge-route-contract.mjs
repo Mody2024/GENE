@@ -17,7 +17,7 @@ assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetRe
 assert.match(route, /if \(!text\)\s*\{\s*const native = nativeAssetResponse/, "native generation must recover from provider failures");
 assert.match(route, /function stableForgeAssetId/, "3D assets must receive stable IDs");
 assert.match(route, /function withForgeAssetMetadata/, "3D assets must carry a canonical versioned manifest");
-assert.match(route, /externalDependencies: \\[\\]/, "native and AI-generated meshes must disclose their external dependency list");
+assert.match(route, /externalDependencies: \[\]/, "native and AI-generated meshes must disclose their external dependency list");
 assert.match(route, /sourcePrompt: prompt\.slice/, "3D asset provenance must retain the source brief");
 assert.match(route, /assetId: manifest\.assetId, version: manifest\.version, manifest/, "API response and exported manifest must share one identity");
 assert.match(route, /try the bounded native generator before returning an error/, "invalid provider recipes must attempt native fallback");
