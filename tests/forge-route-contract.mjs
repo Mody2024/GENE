@@ -36,7 +36,7 @@ assert.match(studioPage, /generateForge2DAsset/, "asset workshop must save nativ
 assert.match(studioPage, /Integrate the generated 2D asset/, "2D assets must offer a game-integration action");
 assert.match(studioPage, /Saved artwork/, "asset workshop must list saved 2D assets");
 assert.ok(runtimeAssets.includes("asset-2d\\.json"), "runtime asset bootstrap must include 2D manifests");
-assert.ok(runtimeAssets.includes("sprite\\.svg"), "runtime asset bootstrap must expose generated sprite sheets");
+assert.match(runtimeAssets, /sprite\|sprite-sheet\|atlas/, "runtime asset bootstrap must expose generated and imported sprite sheets");
 assert.match(researchRoute, /GOOGLE_CSE_API_KEY/, "Google search must only use server-side configured credentials");
 assert.match(researchRoute, /GOOGLE_CSE_ID/, "Google Custom Search must require a configured engine ID");
 assert.match(researchRoute, /Google Custom Search is not configured/, "research must disclose when Google search is unavailable");
