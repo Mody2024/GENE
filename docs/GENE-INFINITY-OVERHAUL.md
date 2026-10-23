@@ -157,6 +157,14 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Added regression assertions for the provenance/integration-state contract in `tests/research-evidence.mjs`.
 - These latest provenance commits still require CI and Playground verification. This is a focused Wave 2 increment, not completion of the full research or Forge roadmap.
 
+## Latest implementation increment (2026-10-23)
+
+- Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
+- Research image payloads are streamed under a hard byte cap, checked against raster file signatures, and returned with exact byte size and SHA-256 fingerprint. External research candidates remain reference-only until an approved importer validates license, type, signature and size.
+- Visual references are deduplicated by canonical URL, ignoring fragments and common tracking parameters.
+- Forge structural QA now flags empty assets, unsupported shapes, malformed transforms, near-zero scales, missing part names and invalid colors; severe structural errors produce an `invalid` status. This remains structural QA, not visual-quality proof.
+- Focused tests were added for these contracts. Current-head CI and Game Playground checks are pending; this increment must not be treated as verified until those checks finish.
+
 ## Implementation log — current branch
 
 The following code changes have been started on `gene-infinity-overhaul` (not yet merged to `main`):
