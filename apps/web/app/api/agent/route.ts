@@ -699,6 +699,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (["interview", "plan"].includes(body.operation) && (body.thinking === "native" || process.env.GENE_NATIVE_ONLY === "true")) {
+    return jsonError("GENE interview and planning require a real configured AI provider. Native deterministic mode is not used for these operations. Choose an AI mode and configure an available provider; your project and answers were preserved.", 503, "GENE_AI_REQUIRED");
+  }
+
   // Explicit native mode is a hard boundary: this branch returns before any provider keys,
   // fetch calls, or fallback chains are inspected. No third-party model is called.
   if (body.thinking === "native" || process.env.GENE_NATIVE_ONLY === "true") {
