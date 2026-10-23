@@ -30,6 +30,9 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 - Added a movement-aware sprite controller to the runtime bridge. It resolves named clips from manifests, selects idle/walk and directional clips from velocity, and keeps facing state; gameplay physics and automatic scene binding remain separate work.
 - Added focused contract coverage for clip selection and facing state.
 - Latest GitHub Actions runs are still in progress at the time of this change; do not mark this checkpoint as fully verified until they finish.
+- Build/source checkpoints can no longer set the gameplay-verified status; the live preview remains "rendered" until gameplay is separately verified.
+- Expanded the browser smoke fixture to exercise all four reachable objectives, confirm the win state, and verify restart resets the score and spawn. This is an end-to-end test fixture, not proof that every generated game is verified.
+- Research now suppresses low-relevance web results and labels encyclopedic context, image references and model catalog entries as reference-only until actual import occurs.
 
 ## Wave 1 — Trustworthy AI, permissions and playable runtime
 
