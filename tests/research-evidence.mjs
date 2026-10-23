@@ -87,3 +87,6 @@ assert.ok(bundle.models.length > 0, "fixture includes a model catalog reference"
 assert.match(notes, /catalog matches \(Poly Haven; not imported\)/);
 assert.match(notes, /catalog reference only, not downloaded or added to the project/i);
 console.log("Research evidence tests passed (HTTPS filtering, relevance ranking, and builder notes).");
+
+assert.match(researchRoute, /sha256: createHash\("sha256"\)\.update\(bytes\)\.digest\("hex"\)/, "the exact raster bytes sent to the model must have a traceable SHA-256 fingerprint");
+assert.match(researchRoute, /byteSize: bytes\.byteLength/, "the exact downloaded payload size must be recorded");
