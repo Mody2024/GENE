@@ -172,6 +172,12 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Native and AI 3D Forge manifests now fingerprint the exact OBJ and MTL outputs with SHA-256; runtime asset listings expose these fingerprints and warn when a legacy or incomplete manifest lacks valid hashes.
 - Added regression coverage for sprite-manifest validation, missing frame detection, 2D frame persistence, scene mesh status, and Forge file-integrity metadata. These tests are committed for the user's later verification; they have not been reported as run on the current head.
 
+## Forge modelling increment (2026-10-23)
+
+- Expanded the 3D recipe vocabulary with real procedural **stairs** and curved **arch** meshes, including bounds and triangle-complexity estimates. The AI recipe instructions now describe when to use them, and the deterministic native building preset uses them when an arched entrance or staircase is requested.
+- Corrected the arch's ellipse dimensions so the generated geometry spans the declared width and height instead of collapsing to a short semicircle.
+- Added focused regression cases for both geometry options and their native building-preset use. These remain procedural static meshes: they do not imply rigging, UV textures, collision generation or gameplay integration.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
