@@ -99,6 +99,9 @@ assert.match(workspace, /colors=Object\.create\(null\)/, "preview visibility che
 assert.doesNotMatch(workspace, /if\(n>12\|\|alpha>12\)window\.__geneFrameConfirmed=true/, "opaque clear-color buffers must not count as a visible 3D game");
 assert.match(workspace, /geometryDraws>0&&\(\(n>1&&alpha>12\)/, "3D visibility confirmation must require actual WebGL geometry draw calls");
 assert.match(workspace, /drawOps>0&&\(\(n>1&&alpha>12\)/, "2D visibility confirmation must require actual entity drawing, not background-only fills");
+assert.match(workspace, /livingPreview: \{ status: "booting".*awaiting a visible runtime render/s, "build completion must not mark an unrendered project as playable");
+assert.match(workspace, /status: "rendered".*Verify player controls, interaction, and the core gameplay loop/, "a visible scene must remain distinct from verified gameplay");
+assert.match(workspace, /Preview visible · verify gameplay/, "the workspace must communicate that rendering is not proof of complete gameplay");
 assert.match(workspace, /alpha<samples\*0\.9/, "sparse visible sprites on transparent canvases should still be detectable");
 assert.doesNotMatch(workspace, /buildRuntimeAudioBootstrap\((?:project|version)\.files\)\s*\+\s*buildRuntimeAudioBootstrap/, "game audio bootstrap must not be injected twice into one preview");
 console.log("Native 2D Forge tests passed.");
