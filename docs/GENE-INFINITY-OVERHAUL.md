@@ -231,6 +231,11 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Reduced the import ceiling to 350 KB to limit base64 expansion and project/version storage growth in the browser. The import action retains only three snapshots for this import checkpoint rather than duplicating a large image across the full version history.
 - Exact source URL, source page, and declared license are now shown in the separate call-scoped approval prompt. Unsupported MIME types and declared oversized responses are canceled immediately; streamed bodies are canceled if they cross the byte ceiling.
 
+## Scene collision-adapter contract increment (2026-10-23)
+
+- `GENE_SCENE.getCollisionProxyData(id)` now reads the mesh manifest and transforms each proxy center and dimensions through the scene object's scale, position, and rotation. It returns oriented-box adapter data and a status that explicitly says the data is ready but no physics collider has been instantiated.
+- This gives a future/current game-engine adapter a stable contract without pretending GENE has already connected a physics backend. Proxy fidelity remains conservative; curved and rotated source primitives may need tighter collision geometry for production.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
