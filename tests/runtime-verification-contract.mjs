@@ -47,6 +47,7 @@ assert.match(runtimeAssets, /new TextEncoder\(\)\.encode\(content\)\.byteLength/
 assert.match(runtimeAssets, /RUNTIME_ASSET_BUDGET_EXCEEDED/, "assets omitted by the runtime payload budget receive an explicit diagnostic instead of disappearing silently");
 assert.match(runtimeAssets, /__GENE_ASSET_BOOTSTRAP_DIAGNOSTICS__/, "runtime bootstrap exposes loaded-byte totals and omitted asset paths for troubleshooting");
 assert.match(runtimeAssets, /loadedPayloadBytes: totalPayloadBytes/, "runtime budget accounts for the serialized JSON payload, not just source asset text");
+assert.match(runtimeAssets, /JSON\.stringify\(\[path, content\]\)\.replace\(\/<\/g/, "runtime budget includes HTML-safe JSON escaping expansion for angle brackets");
 assert.match(runtimeAssets, /payloadByteSize: payloadBytes/, "omitted asset diagnostics include their serialized payload cost");
 assert.match(runtimeAssets, /MAX_OMITTED_ASSET_DETAILS = 100/, "runtime diagnostics cap per-file omission details to prevent pathological metadata growth");
 assert.match(runtimeAssets, /omittedAssetCount \+= 1/, "runtime diagnostics retain the total omitted-asset count even when detail records are capped");
