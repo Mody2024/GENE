@@ -25,6 +25,12 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 - **Dependency-aware work graph:** tasks and artifacts are linked by inputs/outputs. Plan only the dependencies needed for the selected game, and permit independent work to run in parallel after explicit approval.
 - **Runtime adapters:** support only engines with real working adapters. The current browser runtime is centered on Canvas 2D and raw WebGL; do not claim native engine/export support by name alone.
 
+## Current implementation checkpoint (2026-10-23)
+
+- Added a movement-aware sprite controller to the runtime bridge. It resolves named clips from manifests, selects idle/walk and directional clips from velocity, and keeps facing state; gameplay physics and automatic scene binding remain separate work.
+- Added focused contract coverage for clip selection and facing state.
+- Latest GitHub Actions runs are still in progress at the time of this change; do not mark this checkpoint as fully verified until they finish.
+
 ## Wave 1 — Trustworthy AI, permissions and playable runtime
 
 ### 1. AI interview and planning
