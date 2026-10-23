@@ -30,7 +30,7 @@ assert.equal(runtimeRegistry.list().length, 3, "runtime registry should index 2D
 assert.equal(runtimeRegistry.findById("gene3d-skeleton-1234").path, "assets/skeleton/asset.json", "stable 3D asset IDs should resolve to the current manifest path");
 assert.equal(runtimeRegistry.resolve("gene2d-character-5678").manifest.runtimeCompatibility.renderer, "Canvas 2D", "registry should preserve capability metadata when resolving 2D assets");
 assert.equal(runtimeRegistry.findById("gene3d-environment-9012").path, "assets/models/environment.json", "the runtime registry must index the actual Forge 3D manifest path");
-assert.ok(runtimeAssets.includes(String.raw`/^assets\\/models\\/[a-zA-Z0-9_-]+\\.json$/i.test(path)`), "the asset bootstrap must whitelist Forge manifests under assets/models");
+assert.ok(runtimeAssets.includes(String.raw`/^assets\/models\/[a-zA-Z0-9_-]+\.json$/i.test(path)`), "the asset bootstrap must whitelist Forge manifests under assets/models");
 
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 
