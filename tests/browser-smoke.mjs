@@ -118,7 +118,7 @@ try {
   // Exercise objective completion and restart, not only rendering and movement.
   for (const [key, count] of [["ArrowRight", 8], ["ArrowUp", 3], ["ArrowRight", 6], ["ArrowUp", 4], ["ArrowRight", 9], ["ArrowDown", 5], ["ArrowRight", 9], ["ArrowUp", 4]]) {
     for (let i = 0; i < count; i++) {
-      await gameFrame.locator("body").evaluate(keyName => window.dispatchEvent(new KeyboardEvent("keydown", { key: keyName, bubbles: true })), key);
+      await gameFrame.locator("body").evaluate((body, keyName) => window.dispatchEvent(new KeyboardEvent("keydown", { key: keyName, bubbles: true })), key);
       await page.waitForTimeout(18);
     }
   }
