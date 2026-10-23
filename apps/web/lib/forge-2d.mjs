@@ -8,7 +8,7 @@ const esc = value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", 
 const safeKind = new Set(["character", "tileset", "ui", "background", "icon"]);
 const safeQuality = new Set(["performance", "standard", "high"]);
 function stableAssetId(kind, prompt, style) {
-  const input = [kind, prompt, style].join("\\u001f");
+  const input = [kind, prompt, style].join("\u001f");
   let hash = 2166136261;
   for (let index = 0; index < input.length; index++) {
     hash ^= input.charCodeAt(index);
