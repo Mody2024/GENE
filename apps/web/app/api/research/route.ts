@@ -149,6 +149,9 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() } as any);
+  // Apply relevance ranking to the actual bundle, not just the model-image shortlist.
+  // This prevents unrelated thumbnails from being shown in the research UI as "references".
+  bundle.images = rankVisualReferenceResults(bundle.images as any[], topic) as any;
   if (!wantsImages) bundle.images = [];
   if (researchIsGeometryDash) {
     bundle.facts = [
@@ -158,11 +161,8 @@ export async function POST(request: NextRequest) {
       { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
-  // Topic relevance wins when selecting the small set of actual image bytes sent to the model.
-  // The research bundle itself already preserves category diversity for browsing.
-  const imageCandidates = [...bundle.images].sort((a: any, b: any) =>
-    Number(b.relevanceScore || 0) - Number(a.relevanceScore || 0)
-  );
+  // The bundle is already relevance-ranked and filtered above; preserve that exact order.
+  const imageCandidates = [...bundle.images];
   const imageData = wantsImages
     ? (await Promise.all(imageCandidates.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
