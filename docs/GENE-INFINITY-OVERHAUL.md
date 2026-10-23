@@ -29,7 +29,7 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 
 - Added a movement-aware sprite controller to the runtime bridge. It resolves named clips from manifests, selects idle/walk and directional clips from velocity, and keeps facing state; gameplay physics and automatic scene binding remain separate work.
 - Added focused contract coverage for clip selection and facing state.
-- Latest GitHub Actions runs are still in progress at the time of this change; do not mark this checkpoint as fully verified until they finish.
+- Latest GitHub Actions results from the earlier checkpoint do not cover all subsequent commits; current-head CI/Playground verification is intentionally deferred until the user asks to check the completed implementation.
 - Build/source checkpoints can no longer set the gameplay-verified status; the live preview remains "rendered" until gameplay is separately verified.
 - Expanded the browser smoke fixture to exercise all four reachable objectives, confirm the win state, and verify restart resets the score and spawn. This is an end-to-end test fixture, not proof that every generated game is verified.
 - Research now suppresses low-relevance web results and labels encyclopedic context, image references and model catalog entries as reference-only until actual import occurs.
@@ -216,7 +216,7 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Research image payloads are streamed under a hard byte cap, checked against raster file signatures, and returned with exact byte size and SHA-256 fingerprint. External research candidates remain reference-only until an approved importer validates license, type, signature and size.
 - Visual references are deduplicated by canonical URL, ignoring fragments and common tracking parameters.
 - Forge structural QA now flags empty assets, unsupported shapes, malformed transforms, near-zero scales, missing part names and invalid colors; severe structural errors produce an `invalid` status. This remains structural QA, not visual-quality proof.
-- Focused tests were added for these contracts. Current-head CI and Game Playground checks are pending; this increment must not be treated as verified until those checks finish.
+- Focused tests were added for these contracts. The newest commits have not been run through current-head CI or Game Playground; the user requested implementation first and will perform the web checks after the full update.
 
 ## Implementation log — current branch
 
@@ -234,4 +234,4 @@ The following code changes have been started on `gene-infinity-overhaul` (not ye
 - Strengthened preview acceptance: a WebGL clear/background buffer is not enough; 3D needs real geometry draw calls. Canvas2D needs non-uniform pixels plus entity drawing distinct from background clearing. A visible frame is now labeled `rendered`, not `playable`, until gameplay verification exists.
 - Added focused regression coverage for sprite slicing, runtime animation, manifest registry behavior, actual Forge manifest paths, visible-renderer contracts, image relevance, AI-only planning recovery, and call-scoped tool approvals.
 
-Verification status: the CI contract suite passed on an earlier commit containing the research-filter correction and the runtime asset registry. The newest render-state and `assets/models` regression changes are queued for CI/Playground verification on the current head. Do not interpret this log as a claim that the full overhaul is complete.
+Verification status: the CI contract suite passed on an earlier commit containing the research-filter correction and runtime asset registry. Subsequent commits add further runtime, sprite, scene, Forge, and provenance work and have not been run through current-head CI/Playground, at the user's request. The user will perform web checks after implementation is finished. Do not interpret this log as a claim that the full overhaul is complete.
