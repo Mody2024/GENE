@@ -61,4 +61,8 @@ assert.match(agentRoute, /never submits visible geometry to WebGL/, "3D builds m
 assert.match(agentRoute, /never configures the WebGL viewport/, "3D builds must configure their viewport");
 assert.match(agentRoute, /never clears its frame buffers/, "3D builds must clear their frame buffers");
 assert.match(agentRoute, /no detectable camera or view\/projection transform/, "3D builds must define camera framing");
+const workspace = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+assert.match(workspace, /colors=Object\.create\(null\)/, "preview visibility checks must count distinct rendered colors");
+assert.doesNotMatch(workspace, /if\(n>12\|\|alpha>12\)window\.__geneFrameConfirmed=true/, "opaque clear-color buffers must not count as a visible 3D game");
+assert.match(workspace, /alpha<samples\*0\.9/, "sparse visible sprites on transparent canvases should still be detectable");
 console.log("Native 2D Forge tests passed.");
