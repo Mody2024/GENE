@@ -66,7 +66,11 @@ export async function readBoundedImageResponse(response, maxBytes = MAX_RESEARCH
       chunks.push(Buffer.from(value));
     }
   } catch {
+    // Stop any still-active source stream when a read fails; never leave a fetch body running.
+    await reader.cancel().catch(() => {});
     return { ok: false, code: "SOURCE_READ_FAILED", message: "The image response could not be read completely." };
+  } finally {
+    try { reader.releaseLock(); } catch { /* The stream may already have released its lock. */ }
   }
   const bytes = Buffer.concat(chunks, total);
   if (!bytes.length || !hasValidImageSignature(mimeType, bytes)) return { ok: false, code: "IMAGE_SIGNATURE_MISMATCH", message: "The downloaded bytes do not match the declared image type." };
