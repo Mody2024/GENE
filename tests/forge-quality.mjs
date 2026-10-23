@@ -32,6 +32,10 @@ const rotated = analyzeForgeRecipe({ parts: [
 assert.ok(rotated.bounds.size[0] > 2.8, "bounds should account for rotation");
 assert.ok(rotated.bounds.size[1] > 2.8, "rotated beam should expand its world-space bounds");
 
+const mirrored = analyzeForgeRecipe({ parts: [part("mirrored", [0, 0.5, 0], { scale: [-4, 1, 1] })] });
+assert.deepEqual(mirrored.bounds.size, [4, 1, 1], "negative scale mirrors geometry but world-space bounds must remain non-negative");
+assert.deepEqual(mirrored.bounds.min, [-2, 0, -0.5], "mirrored bounds should preserve the correct world-space minimum");
+
 const palette = analyzeForgeRecipe({ parts: Array.from({ length: 14 }, (_, i) =>
   part("color-" + i, [i * 0.5, 0.5, 0], { color: "#" + i.toString(16).padStart(6, "0") })
 ) });
