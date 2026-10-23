@@ -615,6 +615,8 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(runtimeSource)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
         if (!/drawArrays\s*\(|drawElements\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the assembled 3D project never submits visible geometry to WebGL. Audio and scene metadata do not count as a playable rendered game.");
         if (!/viewport\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the 3D renderer never configures the WebGL viewport, so the scene may remain invisible or render incorrectly.");
+        if (!/clear\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the 3D renderer never clears its frame buffers, so stale or undefined pixels may hide the scene.");
+        if (!/(camera|lookAt|viewMatrix|projection|perspective|uMVP|mvp|modelMatrix|viewProjection)/i.test(runtimeSource)) throw new Error("Build rejected: the 3D runtime has no detectable camera or view/projection transform. Define camera framing and transforms so generated geometry can appear in the viewport.");
         for (const [pattern, requirement] of [
           [/createShader\s*\(/, "shader creation"],
           [/shaderSource\s*\(/, "shader source"],
