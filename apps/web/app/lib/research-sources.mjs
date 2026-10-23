@@ -230,7 +230,7 @@ export function formatResearchNotes(input) {
     if (bundle.images.length) {
       lines.push("## Visual references (" + bundle.images.length + ")");
       for (const image of bundle.images) lines.push("- [" + (image.categoryLabel || "Visual reference") + "] " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
-      lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition.", "");
+      lines.push("These are reference-only images, not imported project assets. Some are attached to this message as pixels; study palette, shapes and composition, then create or explicitly import a suitable asset.", "");
     }
     if (Array.isArray(bundle.webResults) && bundle.webResults.length) {
       lines.push("## Web research (ranked by topic relevance)");
@@ -243,8 +243,8 @@ export function formatResearchNotes(input) {
       lines.push("");
     }
     if (bundle.models.length) {
-      lines.push("## Free CC0 3D models that match (Poly Haven)");
-      for (const model of bundle.models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + (model.tags || []).join(", ") + ")");
+      lines.push("## CC0 3D model catalog matches (Poly Haven; not imported)");
+      for (const model of bundle.models) lines.push("- " + model.name + " — " + model.url + " (source-declared CC0; catalog reference only, not downloaded or added to the project; tags: " + (model.tags || []).join(", ") + ")");
       lines.push("");
     }
     if (bundle.unavailable.length) lines.push("Note: some live sources were unavailable (" + bundle.unavailable.join("; ") + "); only verified parts are listed.", "");
