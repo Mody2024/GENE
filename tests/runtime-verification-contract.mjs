@@ -48,3 +48,5 @@ assert.match(runtimeAssets, /R\.verifyContentIntegrity=async function\(p\)/, "ru
 assert.match(runtimeAssets, /SHA-256 mismatch:/, "runtime integrity verification detects file contents changed after fingerprinting");
 assert.match(runtimeAssets, /FINGERPRINT_MISMATCH/, "tampered asset files produce an explicit integrity failure");
 assert.match(runtimeAssets, /crypto\.subtle\.digest\('SHA-256'/, "runtime verifier hashes the exact loaded text bytes with Web Crypto");
+
+assert.match(runtimeAssets, /Sprite sheet\/frame SHA-256 fingerprints are missing/, "2D animation manifests are checked for source and frame fingerprints too");
