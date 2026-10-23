@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildResearchBundle, formatResearchNotes, parseGoogleSearchResults } from "../apps/web/app/lib/research-sources.mjs";
+import { buildResearchBundle, filterPolyHaven, formatResearchNotes, parseCommonsFiles, parseGoogleSearchResults } from "../apps/web/app/lib/research-sources.mjs";
 
 const topic = "Geometry Dash gameplay mechanics level editor";
 const results = parseGoogleSearchResults({ items: [
@@ -12,6 +12,17 @@ assert.equal(results.length, 2, "only complete HTTPS search results should survi
 assert.ok(results[0].relevance > results[1].relevance, "results should be ranked by query relevance");
 assert.match(results[0].url, /^https:\/\//);
 assert.equal(results[0].source, "example.org");
+assert.equal(results[0].resultType, "technical-evidence");
+assert.equal(results[0].integrationState, "reference-only");
+
+const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "File:sample.png", index: 1, imageinfo: [{ url: "https://upload.wikimedia.org/sample.png", thumburl: "https://upload.wikimedia.org/sample-thumb.png", mime: "image/png", descriptionurl: "https://commons.wikimedia.org/wiki/File:sample.png", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Sample Artist" } } }] } } } });
+assert.equal(commons.length, 1);
+assert.equal(commons[0].integrationState, "reference-only", "a research result is not silently treated as imported");
+assert.equal(commons[0].licenseState, "source-declared-review-per-asset");
+
+const models = filterPolyHaven({ chair: { name: "Chair", tags: ["furniture"], categories: ["interior"] } }, "chair", 3);
+assert.equal(models[0].licenseState, "source-declared-CC0");
+assert.equal(models[0].integrationState, "catalog-reference", "catalog matches are not silently treated as downloaded assets");
 
 const bundle = buildResearchBundle({
   topic,
@@ -24,6 +35,7 @@ const bundle = buildResearchBundle({
   unavailable: []
 });
 assert.equal(bundle.webResults.length, 2);
+assert.equal(bundle.webResults[0].integrationState, "reference-only");
 assert.ok(bundle.webResults[0].relevance >= bundle.webResults[1].relevance);
 const notes = formatResearchNotes(bundle);
 assert.match(notes, /Web research \(ranked by topic relevance\)/);
