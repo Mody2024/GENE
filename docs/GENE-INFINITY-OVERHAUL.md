@@ -165,6 +165,13 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Scene integration now reports mesh readiness per scene object, including missing OBJ files, unrenderable geometry, and absent material files. Scene manifest normalization disambiguates duplicate object IDs and prevents zero/negative initial scales from silently making scene objects invisible.
 - These are integration/diagnostic improvements, not proof of visual fidelity or playable gameplay. User-side web checks remain outstanding as requested.
 
+## Asset-pipeline continuation (2026-10-23)
+
+- Fixed a real 2D integration gap: both build-time Forge staging and manual asset saving now persist the cropped frame SVG files, not only the sprite sheet and manifest. Animation clips can now resolve their frame files from the project bundle.
+- Native 2D manifests fingerprint the source sheet and each frame. The save paths relocate fingerprint entries alongside the actual project file paths.
+- Native and AI 3D Forge manifests now fingerprint the exact OBJ and MTL outputs with SHA-256; runtime asset listings expose these fingerprints and warn when a legacy or incomplete manifest lacks valid hashes.
+- Added regression coverage for sprite-manifest validation, missing frame detection, 2D frame persistence, scene mesh status, and Forge file-integrity metadata. These tests are committed for the user's later verification; they have not been reported as run on the current head.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
