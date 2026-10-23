@@ -62,7 +62,7 @@ async function commons(query: string, kind: "image" | "audio", limit: number) {
   const filter = kind === "audio" ? "filetype:audio" : "filetype:bitmap";
   const url = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=" + limit +
     "&gsrsearch=" + encodeURIComponent(query + " " + filter) +
-    "&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=480&iiextmetadatafilter=LicenseShortName%7CArtist&origin=*";
+    "&prop=imageinfo&iiprop=url%7Cmime%7Csize%7Csha1%7Cextmetadata&iiurlwidth=480&iiextmetadatafilter=LicenseShortName%7CArtist&origin=*";
   return parseCommonsFiles(await getJson(url, 6_000), kind);
 }
 
