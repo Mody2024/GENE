@@ -48,6 +48,8 @@ assert.match(runtimeAssets, /RUNTIME_ASSET_BUDGET_EXCEEDED/, "assets omitted by 
 assert.match(runtimeAssets, /__GENE_ASSET_BOOTSTRAP_DIAGNOSTICS__/, "runtime bootstrap exposes loaded-byte totals and omitted asset paths for troubleshooting");
 assert.match(runtimeAssets, /loadedPayloadBytes: totalPayloadBytes/, "runtime budget accounts for the serialized JSON payload, not just source asset text");
 assert.match(runtimeAssets, /payloadByteSize: payloadBytes/, "omitted asset diagnostics include their serialized payload cost");
+assert.match(runtimeAssets, /const entries = Object\.entries\(files \|\| \{\}\)\.sort/, "runtime assets are selected in deterministic priority order rather than arbitrary project insertion order");
+assert.match(runtimeAssets, /return 3;[\s\S]{0,180}return 4;/, "research reference images are lower priority than assets needed by playable scenes");
 assert.match(runtimeAssets, /Exact OBJ\/MTL SHA-256 fingerprints are missing or invalid/, "runtime asset validation warns on manifests without valid fingerprints");
 
 assert.match(runtimeAssets, /R\.verifyContentIntegrity=async function\(p\)/, "runtime assets support actual asynchronous SHA-256 verification");
