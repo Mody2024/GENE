@@ -120,6 +120,15 @@ export function parseCommonsFiles(data, kind = "image") {
       licenseState: "source-declared-review-per-asset",
       integrationState: "reference-only",
       downloadState: "candidate-not-imported",
+      importReadiness: {
+        status: "review-required",
+        licenseReviewRequired: true,
+        sourceBytesMustBeValidated: true,
+        responseMimeMustBeValidated: true,
+        fileSignatureMustBeValidated: true,
+        maxBytes: 15000000,
+        automaticImportImplemented: false
+      },
       assetType: kind === "audio" ? "audio-asset-candidate" : "visual-reference",
       mimeType: String(info.mime || "").toLowerCase(),
       fileSizeBytes: Number.isFinite(Number(info.size)) && Number(info.size) > 0 ? Number(info.size) : null,
