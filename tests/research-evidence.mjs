@@ -111,6 +111,7 @@ assert.equal(validateResearchImportRequest({ ...importCandidate, licenseReviewCo
 assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "http://upload.wikimedia.org/a.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "non-HTTPS image sources are rejected");
 assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "https://127.0.0.1/private.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "private-address URLs are rejected by host allowlisting");
 assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "https://upload.wikimedia.org.evil.example/a.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "lookalike domains cannot pass the exact host allowlist");
+assert.equal(validateResearchImportRequest({ ...importCandidate, sourcePage: "https://unsplash.com/photos/unrelated" }).code, "SOURCE_PAGE_MISMATCH", "an image URL cannot be attributed to an unrelated provider page");
 const pngFixture = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x01,0x02,0x03]);
 const importedImage = await readBoundedImageResponse(new Response(pngFixture, { headers: { "content-type": "image/png", "content-length": String(pngFixture.length) } }));
 assert.equal(importedImage.ok, true, "bounded image import accepts bytes with a matching PNG signature");
