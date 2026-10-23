@@ -178,6 +178,13 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Corrected the arch's ellipse dimensions so the generated geometry spans the declared width and height instead of collapsing to a short semicircle.
 - Added focused regression cases for both geometry options and their native building-preset use. These remain procedural static meshes: they do not imply rigging, UV textures, collision generation or gameplay integration.
 
+## Runtime contract continuation (2026-10-23)
+
+- Added a bounded `GENE_GAMEPLAY` reporting interface for games to declare their genre, controls, objective and expected event types, then report real start/movement/interaction/objective/win/lose/restart transitions. The API labels these as game-authored reports and never sets `verified=true`.
+- The preview host now surfaces those reports as self-reported telemetry without changing the preview's verification status. Builder instructions tell generated games to report only actual state transitions, not placeholder signals.
+- Runtime asset integrity can now asynchronously verify SHA-256 against the exact imported project-file text using Web Crypto. Scene-level verified status composes mesh readiness with those fingerprints and returns an explicit integrity failure if bytes changed.
+- This improves observability and traceability but does not replace independent browser interaction tests; the user plans to perform the web checks after implementation is finished.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
