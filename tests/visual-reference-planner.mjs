@@ -85,7 +85,8 @@ for (const svg of [coverA, coverB]) {
 }
 assert.match(researchRoute, /body\?\.images !== false/, "visual references are enabled by default");
 assert.match(researchRoute, /visualQueries\.map/, "research executes category-specific image searches");
-assert.match(researchRoute, /Topic relevance wins when selecting the small set of actual image bytes sent to the model/, "model image inputs must prioritize relevant references");
+assert.match(researchRoute, /bundle\.images = rankVisualReferenceResults\(bundle\.images as any\[\], topic\)/, "the displayed research bundle itself must exclude irrelevant images");
+assert.match(researchRoute, /The bundle is already relevance-ranked and filtered above/, "model inputs must preserve the verified research ordering");
 assert.match(workspace, /images: true/, "the build workspace always requests visual references by default");
 assert.match(workspace, /assets\/project-cover\.svg/, "new builds save a local cover inside the project");
 assert.match(workspace, /section === "projects"/, "the workspace exposes a dedicated Projects page");
