@@ -287,6 +287,9 @@ function buildMesh(recipe: Recipe) {
     vertexOffset += mesh.vertices.length;
   });
   const qualityReport = analyzeForgeRecipe(recipe);
+  if (qualityReport.status === "invalid") {
+    throw new Error("Forge structural QA rejected this recipe: " + qualityReport.warnings.filter((warning: any) => warning.severity === "error").map((warning: any) => warning.code).join(", "));
+  }
   const asset = {
     format: "gene-forge-asset-v1",
     qualityReport,
