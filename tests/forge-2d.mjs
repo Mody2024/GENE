@@ -21,13 +21,16 @@ for (const name of ["runtime", "art", "diagnostics"]) {
 
 const runtimeSandbox = { window: { __GENE_ASSETS__: {
   "assets/skeleton/asset.json": JSON.stringify({ assetId: "gene3d-skeleton-1234", version: 1, name: "Skeleton", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } }),
-  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } })
+  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } }),
+  "assets/models/environment.json": JSON.stringify({ assetId: "gene3d-environment-9012", version: 1, name: "Environment", kind: "environment", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } })
 } } };
 vm.runInNewContext(runtimeScriptArray("runtime"), runtimeSandbox);
 const runtimeRegistry = runtimeSandbox.window.GENE_ASSET_REGISTRY;
-assert.equal(runtimeRegistry.list().length, 2, "runtime registry should index supported 2D and 3D manifests");
+assert.equal(runtimeRegistry.list().length, 3, "runtime registry should index 2D, direct 3D, and assets/models Forge manifests");
 assert.equal(runtimeRegistry.findById("gene3d-skeleton-1234").path, "assets/skeleton/asset.json", "stable 3D asset IDs should resolve to the current manifest path");
 assert.equal(runtimeRegistry.resolve("gene2d-character-5678").manifest.runtimeCompatibility.renderer, "Canvas 2D", "registry should preserve capability metadata when resolving 2D assets");
+assert.equal(runtimeRegistry.findById("gene3d-environment-9012").path, "assets/models/environment.json", "the runtime registry must index the actual Forge 3D manifest path");
+assert.match(runtimeAssets, /assets\\\\\/models\\\\\//, "the asset bootstrap must whitelist Forge manifests under assets/models");
 
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 
