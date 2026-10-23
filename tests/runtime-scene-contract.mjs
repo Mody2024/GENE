@@ -5,6 +5,11 @@ assert.match(source, /draw2D=function\(ctx,opts\)[\s\S]{0,100}var scene=this/ , 
 assert.match(source, /scene\.drawMesh2D\(ctx,o,unit,ox,oy\)/, "OBJ scene objects route through the captured scene instance");
 assert.doesNotMatch(source, /if\(o\.modelPath&&this\.drawMesh2D/, "callback must not access an unbound this");
 assert.match(source, /getVisibleObjects=function\(\)[\s\S]{0,100}return this\.objects\.filter/, "renderer uses visible scene objects");
+assert.match(source, /analyzeLayout=function\(options\)/, "scene runtime exposes an advisory layout analysis pass");
+assert.match(source, /OBJECT_OUTSIDE_WORLD_LIMIT/, "layout analysis flags objects outside a configurable world limit");
+assert.match(source, /EXTREME_OBJECT_SCALE/, "layout analysis flags unusually large scene transforms");
+assert.match(source, /POSSIBLE_OBJECT_OVERLAP/, "layout analysis reports near-complete object overlap for duplicate-geometry review");
+assert.match(source, /Heuristic checks are advisory/, "layout analysis explicitly avoids claiming every overlap is a defect");
 console.log("Runtime scene contract passed (callback binding and OBJ draw dispatch).");
 
 assert.match(source, /getAssetStatus=function\(id\)/, "scene runtime exposes asset integration status per object");
