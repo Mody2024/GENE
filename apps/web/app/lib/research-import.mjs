@@ -26,7 +26,7 @@ export function validateResearchImportRequest(input) {
   if (sourceUrl.protocol !== "https:" || sourceUrl.username || sourceUrl.password || !RESEARCH_IMPORT_HOSTS.has(sourceUrl.hostname.toLowerCase()) || sourceUrl.port && sourceUrl.port !== "443") {
     return { ok: false, code: "SOURCE_HOST_NOT_ALLOWED", message: "Only HTTPS images from approved research hosts can be imported." };
   }
-  if (sourcePage.protocol !== "https:" || sourcePage.username || sourcePage.password || !RESEARCH_SOURCE_PAGE_HOSTS.has(sourcePage.hostname.toLowerCase()) || sourcePage.port && sourcePage.port !== "443") {
+  if (sourcePage.protocol !== "https:" || sourcePage.username || sourcePage.password || !(RESEARCH_SOURCE_PAGE_HOSTS.has(sourcePage.hostname.toLowerCase()) || sourcePage.hostname.toLowerCase().endsWith(".wikipedia.org")) || sourcePage.port && sourcePage.port !== "443") {
     return { ok: false, code: "SOURCE_PAGE_NOT_ALLOWED", message: "The source page must be HTTPS on an approved research host." };
   }
   if (!license) return { ok: false, code: "LICENSE_REQUIRED", message: "Record the reviewed license before importing." };
