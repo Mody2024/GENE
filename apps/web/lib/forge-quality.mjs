@@ -36,14 +36,19 @@ export function analyzeForgeRecipe(recipe) {
   let invalidShapeCount = 0;
   let invalidTransformCount = 0;
   let degenerateScaleCount = 0;
+  let missingNameCount = 0;
+  let invalidColorCount = 0;
   let min = [Infinity, Infinity, Infinity];
   let max = [-Infinity, -Infinity, -Infinity];
 
   for (const part of parts) {
     const name = String(part?.name || "").trim();
     const key = name.toLowerCase();
+    if (!name) missingNameCount++;
     nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
-    colors.add(String(part?.color || "").toLowerCase());
+    const color = String(part?.color || "").toLowerCase();
+    if (!/^#[0-9a-f]{6}$/i.test(color)) invalidColorCount++;
+    colors.add(color);
     surfaces.add(String(part?.surface || "matte"));
     if (Object.prototype.hasOwnProperty.call(SHAPE_TRIANGLE_ESTIMATES, part?.shape)) estimatedTriangles += SHAPE_TRIANGLE_ESTIMATES[part.shape];
     else invalidShapeCount++;
@@ -65,6 +70,8 @@ export function analyzeForgeRecipe(recipe) {
   if (invalidShapeCount) warnings.push({ code: "UNSUPPORTED_SHAPE", severity: "error", message: "Some parts use unknown shapes and cannot be estimated reliably.", count: invalidShapeCount });
   if (invalidTransformCount) warnings.push({ code: "INVALID_TRANSFORM", severity: "error", message: "Some parts have missing, malformed or non-finite transforms; bounds exclude those parts.", count: invalidTransformCount });
   if (degenerateScaleCount) warnings.push({ code: "DEGENERATE_SCALE", severity: "error", message: "Some parts have near-zero scale and may be invisible or unusable.", count: degenerateScaleCount });
+  if (missingNameCount) warnings.push({ code: "MISSING_PART_NAME", severity: "warning", message: "Every part should have a stable, non-empty name for editing and diagnostics.", count: missingNameCount });
+  if (invalidColorCount) warnings.push({ code: "INVALID_COLOR", severity: "warning", message: "Some parts have missing or invalid hex colors; the runtime may fall back to a default material.", count: invalidColorCount });
 
   const duplicateNames = [...nameCounts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
   if (duplicateNames.length) warnings.push({ code: "DUPLICATE_PART_NAMES", severity: "warning", message: "Some parts share names; rename them for reliable editing and debugging.", parts: duplicateNames.slice(0, 8) });
