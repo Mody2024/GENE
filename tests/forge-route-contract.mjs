@@ -24,7 +24,7 @@ assert.match(route, /try the bounded native generator before returning an error/
 assert.match(route, /shape === "capsule"/, "mesh builder must generate capsule geometry for better limbs and organic forms");
 assert.match(route, /"model\.obj": mesh\.obj/, "Forge must export real OBJ geometry");
 assert.match(route, /"model\.mtl": mesh\.mtl/, "Forge must export material definitions");
-assert.match(route, /"asset\.json": JSON\.stringify\(mesh\.asset, null, 2\)/, "Forge must export a machine-readable asset manifest");
+assert.match(route, /"asset\.json": JSON\.stringify\(manifest, null, 2\)/, "Forge must export the canonical versioned asset manifest");
 assert.match(route, /analyzeForgeRecipe\(recipe\)/, "Forge must run deterministic structural QA before returning an asset");
 assert.match(route, /qualityReport: mesh\.asset\.qualityReport/, "Forge response must expose its QA report");
 assert.match(quality, /scope: "structural-only"/, "QA must disclose that checks are structural, not visual");
