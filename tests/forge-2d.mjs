@@ -191,6 +191,7 @@ vm.runInNewContext(runtimeScriptArray("diagnostics"), { window: gameplayWindow }
 assert.equal(gameplayWindow.GENE_GAMEPLAY.registerContract({ genre: "platformer", controls: "Arrow keys", objective: "Reach the exit", requiredEvents: ["game-started", "player-moved", "bogus"] }), true);
 assert.deepEqual(Array.from(gameplayWindow.GENE_GAMEPLAY.snapshot().contract.requiredEvents), ["game-started", "player-moved"], "gameplay contracts keep only recognized runtime signals");
 assert.equal(gameplayWindow.GENE_GAMEPLAY.report("player-moved", "x changed"), true);
+assert.deepEqual(Array.from(gameplayWindow.GENE_GAMEPLAY.snapshot().missingRequiredEvents), ["game-started"], "the contract identifies expected events not yet reported");
 assert.equal(gameplayWindow.GENE_GAMEPLAY.report("fake-verified", "no"), false, "arbitrary event names cannot masquerade as runtime signals");
 assert.equal(gameplayWindow.GENE_GAMEPLAY.snapshot().verified, false, "game-authored telemetry remains reported evidence, not proof of gameplay verification");
 assert.equal(gameplayEvents.filter(message => message.state === "gameplay-event").length, 1, "gameplay telemetry is emitted to the preview host");
