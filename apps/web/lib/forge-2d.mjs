@@ -7,6 +7,15 @@ const PALETTES = {
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[char]));
 const safeKind = new Set(["character", "tileset", "ui", "background", "icon"]);
 const safeQuality = new Set(["performance", "standard", "high"]);
+function stableAssetId(kind, prompt, style) {
+  const input = [kind, prompt, style].join("\\u001f");
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return "gene2d-" + kind + "-" + (hash >>> 0).toString(16).padStart(8, "0");
+}
 function paletteFor(kind, prompt) {
   const text = prompt.toLowerCase();
   if (/forest|nature|grass|tree/.test(text)) return PALETTES.nature;
@@ -104,7 +113,7 @@ export function buildNative2DAsset({ prompt = "", kind = "character", quality = 
     kind, style: params.style, quality: safeLevel,
     mimeType: "image/svg+xml",
     svg,
-    manifest: { format: "gene-forge-2d-v1", kind, width: built.width, height: built.height, frameWidth: built.frameWidth, frameHeight: built.frameHeight, frames: built.frames, frameNames: built.frameNames, frameFiles: Object.keys(frameFiles), animationClips, frameRate: kind === "character" ? 9 : 0, origin: "top-left", animation: kind === "character" ? "frame-strip-with-cropped-frames; not rigged" : "static", palette: colors, prompt: cleanPrompt, source: "GENE native procedural 2D generator" },
+    manifest: { format: "gene-forge-2d-v1", assetId, version: 1, kind, width: built.width, height: built.height, provenance: { origin: "generated", generator: "GENE native procedural 2D generator", externalDependencies: [], license: "GENE-generated; no third-party source embedded" }, intendedScene: null, frameWidth: built.frameWidth, frameHeight: built.frameHeight, frames: built.frames, frameNames: built.frameNames, frameFiles: Object.keys(frameFiles), animationClips, frameRate: kind === "character" ? 9 : 0, origin: "top-left", animation: kind === "character" ? "frame-strip-with-cropped-frames; not rigged" : "static", palette: colors, prompt: cleanPrompt, source: "GENE native procedural 2D generator" },
     frameFiles,
     qualityReport: report
   };
