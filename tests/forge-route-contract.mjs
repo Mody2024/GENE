@@ -79,3 +79,8 @@ assert.match(route, /function assertValidPrimitiveMesh\(/, "Forge validates gene
 assert.match(route, /contains a non-finite vertex/, "non-finite mesh coordinates are rejected");
 assert.match(route, /contains an invalid face/, "invalid face indices cannot be written into an OBJ file");
 assert.match(route, /assertValidPrimitiveMesh\(mesh, part\.name\)/, "every generated part passes topology validation");
+
+assert.match(route, /hasValidImageSignature\(ref\.mimeType, referenceBytes\)/, "Forge validates the actual uploaded reference bytes against the declared image MIME");
+assert.match(route, /REFERENCE_SIGNATURE_MISMATCH/, "Forge rejects image payloads disguised as another raster format");
+assert.match(route, /totalImageBytes > 550_000/, "Forge enforces a decoded byte budget in addition to base64 character limits");
+assert.match(route, /referenceBytes\.toString\("base64"\)/, "only the validated decoded bytes are forwarded to the provider");
