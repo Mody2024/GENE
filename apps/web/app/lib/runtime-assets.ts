@@ -2,7 +2,7 @@ import { buildRuntimeKitScript } from "./runtime-kit.mjs";
 
 export const MAX_RUNTIME_ASSET_BYTES = 1_500_000;
 /** Illustration SVGs live at assets/art/<name>.svg and are exposed to the game as window.GENE_ART. */
-export const RUNTIME_ART_PATH = /^assets\/(?:art\/[a-zA-Z0-9_-]+\.svg|[a-zA-Z0-9_-]+\/sprite\.svg|forge2d\/(?:character|tileset|background)\.svg)$/i;
+export const RUNTIME_ART_PATH = /^assets\/(?:art\/[a-zA-Z0-9_-]+\.svg|[a-zA-Z0-9_-]+\/sprite\.svg|forge2d\/(?:character|tileset|background)\.svg|forge2d\/(?:character|tileset)\/frames\/frame-\d{2}\.svg)$/i;
 
 /**
  * Exposes saved GENE Forge text assets and a small dependency-free OBJ/MTL
@@ -36,7 +36,11 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
     "A.image=function(p){if(cache[p])return cache[p];var s=A.svg(p);if(s===null)return null;var img=new Image();img.decoding=\"async\";img.src=\"data:image/svg+xml;charset=utf-8,\"+encodeURIComponent(s);cache[p]=img;return img;};",
     "A.ready=function(p){var i=A.image(p);return !!(i&&i.complete&&i.naturalWidth>0);};",
     "A.draw=function(ctx,p,x,y,w,h){try{var i=A.image(p);if(i&&i.complete&&i.naturalWidth>0){ctx.drawImage(i,x,y,w,h);return true;}}catch(e){}return false;};",
-    "})(window.GENE_ART);"
+    "})(window.GENE_ART);",
+    // GENE_SPRITES draws the individually cropped SVG frames as a timed clip. It never stretches
+    // the full sprite sheet into a character rectangle. Call from the normal game render loop.
+    "window.GENE_SPRITES=window.GENE_SPRITES||{};",
+    "(function(S){S.draw=function(ctx,base,clip,x,y,w,h,now){try{var assets=window.__GENE_ASSETS__||{},manifest=JSON.parse(assets[base+'.json']||'{}'),clips=manifest.animationClips||[],c=clips.find(function(v){return v.name===clip;})||clips.find(function(v){return v.name==='idle';})||clips[0];if(!c||!Array.isArray(c.frames)||!c.frames.length)return false;var duration=Math.max(30,Number(c.frameDurationMs)||110),time=Number.isFinite(now)?now:(typeof performance!=='undefined'?performance.now():Date.now()),index=c.loop===false?Math.min(c.frames.length-1,Math.floor(time/duration)):Math.floor(time/duration)%c.frames.length,frame=String(c.frames[index]).padStart(2,'0'),path=base+'/frames/frame-'+frame+'.svg',svg=assets[path];if(typeof svg!=='string')return false;var cache=S._cache||(S._cache={}),img=cache[path];if(!img){img=new Image();img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);cache[path]=img;}if(img.complete&&img.naturalWidth>0){ctx.drawImage(img,x,y,w,h);return true;}return false;}catch(e){return false;}};S.clips=function(base){try{var m=JSON.parse((window.__GENE_ASSETS__||{})[base+'.json']||'{}');return (m.animationClips||[]).map(function(c){return c.name;});}catch(e){return [];}};})(window.GENE_SPRITES);"
   ].join("");
   // The runtime kit (GeneAudio) is injected with the bootstrap so preview, /play, export, publish and cloud builds all get it.
   // Sandboxed preview documents may expose a throwing localStorage getter. Give the game a
