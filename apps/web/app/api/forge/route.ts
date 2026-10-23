@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
+import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -338,6 +339,7 @@ function extractJson(text: string) {
 export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return fail(400, "BAD_JSON", "Request body must be JSON."); }
+  if (!hasToolApproval(body, "forge3d")) return fail(403, "TOOL_APPROVAL_REQUIRED", "GENE did not run this tool because explicit approval for these exact inputs is missing or expired.");
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
