@@ -38,3 +38,5 @@ assert.match(runtimeAssets, /OBJ mesh is missing or has no recognizable geometry
 assert.match(runtimeAssets, /MTL material file is missing/, "runtime asset validation identifies missing material definitions");
 assert.match(runtimeAssets, /Collision shapes must be supplied by scene integration/, "runtime asset validation discloses required scene integration work");
 assert.match(runtimeAssets, /validation:report/, "resolving a runtime asset returns its validation report");
+
+assert.match(runtimeAssets, /frame-\\\\d\{2,3\}/, "sprite asset paths must accept three-digit frame numbers emitted by the manifest renderer");
