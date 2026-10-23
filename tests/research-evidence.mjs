@@ -16,6 +16,13 @@ assert.match(results[0].url, /^https:\/\//);
 assert.equal(results[0].source, "example.org");
 assert.equal(results[0].resultType, "technical-evidence");
 assert.equal(results[0].integrationState, "reference-only");
+const deduplicated = parseGoogleSearchResults({ items: [
+  { title: "Geometry Dash mechanics guide", snippet: "Geometry Dash gameplay timing and level editor mechanics.", link: "https://example.org/guide?utm_source=search" },
+  { title: "Geometry Dash mechanics guide", snippet: "Geometry Dash gameplay timing and level editor mechanics.", link: "https://example.org/guide#section" },
+  { title: "Geometry Dash level editor tutorial", snippet: "Geometry Dash editor and gameplay mechanics.", link: "https://example.org/editor" }
+]}, topic, 5);
+assert.equal(deduplicated.length, 2, "tracking parameters and URL fragments must not create duplicate research slots");
+assert.ok(!deduplicated.some(item => /utm_source|#section/.test(item.url)), "canonical URLs discard tracking fragments and query parameters");
 
 const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "File:sample.png", index: 1, imageinfo: [{ url: "https://upload.wikimedia.org/sample.png", thumburl: "https://upload.wikimedia.org/sample-thumb.png", mime: "image/png", descriptionurl: "https://commons.wikimedia.org/wiki/File:sample.png", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Sample Artist" } } }] } } } });
 assert.equal(commons.length, 1);
