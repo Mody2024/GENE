@@ -8,7 +8,7 @@ import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus" | "capsule";
+type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus" | "capsule" | "stairs" | "arch";
 type Surface = "matte" | "metal" | "rubber" | "glass" | "emissive";
 type Vec3 = [number, number, number];
 type Part = {
@@ -23,7 +23,7 @@ type Part = {
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule"]);
+const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule", "stairs", "arch"]);
 const SURFACES = new Set<Surface>(["matte", "metal", "rubber", "glass", "emissive"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
@@ -190,6 +190,36 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
       const c = (ring + 1) * segments + next + 1;
       const d = (ring + 1) * segments + i + 1;
       faces.push([a, d, b], [b, d, c]);
+    }
+  } else if (shape === "stairs") {
+    const steps = 5;
+    const stepDepth = scale[2] / steps, stepHeight = scale[1] / steps;
+    const [x0, x1] = [-scale[0] / 2, scale[0] / 2];
+    for (let i = 0; i < steps; i++) {
+      const y0 = -scale[1] / 2, y1 = y0 + (i + 1) * stepHeight;
+      const z0 = -scale[2] / 2 + i * stepDepth, z1 = z0 + stepDepth;
+      const start = vertices.length + 1;
+      vertices.push([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
+      const q = [[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]];
+      for (const face of q) faces.push([start+face[0],start+face[1],start+face[2]],[start+face[0],start+face[2],start+face[3]]);
+    }
+  } else if (shape === "arch") {
+    const segments = 16;
+    const outerRadius = Math.max(0.05, Math.min(scale[0] / 2, scale[1] / 2));
+    const thickness = Math.max(0.025, Math.min(scale[0] * 0.14, scale[1] * 0.14));
+    const innerRadius = Math.max(0.02, outerRadius - thickness);
+    const centerY = -scale[1] / 2 + outerRadius;
+    const zFront = scale[2] / 2, zBack = -scale[2] / 2;
+    const point = (radius: number, angle: number, z: number): Vec3 => [radius * Math.cos(angle), centerY + radius * Math.sin(angle), z];
+    for (let i = 0; i < segments; i++) {
+      const a0 = i / segments * Math.PI, a1 = (i + 1) / segments * Math.PI;
+      const start = vertices.length + 1;
+      vertices.push(point(outerRadius,a0,zFront),point(outerRadius,a1,zFront),point(innerRadius,a1,zFront),point(innerRadius,a0,zFront),
+        point(outerRadius,a0,zBack),point(outerRadius,a1,zBack),point(innerRadius,a1,zBack),point(innerRadius,a0,zBack));
+      const v = (n: number) => start + n;
+      faces.push([v(0),v(1),v(2)],[v(0),v(2),v(3)],[v(4),v(7),v(6)],[v(4),v(6),v(5)],
+        [v(0),v(4),v(5)],[v(0),v(5),v(1)],[v(3),v(2),v(6)],[v(3),v(6),v(7)],
+        [v(0),v(3),v(7)],[v(0),v(7),v(4)],[v(1),v(5),v(6)],[v(1),v(6),v(2)]);
     }
   } else if (shape === "sphere") {
     const rings = 5;
@@ -431,7 +461,7 @@ export async function POST(request: NextRequest) {
     "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'capsule',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use beveledBox for light-catching chamfered panels, torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels, rubber for tires/grips, glass for windows, metal for exposed hardware and emissive for small lights. Use spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration. Vary material response intentionally: metal should have higher specular and shininess, rubber should be dark and matte, glass should be translucent in MTL, and emissive should identify small lights rather than large surfaces.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus, capsule. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus, capsule, stairs, arch. Use stairs for stepped forms and arch for curved doorways/portals. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
