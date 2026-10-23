@@ -46,7 +46,7 @@ export type DesignDoc = {
 };
 export type GamePlan = { title: string; summary: string; kind?: ProjectKind; engine: "canvas2d" | "webgl3d" | "webapp"; tasks: string[]; mechanics: string[]; performanceBudget: { targetFps: number; maxEnemies: number; maxObjects: number; maxParticles: number } };
 export type BuildVersion = { number: number; label: string; files: Record<string, string>; createdAt: string; testSummary: string };
-export type ReferenceFile = { id: string; name: string; mimeType: string; kind: "image" | "text"; dataBase64?: string; textContent?: string; size: number };
+export type ReferenceFile = { id: string; name: string; mimeType: string; kind: "image" | "text"; dataBase64?: string; textContent?: string; size: number; sourceId?: string; source?: string; sourceUrl?: string; sourcePage?: string; license?: string; attribution?: string; sha256?: string; byteSize?: number };
 export type GeneProject = {
   id: string;
   name: string;
