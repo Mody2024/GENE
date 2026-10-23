@@ -11,6 +11,7 @@ import {
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
 import { planVisualReferenceQueries } from "../../lib/visual-reference-planner.mjs";
+import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -94,6 +95,7 @@ async function fetchImageData(image: { id: string; title: string; thumb: string 
 export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, error: { code: "BAD_JSON", message: "Request body must be valid JSON." } }, { status: 400 }); }
+  if (!hasToolApproval(body, "research")) return NextResponse.json({ ok: false, error: { code: "TOOL_APPROVAL_REQUIRED", message: "Research did not run: GENE requires explicit approval for this exact research query." } }, { status: 403 });
   const topic = cleanQuery(body?.query);
   if (topic.length < 3) return NextResponse.json({ ok: false, error: { code: "QUERY_REQUIRED", message: "Describe what to research (at least a few letters)." } }, { status: 400 });
   const clientKey = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
