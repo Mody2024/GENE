@@ -27,6 +27,7 @@ import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/p
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
+import { createToolApproval } from "./lib/tool-permissions.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -46,6 +47,86 @@ function readText(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsText(file);
   });
+}
+
+type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; approval: ReturnType<typeof createToolApproval> };
+function approvalPrompt(tool: string, input: any): string {
+  const label = tool === "research" ? "Research" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
+  const detail = String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request").trim().slice(0, 240);
+  return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
+    "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
+}
+function buildNestedToolApprovals(body: any): { entries: ToolApprovalEntry[]; summary: string[] } {
+  const entries: ToolApprovalEntry[] = [], summary: string[] = [];
+  const prompt = String(body.message || body.project?.initialPrompt || "");
+  const kind = body.project?.kind === "app" ? "app" : "game";
+  const operation = body.operation;
+  if (!["build", "surprise"].includes(operation) || kind !== "game") return { entries, summary };
+  const wants3D = body.project?.projectIntent === "game-3d" || body.project?.preferredEngine === "webgl3d" ||
+    body.project?.plan?.engine === "webgl3d" || /\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(prompt);
+  const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
+  if (wants3D) {
+    const lower = prompt.toLowerCase();
+    const requested: Array<{ kind: string; prompt: string }> = [
+      { kind: "character", prompt: "Create the main playable character for this game. " + prompt },
+      { kind: "environment", prompt: "Create a recognizable environment landmark and ground-contact forms for this game world. " + prompt }
+    ];
+    if (/\b(vehicle|truck|car|van|driving|racing|bus)\b/i.test(lower)) requested.push({ kind: "vehicle", prompt: "Create the main vehicle for this game. " + prompt });
+    if (/\b(furniture|chair|table|sofa|bed|cabinet|crate|prop)\b/i.test(lower) && requested.length < 3) requested.push({ kind: "prop", prompt: "Create the most important gameplay prop for this game. " + prompt });
+    const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
+    for (const item of requested.slice(0, 3)) {
+      const input = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
+      entries.push({ tool: "forge3d", approval: createToolApproval("forge3d", input) });
+      summary.push("3D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
+    }
+  } else {
+    const explicit2D = body.project?.preferredEngine === "canvas2d" || body.project?.plan?.engine === "canvas2d";
+    const noEngine = !body.project?.preferredEngine && !body.project?.plan?.engine;
+    if (explicit2D || (noEngine && !/\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(prompt))) {
+      const lower = prompt.toLowerCase();
+      const requested = [
+        { kind: "character", prompt: "Create the main recognizable 2D playable character sprite for this game. " + prompt },
+        { kind: /city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lower) ? "tileset" : "background",
+          prompt: "Create a matching 2D " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lower) ? "game tileset" : "game background") + " for this game. " + prompt }
+      ];
+      for (const item of requested) {
+        const input = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
+        entries.push({ tool: "forge2d", approval: createToolApproval("forge2d", input) });
+        summary.push("2D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
+      }
+    }
+  }
+  return { entries, summary };
+}
+async function fetchWithToolApproval(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = String(input);
+  let payload: any = null;
+  if (typeof init?.body === "string") { try { payload = JSON.parse(init.body); } catch { payload = null; } }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fetch(input, init);
+  let tool: string | null = null;
+  if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
+  else if (/\/api\/forge\/2d(?:\?|$)/.test(url)) tool = "forge2d";
+  else if (/\/api\/forge(?:\?|$)/.test(url)) tool = "forge3d";
+  if (tool) {
+    if (typeof window !== "undefined" && !window.confirm(approvalPrompt(tool, payload))) throw new DOMException("Tool call canceled by the user.", "AbortError");
+    payload.toolApproval = createToolApproval(tool, payload);
+    return fetch(input, { ...init, body: JSON.stringify(payload) });
+  }
+  if (/\/api\/agent(?:\?|$)/.test(url)) {
+    if (payload.operation === "research") {
+      if (typeof window !== "undefined" && !window.confirm(approvalPrompt("agentResearch", payload))) throw new DOMException("AI research canceled by the user.", "AbortError");
+      payload.toolApproval = createToolApproval("agentResearch", payload);
+    }
+    const batch = buildNestedToolApprovals(payload);
+    if (batch.entries.length) {
+      const message = "GENE wants to run the following specialist tool calls as one explicit batch:\n\n" + batch.summary.map((item, index) => (index + 1) + ". " + item).join("\n") +
+        "\n\nApprove this exact batch? Each listed call will receive its own call-scoped approval. Cancel skips all Forge calls; the AI build may continue without those generated assets.";
+      if (typeof window !== "undefined" && window.confirm(message)) payload.toolApprovals = batch.entries;
+      else payload.toolApprovals = [];
+    }
+    return fetch(input, { ...init, body: JSON.stringify(payload) });
+  }
+  return fetch(input, init);
 }
 
 function uid() {
@@ -682,7 +763,7 @@ export default function Home() {
     activeRunControllers.current.add(runController);
     const runFetch = (input: RequestInfo | URL, init?: RequestInit) => {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
-      return fetch(input, { ...init, signal: runController.signal });
+      return fetchWithToolApproval(input, { ...init, signal: runController.signal });
     };
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
@@ -1784,7 +1865,7 @@ export default function Home() {
     setForgeNotice("");
     addActivity((targetId ? "Editing existing mesh " + targetId : "Generating a new 3D mesh") + " through GENE Forge");
     try {
-      const response = await fetch("/api/forge", {
+      const response = await fetchWithToolApproval("/api/forge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1869,7 +1950,7 @@ export default function Home() {
     setForgeNotice("");
     addActivity("Generating native procedural 2D " + forge2DKind + " artwork through GENE Forge");
     try {
-      const response = await fetch("/api/forge/2d", {
+      const response = await fetchWithToolApproval("/api/forge/2d", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: forgePrompt.trim(), kind: forge2DKind, quality: forgeQuality, style: "project-matched stylized game art" })
