@@ -28,6 +28,10 @@ const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "
 assert.equal(commons.length, 1);
 assert.equal(commons[0].integrationState, "reference-only", "a research result is not silently treated as imported");
 assert.equal(commons[0].licenseState, "source-declared-review-per-asset");
+assert.equal(commons[0].downloadState, "candidate-not-imported", "a direct URL is not misrepresented as an imported project file");
+assert.equal(commons[0].downloadUrl, "https://upload.wikimedia.org/sample.png", "the source's actual download URL is preserved");
+assert.equal(commons[0].mimeType, "image/png", "the source MIME type is preserved for future safe import validation");
+assert.match(commons[0].attribution, /Sample Artist.*CC BY-SA 4.0/, "credit and license are available together for attribution");
 
 const models = filterPolyHaven({ chair: { name: "Chair", tags: ["furniture"], categories: ["interior"] } }, "chair", 3);
 assert.equal(models[0].licenseState, "source-declared-CC0");
