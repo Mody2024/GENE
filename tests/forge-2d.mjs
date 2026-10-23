@@ -64,7 +64,7 @@ assert.match(background.svg, /#263849/);
 assert.throws(() => buildNative2DAsset({ prompt: "test", kind: "weapon" }), /Unsupported 2D asset kind/);
 assert.match(runtimeAssets, /window\.GENE_SPRITES/ , "runtime exposes frame-based animation playback");
 assert.match(runtimeAssets, /GENE_DIAGNOSTICS/, "isolated game runtime exposes render and error diagnostics");
-assert.match(runtimeAssets, /canvasOps:0,webglDrawCalls:0,animationFrames:0/, "runtime diagnostics distinguish 2D drawing, 3D draw calls, and frame-loop activity");
+assert.match(runtimeAssets, /canvasOps:0,canvasEntityOps:0,webglDrawCalls:0,animationFrames:0/, "runtime diagnostics distinguish entity drawing, background clearing, 3D draw calls, and frame-loop activity");
 assert.match(runtimeAssets, /unhandledrejection/, "runtime diagnostics capture unhandled async failures");
 assert.match(runtimeAssets, /hasCanvas:/, "runtime diagnostics report whether a canvas exists");
 
@@ -85,7 +85,7 @@ const workspace = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.u
 assert.match(workspace, /colors=Object\.create\(null\)/, "preview visibility checks must count distinct rendered colors");
 assert.doesNotMatch(workspace, /if\(n>12\|\|alpha>12\)window\.__geneFrameConfirmed=true/, "opaque clear-color buffers must not count as a visible 3D game");
 assert.match(workspace, /geometryDraws>0&&\(\(n>1&&alpha>12\)/, "3D visibility confirmation must require actual WebGL geometry draw calls");
-assert.match(workspace, /drawOps>1&&\(\(n>1&&alpha>12\)/, "2D visibility confirmation must require more than a lone background draw");
+assert.match(workspace, /drawOps>0&&\(\(n>1&&alpha>12\)/, "2D visibility confirmation must require actual entity drawing, not background-only fills");
 assert.match(workspace, /alpha<samples\*0\.9/, "sparse visible sprites on transparent canvases should still be detectable");
 assert.doesNotMatch(workspace, /buildRuntimeAudioBootstrap\((?:project|version)\.files\)\s*\+\s*buildRuntimeAudioBootstrap/, "game audio bootstrap must not be injected twice into one preview");
 console.log("Native 2D Forge tests passed.");
