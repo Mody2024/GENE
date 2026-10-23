@@ -26,3 +26,6 @@ assert.match(page, /and " \+ Object\.keys\(data\.asset\.frameFiles \|\| \{\}\)\.
 assert.match(page, /sourceIntegrity\.files\["sprite\.svg"\]/, "staged 2D manifest maps the source sheet fingerprint to its actual project path");
 assert.match(page, /sourceManifest\.contentIntegrity\.files \|\| \{\}/, "manual 2D import preserves and relocates the generated source fingerprints");
 assert.match(page, /\[prefix \+ name, hash\]/, "manual 2D manifest fingerprints follow the saved asset paths");
+
+assert.match(page, /previousAssetVersion = Number\(JSON\.parse\(project\.files\[prefix \+ "asset\.json"\]/, "editing an existing Forge asset reads its previous manifest version");
+assert.match(page, /version: Math\.max\(1, previousAssetVersion \+ 1\)/, "asset edits increment manifest version instead of resetting to version one");
