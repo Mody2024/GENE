@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildResearchBundle, filterPolyHaven, formatResearchNotes, hasValidImageSignature, parseCommonsFiles, parseGoogleSearchResults } from "../apps/web/app/lib/research-sources.mjs";
+import { MAX_RESEARCH_IMPORT_BYTES, readBoundedImageResponse, validateResearchImportRequest } from "../apps/web/app/lib/research-import.mjs";
 
 const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
+const researchImportRoute = readFileSync(new URL("../apps/web/app/api/research/import/route.ts", import.meta.url), "utf8");
+const researchImportSource = readFileSync(new URL("../apps/web/app/lib/research-import.mjs", import.meta.url), "utf8");
 const researchSources = readFileSync(new URL("../apps/web/app/lib/research-sources.mjs", import.meta.url), "utf8");
 assert.match(researchRoute, /isAppResearch\s*\?\s*normalizedTopic \+ " UI design interaction patterns accessibility official documentation"/, "app research must query interface and interaction guidance instead of game mechanics");
 assert.match(researchRoute, /isAppResearch\s*\?\s*topic \+ " interface UI design interaction patterns accessibility"/, "app research-library links must match app-building intent");
@@ -94,3 +97,29 @@ assert.match(researchRoute, /byteSize: bytes\.byteLength/, "the exact downloaded
 
 assert.match(researchSources, /requiredChecks: \["review-license-and-attribution"[\s\S]{0,240}"record-source-provenance"\]/, "external asset candidates list the checks required before import");
 assert.match(researchSources, /blockers: \["license-review-not-confirmed", "asset-import-not-implemented"\]/, "research candidates clearly remain blocked from automatic project import");
+
+const importCandidate = {
+  licenseReviewConfirmed: true,
+  title: "Reviewed reference",
+  sourceUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.png",
+  sourcePage: "https://commons.wikimedia.org/wiki/File:Example.png",
+  license: "CC BY-SA 4.0",
+  attribution: "Creator / Wikimedia Commons"
+};
+assert.equal(validateResearchImportRequest(importCandidate).ok, true, "reviewed direct images from the approved host are accepted for bounded import");
+assert.equal(validateResearchImportRequest({ ...importCandidate, licenseReviewConfirmed: false }).code, "LICENSE_REVIEW_REQUIRED", "unreviewed licenses cannot be imported");
+assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "http://upload.wikimedia.org/a.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "non-HTTPS image sources are rejected");
+assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "https://127.0.0.1/private.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "private-address URLs are rejected by host allowlisting");
+assert.equal(validateResearchImportRequest({ ...importCandidate, sourceUrl: "https://upload.wikimedia.org.evil.example/a.png" }).code, "SOURCE_HOST_NOT_ALLOWED", "lookalike domains cannot pass the exact host allowlist");
+const pngFixture = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x01,0x02,0x03]);
+const importedImage = await readBoundedImageResponse(new Response(pngFixture, { headers: { "content-type": "image/png", "content-length": String(pngFixture.length) } }));
+assert.equal(importedImage.ok, true, "bounded image import accepts bytes with a matching PNG signature");
+assert.equal(importedImage.byteSize, pngFixture.length, "import reports the exact downloaded byte size");
+assert.equal(importedImage.sha256.length, 64, "import fingerprints exact downloaded bytes");
+assert.equal((await readBoundedImageResponse(new Response(Buffer.from("not png"), { headers: { "content-type": "image/png" } }))).code, "IMAGE_SIGNATURE_MISMATCH", "image payloads disguised with an image MIME are rejected");
+assert.equal((await readBoundedImageResponse(new Response(pngFixture, { headers: { "content-type": "text/html" } }))).code, "UNSUPPORTED_IMAGE_MIME", "non-image responses are rejected");
+assert.equal(MAX_RESEARCH_IMPORT_BYTES, 1_500_000, "the import byte budget is bounded");
+assert.match(researchImportRoute, /hasToolApproval\(body, "researchAssetImport"\)/, "research image import requires explicit tool approval");
+assert.match(researchImportRoute, /redirect: "manual"/, "image import refuses redirects that could escape the source allowlist");
+assert.match(researchImportRoute, /REDIRECT_NOT_ALLOWED/, "redirected downloads are rejected instead of followed");
+assert.match(researchImportSource, /await reader\.cancel\(\)/, "oversized streamed image responses are canceled before the entire body is buffered");
