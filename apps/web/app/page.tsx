@@ -505,6 +505,19 @@ export default function Home() {
         setDraft(current => (current.trim() ? current.trim() + "\n\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
         setNotice("Element selected. Describe the exact change in the composer, then send it.");
       }
+      if (event.data?.type === "gene-runtime" && event.data.state === "input-observed") {
+        const inputType = String(event.data.inputType || "user input").slice(0, 40);
+        setNotice("The preview received " + inputType + ". This confirms input reached the game frame, not that gameplay responded. Verify movement, interaction, and the core objective.");
+        setProject(current => current ? {
+          ...current,
+          livingPreview: current.livingPreview ? {
+            ...current.livingPreview,
+            currentObjectives: ["Input reached the preview; confirm the game reacted", "Verify interaction and the core objective", "Check restart or reset behavior where available"],
+            updatedAt: now()
+          } : current.livingPreview
+        } : current);
+        return;
+      }
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
