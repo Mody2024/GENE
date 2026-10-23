@@ -190,6 +190,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - The gameplay telemetry snapshot now summarizes observed event names and required-but-unreported events for a declared game contract. It always returns `reportedOnly: true` and `verified: false`; these signals are useful for diagnosis but cannot satisfy independent gameplay verification on their own.
 - The workspace records game-reported events with that limitation stated explicitly, while preserving the existing visible-render-versus-playable distinction.
 
+## Asset versioning continuation (2026-10-23)
+
+- Editing an existing Forge model now reads its previous manifest version and increments it in the saved asset manifest, rather than resetting the stable asset to version 1. Project-wide build checkpoints remain separate from per-asset versions.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
