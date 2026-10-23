@@ -24,3 +24,10 @@ assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemet
 assert.match(runtimeAssets, /originalGetContext\.apply\(this,arguments\)/, "renderer diagnostics observe existing getContext calls rather than creating a competing context");
 assert.match(runtimeAssets, /contextTypes:state\.contextTypes\.slice\(\)/, "runtime diagnostics report the context types actually requested by the game");
 assert.doesNotMatch(runtimeAssets, /hasWebGLContext:Array\.prototype\.some\.call\(w\.document\.querySelectorAll\('canvas'\),function\(c\)\{try\{return !!\(c\.getContext\('webgl'\)/, "diagnostics must not create a WebGL context just to probe for one");
+
+assert.match(runtimeAssets, /S\.validateManifest=function\(base\)/, "sprite runtime exposes a reusable manifest validator");
+assert.match(runtimeAssets, /MANIFEST_MISSING/, "sprite validation reports missing manifests explicitly");
+assert.match(runtimeAssets, /MANIFEST_INVALID_JSON/, "sprite validation detects malformed manifests");
+assert.match(runtimeAssets, /FRAMES_MISSING/, "sprite validation detects referenced animation frames that were not imported");
+assert.match(runtimeAssets, /Duplicate animation clip:/, "sprite validation detects duplicate clip names");
+assert.match(runtimeAssets, /invalid frame duration/, "sprite validation catches invalid animation timing");
