@@ -8,6 +8,7 @@ import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 import { nextInterviewQuestion } from "../../lib/design-doc";
 import { createNativeResult } from "../../../lib/native-generator.mjs";
+import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -637,6 +638,7 @@ export async function POST(request: NextRequest) {
   const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise", "enhancePrompt"];
   const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
+  if (body.operation === "research" && !hasToolApproval(body, "agentResearch")) return jsonError("GENE did not run web research because explicit approval for this exact research request is missing or expired.", 403, "TOOL_APPROVAL_REQUIRED");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
   if (body.mode === "plan" && ["build", "buildPart", "edit", "surprise"].includes(body.operation)) {
     return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing project files.", 409, "GENE_PLAN_MODE_READ_ONLY");
@@ -857,13 +859,24 @@ export async function POST(request: NextRequest) {
     if (/\b(vehicle|truck|car|van|driving|racing|bus)\b/i.test(lowerPrompt)) requestedKinds.push({ kind: "vehicle", prompt: "Create the main vehicle for this game. " + forgePrompt });
     if (/\b(furniture|chair|table|sofa|bed|cabinet|crate|prop)\b/i.test(lowerPrompt) && requestedKinds.length < 3) requestedKinds.push({ kind: "prop", prompt: "Create the most important gameplay prop for this game. " + forgePrompt });
     const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
-    const toolResults = await Promise.all(requestedKinds.slice(0, 3).map(async item => {
+    const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
+    const approvedKinds = requestedKinds.filter(item => {
+      const toolBody = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge3d")) : null;
+      return Boolean(entry);
+    });
+    const toolResults = await Promise.all(approvedKinds.slice(0, 3).map(async item => {
       try {
         const endpoint = new URL("/api/forge", request.url);
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle: String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200), nativeOnly: true }),
+          body: JSON.stringify({
+            prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true,
+            toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({
+              prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true, toolApproval: candidate.approval
+            }, "forge3d"))?.approval
+          }),
           signal: request.signal,
           cache: "no-store"
         });
@@ -901,12 +914,22 @@ export async function POST(request: NextRequest) {
         prompt: "Create a matching 2D " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt) ? "game tileset" : "game background") + " for this game. " + forgePrompt }
     ];
     const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
-    const results = await Promise.all(kinds.map(async item => {
+    const approvedKinds = kinds.filter(item => {
+      const toolBody = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge2d")) : null;
+      return Boolean(entry);
+    });
+    const results = await Promise.all(approvedKinds.map(async item => {
       try {
         const response = await fetch(new URL("/api/forge/2d", request.url), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" }),
+          body: JSON.stringify({
+            prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art",
+            toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({
+              prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art", toolApproval: candidate.approval
+            }, "forge2d"))?.approval
+          }),
           signal: request.signal,
           cache: "no-store"
         });
