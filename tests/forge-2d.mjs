@@ -151,7 +151,7 @@ assert.ok(runtimeAssets.includes(String.raw`data:image\\/(?:png|jpeg|webp|gif);b
 assert.match(runtimeAssets, /sprite-sheet\|atlas/, "runtime exposes imported sprite sheets to the frame detector");
 assert.match(runtimeAssets, /GENE_SPRITES[\s\S]{0,2500}frame-/, "runtime selects a single cropped frame rather than drawing the full atlas");
 assert.ok(runtimeAssets.includes("mtlPath=String(path).replace(/") && runtimeAssets.includes(".obj$/i") && runtimeAssets.includes(".mtl"), "runtime must derive each material path from the actual OBJ filename, including character.obj and environment.obj");
-assert.ok(runtimeAssets.includes(String.raw`forge2d\\/(?:character|tileset)\\/frames\\/frame-\\d{2}\\.svg`), "asset browser exposes separately sliced character and tileset frames");
+assert.ok(runtimeAssets.includes(String.raw`forge2d\\/(?:character|tileset)\\/frames\\/frame-\\d{2,3}\\.svg`), "asset browser exposes separately sliced character and tileset frames");
 assert.ok(runtimeAssets.includes(String.raw`[a-zA-Z0-9_-]+\/frames\/frame-\d{2}\.svg`), "generated assets under a stable ID can load their own sliced frame files");
 assert.match(runtimeAssets, /frame-\\d\{2\}/, "runtime asset allowlist admits sliced sprite frames");
 assert.match(agentRoute, /assembled Canvas 2D project has no detectable visible drawing operations/, "audio-only or empty Canvas builds are rejected");
