@@ -15,6 +15,13 @@ const character = buildNative2DAsset({ prompt: "A skeleton player sprite", kind:
 assert.equal(character.manifest.frames, 4);
 assert.ok(character.manifest.frameNames.includes("walk-left"));
 assert.match(character.qualityReport.warnings[0].code, /NO_SKELETON_RIG/);
+assert.equal(character.manifest.animationClips.find(clip => clip.name === "walk").frames.length, 4);
+assert.equal(character.manifest.animationClips.find(clip => clip.name === "idle").frames.length, 1);
+assert.equal(character.manifest.frameFiles.length, 4);
+assert.deepEqual(Object.keys(character.frameFiles), ["frame-00.svg", "frame-01.svg", "frame-02.svg", "frame-03.svg"]);
+assert.ok(Object.values(character.frameFiles).every(frame => frame.startsWith("<svg ") && frame.includes("viewBox=")));
+assert.match(character.frameFiles["frame-00.svg"], /viewBox="0 0 128 128"/);
+assert.match(character.frameFiles["frame-03.svg"], /viewBox="384 0 128 128"/);
 const tiles = buildNative2DAsset({ prompt: "A city street tileset", kind: "tileset" });
 assert.equal(tiles.manifest.frames, 4);
 assert.deepEqual(tiles.manifest.frameNames, ["ground", "road", "wall", "sidewalk"]);
