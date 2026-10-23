@@ -36,7 +36,7 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
     // Count UTF-8 bytes, not UTF-16 code units, so non-ASCII SVG/manifest text cannot bypass the runtime payload cap.
     const contentBytes = new TextEncoder().encode(content).byteLength;
     // A JSON [key,value] pair has the same byte length as an object key/value pair including delimiters.
-    const pairBytes = new TextEncoder().encode(JSON.stringify([path, content]).replace(/</g, "\\\\u003c")).byteLength - 2;
+    const pairBytes = new TextEncoder().encode(JSON.stringify([path, content]).replace(/</g, "\\u003c")).byteLength - 2;
     const payloadBytes = pairBytes + (Object.keys(assets).length ? 1 : 0);
     if (totalBytes + contentBytes > MAX_RUNTIME_ASSET_BYTES || totalPayloadBytes + payloadBytes > MAX_RUNTIME_ASSET_BYTES) {
       omittedAssetCount += 1;
