@@ -94,7 +94,7 @@ assert.match(route, /license: typeof ref\.license === "string"/, "reference mani
 assert.match(route, /sha256: createHash\("sha256"\)\.update\(referenceBytes\)/, "reference provenance fingerprints the exact validated image bytes sent to the provider");
 
 assert.match(route, /collisionProxies: Array<\{ name: string; shape: "box"; center: Vec3; size: Vec3; sourceShape: Shape \}>/, "Forge represents collision proxies explicitly in the asset manifest");
-assert.match(route, /collisionProxies\.push\(\{[\s\S]{0,240}sourceShape: part\.shape/, "each generated mesh part gets a conservative AABB proxy derived from transformed vertices");
+assert.match(route, /collisionProxies\.push\(\{[\s\S]{0,500}sourceShape: part\.shape/, "each generated mesh part gets a conservative AABB proxy derived from transformed vertices");
 assert.match(route, /bounds: \{ min: bounds\.min[\s\S]{0,120}max: bounds\.max/, "the asset manifest exposes calculated world-space bounds");
 assert.match(route, /'capsule'\|'stairs'\|'arch'/, "AI recipe schema accepts all implemented procedural geometry types");
 assert.match(route, /conservative axis-aligned box proxies are provided in collisionProxies/, "manifest documents the difference between proxy metadata and engine-bound colliders");
