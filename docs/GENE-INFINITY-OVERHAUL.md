@@ -202,6 +202,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - Forge now decodes supplied reference images, enforces a decoded-byte budget in addition to the base64 character cap, validates the actual file signature against the declared JPEG/PNG/WebP MIME type, and forwards only the validated bytes. A client-supplied MIME label alone is no longer accepted as evidence of a valid image.
 
+## Research-to-Forge provenance increment (2026-10-23)
+
+- AI-generated 3D Forge manifests now retain sanitized source page/direct URL, declared license and attribution, MIME type, exact byte size, and SHA-256 of each validated reference image actually sent to the provider. Unsafe/non-HTTPS metadata links are omitted. A declared license remains metadata, not an automatic license approval.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
