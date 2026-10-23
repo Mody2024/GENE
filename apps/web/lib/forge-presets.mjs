@@ -24,9 +24,16 @@ function makeBuilding(prompt, quality, palette) {
   p.push(part("foundation", "beveledBox", [0,.25,0], [width+.6,.5,depth+.6], palette[4], "metal"));
   p.push(part("main facade", "beveledBox", [0,height/2+.5,0], [width,height,depth], palette[0]));
   p.push(part("roof slab", "beveledBox", [0,height+.55,0], [width+.35,.35,depth+.35], palette[2]));
-  p.push(part("entrance frame", "beveledBox", [0,1.35,depth/2+.045], [1.55,2.15,.12], palette[4], "metal"));
-  p.push(part("entrance glass", "box", [0,1.48,depth/2+.12], [.88,1.7,.035], "#7ca4b7", "glass"));
+  if (/\b(arch|arched|archway)\b/.test(text)) {
+    p.push(part("arched entrance surround", "arch", [0,1.15,depth/2+.045], [1.8,2.3,.16], palette[4], "metal"));
+  } else {
+    p.push(part("entrance frame", "beveledBox", [0,1.35,depth/2+.045], [1.55,2.15,.12], palette[4], "metal"));
+    p.push(part("entrance glass", "box", [0,1.48,depth/2+.12], [.88,1.7,.035], "#7ca4b7", "glass"));
+  }
   p.push(part("entrance canopy", "beveledBox", [0,2.55,depth/2+.38], [2.2,.18,.9], palette[3], "metal"));
+  if (/\b(stair|stairs|staircase)\b/.test(text)) {
+    p.push(part("front staircase", "stairs", [0,.62,depth/2+1.35], [2.6,1.2,2.7], palette[2]));
+  }
   const columns = 4, spacing = (width-1.6)/(columns-1);
   for (let floor=0; floor<floors; floor++) {
     const y = 1.45 + floor*floorH;
