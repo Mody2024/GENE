@@ -43,3 +43,8 @@ assert.match(runtimeAssets, /frame-\\\\d\{2,3\}/, "sprite asset paths must accep
 
 assert.match(runtimeAssets, /contentIntegrity:m\.contentIntegrity\|\|null/, "runtime asset listings expose exact-file fingerprints");
 assert.match(runtimeAssets, /Exact OBJ\/MTL SHA-256 fingerprints are missing or invalid/, "runtime asset validation warns on manifests without valid fingerprints");
+
+assert.match(runtimeAssets, /R\.verifyContentIntegrity=async function\(p\)/, "runtime assets support actual asynchronous SHA-256 verification");
+assert.match(runtimeAssets, /SHA-256 mismatch:/, "runtime integrity verification detects file contents changed after fingerprinting");
+assert.match(runtimeAssets, /FINGERPRINT_MISMATCH/, "tampered asset files produce an explicit integrity failure");
+assert.match(runtimeAssets, /crypto\.subtle\.digest\('SHA-256'/, "runtime verifier hashes the exact loaded text bytes with Web Crypto");
