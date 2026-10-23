@@ -118,7 +118,7 @@ assert.equal(importedImage.byteSize, pngFixture.length, "import reports the exac
 assert.equal(importedImage.sha256.length, 64, "import fingerprints exact downloaded bytes");
 assert.equal((await readBoundedImageResponse(new Response(Buffer.from("not png"), { headers: { "content-type": "image/png" } }))).code, "IMAGE_SIGNATURE_MISMATCH", "image payloads disguised with an image MIME are rejected");
 assert.equal((await readBoundedImageResponse(new Response(pngFixture, { headers: { "content-type": "text/html" } }))).code, "UNSUPPORTED_IMAGE_MIME", "non-image responses are rejected");
-assert.equal(MAX_RESEARCH_IMPORT_BYTES, 1_500_000, "the import byte budget is bounded");
+assert.equal(MAX_RESEARCH_IMPORT_BYTES, 350_000, "the import byte budget is bounded to protect project version storage");
 assert.match(researchImportRoute, /hasToolApproval\(body, "researchAssetImport"\)/, "research image import requires explicit tool approval");
 assert.match(researchImportRoute, /redirect: "manual"/, "image import refuses redirects that could escape the source allowlist");
 assert.match(researchImportRoute, /REDIRECT_NOT_ALLOWED/, "redirected downloads are rejected instead of followed");
