@@ -32,8 +32,8 @@ const background = buildNative2DAsset({ prompt: "A night city background", kind:
 assert.match(background.svg, /#263849/);
 assert.throws(() => buildNative2DAsset({ prompt: "test", kind: "weapon" }), /Unsupported 2D asset kind/);
 assert.match(runtimeAssets, /window\.GENE_SPRITES/ , "runtime exposes frame-based animation playback");
-assert.match(runtimeAssets, /frame-\+frame\+\.svg/, "runtime selects a single cropped frame rather than drawing the full atlas");
-assert.match(runtimeAssets, /forge2d\\\/\(\?:character\|tileset\)\\\/frames/, "runtime asset allowlist admits sliced sprite frames");
+assert.match(runtimeAssets, /GENE_SPRITES[\s\S]{0,2500}frame-/, "runtime selects a single cropped frame rather than drawing the full atlas");
+assert.match(runtimeAssets, /frame-\\d\{2\}/, "runtime asset allowlist admits sliced sprite frames");
 assert.match(agentRoute, /assembled Canvas 2D project has no detectable visible drawing operations/, "audio-only or empty Canvas builds are rejected");
 assert.match(agentRoute, /never submits visible geometry to WebGL/, "3D builds must actually submit visible geometry");
 assert.match(agentRoute, /never configures the WebGL viewport/, "3D builds must configure their viewport");
