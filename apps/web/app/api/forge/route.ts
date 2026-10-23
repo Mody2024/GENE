@@ -397,6 +397,10 @@ function withForgeAssetMetadata(asset: any, prompt: string, mode: "native" | "ai
   };
 }
 
+function safeHttpsUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString().slice(0, 1200) : null; } catch { return null; }
+}
 function attachContentIntegrity(manifest: any, obj: string, mtl: string) {
   return {
     ...manifest,
@@ -499,6 +503,7 @@ export async function POST(request: NextRequest) {
   let totalImageChars = 0;
   let totalImageBytes = 0;
   let imageCount = 0;
+  const acceptedReferenceProvenance: Array<Record<string, unknown>> = [];
   for (const ref of references) {
     if (ref?.kind !== "image" || typeof ref.dataBase64 !== "string") continue;
     if (imageCount >= 2) break;
@@ -510,6 +515,17 @@ export async function POST(request: NextRequest) {
     totalImageBytes += referenceBytes.byteLength;
     if (!referenceBytes.byteLength || referenceBytes.byteLength > 400_000 || totalImageBytes > 550_000) return fail(413, "REFERENCE_TOO_LARGE", "Decoded Forge reference images exceed the byte budget.");
     if (!hasValidImageSignature(ref.mimeType, referenceBytes)) return fail(400, "REFERENCE_SIGNATURE_MISMATCH", "A Forge reference image does not match its declared raster MIME type.");
+    acceptedReferenceProvenance.push({
+      title: typeof ref.title === "string" ? ref.title.trim().slice(0, 160) : "",
+      source: typeof ref.source === "string" ? ref.source.trim().slice(0, 120) : "",
+      sourcePage: safeHttpsUrl(ref.sourcePage || ref.page),
+      sourceUrl: safeHttpsUrl(ref.full || ref.url),
+      license: typeof ref.license === "string" ? ref.license.trim().slice(0, 120) : "",
+      attribution: typeof ref.attribution === "string" ? ref.attribution.trim().slice(0, 240) : "",
+      mimeType: ref.mimeType,
+      byteSize: referenceBytes.byteLength,
+      sha256: createHash("sha256").update(referenceBytes).digest("hex")
+    });
     parts.push({ inlineData: { mimeType: ref.mimeType, data: referenceBytes.toString("base64") } });
     imageCount++;
   }
@@ -609,7 +625,7 @@ export async function POST(request: NextRequest) {
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
-    const manifest = attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel), mesh.obj, mesh.mtl);
+    const manifest = { ...attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel), mesh.obj, mesh.mtl), referenceInputs: acceptedReferenceProvenance };
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
