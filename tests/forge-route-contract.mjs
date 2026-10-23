@@ -69,3 +69,8 @@ assert.equal((route.match(/attachContentIntegrity\(withForgeAssetMetadata/g) || 
 assert.match(twoDRoute, /createHash\("sha256"\)\.update\(asset\.svg, "utf8"\)\.digest\("hex"\)/, "native 2D sprite SVG receives a SHA-256 fingerprint");
 assert.match(twoDRoute, /integrityFiles\["frames\/" \+ name\] = createHash\("sha256"\)/, "every cropped animation frame receives its own fingerprint");
 assert.match(twoDRoute, /contentIntegrity: \{ algorithm: "sha256", files: integrityFiles \}/, "2D asset manifest stores exact source and frame fingerprints");
+
+assert.match(route, /"stairs" \| "arch"/, "Forge accepts useful procedural architectural shapes");
+assert.match(route, /const steps = 5/, "stair geometry is generated from bounded step segments");
+assert.match(route, /const segments = 16/, "arched geometry uses a curved segmented mesh rather than a flat placeholder");
+assert.match(route, /Allowed shapes: box, beveledBox[\s\S]{0,180}stairs, arch/, "AI modelling instructions describe the new shapes");
