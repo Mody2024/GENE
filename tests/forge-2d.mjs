@@ -45,11 +45,12 @@ const runtimeSandbox = { crypto: webcrypto, TextEncoder, window: { __GENE_ASSETS
   "assets/verified/asset.json": JSON.stringify({ assetId: "gene3d-verified-1234", version: 1, provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" }, contentIntegrity: { algorithm: "sha256", files: { "model.obj": sha256(verifiedObj), "model.mtl": sha256(verifiedMtl) } } }),
   "assets/verified/model.obj": verifiedObj,
   "assets/verified/model.mtl": verifiedMtl,
+  "assets/forge2d/character.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-00.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-01.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-02.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-03.svg": "<svg></svg>",
-  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", animationClips: [{ name: "idle", frames: [0], frameDurationMs: 220, loop: true }, { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 110, loop: true }, { name: "move-left", frames: [1, 2, 3, 0], frameDurationMs: 110, loop: true }, { name: "move-right", frames: [3, 2, 1, 0], frameDurationMs: 110, loop: true }], provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } }),
+  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", contentIntegrity: { algorithm: "sha256", files: { "assets/forge2d/character.svg": sha256("<svg></svg>"), "assets/forge2d/character/frames/frame-00.svg": sha256("<svg></svg>"), "assets/forge2d/character/frames/frame-01.svg": sha256("<svg></svg>"), "assets/forge2d/character/frames/frame-02.svg": sha256("<svg></svg>"), "assets/forge2d/character/frames/frame-03.svg": sha256("<svg></svg>") } }, animationClips: [{ name: "idle", frames: [0], frameDurationMs: 220, loop: true }, { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 110, loop: true }, { name: "move-left", frames: [1, 2, 3, 0], frameDurationMs: 110, loop: true }, { name: "move-right", frames: [3, 2, 1, 0], frameDurationMs: 110, loop: true }], provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } }),
   "assets/models/environment.json": JSON.stringify({ assetId: "gene3d-environment-9012", version: 1, name: "Environment", kind: "environment", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } })
 } } };
 vm.runInNewContext(runtimeScriptArray("runtime"), runtimeSandbox);
@@ -70,6 +71,11 @@ vm.runInNewContext(runtimeScriptArray("art"), { window: runtimeSandbox.window, I
 const spriteValidation = runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character");
 assert.equal(spriteValidation.ok, true, "complete sprite manifests pass frame-integrity validation");
 assert.equal(spriteValidation.frameCount, 13, "sprite validation counts frames across animation clips, including repeated frame references");
+const spriteIntegrity = await runtimeRegistry.verifyContentIntegrity("assets/forge2d/character.json");
+assert.equal(spriteIntegrity.ok, true, "2D sheet and frame fingerprints verify against project paths");
+runtimeSandbox.window.__GENE_ASSETS__["assets/forge2d/character/frames/frame-03.svg"] = "<svg><path/></svg>";
+assert.equal((await runtimeRegistry.verifyContentIntegrity("assets/forge2d/character.json")).ok, false, "modified 2D frames fail integrity verification");
+runtimeSandbox.window.__GENE_ASSETS__["assets/forge2d/character/frames/frame-03.svg"] = "<svg></svg>";
 const missingFrameAssets = { ...runtimeSandbox.window.__GENE_ASSETS__ };
 delete missingFrameAssets["assets/forge2d/character/frames/frame-03.svg"];
 runtimeSandbox.window.__GENE_ASSETS__ = missingFrameAssets;
