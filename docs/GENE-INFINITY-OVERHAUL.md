@@ -33,6 +33,8 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 - Build/source checkpoints can no longer set the gameplay-verified status; the live preview remains "rendered" until gameplay is separately verified.
 - Expanded the browser smoke fixture to exercise all four reachable objectives, confirm the win state, and verify restart resets the score and spawn. This is an end-to-end test fixture, not proof that every generated game is verified.
 - Research now suppresses low-relevance web results and labels encyclopedic context, image references and model catalog entries as reference-only until actual import occurs.
+- App research now uses interface, interaction-pattern and accessibility queries rather than game-mechanics searches.
+- Wikimedia candidates expose source byte size, dimensions and checksum when available. Thumbnail downloads are streamed with a strict byte cap rather than buffering an unbounded response. Automatic external-asset import is not yet implemented; candidates explicitly require license, MIME, signature and size review.
 
 ## Wave 1 — Trustworthy AI, permissions and playable runtime
 
