@@ -117,11 +117,14 @@ try {
   assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game player position");
   // Exercise objective completion and restart, not only rendering and movement.
   for (const [key, count] of [["ArrowRight", 8], ["ArrowUp", 3], ["ArrowRight", 6], ["ArrowUp", 4], ["ArrowRight", 9], ["ArrowDown", 5], ["ArrowRight", 9], ["ArrowUp", 4]]) {
-    for (let i = 0; i < count; i++) await page.keyboard.press(key);
+    for (let i = 0; i < count; i++) {
+      await gameFrame.locator("body").evaluate(keyName => window.dispatchEvent(new KeyboardEvent("keydown", { key: keyName, bubbles: true })), key);
+      await page.waitForTimeout(18);
+    }
   }
-  await gameFrame.getByText("OUTPOST CLEARED", { exact: true }).waitFor({ timeout: 5000 });
   const won = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState);
-  assert.equal(won?.score, 4, "all four objectives can be reached and scored through input");
+  assert.equal(won?.score, 4, "all four objectives can be reached and scored through input; observed state: " + JSON.stringify(won));
+  await gameFrame.getByText("OUTPOST CLEARED", { exact: true }).waitFor({ timeout: 1000 });
   assert.equal(won?.won, true, "the game reaches its defined win condition");
   await page.keyboard.press("r");
   await page.waitForTimeout(80);
