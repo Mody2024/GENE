@@ -538,7 +538,7 @@ export async function POST(request: NextRequest) {
       title: typeof ref.title === "string" ? ref.title.trim().slice(0, 160) : "",
       source: typeof ref.source === "string" ? ref.source.trim().slice(0, 120) : "",
       sourcePage: safeHttpsUrl(ref.sourcePage || ref.page),
-      sourceUrl: safeHttpsUrl(ref.full || ref.url),
+      sourceUrl: safeHttpsUrl(ref.sourceUrl || ref.full || ref.url),
       license: typeof ref.license === "string" ? ref.license.trim().slice(0, 120) : "",
       attribution: typeof ref.attribution === "string" ? ref.attribution.trim().slice(0, 240) : "",
       mimeType: ref.mimeType,
