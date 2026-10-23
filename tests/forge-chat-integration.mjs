@@ -48,3 +48,7 @@ assert.match(page, /sourcePage: String\(sourceImage\.page \|\| ""\)/, "research 
 assert.match(page, /sourceUrl: String\(sourceImage\.full \|\| sourceImage\.thumb \|\| ""\)/, "research image references preserve the exact image URL");
 assert.match(page, /filter\(ref => ref\.kind === "image" && ref\.dataBase64\)\.slice\(0, 2\)/, "automated and manual Forge calls pass actual image pixels rather than text-only references");
 assert.match(page, /filter\(ref => ref\.kind === "text"\)\.slice\(0, 2\)/, "text notes remain available alongside image references");
+
+assert.match(page, /const savedResearchImages = useMemo/, "imported research images are enumerated from project manifests");
+assert.match(page, /RESEARCH REFERENCES[\s\S]{0,900}Imported images/, "the asset library displays imported reference images");
+assert.match(page, /removeForgeAsset\(asset\.id\)/, "imported reference files can be removed through the existing asset removal flow");
