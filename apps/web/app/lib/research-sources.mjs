@@ -156,7 +156,8 @@ export function parseGoogleSearchResults(data, topic, limit = 5) {
     const relevance = Math.min(100, Math.round((queryTerms.length ? matched.length / queryTerms.length * 80 : 0) + phraseBonus));
     scored.push({ title, snippet, url, source: hostname, relevance, resultType: "technical-evidence", integrationState: "reference-only" });
   }
-  return scored.sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
+  // Suppress zero-relevance noise instead of filling the research panel with unrelated results.
+  return scored.filter(item => item.relevance >= 15).sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
 }
 
 /** Assemble the single research bundle that is shown on the message and sent to GENE.
