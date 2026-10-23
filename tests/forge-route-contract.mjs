@@ -74,3 +74,8 @@ assert.match(route, /"stairs" \| "arch"/, "Forge accepts useful procedural archi
 assert.match(route, /const steps = 5/, "stair geometry is generated from bounded step segments");
 assert.match(route, /const segments = 16/, "arched geometry uses a curved segmented mesh rather than a flat placeholder");
 assert.match(route, /Allowed shapes: box, beveledBox[\s\S]{0,180}stairs, arch/, "AI modelling instructions describe the new shapes");
+
+assert.match(route, /function assertValidPrimitiveMesh\(/, "Forge validates generated primitive geometry before export");
+assert.match(route, /contains a non-finite vertex/, "non-finite mesh coordinates are rejected");
+assert.match(route, /contains an invalid face/, "invalid face indices cannot be written into an OBJ file");
+assert.match(route, /assertValidPrimitiveMesh\(mesh, part\.name\)/, "every generated part passes topology validation");
