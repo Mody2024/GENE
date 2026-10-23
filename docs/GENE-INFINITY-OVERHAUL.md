@@ -206,6 +206,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - AI-generated 3D Forge manifests now retain sanitized source page/direct URL, declared license and attribution, MIME type, exact byte size, and SHA-256 of each validated reference image actually sent to the provider. Unsafe/non-HTTPS metadata links are omitted. A declared license remains metadata, not an automatic license approval.
 
+## Scene-wide asset verification increment (2026-10-23)
+
+- Added an asynchronous scene-wide verification helper that checks each visible scene mesh through the mesh-readiness report and SHA-256 integrity verifier. It returns per-object results and does not alter the render/playability state by itself.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
