@@ -64,12 +64,12 @@ export function rankVisualReferenceResults(images, topic) {
     const categoryTerms = CATEGORY_TERMS[category] || [];
     const topicHits = terms.filter(term => title.includes(term));
     const categoryHits = categoryTerms.filter(term => title.includes(term));
-    const score = topicHits.length * 4 + categoryHits.length;
+    const score = topicHits.length * 4 + (categoryHits.length ? 1 : 0);
     return { image, index, score, topicHits: topicHits.length, categoryHits: categoryHits.length };
   });
   // If the query is specific, a generic category match is not enough: reject unrelated
   // images instead of filling slots with irrelevant material. Keep topic-matching items first.
   return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || item.categoryHits >= 2))
-    .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || b.categoryHits - a.categoryHits || a.index - b.index)
+    .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || a.index - b.index)
     .map(item => ({ ...item.image, relevanceScore: item.score }));
 }
