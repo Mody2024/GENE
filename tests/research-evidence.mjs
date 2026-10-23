@@ -39,6 +39,8 @@ const bundle = buildResearchBundle({
 });
 assert.equal(bundle.webResults.length, 2);
 assert.equal(bundle.webResults[0].integrationState, "reference-only");
+assert.equal(bundle.facts[0].resultType, "encyclopedic-context");
+assert.equal(bundle.facts[0].integrationState, "reference-only", "encyclopedic context is not an imported asset");
 assert.ok(bundle.webResults[0].relevance >= bundle.webResults[1].relevance);
 const notes = formatResearchNotes(bundle);
 assert.match(notes, /Web research \(ranked by topic relevance\)/);
