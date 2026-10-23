@@ -1978,7 +1978,12 @@ export default function Home() {
       const assetId = "art-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
       const prefix = "assets/" + assetId + "/";
       const manifest = { ...JSON.parse(data.files["asset.json"]), assetId, name: data.asset.name, kind: data.asset.kind, width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider };
-      const files = { ...project.files, [prefix + "sprite.svg"]: String(data.asset.svg), [prefix + "asset-2d.json"]: JSON.stringify(manifest, null, 2) };
+      const files = {
+        ...project.files,
+        [prefix + "sprite.svg"]: String(data.asset.svg),
+        [prefix + "asset-2d.json"]: JSON.stringify(manifest, null, 2),
+        ...Object.fromEntries(Object.entries(data.asset.frameFiles || {}).map(([name, svg]) => [prefix + "frames/" + name, String(svg)]))
+      };
       const versionNumber = (project.versions[0]?.number || 0) + 1;
       const version: BuildVersion = { number: versionNumber, label: "Generated 2D asset: " + String(data.asset.name), files: { ...files }, createdAt: now(), testSummary: "Generated a self-contained procedural SVG and a versioned 2D manifest. Visual integration into the running game and raster conversion are not yet verified." };
       const reply = message("assistant", "Generated **" + data.asset.name + "** as native procedural SVG artwork. Saved " + prefix + "sprite.svg and the asset manifest. This generator uses vector shapes and curated palettes; it is not an external image model, and the asset has not been automatically inserted into the game scene.", "build");
@@ -1987,7 +1992,7 @@ export default function Home() {
       setForgePrompt("");
       setSection("assets");
       setForgeNotice("2D artwork saved in version " + versionNumber + ". Use the asset's integration action to request insertion into the playable game; scene integration must be tested separately.");
-      addActivity("Saved " + prefix + "sprite.svg (" + data.asset.qualityReport.svgBytes + " bytes) and asset-2d.json");
+      addActivity("Saved " + prefix + "sprite.svg (" + data.asset.qualityReport.svgBytes + " bytes), asset-2d.json, and " + Object.keys(data.asset.frameFiles || {}).length + " animation frame files.");
       if (localAgentStatus === "connected" && localAgentToken && updated.files["game.html"] && updated.files["game.js"]) {
         try {
           const diskResult = await writeProjectToDisk(updated, localAgentUrl, localAgentToken);
