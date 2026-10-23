@@ -24,3 +24,7 @@ assert.match(source, /status="integrity-failed"/, "scene status blocks assets wh
 
 assert.match(source, /verifyAllAssets=async function\(\)/, "runtime exposes a scene-wide asset verification pass");
 assert.match(source, /targets\.map\(async function\(o\)\{var status=await scene\.getAssetStatusVerified\(o\.id\)/, "scene-wide verification checks every visible mesh object against actual asset hashes");
+
+assert.match(source, /collisionProxyCount:collisionProxies\.length/, "scene mesh readiness reports collision proxy metadata availability");
+assert.match(source, /physicsColliderInstantiated:false/, "scene reports never mistake collision metadata for an instantiated physics collider");
+assert.match(source, /No collision proxy metadata is available/, "scene readiness warns when a visible mesh has no collision metadata");
