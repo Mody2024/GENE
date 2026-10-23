@@ -26,6 +26,10 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     };
     const seenIds = new Set<string>();
     const duplicateIds: string[] = [];
+    const invalidObjectEntryIndices = rawObjects.slice(0, 500).reduce<number[]>((indices, entry, index) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) indices.push(index);
+      return indices;
+    }, []);
     scene = {
       version: 1,
       objects: rawObjects.slice(0, 500).map((entry, index) => {
@@ -53,7 +57,13 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           camera: (() => { const c = raw.camera && typeof raw.camera === "object" ? raw.camera as Record<string, unknown> : {}; const fov = Number(c.fov); return { fov: Number.isFinite(fov) ? Math.max(10, Math.min(120, fov)) : 60 }; })()
         };
       }),
-      integrity: { duplicateIds }
+      integrity: {
+        duplicateIds,
+        sourceObjectCount: rawObjects.length,
+        loadedObjectCount: Math.min(rawObjects.length, 500),
+        truncatedObjectCount: Math.max(0, rawObjects.length - 500),
+        invalidObjectEntryIndices
+      }
     };
   } catch {
     scene = { version: 1, objects: [], error: "Invalid game-spec.json scene manifest" };
