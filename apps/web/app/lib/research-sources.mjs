@@ -53,7 +53,7 @@ export function filterPolyHaven(catalog, query, limit = 6) {
       if (tags.some(tag => tag === word || tag.includes(word))) score += 3;
       if (cats.some(cat => cat.includes(word))) score += 2;
     }
-    if (score > 0) results.push({ id, name: String(item.name || id), tags: tags.slice(0, 6), score, url: "https://polyhaven.com/a/" + encodeURIComponent(id), license: "CC0" });
+    if (score > 0) results.push({ id, name: String(item.name || id), tags: tags.slice(0, 6), score, url: "https://polyhaven.com/a/" + encodeURIComponent(id), license: "CC0", licenseState: "source-declared-CC0", integrationState: "catalog-reference", assetType: "downloadable-3d-model" });
   }
   return results.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, limit);
 }
@@ -113,7 +113,7 @@ export function parseCommonsFiles(data, kind = "image") {
     const license = stripHtml(meta.LicenseShortName && meta.LicenseShortName.value);
     if (!license) continue; // never present a file whose licence we cannot state
     const title = String(page.title || "").replace(/^File:/i, "").replace(/\.[A-Za-z0-9]+$/, "").replace(/_/g, " ");
-    const base = { id: "commons-" + String(page.pageid || title), title, license, credit: stripHtml(meta.Artist && meta.Artist.value).slice(0, 120) || "Wikimedia Commons contributors", page: String(info.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(String(page.title || "").replace(/ /g, "_"))), source: "Wikimedia Commons" };
+    const base = { id: "commons-" + String(page.pageid || title), title, license, licenseState: "source-declared-review-per-asset", integrationState: "reference-only", credit: stripHtml(meta.Artist && meta.Artist.value).slice(0, 120) || "Wikimedia Commons contributors", page: String(info.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(String(page.title || "").replace(/ /g, "_"))), source: "Wikimedia Commons" };
     if (kind === "audio") {
       if (!AUDIO_NAME.test(String(page.title || "")) && !/^audio\//i.test(String(info.mime || ""))) continue;
       out.push({ ...base, url: info.url });
@@ -154,7 +154,7 @@ export function parseGoogleSearchResults(data, topic, limit = 5) {
     const matched = queryTerms.filter(term => haystack.includes(term));
     const phraseBonus = cleanQuery(topic).length > 4 && haystack.includes(cleanQuery(topic).toLowerCase()) ? 20 : 0;
     const relevance = Math.min(100, Math.round((queryTerms.length ? matched.length / queryTerms.length * 80 : 0) + phraseBonus));
-    scored.push({ title, snippet, url, source: hostname, relevance });
+    scored.push({ title, snippet, url, source: hostname, relevance, resultType: "technical-evidence", integrationState: "reference-only" });
   }
   return scored.sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
 }
@@ -168,9 +168,9 @@ export function buildResearchBundle(input) {
   const images = [];
   const seen = new Set();
   const pushImage = item => { const key = item.thumb || item.full; if (key && !seen.has(key)) { seen.add(key); images.push(item); } };
-  for (const page of wiki) if (page.thumb) pushImage({ id: "wiki-" + page.title, title: page.title, thumb: page.thumb, full: page.thumb, page: page.url, license: "See Wikipedia page", credit: "Wikipedia", source: "Wikipedia" });
+  for (const page of wiki) if (page.thumb) pushImage({ id: "wiki-" + page.title, title: page.title, thumb: page.thumb, full: page.thumb, page: page.url, license: "See Wikipedia page", licenseState: "license-unverified-review-source-page", integrationState: "reference-only", credit: "Wikipedia", source: "Wikipedia" });
   for (const file of (Array.isArray(input.commonsImages) ? input.commonsImages : [])) pushImage(file);
-  const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" }));
+  const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven", licenseState: model.licenseState || "source-declared-CC0", integrationState: "catalog-reference", assetType: "downloadable-3d-model" }));
   const matches = matchGameKnowledge(topic, 3);
   const webResults = parseGoogleSearchResults({ items: Array.isArray(input.webResults) ? input.webResults : [] }, topic, 5);
   // Round-robin category-tagged references so UI, gameplay, characters and environments
