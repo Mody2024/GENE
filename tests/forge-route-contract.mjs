@@ -17,6 +17,10 @@ assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetRe
 assert.match(route, /if \(!text\)\s*\{\s*const native = nativeAssetResponse/, "native generation must recover from provider failures");
 assert.match(route, /function stableForgeAssetId/, "3D assets must receive stable IDs");
 assert.match(route, /function withForgeAssetMetadata/, "3D assets must carry a canonical versioned manifest");
+assert.match(route, /runtimeCompatibility:/, "3D assets must expose runtime capability metadata");
+assert.match(route, /textures: "not-included"/, "3D manifests must not imply texture support when textures are not exported");
+assert.match(route, /rigging: "not-supported-by-current-pipeline"/, "3D manifests must clearly disclose missing rigging support");
+assert.match(route, /qualityEvidence: "structural-only; no automatic visual equivalence claim"/, "structural QA must not be presented as proof of visual fidelity");
 assert.match(route, /externalDependencies: \[\]/, "native and AI-generated meshes must disclose their external dependency list");
 assert.match(route, /sourcePrompt: prompt\.slice/, "3D asset provenance must retain the source brief");
 assert.match(route, /assetId: manifest\.assetId, version: manifest\.version, manifest/, "API response and exported manifest must share one identity");
