@@ -33,6 +33,9 @@ for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
   assert.equal(asset.manifest.assetId, asset.assetId, "manifest and asset must share a stable identity");
   assert.equal(asset.manifest.version, 1, "newly generated assets must be versioned");
   assert.equal(asset.manifest.provenance.origin, "generated", "asset provenance must distinguish generated from imported assets");
+  assert.equal(asset.manifest.runtimeCompatibility.renderer, "Canvas 2D via GENE_ART/GENE_SPRITES", "2D manifests must identify the actual runtime integration path");
+  assert.equal(asset.manifest.runtimeCompatibility.rigging, "not-included", "frame animation must not be misrepresented as skeletal rigging");
+  assert.equal(asset.manifest.runtimeCompatibility.collision, "must-be-configured-by-game-integration", "generated art must not imply that gameplay collision was automatically created");
   assert.deepEqual(asset.manifest.provenance.externalDependencies, [], "native assets must disclose their external dependency list");
 
   assert.ok(!/<script|<image|href=/i.test(asset.svg), "asset should not contain scripts or externally embedded resources");
