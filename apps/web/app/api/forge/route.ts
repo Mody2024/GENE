@@ -329,7 +329,18 @@ function withForgeAssetMetadata(asset: any, prompt: string, mode: "native" | "ai
       externalDependencies: [],
       license: "GENE-generated; no third-party source embedded"
     },
-    intendedScene: null
+    intendedScene: null,
+    runtimeCompatibility: {
+      format: "OBJ/MTL",
+      geometry: "static-mesh",
+      materialSupport: ["diffuse-color"],
+      textures: "not-included",
+      uvMaps: "not-exported-by-current-pipeline",
+      rigging: "not-supported-by-current-pipeline",
+      animation: "not-included",
+      colliders: "must-be-created-by-scene-integration",
+      qualityEvidence: "structural-only; no automatic visual equivalence claim"
+    }
   };
 }
 
