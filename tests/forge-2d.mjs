@@ -43,6 +43,11 @@ const background = buildNative2DAsset({ prompt: "A night city background", kind:
 assert.match(background.svg, /#263849/);
 assert.throws(() => buildNative2DAsset({ prompt: "test", kind: "weapon" }), /Unsupported 2D asset kind/);
 assert.match(runtimeAssets, /window\.GENE_SPRITES/ , "runtime exposes frame-based animation playback");
+assert.match(runtimeAssets, /GENE_DIAGNOSTICS/, "isolated game runtime exposes render and error diagnostics");
+assert.match(runtimeAssets, /canvasOps:0,webglDrawCalls:0,animationFrames:0/, "runtime diagnostics distinguish 2D drawing, 3D draw calls, and frame-loop activity");
+assert.match(runtimeAssets, /unhandledrejection/, "runtime diagnostics capture unhandled async failures");
+assert.match(runtimeAssets, /hasCanvas:/, "runtime diagnostics report whether a canvas exists");
+
 assert.match(runtimeAssets, /S\.detectFrames=function/, "runtime can detect transparent frame boundaries in sprite sheets");
 assert.match(runtimeAssets, /S\.createSheetClip=function/, "runtime supports imported sprite sheets with explicit clip metadata");
 assert.match(runtimeAssets, /S\.drawSheet=function/, "runtime can crop one source rectangle from a sprite sheet");
