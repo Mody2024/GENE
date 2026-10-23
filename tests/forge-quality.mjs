@@ -37,3 +37,17 @@ const palette = analyzeForgeRecipe({ parts: Array.from({ length: 14 }, (_, i) =>
 assert.ok(palette.warnings.some(w => w.code === "PALETTE_FRAGMENTATION"));
 assert.ok(palette.score >= 0 && palette.score <= 100);
 console.log("Forge structural QA tests passed (bounds, rotation, duplicates, palette, and honest QA scope).");
+
+const empty = analyzeForgeRecipe({ parts: [] });
+assert.equal(empty.status, "invalid", "an empty recipe must not be reported as a clean asset");
+assert.ok(empty.warnings.some(w => w.code === "EMPTY_ASSET"));
+const malformed = analyzeForgeRecipe({ parts: [
+  part("bad-shape", [0, 0.5, 0], { shape: "magicMesh" }),
+  part("bad-transform", [0, 0.5], { scale: [1, 1, 1] }),
+  part("zero-scale", [0, 0.5, 0], { scale: [1, 0, 1] })
+] });
+assert.equal(malformed.status, "invalid", "unknown shapes and unusable transforms must fail structural QA");
+assert.ok(malformed.warnings.some(w => w.code === "UNSUPPORTED_SHAPE"));
+assert.ok(malformed.warnings.some(w => w.code === "INVALID_TRANSFORM"));
+assert.ok(malformed.warnings.some(w => w.code === "DEGENERATE_SCALE"));
+assert.ok(malformed.score < 100, "structural errors must affect the quality score");
