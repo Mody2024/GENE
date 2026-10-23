@@ -9,8 +9,8 @@ function runtimeScriptArray(name) {
   const bodyStart = runtimeAssets.indexOf("[", start) + 1;
   const end = runtimeAssets.indexOf('].join("");', bodyStart);
   assert.ok(end > bodyStart, "runtime bootstrap array closes: " + name);
-  return runtimeAssets.slice(bodyStart, end).split("\\n")
-    .map(line => line.match(/^\\s*("(?:\\\\.|[^"\\\\])*")\\s*,?$/))
+  return runtimeAssets.slice(bodyStart, end).split("\n")
+    .map(line => line.match(/^\s*("(?:\\.|[^"\\])*")\s*,?$/))
     .filter(Boolean)
     .map(match => JSON.parse(match[1]))
     .join("");
