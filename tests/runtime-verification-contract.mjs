@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const page = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
+const prompts = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
 assert.match(page, /const persistRun = \(run: BuildRun, previewStatus: "booting" \| "stale" \| "error"/, "source validation/build checkpoints cannot set gameplay-verified status");
 assert.match(page, /livingPreview: \{ status: previewStatus[\s\S]{0,260}canContinuePlaying: false/, "a build checkpoint must not claim the game is playable before runtime verification");
 assert.match(page, /livingPreview: \{ status: "rendered"[\s\S]{0,260}Verify player controls, interaction, and the core gameplay loop/, "a visible render is explicitly not the same as verified gameplay");
@@ -50,3 +51,5 @@ assert.match(runtimeAssets, /FINGERPRINT_MISMATCH/, "tampered asset files produc
 assert.match(runtimeAssets, /crypto\.subtle\.digest\('SHA-256'/, "runtime verifier hashes the exact loaded text bytes with Web Crypto");
 
 assert.match(runtimeAssets, /Sprite sheet\/frame SHA-256 fingerprints are missing/, "2D animation manifests are checked for source and frame fingerprints too");
+
+assert.match(prompts, /GAMEPLAY TELEMETRY CONTRACT[\s\S]{0,700}Never treat game-authored telemetry as independent proof/, "generated games receive honest instructions for reporting real gameplay transitions");
