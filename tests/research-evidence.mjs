@@ -41,7 +41,8 @@ assert.equal(bundle.webResults.length, 1, "unrelated results are removed from th
 assert.equal(bundle.webResults[0].integrationState, "reference-only");
 assert.equal(bundle.facts[0].resultType, "encyclopedic-context");
 assert.equal(bundle.facts[0].integrationState, "reference-only", "encyclopedic context is not an imported asset");
-assert.ok(bundle.webResults[0].relevance >= bundle.webResults[1].relevance);
+assert.ok(bundle.webResults[0].relevance >= 15, "the assembled bundle keeps only meaningful topic matches");
+assert.equal(bundle.webResults.some(result => /gardening/i.test(result.title)), false, "unrelated hits must not reach the builder context");
 const notes = formatResearchNotes(bundle);
 assert.match(notes, /Web research \(ranked by topic relevance\)/);
 assert.match(notes, /relevance \d+\/100/);
