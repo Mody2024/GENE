@@ -210,6 +210,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - Added an asynchronous scene-wide verification helper that checks each visible scene mesh through the mesh-readiness report and SHA-256 integrity verifier. It returns per-object results and does not alter the render/playability state by itself.
 
+## Research import readiness increment (2026-10-23)
+
+- Wikimedia asset candidates now carry explicit import blockers and a required-check list covering license/attribution review, downloaded size, response MIME, file signature, project path, and source provenance. This makes the boundary clear: finding a downloadable candidate is not the same as approving or importing it.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
