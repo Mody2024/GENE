@@ -35,7 +35,9 @@ assert.deepEqual(Array.from(runtimeDiagnostics.inputTypes), ["keydown"], "runtim
 assert.equal(observedMessages.filter(message => message.state === "input-observed").length, 1, "the first input emits one diagnostic event without claiming gameplay verification");
 
 const runtimeSandbox = { window: { __GENE_ASSETS__: {
-  "assets/skeleton/asset.json": JSON.stringify({ assetId: "gene3d-skeleton-1234", version: 1, name: "Skeleton", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } }),
+  "assets/skeleton/asset.json": JSON.stringify({ assetId: "gene3d-skeleton-1234", version: 1, name: "Skeleton", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL", textures: "not-included", rigging: "not-supported-by-current-pipeline", colliders: "must-be-created-by-scene-integration" } }),
+  "assets/skeleton/model.obj": "o Skeleton\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nf 1 2 3\\n",
+  "assets/skeleton/model.mtl": "newmtl body\\nKd 0.5 0.5 0.5\\n",
   "assets/forge2d/character/frames/frame-00.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-01.svg": "<svg></svg>",
   "assets/forge2d/character/frames/frame-02.svg": "<svg></svg>",
@@ -45,7 +47,20 @@ const runtimeSandbox = { window: { __GENE_ASSETS__: {
 } } };
 vm.runInNewContext(runtimeScriptArray("runtime"), runtimeSandbox);
 const runtimeRegistry = runtimeSandbox.window.GENE_ASSET_REGISTRY;
+const skeletonValidation = runtimeRegistry.validate("assets/skeleton/asset.json");
+assert.equal(skeletonValidation.ok, true, "valid OBJ geometry remains usable in the runtime asset registry");
+assert.equal(skeletonValidation.code, "ASSET_REVIEW_REQUIRED", "missing exact-file hashes and static-only limitations remain visible as warnings");
+assert.ok(skeletonValidation.warnings.some(w => /SHA-256 fingerprints/.test(w)), "runtime registry flags manifests without content hashes");
+assert.ok(runtimeRegistry.resolve("gene3d-skeleton-1234").validation, "asset lookup returns its runtime integrity assessment");
 vm.runInNewContext(runtimeScriptArray("art"), { window: runtimeSandbox.window, Image: function Image() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; Object.defineProperty(this, "src", { set() {} }); } });
+const spriteValidation = runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character");
+assert.equal(spriteValidation.ok, true, "complete sprite manifests pass frame-integrity validation");
+assert.equal(spriteValidation.frameCount, 9, "sprite validation counts frames across animation clips, including repeated frame references");
+const missingFrameAssets = { ...runtimeSandbox.window.__GENE_ASSETS__ };
+delete missingFrameAssets["assets/forge2d/character/frames/frame-03.svg"];
+runtimeSandbox.window.__GENE_ASSETS__ = missingFrameAssets;
+assert.equal(runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character").ok, false, "missing referenced animation frames are caught");
+runtimeSandbox.window.__GENE_ASSETS__ = { ...missingFrameAssets, "assets/forge2d/character/frames/frame-03.svg": "<svg></svg>" };
 const spriteController = runtimeSandbox.window.GENE_SPRITES.createController("assets/forge2d/character");
 assert.equal(spriteController.getClip(), "idle", "new sprite controllers start on idle when available");
 assert.equal(spriteController.update(1, 0), "move-right", "horizontal movement selects the matching direction clip");
