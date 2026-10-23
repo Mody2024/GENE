@@ -55,3 +55,6 @@ assert.match(runtimeAssets, /Sprite sheet\/frame SHA-256 fingerprints are missin
 assert.match(prompts, /GAMEPLAY TELEMETRY CONTRACT[\s\S]{0,700}Never treat game-authored telemetry as independent proof/, "generated games receive honest instructions for reporting real gameplay transitions");
 
 assert.match(page, /state === "gameplay-event"[\s\S]{0,500}not independent gameplay verification/, "the workspace surfaces gameplay telemetry while explicitly avoiding false verification claims");
+
+assert.match(runtimeAssets, /Sprite manifest\/frame integrity failed:/, "asset registry rejects animation manifests with missing or invalid frames");
+assert.match(runtimeAssets, /GENE_SPRITES\.validateManifest\(spriteBase\)/, "asset registry delegates sprite frame validation to the animation runtime");
