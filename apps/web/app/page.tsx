@@ -51,7 +51,7 @@ function readText(file: File): Promise<string> {
 
 type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; approval: ReturnType<typeof createToolApproval> };
 function approvalPrompt(tool: string, input: any): string {
-  const label = tool === "research" ? "Research" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
+  const label = tool === "research" ? "Research" : tool === "researchAssetImport" ? "Research image import" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
   const detail = String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request").trim().slice(0, 240);
   return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
     "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
@@ -104,7 +104,8 @@ async function fetchWithToolApproval(input: RequestInfo | URL, init?: RequestIni
   if (typeof init?.body === "string") { try { payload = JSON.parse(init.body); } catch { payload = null; } }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fetch(input, init);
   let tool: string | null = null;
-  if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
+  if (/\/api\/research\/import(?:\?|$)/.test(url)) tool = "researchAssetImport";
+  else if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
   else if (/\/api\/forge\/2d(?:\?|$)/.test(url)) tool = "forge2d";
   else if (/\/api\/forge(?:\?|$)/.test(url)) tool = "forge3d";
   if (tool) {
@@ -1875,6 +1876,99 @@ export default function Home() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  async function importResearchImage(image: any) {
+    if (!project || !image || typeof image.full !== "string" || typeof image.page !== "string") return;
+    const license = String(image.license || "").trim();
+    const attribution = String(image.credit || image.attribution || "").trim();
+    const title = String(image.title || "Research reference").trim().slice(0, 160);
+    const accepted = typeof window !== "undefined" && window.confirm(
+      "Import this external image into the current project?\n\n" +
+      title + "\nLicense: " + (license || "not stated") + "\nAttribution: " + (attribution || "not stated") +
+      "\nSource page: " + image.page +
+      "\n\nReview the source page and license first. GENE will record your review and the source metadata, but cannot independently certify the license."
+    );
+    if (!accepted) return;
+    try {
+      const response = await fetchWithToolApproval("/api/research/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: image.full,
+          sourcePage: image.page,
+          title,
+          license,
+          attribution,
+          licenseReviewConfirmed: true
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok || !result.asset?.dataBase64 || !result.asset?.sha256) {
+        addActivity("Research image was not imported: " + String(result?.error?.message || "source validation failed") + ".");
+        setNotice("Image import failed: " + String(result?.error?.message || "source validation failed"));
+        return;
+      }
+      const imported = result.asset;
+      const assetId = ("research-" + uid()).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 64);
+      const prefix = "assets/" + assetId + "/";
+      const extension = imported.mimeType === "image/png" ? "png" : imported.mimeType === "image/webp" ? "webp" : "jpg";
+      const imagePath = prefix + "reference." + extension;
+      const manifestPath = prefix + "asset.json";
+      const manifest = {
+        assetId,
+        version: 1,
+        name: imported.title,
+        kind: "reference-image",
+        createdAt: imported.importedAt,
+        provenance: {
+          origin: "external-research",
+          sourceUrl: imported.sourceUrl,
+          sourcePage: imported.sourcePage,
+          license: imported.license,
+          attribution: imported.attribution,
+          licenseReviewConfirmed: true,
+          reviewedAt: now(),
+          byteSize: imported.byteSize,
+          sha256: imported.sha256
+        },
+        contentIntegrity: { algorithm: "sha256", files: { [imagePath]: imported.sha256 } },
+        runtimeCompatibility: { format: "raster-reference", role: "reference-image", automaticallyAppliedAsTexture: false }
+      };
+      const files = {
+        ...project.files,
+        [imagePath]: "data:" + imported.mimeType + ";base64," + imported.dataBase64,
+        [manifestPath]: JSON.stringify(manifest, null, 2)
+      };
+      const versionNumber = (project.versions[0]?.number || 0) + 1;
+      const version: BuildVersion = {
+        number: versionNumber,
+        label: "Imported research reference: " + imported.title,
+        files: { ...files },
+        createdAt: now(),
+        testSummary: "Imported reviewed external raster bytes with source/license metadata and SHA-256 fingerprint. Automatic texture application and scene integration are not claimed."
+      };
+      const reply = message("assistant",
+        "Imported **" + imported.title + "** into " + imagePath + ". The project now contains the image and its source/license manifest. Its exact bytes are fingerprinted; it remains a reference image until you assign it to a supported sprite or texture workflow.",
+        "build"
+      );
+      const updated: GeneProject = {
+        ...project,
+        files,
+        versions: [version, ...project.versions].slice(0, 8),
+        messages: [...project.messages, reply],
+        updatedAt: now()
+      };
+      setProject(updated);
+      setSection("assets");
+      addActivity("Imported research image " + imported.title + " (" + imported.byteSize + " bytes; " + imported.license + ").");
+      setNotice("Research image saved in project version " + versionNumber + "; source metadata and SHA-256 were recorded.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      const reason = error instanceof Error ? error.message : "unknown error";
+      addActivity("Research image import failed: " + reason);
+      setNotice("Research image import failed: " + reason);
+    }
+  }
+
   async function generateForgeAsset() {
     if (!project || forgeBusy || !forgePrompt.trim()) return;
     const targetId = forgeTargetId;
@@ -3109,7 +3203,7 @@ export default function Home() {
                   {msg.role !== "user" && <div className="message-avatar">{msg.role === "system" ? "•" : "G"}</div>}
                   <div className="message-content">
                     {msg.role === "user" ? <div className="user-bubble">{msg.content}</div> : <div className="assistant-copy">{msg.content}</div>}
-                    {msg.research && <ResearchCard bundle={msg.research} />}
+                    {msg.research && <ResearchCard bundle={msg.research} onImportImage={importResearchImage} />}
                     {msg.changes && msg.changes.length > 0 && <div className="change-list" aria-label="Files changed by this request">{msg.changes.map(change => <button type="button" key={change.path} className={"change-row " + change.status} title="Open this file" onClick={() => { setProject(current => current ? { ...current, activeFile: change.path } : current); setSection("files"); }}><span className="change-path">{change.path}</span><span className="change-stat">{change.status === "removed" ? "removed" : <><b>+{change.added}</b> <i>−{change.removed}</i></>}</span></button>)}</div>}
                     {msg.kind === "error" && <div className="message-recovery">
                       <div className="inline-error">Your last saved files are preserved.</div>
