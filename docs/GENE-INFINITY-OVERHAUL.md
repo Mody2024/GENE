@@ -145,6 +145,13 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 Start with the highest-risk correctness fixes and shared contracts, then wire them into the actual endpoints and UI. Implement in coherent batches, reusing existing modules/tests and avoiding parallel duplicate systems. This roadmap is the target; completed work must be recorded separately with code, commits and verification evidence.
 
 
+## Wave 2 implementation checkpoint (2026-10-23)
+
+- Research results now distinguish **technical evidence** from **asset references** using explicit `resultType` / `integrationState` metadata. Search results and Wikimedia visual/audio results are labelled reference-only; a research result is not silently treated as an imported project asset.
+- Commons results expose a declared-license state that still requires per-asset review. Wikipedia thumbnail references are explicitly license-unverified until the source page is checked. Poly Haven model matches are labelled catalog references with source-declared CC0 metadata, not downloaded/imported files.
+- Added regression assertions for the provenance/integration-state contract in `tests/research-evidence.mjs`.
+- These latest provenance commits still require CI and Playground verification. This is a focused Wave 2 increment, not completion of the full research or Forge roadmap.
+
 ## Implementation log — current branch
 
 The following code changes have been started on `gene-infinity-overhaul` (not yet merged to `main`):
