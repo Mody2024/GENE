@@ -214,6 +214,11 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - Wikimedia asset candidates now carry explicit import blockers and a required-check list covering license/attribution review, downloaded size, response MIME, file signature, project path, and source provenance. This makes the boundary clear: finding a downloadable candidate is not the same as approving or importing it.
 
+## Forge-to-runtime collision metadata increment (2026-10-23)
+
+- Procedural 3D mesh manifests now calculate transformed world-space bounds and derive conservative per-part axis-aligned box collision proxies from the same vertices written to OBJ. The proxy records include center, positive dimensions, and source primitive type.
+- Runtime asset validation now checks bounds and proxy metadata, rejects malformed proxy dimensions, and warns when older static models have no collision metadata. These are data contracts only: no physics-engine collider is instantiated automatically yet, and AABB proxies can be conservative for rotated/curved shapes.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
