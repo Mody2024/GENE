@@ -226,6 +226,11 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Imported images are saved into the project file map and a build-version checkpoint as `assets/<id>/reference.png|jpg|webp` plus `asset.json`. Runtime bundling now accepts these bounded reference/texture paths, and SHA-256 verification decodes the stored data URL so it verifies the original raster bytes rather than the URL text.
 - The imported image remains a reference asset by default; it is **not** automatically applied as a texture or claimed to be a playable/game-ready asset. That needs a separate supported sprite/UV-material assignment path.
 
+## Research import hardening increment (2026-10-23)
+
+- Reduced the import ceiling to 350 KB to limit base64 expansion and project/version storage growth in the browser. The import action retains only three snapshots for this import checkpoint rather than duplicating a large image across the full version history.
+- Exact source URL, source page, and declared license are now shown in the separate call-scoped approval prompt. Unsupported MIME types and declared oversized responses are canceled immediately; streamed bodies are canceled if they cross the byte ceiling.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
