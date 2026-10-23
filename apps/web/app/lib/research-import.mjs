@@ -42,9 +42,15 @@ export function validateResearchImportRequest(input) {
 export async function readBoundedImageResponse(response, maxBytes = MAX_RESEARCH_IMPORT_BYTES) {
   if (!response || !response.ok || !response.body) return { ok: false, code: "SOURCE_FETCH_FAILED", message: "The approved source did not return an image response." };
   const mimeType = String(response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-  if (!RESEARCH_IMAGE_MIMES.has(mimeType)) return { ok: false, code: "UNSUPPORTED_IMAGE_MIME", message: "Only PNG, JPEG, and WebP images can be imported." };
+  if (!RESEARCH_IMAGE_MIMES.has(mimeType)) {
+    await response.body.cancel().catch(() => {});
+    return { ok: false, code: "UNSUPPORTED_IMAGE_MIME", message: "Only PNG, JPEG, and WebP images can be imported." };
+  }
   const length = Number(response.headers.get("content-length") || 0);
-  if (length > maxBytes) return { ok: false, code: "IMAGE_TOO_LARGE", message: "The source image exceeds the import byte limit." };
+  if (length > maxBytes) {
+    await response.body.cancel().catch(() => {});
+    return { ok: false, code: "IMAGE_TOO_LARGE", message: "The source image exceeds the import byte limit." };
+  }
   const reader = response.body.getReader();
   const chunks = [];
   let total = 0;
