@@ -899,7 +899,7 @@ export default function Home() {
           const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", engine: nextProject.plan?.engine || nextProject.preferredEngine || "auto", images: true }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
-            const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
+            const imageData: Array<{ id?: string; name: string; mimeType: string; dataBase64: string; byteSize?: number; sha256?: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
             const kept = (nextProject.references || []).filter(item => item.name !== note.name && !/^research-image-/.test(item.name));
             // The model accepts at most 4 reference images; the user's own attachments always win.
