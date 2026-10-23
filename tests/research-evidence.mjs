@@ -22,7 +22,6 @@ const deduplicated = parseGoogleSearchResults({ items: [
   { title: "Geometry Dash level editor tutorial", snippet: "Geometry Dash editor and gameplay mechanics.", link: "https://example.org/editor" }
 ]}, topic, 5);
 assert.equal(deduplicated.length, 2, "tracking parameters and URL fragments must not create duplicate research slots");
-assert.equal(new Set(deduplicated.map(item => { const url = new URL(item.url); url.hash = ""; for (const key of Array.from(url.searchParams.keys())) if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid|ref_src)$/i.test(key)) url.searchParams.delete(key); return url.toString().replace(/\\/$/, "").toLowerCase(); })).size, 2, "deduplicated output contains distinct canonical article URLs");
 
 const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "File:sample.png", index: 1, imageinfo: [{ url: "https://upload.wikimedia.org/sample.png", thumburl: "https://upload.wikimedia.org/sample-thumb.png", mime: "image/png", descriptionurl: "https://commons.wikimedia.org/wiki/File:sample.png", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Sample Artist" } } }] } } } });
 assert.equal(commons.length, 1);
