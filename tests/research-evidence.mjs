@@ -11,6 +11,7 @@ const results = parseGoogleSearchResults({ items: [
 assert.equal(results.length, 1, "only complete HTTPS results with meaningful topic relevance should survive");
 assert.ok(results[0].relevance >= 15, "weak or unrelated results should be filtered out");
 assert.ok(!results.some(result => /vegetables/i.test(result.title)), "unrelated search results must not be shown as useful research");
+assert.deepEqual(parseGoogleSearchResults({ items: [{ title: "Unrelated gardening", snippet: "Planting flowers", link: "https://example.org/garden" }] }, topic, 5), [], "a search with only unrelated hits should return no misleading evidence");
 assert.match(results[0].url, /^https:\/\//);
 assert.equal(results[0].source, "example.org");
 assert.equal(results[0].resultType, "technical-evidence");
