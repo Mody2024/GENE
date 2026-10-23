@@ -21,7 +21,7 @@ for (const name of ["runtime", "art", "diagnostics"]) {
 
 const runtimeSandbox = { window: { __GENE_ASSETS__: {
   "assets/skeleton/asset.json": JSON.stringify({ assetId: "gene3d-skeleton-1234", version: 1, name: "Skeleton", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } }),
-  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", animationClips: [{ name: "idle", frames: [0], frameDurationMs: 220, loop: true }, { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 110, loop: true }, { name: "walk-left", frames: [1, 2, 3, 0], frameDurationMs: 110, loop: true }, { name: "walk-right", frames: [3, 2, 1, 0], frameDurationMs: 110, loop: true }], provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } }),
+  "assets/forge2d/character.json": JSON.stringify({ assetId: "gene2d-character-5678", version: 1, name: "Character", kind: "character", animationClips: [{ name: "idle", frames: [0], frameDurationMs: 220, loop: true }, { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 110, loop: true }, { name: "move-left", frames: [1, 2, 3, 0], frameDurationMs: 110, loop: true }, { name: "move-right", frames: [3, 2, 1, 0], frameDurationMs: 110, loop: true }], provenance: { origin: "generated" }, runtimeCompatibility: { renderer: "Canvas 2D" } }),
   "assets/models/environment.json": JSON.stringify({ assetId: "gene3d-environment-9012", version: 1, name: "Environment", kind: "environment", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } })
 } } };
 vm.runInNewContext(runtimeScriptArray("runtime"), runtimeSandbox);
@@ -29,11 +29,11 @@ const runtimeRegistry = runtimeSandbox.window.GENE_ASSET_REGISTRY;
 vm.runInNewContext(runtimeScriptArray("art"), { window: runtimeSandbox.window, Image: function Image() {} });
 const spriteController = runtimeSandbox.window.GENE_SPRITES.createController("assets/forge2d/character");
 assert.equal(spriteController.getClip(), "idle", "new sprite controllers start on idle when available");
-assert.equal(spriteController.update(1, 0), "walk-right", "horizontal movement selects the matching direction clip");
+assert.equal(spriteController.update(1, 0), "move-right", "horizontal movement selects the matching direction clip");
 assert.equal(spriteController.getFacing(), "right", "controller retains the direction the character is facing");
-assert.equal(spriteController.update(-1, 0), "walk-left", "leftward movement selects the left clip");
+assert.equal(spriteController.update(-1, 0), "move-left", "leftward movement selects the left clip");
 assert.equal(spriteController.update(0, 0), "idle", "stopping returns the controller to idle");
-assert.equal(spriteController.clips().join(","), "idle,walk,walk-left,walk-right", "controller exposes the manifest's actual clips");
+assert.equal(spriteController.clips().join(","), "idle,walk,move-left,move-right", "controller exposes the manifest's actual clips");
 
 assert.equal(runtimeRegistry.list().length, 3, "runtime registry should index 2D, direct 3D, and assets/models Forge manifests");
 assert.equal(runtimeRegistry.findById("gene3d-skeleton-1234").path, "assets/skeleton/asset.json", "stable 3D asset IDs should resolve to the current manifest path");
