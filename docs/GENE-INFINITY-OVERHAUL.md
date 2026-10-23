@@ -185,6 +185,11 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Runtime asset integrity can now asynchronously verify SHA-256 against the exact imported project-file text using Web Crypto. Scene-level verified status composes mesh readiness with those fingerprints and returns an explicit integrity failure if bytes changed.
 - This improves observability and traceability but does not replace independent browser interaction tests; the user plans to perform the web checks after implementation is finished.
 
+## Gameplay coverage increment (2026-10-23)
+
+- The gameplay telemetry snapshot now summarizes observed event names and required-but-unreported events for a declared game contract. It always returns `reportedOnly: true` and `verified: false`; these signals are useful for diagnosis but cannot satisfy independent gameplay verification on their own.
+- The workspace records game-reported events with that limitation stated explicitly, while preserving the existing visible-render-versus-playable distinction.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
