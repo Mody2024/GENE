@@ -53,3 +53,5 @@ assert.match(runtimeAssets, /crypto\.subtle\.digest\('SHA-256'/, "runtime verifi
 assert.match(runtimeAssets, /Sprite sheet\/frame SHA-256 fingerprints are missing/, "2D animation manifests are checked for source and frame fingerprints too");
 
 assert.match(prompts, /GAMEPLAY TELEMETRY CONTRACT[\s\S]{0,700}Never treat game-authored telemetry as independent proof/, "generated games receive honest instructions for reporting real gameplay transitions");
+
+assert.match(page, /state === "gameplay-event"[\s\S]{0,500}not independent gameplay verification/, "the workspace surfaces gameplay telemetry while explicitly avoiding false verification claims");
