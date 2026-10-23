@@ -13,6 +13,11 @@ assert.match(source, /Heuristic checks are advisory/, "layout analysis explicitl
 console.log("Runtime scene contract passed (callback binding and OBJ draw dispatch).");
 
 assert.match(source, /getIntegrityReport=function\(\)/, "scene runtime exposes a unified manifest integrity report");
+assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "scene runtime exposes a playable-readiness preflight");
+assert.match(source, /SPAWN_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested spawn marker");
+assert.match(source, /GOAL_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested goal marker");
+assert.match(source, /MESH_NOT_RENDERABLE/, "readiness preflight blocks scenes with assigned mesh assets that fail validation");
+assert.match(source, /This is a structural preflight, not proof of successful rendering/, "readiness preflight documents its limits and does not falsely certify a complete playable game");
 assert.match(source, /MISSING_RUNTIME_MESH_ASSETS/, "scene integrity report identifies assigned meshes missing from the runtime bundle");
 assert.match(source, /SCENE_OBJECT_LIMIT_REACHED/, "scene integrity report surfaces objects dropped by the runtime limit");
 assert.match(source, /Presence checks do not guarantee a mesh parses/, "scene integrity report distinguishes file presence from actual renderability");
