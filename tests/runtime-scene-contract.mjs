@@ -17,6 +17,8 @@ assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "sc
 assert.match(source, /SPAWN_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested spawn marker");
 assert.match(source, /GOAL_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested goal marker");
 assert.match(source, /MESH_NOT_RENDERABLE/, "readiness preflight blocks scenes with assigned mesh assets that fail validation");
+assert.match(source, /var status=await scene\.getAssetStatusVerified\(o\.id\)/, "playable readiness verifies mesh content integrity rather than checking only file presence");
+assert.match(source, /ASSET_INTEGRITY_FAILED/, "playable readiness blocks assets whose verified content fingerprints fail");
 assert.match(source, /MISSING_RUNTIME_MESH_ASSET/, "readiness preflight blocks visible objects whose assigned mesh files are absent");
 assert.match(source, /UNASSIGNED_MESH_OBJECT/, "readiness preflight blocks mesh/model objects with no assigned model");
 assert.match(source, /DUPLICATE_SCENE_IDS_REPAIRED/, "readiness preflight warns when duplicate IDs required normalization");
