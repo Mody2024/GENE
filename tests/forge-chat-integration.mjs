@@ -29,3 +29,10 @@ assert.match(page, /\[prefix \+ name, hash\]/, "manual 2D manifest fingerprints 
 
 assert.match(page, /previousAssetVersion = Number\(JSON\.parse\(project\.files\[prefix \+ "asset\.json"\]/, "editing an existing Forge asset reads its previous manifest version");
 assert.match(page, /version: Math\.max\(1, previousAssetVersion \+ 1\)/, "asset edits increment manifest version instead of resetting to version one");
+
+assert.match(page, /async function importResearchImage\(image: any\)/, "research cards can invoke the reviewed image-import workflow");
+assert.match(page, /fetchWithToolApproval\("\/api\/research\/import"/, "image import passes through the explicit call-scoped approval gateway");
+assert.match(page, /contentIntegrity: \{ algorithm: "sha256", files: \{ \[imagePath\]: imported\.sha256 \} \}/, "imported images are saved with exact-byte SHA-256 manifests");
+assert.match(page, /automaticallyAppliedAsTexture: false/, "reference import does not falsely claim automatic texture application");
+assert.match(page, /<ResearchCard bundle=\{msg\.research\} onImportImage=\{importResearchImage\}/, "the research card is connected to project import");
+assert.match(page, /researchAssetImport/, "the tool approval helper recognizes research image import");
