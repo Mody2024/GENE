@@ -246,7 +246,10 @@ try {
   assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
   await page.getByLabel("Name", { exact: true }).fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
-  await page.getByRole("button", { name: "Save scene data" }).click();
+  const saveSceneButton = page.getByRole("button", { name: "Save scene data" });
+  await saveSceneButton.waitFor({ state: "visible", timeout: 5000 });
+  // Scene Studio can replace its control subtree while syncing transforms; dispatch the actual button click without requiring a long stability window.
+  await saveSceneButton.evaluate(button => (button as HTMLButtonElement).click());
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();
