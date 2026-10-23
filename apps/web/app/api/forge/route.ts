@@ -4,6 +4,7 @@ import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
 import { hasToolApproval } from "../../lib/tool-permissions.mjs";
+import { hasValidImageSignature } from "../../lib/research-sources.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -496,6 +497,7 @@ export async function POST(request: NextRequest) {
   const references = Array.isArray(body.references) ? body.references : [];
   const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
   let totalImageChars = 0;
+  let totalImageBytes = 0;
   let imageCount = 0;
   for (const ref of references) {
     if (ref?.kind !== "image" || typeof ref.dataBase64 !== "string") continue;
@@ -504,7 +506,11 @@ export async function POST(request: NextRequest) {
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(ref.dataBase64)) return fail(400, "REFERENCE_INVALID", "A reference image is not valid base64.");
     totalImageChars += ref.dataBase64.length;
     if (ref.dataBase64.length > 550_000 || totalImageChars > 750_000) return fail(413, "REFERENCE_TOO_LARGE", "Forge image references exceed the request budget. Attach smaller images or fewer references.");
-    parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.dataBase64 } });
+    const referenceBytes = Buffer.from(ref.dataBase64, "base64");
+    totalImageBytes += referenceBytes.byteLength;
+    if (!referenceBytes.byteLength || referenceBytes.byteLength > 400_000 || totalImageBytes > 550_000) return fail(413, "REFERENCE_TOO_LARGE", "Decoded Forge reference images exceed the byte budget.");
+    if (!hasValidImageSignature(ref.mimeType, referenceBytes)) return fail(400, "REFERENCE_SIGNATURE_MISMATCH", "A Forge reference image does not match its declared raster MIME type.");
+    parts.push({ inlineData: { mimeType: ref.mimeType, data: referenceBytes.toString("base64") } });
     imageCount++;
   }
 
