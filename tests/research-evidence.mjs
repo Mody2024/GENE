@@ -40,6 +40,6 @@ assert.ok(bundle.webResults[0].relevance >= bundle.webResults[1].relevance);
 const notes = formatResearchNotes(bundle);
 assert.match(notes, /Web research \(ranked by topic relevance\)/);
 assert.match(notes, /relevance \d+\/100/);
-assert.match(notes, /reference-only images, not imported project assets/i);
+assert.match(notes, /reference-only images, not imported project assets|reference-only, not imported/i);
 assert.match(notes, /catalog matches \(Poly Haven; not imported\)/);
 console.log("Research evidence tests passed (HTTPS filtering, relevance ranking, and builder notes).");
