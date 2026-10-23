@@ -505,6 +505,12 @@ export default function Home() {
         setDraft(current => (current.trim() ? current.trim() + "\n\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
         setNotice("Element selected. Describe the exact change in the composer, then send it.");
       }
+      if (event.data?.type === "gene-runtime" && event.data.state === "gameplay-event") {
+        const eventName = String(event.data.event?.name || "unknown").slice(0, 40);
+        addActivity("Game-reported gameplay event: " + eventName + " (self-reported telemetry only; not independent gameplay verification).");
+        setNotice("Game-reported event: " + eventName + ". This is telemetry from the generated game, not independent proof that the mechanic works.");
+        return;
+      }
       if (event.data?.type === "gene-runtime" && event.data.state === "input-observed") {
         const inputType = String(event.data.inputType || "user input").slice(0, 40);
         setNotice("The preview received " + inputType + ". This confirms input reached the game frame, not that gameplay responded. Verify movement, interaction, and the core objective.");
