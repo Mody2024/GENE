@@ -60,3 +60,7 @@ assert.match(runtimeAssets, /Sprite manifest\/frame integrity failed:/, "asset r
 assert.match(runtimeAssets, /GENE_SPRITES\.validateManifest\(spriteBase\)/, "asset registry delegates sprite frame validation to the animation runtime");
 
 assert.match(runtimeAssets, /referenceInputs:Array\.isArray\(m\.referenceInputs\)\?m\.referenceInputs:\[\]/, "runtime asset listings expose recorded source-reference provenance");
+
+assert.match(runtimeAssets, /World-space mesh bounds are missing or invalid/, "runtime asset validation reports absent or malformed model bounds");
+assert.match(runtimeAssets, /Collision proxy metadata is missing/, "runtime asset validation warns when static models lack collision proxies");
+assert.match(runtimeAssets, /Collision proxy '\+index\+' is malformed/, "runtime asset validation rejects malformed collision proxy dimensions");
