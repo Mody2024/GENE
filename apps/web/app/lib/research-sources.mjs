@@ -9,6 +9,18 @@
 
 import { matchGameKnowledge, musicStylesFor } from "./game-knowledge.mjs";
 
+/** Validate that downloaded image bytes agree with the declared raster MIME type. */
+export function hasValidImageSignature(mimeType, input) {
+  const bytes = input instanceof Uint8Array ? input : Uint8Array.from(input || []);
+  const starts = (...signature) => signature.every((byte, index) => bytes[index] === byte);
+  const ascii = (start, value) => value.split("").every((char, index) => bytes[start + index] === char.charCodeAt(0));
+  if (mimeType === "image/png") return starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+  if (mimeType === "image/jpeg") return starts(0xff, 0xd8, 0xff);
+  if (mimeType === "image/gif") return ascii(0, "GIF87a") || ascii(0, "GIF89a");
+  if (mimeType === "image/webp") return bytes.length >= 12 && ascii(0, "RIFF") && ascii(8, "WEBP");
+  return false;
+}
+
 export function cleanQuery(value) {
   return String(value || "").replace(/[^\p{L}\p{N}\s'&-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120);
 }
