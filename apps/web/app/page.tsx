@@ -714,6 +714,20 @@ export default function Home() {
       });
   }, [project?.files, project?.id]);
 
+  const savedResearchImages = useMemo(() => {
+    if (!project) return [];
+    return Object.entries(project.files)
+      .filter(([path]) => /^assets\/[a-zA-Z0-9_-]+\/asset\.json$/.test(path))
+      .map(([manifestPath, source]) => {
+        let manifest: any = {};
+        try { manifest = JSON.parse(source); } catch {}
+        if (manifest.kind !== "reference-image") return null;
+        const imagePath = Object.keys(manifest.contentIntegrity?.files || {}).find(path => /\/reference\.(?:png|jpe?g|webp)$/i.test(path)) || "";
+        return { id: String(manifest.assetId || manifestPath.split("/")[1]), name: String(manifest.name || "Research reference"), manifestPath, imagePath, license: String(manifest.provenance?.license || "License not recorded"), attribution: String(manifest.provenance?.attribution || ""), sourcePage: String(manifest.provenance?.sourcePage || "") };
+      })
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset?.imagePath && project.files[asset.imagePath]));
+  }, [project?.files, project?.id]);
+
   const addActivity = (entry: string) => {
     const safeEntry = entry
       .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[redacted]")
@@ -3339,6 +3353,7 @@ export default function Home() {
     {forgeNotice && <div className="forge-notice">{forgeNotice}</div>}
   </div>
   {saved2DAssets.length > 0 && <><div className="forge-assets-heading"><div><div className="eyebrow">2D PROJECT ASSETS</div><h3>Saved artwork <span>{saved2DAssets.length}</span></h3></div><span>SVG · JSON manifest</span></div><div className="forge-asset-grid">{saved2DAssets.map(asset => <article className="forge-asset-card" key={asset.id}><div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.kind} · {asset.width}×{asset.height} · {asset.frames} frame(s)</small></div><button className="icon-button" title="Remove this 2D asset" onClick={() => removeForgeAsset(asset.id)}>×</button></div><div className="forge-2d-preview"><img alt={asset.name + " generated vector artwork"} src={"data:image/svg+xml;charset=utf-8," + encodeURIComponent(project.files[asset.svgPath] || "")} /></div><div className="forge-asset-actions"><button className="primary-button" onClick={() => { setSection("chat"); setDraft("Integrate the generated 2D asset at " + asset.svgPath + " into the actual playable game. Read its manifest at " + asset.manifestPath + ". The isolated runtime exposes the SVG through window.GENE_ART.list(), window.GENE_ART.image(path), and window.GENE_ART.draw(ctx,path,x,y,w,h); use these helpers or a verified equivalent. Use the correct asset kind (" + asset.kind + "), preserve current controls and responsive layout, and crop sprite-sheet frames when needed. Do not claim integration until the live preview visibly uses the saved SVG and a browser test passes."); setNotice("Prepared a specific 2D asset integration request for " + asset.name + ". Review it in Chat and send it to apply."); }}>Integrate into game</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.svgPath)}>SVG ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.manifestPath)}>Manifest ↓</button></div></article>)}</div></>}
+  {savedResearchImages.length > 0 && <><div className="forge-assets-heading"><div><div className="eyebrow">RESEARCH REFERENCES</div><h3>Imported images <span>{savedResearchImages.length}</span></h3></div><span>PNG · JPEG · WebP · source manifest</span></div><div className="forge-asset-grid">{savedResearchImages.map(asset => <article className="forge-asset-card" key={asset.id}><div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.license}{asset.attribution ? " · " + asset.attribution : ""}</small></div><button className="icon-button" title="Remove this imported reference" onClick={() => removeForgeAsset(asset.id)}>×</button></div><div className="forge-2d-preview"><img alt={asset.name + " imported research reference"} src={project.files[asset.imagePath]} /></div><div className="forge-asset-actions"><button className="secondary-button" onClick={() => downloadAssetFile(asset.imagePath)}>Image ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.manifestPath)}>Source manifest ↓</button>{asset.sourcePage && <a className="secondary-button" href={asset.sourcePage} target="_blank" rel="noreferrer noopener">Open source ↗</a>}</div><small className="rc-dim">Reference asset only; not automatically applied as a texture.</small></article>)}</div></>}
   <div className="forge-assets-heading"><div><div className="eyebrow">PROJECT ASSETS</div><h3>Saved meshes <span>{savedAssets.length}</span></h3></div><span>OBJ · MTL · JSON recipe</span></div>
   {savedAssets.length === 0 ? <div className="empty-state forge-empty"><div className="asset-symbol">◇</div><strong>No generated meshes yet</strong><p>Start with a prop, vehicle, character, weapon, or building. A successful result creates real files under <code>assets/&lt;asset-id&gt;/</code>. Mesh generation is not the same thing as importing it into a game scene; integration is a separate, testable change.</p></div> : <div className="forge-asset-grid">
     {savedAssets.map(asset => <article className="forge-asset-card" key={asset.id}>
