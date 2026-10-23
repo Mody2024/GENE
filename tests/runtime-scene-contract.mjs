@@ -17,6 +17,10 @@ assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "sc
 assert.match(source, /SPAWN_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested spawn marker");
 assert.match(source, /GOAL_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested goal marker");
 assert.match(source, /MESH_NOT_RENDERABLE/, "readiness preflight blocks scenes with assigned mesh assets that fail validation");
+assert.match(source, /MISSING_RUNTIME_MESH_ASSET/, "readiness preflight blocks visible objects whose assigned mesh files are absent");
+assert.match(source, /UNASSIGNED_MESH_OBJECT/, "readiness preflight blocks mesh/model objects with no assigned model");
+assert.match(source, /DUPLICATE_SCENE_IDS_REPAIRED/, "readiness preflight warns when duplicate IDs required normalization");
+assert.match(source, /INVALID_SCENE_ENTRIES_NORMALIZED/, "readiness preflight warns when malformed manifest entries were normalized");
 assert.match(source, /This is a structural preflight, not proof of successful rendering/, "readiness preflight documents its limits and does not falsely certify a complete playable game");
 assert.match(source, /MISSING_RUNTIME_MESH_ASSETS/, "scene integrity report identifies assigned meshes missing from the runtime bundle");
 assert.match(source, /SCENE_OBJECT_LIMIT_REACHED/, "scene integrity report surfaces objects dropped by the runtime limit");
