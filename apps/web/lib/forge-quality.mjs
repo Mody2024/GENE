@@ -4,7 +4,8 @@ const SHAPE_TRIANGLE_ESTIMATES = {
 };
 
 function rotateHalfExtents(scale, rotation) {
-  const [x, y, z] = scale.map(value => value / 2);
+  // Mirroring with negative scale must not create negative half-extents in world bounds.
+  const [x, y, z] = scale.map(value => Math.abs(value) / 2);
   const toRad = value => value * Math.PI / 180;
   const [rx, ry, rz] = rotation.map(toRad);
   const cx = Math.cos(rx), sx = Math.sin(rx);
