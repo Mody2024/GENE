@@ -43,4 +43,6 @@ assert.match(runtimeAssets, /frame-\\d\{2\}/, "runtime asset allowlist admits sl
 assert.match(agentRoute, /assembled Canvas 2D project has no detectable visible drawing operations/, "audio-only or empty Canvas builds are rejected");
 assert.match(agentRoute, /never submits visible geometry to WebGL/, "3D builds must actually submit visible geometry");
 assert.match(agentRoute, /never configures the WebGL viewport/, "3D builds must configure their viewport");
+assert.match(agentRoute, /never clears its frame buffers/, "3D builds must clear their frame buffers");
+assert.match(agentRoute, /no detectable camera or view\/projection transform/, "3D builds must define camera framing");
 console.log("Native 2D Forge tests passed.");
