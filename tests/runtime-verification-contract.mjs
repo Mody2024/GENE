@@ -11,3 +11,9 @@ assert.match(runtimeAssets, /inputEvents:state.inputEvents/, "runtime diagnostic
 assert.match(page, /event\.data\.state === "input-observed"/, "the workspace handles input telemetry without promoting it to gameplay-verified");
 assert.match(page, /not that gameplay responded/, "the UI explicitly distinguishes input arrival from actual gameplay response");
 console.log("Runtime verification contract passed (build/source checks cannot masquerade as gameplay verification).");
+
+assert.match(runtimeAssets, /canvasSize:/, "runtime diagnostics expose canvas dimensions for blank or off-screen render diagnosis");
+assert.match(runtimeAssets, /hasWebGLContext:/, "runtime diagnostics distinguish a canvas element from a live WebGL context");
+assert.match(runtimeAssets, /renderEvidence:\\{canvasEntityOps:state\\.canvasEntityOps,webglDrawCalls:state\\.webglDrawCalls,animationFrames:state\\.animationFrames\\}/, "runtime snapshots include observed draw and frame evidence");
+assert.match(runtimeAssets, /inputObserved:state\\.inputEvents>0/, "runtime snapshots distinguish observed input from a successful gameplay response");
+assert.match(runtimeAssets, /hasRuntimeErrors:state\\.errors\\.length>0/, "runtime snapshots expose whether runtime errors were captured");
