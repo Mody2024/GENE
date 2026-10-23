@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import { buildNative2DAsset } from "../apps/web/lib/forge-2d.mjs";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
+function runtimeScriptArray(name) {
+  const start = runtimeAssets.indexOf("const " + name + " = [");
+  assert.ok(start >= 0, "runtime bootstrap array exists: " + name);
+  const bodyStart = runtimeAssets.indexOf("[", start) + 1;
+  const end = runtimeAssets.indexOf('].join("");', bodyStart);
+  assert.ok(end > bodyStart, "runtime bootstrap array closes: " + name);
+  return runtimeAssets.slice(bodyStart, end).split("\\n")
+    .map(line => line.match(/^\\s*("(?:\\\\.|[^"\\\\])*")\\s*,?$/))
+    .filter(Boolean)
+    .map(match => JSON.parse(match[1]))
+    .join("");
+}
+for (const name of ["runtime", "art", "diagnostics"]) {
+  assert.doesNotThrow(() => new vm.Script(runtimeScriptArray(name)), "runtime " + name + " JavaScript must parse before it is injected into a game iframe");
+}
+
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 
 for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
