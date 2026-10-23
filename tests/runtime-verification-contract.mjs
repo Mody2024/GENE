@@ -46,6 +46,8 @@ assert.match(runtimeAssets, /contentIntegrity:m\.contentIntegrity\|\|null/, "run
 assert.match(runtimeAssets, /new TextEncoder\(\)\.encode\(content\)\.byteLength/, "runtime asset payload limits count UTF-8 bytes rather than UTF-16 code units");
 assert.match(runtimeAssets, /RUNTIME_ASSET_BUDGET_EXCEEDED/, "assets omitted by the runtime payload budget receive an explicit diagnostic instead of disappearing silently");
 assert.match(runtimeAssets, /__GENE_ASSET_BOOTSTRAP_DIAGNOSTICS__/, "runtime bootstrap exposes loaded-byte totals and omitted asset paths for troubleshooting");
+assert.match(runtimeAssets, /loadedPayloadBytes: totalPayloadBytes/, "runtime budget accounts for the serialized JSON payload, not just source asset text");
+assert.match(runtimeAssets, /payloadByteSize: payloadBytes/, "omitted asset diagnostics include their serialized payload cost");
 assert.match(runtimeAssets, /Exact OBJ\/MTL SHA-256 fingerprints are missing or invalid/, "runtime asset validation warns on manifests without valid fingerprints");
 
 assert.match(runtimeAssets, /R\.verifyContentIntegrity=async function\(p\)/, "runtime assets support actual asynchronous SHA-256 verification");
