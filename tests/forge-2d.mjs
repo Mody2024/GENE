@@ -86,6 +86,7 @@ assert.match(runtimeAssets, /hasCanvas:/, "runtime diagnostics report whether a 
 
 assert.match(runtimeAssets, /S\.detectFrames=function/, "runtime can detect transparent frame boundaries in sprite sheets");
 assert.match(runtimeAssets, /S\.createSheetClip=function/, "runtime supports imported sprite sheets with explicit clip metadata");
+assert.ok(runtimeAssets.includes("assets[base+'/asset.json']") && runtimeAssets.includes("assets[base+'/asset-2d.json']"), "animation clips resolve manifests stored inside stable-ID asset folders");
 assert.match(runtimeAssets, /S\.drawSheet=function/, "runtime can crop one source rectangle from a sprite sheet");
 assert.match(runtimeAssets, /RUNTIME_RASTER_PATH/, "runtime admits imported raster atlases only through a bounded data-URI path");
 assert.ok(runtimeAssets.includes(String.raw`data:image\\/(?:png|jpeg|webp|gif);base64,`), "runtime can decode approved local raster sheet data");
