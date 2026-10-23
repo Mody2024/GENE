@@ -86,3 +86,9 @@ assert.match(route, /totalImageBytes > 550_000/, "Forge enforces a decoded byte 
 assert.match(route, /referenceBytes\.toString\("base64"\)/, "only the validated decoded bytes are forwarded to the provider");
 
 assert.match(prompt, /every frameFiles entry[\s\S]{0,140}preserve animationClips and remap contentIntegrity paths/, "Forge course requires persisting all animation frames and their integrity metadata");
+
+assert.match(route, /function safeHttpsUrl\(value: unknown\)/, "Forge sanitizes reference source URLs before recording provenance");
+assert.match(route, /referenceInputs: acceptedReferenceProvenance/, "AI-generated Forge manifests retain reference provenance");
+assert.match(route, /sourcePage: safeHttpsUrl\(ref\.sourcePage \|\| ref\.page\)/, "reference manifests preserve a safe source page link");
+assert.match(route, /license: typeof ref\.license === "string"/, "reference manifests preserve declared license metadata without claiming approval");
+assert.match(route, /sha256: createHash\("sha256"\)\.update\(referenceBytes\)/, "reference provenance fingerprints the exact validated image bytes sent to the provider");
