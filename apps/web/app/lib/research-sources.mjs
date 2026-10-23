@@ -254,13 +254,13 @@ export function formatResearchNotes(input) {
     const wiki = input.wiki || [], models = input.models || [], links = input.links || [];
     if (input.note) lines.push(input.note, "");
     if (wiki.length) {
-      lines.push("## Real-world and visual context (Wikipedia)");
+      lines.push("## Real-world and visual context (Wikipedia; reference-only, not imported)");
       for (const page of wiki) lines.push("- **" + page.title + "** — " + String(page.extract || "").replace(/\s+/g, " ").slice(0, 420) + " (" + page.url + ")");
       lines.push("");
     }
     if (models.length) {
-      lines.push("## Free CC0 3D models that match (Poly Haven)");
-      for (const model of models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + model.tags.join(", ") + ")");
+      lines.push("## CC0 3D model catalog matches (Poly Haven; not imported)");
+      for (const model of models) lines.push("- " + model.name + " — " + model.url + " (source-declared CC0; catalog reference only, not downloaded or added to the project; tags: " + (model.tags || []).join(", ") + ")");
       lines.push("");
     }
     lines.push("## Free asset libraries to search");
