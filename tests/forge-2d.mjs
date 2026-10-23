@@ -37,7 +37,7 @@ assert.match(runtimeAssets, /S\.createSheetClip=function/, "runtime supports imp
 assert.match(runtimeAssets, /S\.drawSheet=function/, "runtime can crop one source rectangle from a sprite sheet");
 assert.match(runtimeAssets, /RUNTIME_RASTER_PATH/, "runtime admits imported raster atlases only through a bounded data-URI path");
 assert.match(runtimeAssets, /data:image\\\/(?:png|jpeg|webp|gif);base64/, "runtime can decode approved local raster sheet data");
-assert.match(runtimeAssets, /sprite-sheet\\|atlas/, "runtime exposes imported sprite sheets to the frame detector");
+assert.match(runtimeAssets, /sprite-sheet\|atlas/, "runtime exposes imported sprite sheets to the frame detector");
 assert.match(runtimeAssets, /GENE_SPRITES[\s\S]{0,2500}frame-/, "runtime selects a single cropped frame rather than drawing the full atlas");
 assert.match(runtimeAssets, /frame-\\d\{2\}/, "runtime asset allowlist admits sliced sprite frames");
 assert.match(agentRoute, /assembled Canvas 2D project has no detectable visible drawing operations/, "audio-only or empty Canvas builds are rejected");
