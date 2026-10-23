@@ -1,6 +1,6 @@
 const SHAPE_TRIANGLE_ESTIMATES = {
   box: 12, beveledBox: 44, sphere: 80, cylinder: 44,
-  cone: 24, wedge: 8, torus: 256, capsule: 168
+  cone: 24, wedge: 8, torus: 256, capsule: 168, stairs: 60, arch: 192
 };
 
 function rotateHalfExtents(scale, rotation) {
