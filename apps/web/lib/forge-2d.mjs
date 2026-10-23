@@ -79,7 +79,7 @@ export function buildNative2DAsset({ prompt = "", kind = "character", quality = 
   // Export each atlas cell as a separately loadable SVG as well as retaining the source sheet.
   // The viewBox crops the original vector geometry without rasterizing or duplicating its design.
   const frameFiles = {};
-  if (built.frames > 1 && built.frameWidth > 0 && built.frameHeight > 0) {
+  if ((kind === "character" || kind === "tileset") && built.frames > 1 && built.frameWidth > 0 && built.frameHeight > 0) {
     for (let index = 0; index < built.frames; index++) {
       const x = (index % Math.max(1, Math.floor(built.width / built.frameWidth))) * built.frameWidth;
       const y = Math.floor(index / Math.max(1, Math.floor(built.width / built.frameWidth))) * built.frameHeight;
