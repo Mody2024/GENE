@@ -84,3 +84,5 @@ assert.match(route, /hasValidImageSignature\(ref\.mimeType, referenceBytes\)/, "
 assert.match(route, /REFERENCE_SIGNATURE_MISMATCH/, "Forge rejects image payloads disguised as another raster format");
 assert.match(route, /totalImageBytes > 550_000/, "Forge enforces a decoded byte budget in addition to base64 character limits");
 assert.match(route, /referenceBytes\.toString\("base64"\)/, "only the validated decoded bytes are forwarded to the provider");
+
+assert.match(prompt, /every frameFiles entry[\s\S]{0,140}preserve animationClips and remap contentIntegrity paths/, "Forge course requires persisting all animation frames and their integrity metadata");
