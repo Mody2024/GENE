@@ -43,3 +43,8 @@ assert.match(researchCard, /Import to project/, "each eligible visual reference 
 assert.match(researchCard, /<a href=\{image\.page\}[\s\S]{0,700}<\/a>[\s\S]{0,220}Import to project/, "the import action is a separate control rather than nested inside the source link");
 
 assert.match(page, /tool === "researchAssetImport"[\s\S]{0,260}input\?\.sourceUrl[\s\S]{0,180}input\?\.license/, "research import approval previews the exact source URL and declared license");
+
+assert.match(page, /sourcePage: String\(sourceImage\.page \|\| ""\)/, "research image references preserve source page metadata");
+assert.match(page, /sourceUrl: String\(sourceImage\.full \|\| sourceImage\.thumb \|\| ""\)/, "research image references preserve the exact image URL");
+assert.match(page, /filter\(ref => ref\.kind === "image" && ref\.dataBase64\)\.slice\(0, 2\)/, "automated and manual Forge calls pass actual image pixels rather than text-only references");
+assert.match(page, /filter\(ref => ref\.kind === "text"\)\.slice\(0, 2\)/, "text notes remain available alongside image references");
