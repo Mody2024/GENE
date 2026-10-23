@@ -43,6 +43,7 @@ assert.match(runtimeAssets, /validation:report/, "resolving a runtime asset retu
 assert.match(runtimeAssets, /frame-\\\\d\{2,3\}/, "sprite asset paths must accept three-digit frame numbers emitted by the manifest renderer");
 
 assert.match(runtimeAssets, /contentIntegrity:m\.contentIntegrity\|\|null/, "runtime asset listings expose exact-file fingerprints");
+assert.match(runtimeAssets, /new TextEncoder\(\)\.encode\(content\)\.byteLength/, "runtime asset payload limits count UTF-8 bytes rather than UTF-16 code units");
 assert.match(runtimeAssets, /Exact OBJ\/MTL SHA-256 fingerprints are missing or invalid/, "runtime asset validation warns on manifests without valid fingerprints");
 
 assert.match(runtimeAssets, /R\.verifyContentIntegrity=async function\(p\)/, "runtime assets support actual asynchronous SHA-256 verification");
