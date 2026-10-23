@@ -960,7 +960,12 @@ export default function Home() {
               if (!item) continue;
               const base = "assets/forge2d/" + item.kind;
               stagedFiles[base + ".svg"] = String(item.asset.svg);
-              stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport }, null, 2);
+              const sourceIntegrity = item.asset.manifest.contentIntegrity;
+              const projectIntegrityFiles = sourceIntegrity?.files ? {
+                [base + ".svg"]: sourceIntegrity.files["sprite.svg"],
+                ...Object.fromEntries(Object.entries(item.asset.frameFiles || {}).map(([frameName]) => [base + "/frames/" + frameName, sourceIntegrity.files["frames/" + frameName]]))
+              } : undefined;
+              stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport, contentIntegrity: sourceIntegrity ? { ...sourceIntegrity, files: projectIntegrityFiles } : undefined }, null, 2);
               for (const [frameName, frameSvg] of Object.entries(item.asset.frameFiles || {})) {
                 stagedFiles[base + "/frames/" + frameName] = String(frameSvg);
               }
@@ -1977,7 +1982,15 @@ export default function Home() {
       }
       const assetId = "art-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
       const prefix = "assets/" + assetId + "/";
-      const manifest = { ...JSON.parse(data.files["asset.json"]), assetId, name: data.asset.name, kind: data.asset.kind, width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider };
+      const sourceManifest = JSON.parse(data.files["asset.json"]);
+      const manifest = {
+        ...sourceManifest, assetId, name: data.asset.name, kind: data.asset.kind,
+        width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider,
+        contentIntegrity: sourceManifest.contentIntegrity ? {
+          ...sourceManifest.contentIntegrity,
+          files: Object.fromEntries(Object.entries(sourceManifest.contentIntegrity.files || {}).map(([name, hash]) => [prefix + name, hash]))
+        } : undefined
+      };
       const files = {
         ...project.files,
         [prefix + "sprite.svg"]: String(data.asset.svg),
