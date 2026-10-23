@@ -5,6 +5,7 @@ import {
   cleanQuery,
   filterPolyHaven,
   formatResearchNotes,
+  hasValidImageSignature,
   keywords,
   musicSearchTerms,
   parseCommonsFiles,
@@ -109,6 +110,7 @@ async function fetchImageData(image: { id: string; title: string; thumb: string 
     }
     if (!totalBytes) return null;
     const bytes = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), totalBytes);
+    if (!hasValidImageSignature(mimeType, bytes)) return null;
     return { id: image.id, name: image.title, mimeType, dataBase64: bytes.toString("base64") };
   } catch {
     return null;
