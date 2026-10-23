@@ -1953,7 +1953,7 @@ export default function Home() {
       const updated: GeneProject = {
         ...project,
         files,
-        versions: [version, ...project.versions].slice(0, 8),
+        versions: [version, ...project.versions].slice(0, 3),
         messages: [...project.messages, reply],
         updatedAt: now()
       };
