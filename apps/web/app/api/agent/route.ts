@@ -623,9 +623,9 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           [/linkProgram\s*\(/, "shader program linking"],
           [/bufferData\s*\(/, "GPU geometry buffers"],
           [/drawArrays\s*\(|drawElements\s*\(/, "GPU geometry draw calls"]
-        ] as Array<[RegExp, string]>) if (!pattern.test(js)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
+        ] as Array<[RegExp, string]>) if (!pattern.test(runtimeSource)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
       }
-      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
+      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(runtimeSource)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
     }
   }
   return normalized;
