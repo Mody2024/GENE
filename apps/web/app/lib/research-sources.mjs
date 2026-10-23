@@ -113,7 +113,22 @@ export function parseCommonsFiles(data, kind = "image") {
     const license = stripHtml(meta.LicenseShortName && meta.LicenseShortName.value);
     if (!license) continue; // never present a file whose licence we cannot state
     const title = String(page.title || "").replace(/^File:/i, "").replace(/\.[A-Za-z0-9]+$/, "").replace(/_/g, " ");
-    const base = { id: "commons-" + String(page.pageid || title), title, license, licenseState: "source-declared-review-per-asset", integrationState: "reference-only", credit: stripHtml(meta.Artist && meta.Artist.value).slice(0, 120) || "Wikimedia Commons contributors", page: String(info.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(String(page.title || "").replace(/ /g, "_"))), source: "Wikimedia Commons" };
+    const credit = stripHtml(meta.Artist && meta.Artist.value).slice(0, 120) || "Wikimedia Commons contributors";
+    const sourcePage = String(info.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(String(page.title || "").replace(/ /g, "_")));
+    const base = {
+      id: "commons-" + String(page.pageid || title), title, license,
+      licenseState: "source-declared-review-per-asset",
+      integrationState: "reference-only",
+      downloadState: "candidate-not-imported",
+      assetType: kind === "audio" ? "audio-asset-candidate" : "visual-reference",
+      mimeType: String(info.mime || "").toLowerCase(),
+      downloadUrl: info.url,
+      credit,
+      attribution: credit + " — " + license,
+      page: sourcePage,
+      sourcePage,
+      source: "Wikimedia Commons"
+    };
     if (kind === "audio") {
       if (!AUDIO_NAME.test(String(page.title || "")) && !/^audio\//i.test(String(info.mime || ""))) continue;
       out.push({ ...base, url: info.url });
