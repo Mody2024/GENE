@@ -194,6 +194,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - Editing an existing Forge model now reads its previous manifest version and increments it in the saved asset manifest, rather than resetting the stable asset to version 1. Project-wide build checkpoints remain separate from per-asset versions.
 
+## Mesh validation increment (2026-10-23)
+
+- Every procedural 3D primitive is now checked before OBJ serialization for non-empty geometry, finite vertex coordinates, valid face lengths, and in-range integer indices. A malformed generated primitive is rejected before it can be saved as a model.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
