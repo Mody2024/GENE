@@ -54,4 +54,6 @@ assert.match(source, /No collision proxy metadata is available/, "scene readines
 assert.match(source, /getCollisionProxyData=function\(id\)/, "runtime scene exposes collision proxy data for each assigned mesh");
 assert.match(source, /PROXY_DATA_READY_NOT_INSTANTIATED/, "proxy generation explicitly does not claim to instantiate physics colliders");
 assert.match(source, /center:\{x:center\[0\]\+o\.position\.x,y:center\[1\]\+o\.position\.y,z:center\[2\]\+o\.position\.z\}/, "proxy centers are transformed into scene coordinates");
+assert.match(source, /var sign=next\[a\]<0\?-1:1;next\[a\]=sign\*Math\.max\(\.001,Math\.min\(100000,Math\.abs\(next\[a\]\)\)\)/, "scene transforms preserve negative scale for mirrored geometry while clamping magnitude");
+assert.match(source, /size:\{x:p\.size\[0\]\*Math\.abs\(o\.scale\.x\),y:p\.size\[1\]\*Math\.abs\(o\.scale\.y\),z:p\.size\[2\]\*Math\.abs\(o\.scale\.z\)\}/, "mirrored transforms keep collision proxy dimensions positive");
 assert.match(source, /rotation:\{x:o\.rotation\.x,y:o\.rotation\.y,z:o\.rotation\.z\}/, "scene object rotation is retained for oriented-box adapters");
