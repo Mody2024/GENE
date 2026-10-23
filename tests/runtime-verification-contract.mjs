@@ -66,3 +66,6 @@ assert.match(runtimeAssets, /Collision proxy metadata is missing/, "runtime asse
 assert.match(runtimeAssets, /Collision proxy '\+index\+' is malformed/, "runtime asset validation rejects malformed collision proxy dimensions");
 
 assert.match(runtimeAssets, /sprite-sheet\|atlas\|reference\|texture/, "runtime asset bundles accept bounded imported reference and texture raster paths");
+
+assert.match(runtimeAssets, /Imported image data URL is malformed/, "runtime integrity verification detects malformed imported image data URLs");
+assert.match(runtimeAssets, /digestBytes=raw/, "runtime integrity verification hashes decoded raster bytes rather than the data URL string");
