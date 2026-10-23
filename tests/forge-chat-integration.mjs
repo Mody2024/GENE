@@ -22,3 +22,7 @@ assert.match(page, /Object\.entries\(item\.asset\.frameFiles \|\| \{\}\)/, "the 
 
 assert.match(page, /Object\.entries\(data\.asset\.frameFiles \|\| \{\}\)\.map\(\(\[name, svg\]\) => \[prefix \+ "frames\/" \+ name, String\(svg\)\]\)/, "manual 2D asset saving must persist frame files next to the manifest");
 assert.match(page, /and " \+ Object\.keys\(data\.asset\.frameFiles \|\| \{\}\)\.length \+ " animation frame files/, "activity log reports how many cropped frames were actually saved");
+
+assert.match(page, /sourceIntegrity\.files\["sprite\.svg"\]/, "staged 2D manifest maps the source sheet fingerprint to its actual project path");
+assert.match(page, /sourceManifest\.contentIntegrity\.files \|\| \{\}/, "manual 2D import preserves and relocates the generated source fingerprints");
+assert.match(page, /\[prefix \+ name, hash\]/, "manual 2D manifest fingerprints follow the saved asset paths");
