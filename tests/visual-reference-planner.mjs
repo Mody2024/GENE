@@ -41,7 +41,7 @@ const rankedImages = rankVisualReferenceResults([
 assert.deepEqual(rankedImages.map(image => image.id), ["good", "city"], "off-topic image results should be filtered and topic matches prioritized");
 const relevanceTie = rankVisualReferenceResults([
   { id: "specific", title: "Skeleton character concept", category: "characters" },
-  { id: "generic-category", title: "City street buildings skyline", category: "environments" },
+  { id: "generic-category", title: "Environment architecture buildings props", category: "environments" },
   { id: "off-topic", title: "Cooking pasta recipe", category: "environments" }
 ], "skeleton character in city");
 assert.equal(relevanceTie[0].id, "specific", "generic category keywords must not outrank direct subject matches");
