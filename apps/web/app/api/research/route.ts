@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() } as any);
-  if (!wantsImages) bundle.images = [];
+  if (!wantsImages) { bundle.images = []; if (bundle.evidence) bundle.evidence.visual.count = 0; }
   if (researchIsGeometryDash) {
     bundle.facts = [
       ...bundle.facts,

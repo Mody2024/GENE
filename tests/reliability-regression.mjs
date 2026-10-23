@@ -12,7 +12,7 @@ const recovery = read("apps/web/app/lib/error-recovery.mjs");
 
 assert.match(research, /body\?\.images !== false/, "visual research should run by default unless explicitly disabled");
 assert.match(research, /planVisualReferenceQueries/, "visual research must query distinct design categories");
-assert.match(research, /if \(!wantsImages\) bundle\.images = \[\]/, "Wikipedia thumbnails must not leak into research when images are disabled");
+assert.match(research, /if \(!wantsImages\) \{ bundle\.images = \[\];/, "Wikipedia thumbnails must not leak into research when images are disabled");
 assert.match(research, /researchIsGeometryDash/, "Geometry Dash must get a genre-specific research path");
 assert.match(research, /rhythm-based precision platformer/, "Geometry Dash research must prioritize mechanics rather than generic pictures");
 assert.match(agent, /GENE_AI_PROVIDER_UNAVAILABLE/, "interview must surface provider failure instead of silently continuing with deterministic questions");

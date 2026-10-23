@@ -159,6 +159,42 @@ export function parseGoogleSearchResults(data, topic, limit = 5) {
   return scored.sort((a, b) => b.relevance - a.relevance).slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
 }
 
+const OPEN_LICENSE = /^(?:cc0(?:[\s-]*1\.0)?|public domain(?: mark)?|pd[\s-]|cc[\s-]by(?:[\s-]sa)?(?:[\s-]\d(?:\.\d)?)?(?:\s.*)?|cc[\s-]by[\s-]\d.*)$/i;
+
+/** "open" only when the licence string names a known open licence; anything vague stays "unverified".
+ * This never certifies a download: it only describes what the source itself states. */
+export function classifyLicense(license) {
+  const text = String(license || "").trim();
+  if (!text) return "unverified";
+  if (/\b(?:nc|nd|all rights reserved|fair use|non[\s-]?commercial)\b/i.test(text)) return "restricted";
+  return OPEN_LICENSE.test(text) ? "open" : "unverified";
+}
+
+/** Tag every research item with what it actually is, so a reference is never presented as an imported asset.
+ * States: reference-only (inspiration/context, nothing imported), downloadable (a real file exists at the source but
+ * has NOT been imported), built-in (ships with GENE's runtime). licenseState: open | restricted | unverified. */
+function annotateEvidence(items, state, extra = () => ({})) {
+  return items.map(item => ({ ...item, state, licenseState: classifyLicense(item.license), ...extra(item) }));
+}
+
+/** Group the bundle into the four distinct kinds of evidence. Counts only; no item is claimed to be imported. */
+function summarizeEvidence(bundle, topic) {
+  const downloadable = [...bundle.models, ...bundle.music.tracks];
+  const compatibility = [
+    "The sandboxed game runtime cannot download files; downloadable assets must be added to the project with Import before a game can use them.",
+    "GENE's runtime renders Canvas 2D and raw WebGL; assets for other engines are reference-only until converted.",
+    "GENE imports SVG, OBJ and MTL; other formats (for example glTF or Blender files) need conversion first."
+  ];
+  if (downloadable.some(item => item.licenseState !== "open")) compatibility.push("Some downloadable items do not state an open licence; treat them as license-unverified and check the source page before importing.");
+  return {
+    topic,
+    technical: { count: bundle.facts.length + (bundle.webResults?.length || 0) + bundle.games.length },
+    visual: { count: bundle.images.length, imported: 0 },
+    assets: { downloadable: downloadable.length, builtIn: bundle.engineModels.length, imported: 0, licenseUnverified: downloadable.filter(item => item.licenseState !== "open").length },
+    compatibility
+  };
+}
+
 /** Assemble the single research bundle that is shown on the message and sent to GENE.
  * @param {{ id?: string, topic: string, createdAt?: string, wiki?: any[], commonsImages?: any[], commonsAudio?: any[], models?: any[], webResults?: any[], links?: any[], unavailable?: string[] }} input
  */
@@ -170,7 +206,7 @@ export function buildResearchBundle(input) {
   const pushImage = item => { const key = item.thumb || item.full; if (key && !seen.has(key)) { seen.add(key); images.push(item); } };
   for (const page of wiki) if (page.thumb) pushImage({ id: "wiki-" + page.title, title: page.title, thumb: page.thumb, full: page.thumb, page: page.url, license: "See Wikipedia page", credit: "Wikipedia", source: "Wikipedia" });
   for (const file of (Array.isArray(input.commonsImages) ? input.commonsImages : [])) pushImage(file);
-  const models = (Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" }));
+  const models = annotateEvidence((Array.isArray(input.models) ? input.models : []).map(model => ({ ...model, thumb: polyHavenThumb(model.id), source: "Poly Haven" })), "downloadable");
   const matches = matchGameKnowledge(topic, 3);
   const webResults = parseGoogleSearchResults({ items: Array.isArray(input.webResults) ? input.webResults : [] }, topic, 5);
   // Round-robin category-tagged references so UI, gameplay, characters and environments
@@ -185,24 +221,28 @@ export function buildResearchBundle(input) {
     }
   }
   const visualImages = [...balancedImages, ...images.filter(image => !image.category)];
-  return {
+  const engineModels = annotateEvidence(matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")).filter(model => {
+    const explicit = /\b(character|player|hero|person|human|ninja|knight|mario|runner|run|enemy|enemies|monster|goomba|slime|zombie|ghost|boss|creature|npc|avatar)\b/i.test(topic);
+    if (/Animated character|Enemies/i.test(model.name)) return explicit;
+    return true;
+  }), "built-in", () => ({ licenseState: "open" }));
+  const tracks = annotateEvidence((Array.isArray(input.commonsAudio) ? input.commonsAudio : []).slice(0, 4), "downloadable");
+  const bundle = {
     id: String(input.id || "research-" + Date.now().toString(36)),
     topic,
     createdAt: String(input.createdAt || new Date().toISOString()),
     facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
     webResults,
-    images: visualImages.slice(0, 12),
+    images: annotateEvidence(visualImages.slice(0, 12), "reference-only"),
     models,
-    engineModels: matchEngineModels(topic + " " + matches.map(entry => entry.models).join(" ")).filter(model => {
-      const explicit = /\b(character|player|hero|person|human|ninja|knight|mario|runner|run|enemy|enemies|monster|goomba|slime|zombie|ghost|boss|creature|npc|avatar)\b/i.test(topic);
-      if (/Animated character|Enemies/i.test(model.name)) return explicit;
-      return true;
-    }),
-    music: { styles: musicStylesFor(topic, 3), tracks: (Array.isArray(input.commonsAudio) ? input.commonsAudio : []).slice(0, 4), links: (Array.isArray(input.links) ? input.links : []).filter(link => ["fma", "opengameart", "freesound", "commons"].includes(link.id)) },
+    engineModels,
+    music: { styles: musicStylesFor(topic, 3), tracks, links: (Array.isArray(input.links) ? input.links : []).filter(link => ["fma", "opengameart", "freesound", "commons"].includes(link.id)) },
     games: matches.map(entry => ({ title: entry.title, examples: entry.examples, loop: entry.loop, engine: entry.engine })),
     links: Array.isArray(input.links) ? input.links : [],
     unavailable: Array.isArray(input.unavailable) ? input.unavailable : []
   };
+  bundle.evidence = summarizeEvidence(bundle, topic);
+  return bundle;
 }
 
 /** Markdown note given to the builder. Most useful guidance comes first because staged prompts truncate references. */
@@ -219,7 +259,7 @@ export function formatResearchNotes(input) {
     if (bundle.music.styles.length) {
       lines.push("## Music direction (use GeneAudio)");
       for (const style of bundle.music.styles) lines.push("- " + style.genre + ": GeneAudio mood '" + style.mood + "', ~" + style.bpm + " BPM, " + style.scale + "; " + style.instruments + ". " + style.notes + ". SFX: " + style.sfx.join(", ") + ".");
-      for (const track of bundle.music.tracks) lines.push("- Reference track: " + track.title + " — " + track.page + " (" + track.license + ", " + track.credit + ")");
+      for (const track of bundle.music.tracks) lines.push("- Reference track: " + track.title + " — " + track.page + " (" + track.license + ", " + track.credit + "; " + (track.state || "reference-only") + ", licence " + (track.licenseState || "unverified") + "; not imported)");
       lines.push("");
     }
     if (bundle.engineModels.length) {
@@ -229,8 +269,8 @@ export function formatResearchNotes(input) {
     }
     if (bundle.images.length) {
       lines.push("## Visual references (" + bundle.images.length + ")");
-      for (const image of bundle.images) lines.push("- [" + (image.categoryLabel || "Visual reference") + "] " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + ")");
-      lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition.", "");
+      for (const image of bundle.images) lines.push("- [" + (image.categoryLabel || "Visual reference") + "] " + image.title + " — " + image.page + " (" + image.license + "; " + image.credit + "; via " + image.source + "; reference-only, licence " + (image.licenseState || "unverified") + ")");
+      lines.push("Some of these images are attached to this message as pixels; study palette, shapes and composition. They are references, not imported assets.", "");
     }
     if (Array.isArray(bundle.webResults) && bundle.webResults.length) {
       lines.push("## Web research (ranked by topic relevance)");
@@ -244,7 +284,12 @@ export function formatResearchNotes(input) {
     }
     if (bundle.models.length) {
       lines.push("## Free CC0 3D models that match (Poly Haven)");
-      for (const model of bundle.models) lines.push("- " + model.name + " — " + model.url + " (CC0; tags: " + (model.tags || []).join(", ") + ")");
+      for (const model of bundle.models) lines.push("- " + model.name + " — " + model.url + " (" + (model.license || "CC0") + "; downloadable at source, NOT imported; tags: " + (model.tags || []).join(", ") + ")");
+      lines.push("");
+    }
+    if (bundle.evidence) {
+      lines.push("## Compatibility and integration");
+      for (const note of bundle.evidence.compatibility) lines.push("- " + note);
       lines.push("");
     }
     if (bundle.unavailable.length) lines.push("Note: some live sources were unavailable (" + bundle.unavailable.join("; ") + "); only verified parts are listed.", "");

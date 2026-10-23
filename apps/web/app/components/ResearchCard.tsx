@@ -37,7 +37,7 @@ export default function ResearchCard({ bundle }: Props) {
         <div className="rc-grid">{bundle.images.map(image => <a key={image.id} className="rc-image" href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
+          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source} · reference only{image.licenseState === "unverified" ? " · license unverified" : ""}</small>
         </a>)}</div>
       </section>}
 
@@ -52,7 +52,7 @@ export default function ResearchCard({ bundle }: Props) {
         {bundle.models.length > 0 && <div className="rc-grid">{bundle.models.map(model => <a key={model.id} className="rc-image" href={model.url} target="_blank" rel="noreferrer noopener" title={model.name + " — " + model.license}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={model.thumb} alt={model.name} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{model.name}</span><small>{model.license} · Poly Haven</small>
+          <span>{model.name}</span><small>{model.license} · Poly Haven · downloadable, not imported{model.licenseState === "unverified" ? " · license unverified" : ""}</small>
         </a>)}</div>}
       </section>}
 
@@ -69,6 +69,7 @@ export default function ResearchCard({ bundle }: Props) {
         </div>)}
       </section>}
 
+      {bundle.evidence && <p className="rc-note">Nothing here has been imported into your project. {bundle.evidence.assets.downloadable > 0 ? bundle.evidence.assets.downloadable + " downloadable item" + (bundle.evidence.assets.downloadable === 1 ? "" : "s") + " must be added with Import." : "Images are references only."}{bundle.evidence.assets.licenseUnverified > 0 ? " " + bundle.evidence.assets.licenseUnverified + " without a stated open licence." : ""}</p>}
       {bundle.unavailable.length > 0 && <p className="rc-note">Not available this time: {bundle.unavailable.join("; ")}.</p>}
       <footer className="rc-sent">{sent ? "Sent to GENE as reference: " + (sent.notes ? "research notes" : "no notes") + (sent.images ? " + " + sent.images + " image" + (sent.images === 1 ? "" : "s") : "") : "Attached to this message"}</footer>
     </details>

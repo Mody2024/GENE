@@ -153,3 +153,10 @@ The following code changes have been started on `gene-infinity-overhaul` (not ye
 - Added focused regression tests for sprite slicing, runtime animation support, visible-renderer contracts, image relevance, and call-scoped tool approvals.
 
 Verification status: repository files and branch commits were inspected through GitHub. A local build/test run has not yet been completed in this environment because the repository could not be cloned from the container network. CI should be used to verify the branch before merge. Do not interpret this log as a claim that the full overhaul is complete.
+
+## Implementation log — continuation (2026-10-23)
+
+- Repaired `package-lock.json`, which was missing the `@gene/native-brain` workspace entry and made `npm ci` fail.
+- Research evidence states (Wave 2, item 6): every research item now carries `state` (`reference-only`, `downloadable`, `built-in`) and `licenseState` (`open`, `restricted`, `unverified`), derived only from the licence text the source reports. Images stay `reference-only`; Poly Haven models and Commons audio are `downloadable` but never marked imported. The bundle gains an `evidence` summary (technical, visual, assets, compatibility) with `imported` fixed at 0 until a real import path exists, builder notes include a compatibility section, and the Research card says nothing was imported.
+- Verification: `npm test` (all contract tests, including new evidence-state assertions) and `npm run typecheck` pass locally. Browser/Playwright suites were not run in this session.
+- Still open from Wave 2: scoring and suppression of weak matches across all four kinds, fetching real asset bytes from trusted sources with validation, and the Forge asset-fidelity trace.

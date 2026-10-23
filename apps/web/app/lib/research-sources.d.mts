@@ -1,7 +1,9 @@
+export type EvidenceState = "reference-only" | "downloadable" | "built-in";
+export type LicenseState = "open" | "restricted" | "unverified";
 export type ResearchLink = { id: string; label: string; kind: string; license: string; url: string };
-export type ResearchImage = { id: string; title: string; thumb: string; full: string; page: string; license: string; credit: string; source: string; category?: string; categoryLabel?: string };
-export type ResearchAudio = { id: string; title: string; url: string; page: string; license: string; credit: string; source: string };
-export type ResearchModel = { id: string; name: string; tags: string[]; url: string; license: string; thumb?: string; source?: string; score?: number };
+export type ResearchImage = { id: string; title: string; thumb: string; full: string; page: string; license: string; credit: string; source: string; category?: string; categoryLabel?: string; state?: EvidenceState; licenseState?: LicenseState; relevanceScore?: number };
+export type ResearchAudio = { id: string; title: string; url: string; page: string; license: string; credit: string; source: string; state?: EvidenceState; licenseState?: LicenseState };
+export type ResearchModel = { id: string; name: string; tags: string[]; url: string; license: string; thumb?: string; source?: string; score?: number; state?: EvidenceState; licenseState?: LicenseState };
 export type ResearchWebResult = { title: string; snippet: string; url: string; source: string; relevance: number };
 export type ResearchBundle = {
   id: string; topic: string; createdAt: string;
@@ -9,11 +11,12 @@ export type ResearchBundle = {
   webResults?: ResearchWebResult[];
   images: ResearchImage[];
   models: ResearchModel[];
-  engineModels: Array<{ name: string; call: string; dims: string }>;
+  engineModels: Array<{ name: string; call: string; dims: string; state?: EvidenceState; licenseState?: LicenseState }>;
   music: { styles: Array<{ genre: string; mood: string; bpm: number; scale: string; instruments: string; notes: string; sfx: string[]; source: string; reference: string }>; tracks: ResearchAudio[]; links: ResearchLink[] };
   games: Array<{ title: string; examples: string[]; loop: string; engine: string }>;
   links: ResearchLink[];
   unavailable: string[];
+  evidence?: { topic: string; technical: { count: number }; visual: { count: number; imported: number }; assets: { downloadable: number; builtIn: number; imported: number; licenseUnverified: number }; compatibility: string[] };
   sent?: { notes: boolean; images: number };
 };
 export function cleanQuery(value: unknown): string;
@@ -28,3 +31,4 @@ export function musicSearchTerms(topic: string): string[];
 export function parseGoogleSearchResults(data: unknown, topic: string, limit?: number): ResearchWebResult[];
 export function buildResearchBundle(input: { id?: string; topic: string; createdAt?: string; wiki?: any[]; commonsImages?: any[]; commonsAudio?: any[]; models?: any[]; webResults?: any[]; links?: ResearchLink[]; unavailable?: string[] }): ResearchBundle;
 export function formatResearchNotes(input: any): string;
+export function classifyLicense(license: unknown): LicenseState;
