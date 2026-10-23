@@ -5,6 +5,7 @@ import { buildResearchBundle, filterPolyHaven, formatResearchNotes, parseCommons
 const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 assert.match(researchRoute, /isAppResearch\s*\?\s*normalizedTopic \+ " UI design interaction patterns accessibility official documentation"/, "app research must query interface and interaction guidance instead of game mechanics");
 assert.match(researchRoute, /isAppResearch\s*\?\s*topic \+ " interface UI design interaction patterns accessibility"/, "app research-library links must match app-building intent");
+assert.match(researchRoute, /iiprop=url%7Cmime%7Csize%7Csha1%7Cextmetadata/, "Commons queries must actually request the size, dimensions and checksum exposed by asset candidates");
 const topic = "Geometry Dash gameplay mechanics level editor";
 const results = parseGoogleSearchResults({ items: [
   { title: "A gameplay guide to Geometry Dash", snippet: "Rhythm platformer mechanics, editor workflows and level design.", link: "https://example.org/geometry-dash-guide" },
