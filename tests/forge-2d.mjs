@@ -91,6 +91,8 @@ assert.match(runtimeAssets, /RUNTIME_RASTER_PATH/, "runtime admits imported rast
 assert.ok(runtimeAssets.includes(String.raw`data:image\\/(?:png|jpeg|webp|gif);base64,`), "runtime can decode approved local raster sheet data");
 assert.match(runtimeAssets, /sprite-sheet\|atlas/, "runtime exposes imported sprite sheets to the frame detector");
 assert.match(runtimeAssets, /GENE_SPRITES[\s\S]{0,2500}frame-/, "runtime selects a single cropped frame rather than drawing the full atlas");
+assert.ok(runtimeAssets.includes(String.raw`replace(/\\.obj$/i,\\\".mtl\\\")`), "runtime must resolve matching MTL files for character.obj and environment.obj, not only model.obj");
+assert.match(runtimeAssets, /forge2d\\\\\/(?:character|tileset)\\\\\/frames\\\\\/frame-/, "asset browser exposes separately sliced character and tileset frames");
 assert.match(runtimeAssets, /frame-\\d\{2\}/, "runtime asset allowlist admits sliced sprite frames");
 assert.match(agentRoute, /assembled Canvas 2D project has no detectable visible drawing operations/, "audio-only or empty Canvas builds are rejected");
 assert.match(agentRoute, /never submits visible geometry to WebGL/, "3D builds must actually submit visible geometry");
