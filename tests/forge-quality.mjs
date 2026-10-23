@@ -51,3 +51,9 @@ assert.ok(malformed.warnings.some(w => w.code === "UNSUPPORTED_SHAPE"));
 assert.ok(malformed.warnings.some(w => w.code === "INVALID_TRANSFORM"));
 assert.ok(malformed.warnings.some(w => w.code === "DEGENERATE_SCALE"));
 assert.ok(malformed.score < 100, "structural errors must affect the quality score");
+
+const incompleteMaterials = analyzeForgeRecipe({ parts: [
+  part("", [0, 0.5, 0], { color: "not-a-color" })
+] });
+assert.ok(incompleteMaterials.warnings.some(w => w.code === "MISSING_PART_NAME"));
+assert.ok(incompleteMaterials.warnings.some(w => w.code === "INVALID_COLOR"));
