@@ -46,6 +46,7 @@ const relevanceTie = rankVisualReferenceResults([
 ], "skeleton character in city");
 assert.equal(relevanceTie[0].id, "specific", "generic category keywords must not outrank direct subject matches");
 assert.ok(!relevanceTie.some(image => image.id === "off-topic"), "unrelated results must be discarded instead of passed as visual references");
+assert.ok(!relevanceTie.some(image => image.id === "generic-category"), "a generic environment-category match without a topic term must not pass relevance filtering");
 
 const coverA = createProjectCoverSvg({ name: "Skeleton City", kind: "game", engine: "webgl3d", prompt: "third person skeleton in a city" });
 const coverB = createProjectCoverSvg({ name: "Budget Board", kind: "app", engine: "webapp", prompt: "dashboard and budget charts" });
