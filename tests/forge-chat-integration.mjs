@@ -41,3 +41,5 @@ assert.match(page, /researchAssetImport/, "the tool approval helper recognizes r
 assert.match(researchCard, /onImportImage\?: \(image: any\) => void/, "research cards expose an optional import callback");
 assert.match(researchCard, /Import to project/, "each eligible visual reference has a clear import action");
 assert.match(researchCard, /<a href=\{image\.page\}[\s\S]{0,700}<\/a>[\s\S]{0,220}Import to project/, "the import action is a separate control rather than nested inside the source link");
+
+assert.match(page, /tool === "researchAssetImport"[\s\S]{0,260}input\?\.sourceUrl[\s\S]{0,180}input\?\.license/, "research import approval previews the exact source URL and declared license");
