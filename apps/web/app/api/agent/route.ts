@@ -907,7 +907,7 @@ export async function POST(request: NextRequest) {
 
   // GENE Forge 2D bridge: generate native vector assets during ordinary 2D game builds,
   // pass the real asset paths into the model context, and return the actual files with the game.
-  let forge2DAssets: Array<{ kind: string; name: string; svg: string; manifest: any; qualityReport: any }> = [];
+  let forge2DAssets: Array<{ kind: string; name: string; svg: string; manifest: any; qualityReport: any; frameFiles?: Record<string, string> }> = [];
   const wants2DForge = ["build", "surprise"].includes(body.operation) && projectKind === "game" && !wants3DForge &&
     (body.project?.preferredEngine === "canvas2d" || body.project?.plan?.engine === "canvas2d" ||
       (!body.project?.preferredEngine && !body.project?.plan?.engine && !/\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(forgePrompt)));
