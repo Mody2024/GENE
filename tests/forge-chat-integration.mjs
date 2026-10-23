@@ -15,3 +15,6 @@ assert.match(agent, /assets\/models\/" \+ asset\.kind \+ "\.obj".*replace\(\/mtl
 assert.match(forge, /body\.nativeOnly === true/, "Forge must expose a bounded native-only internal tool mode");
 assert.match(forge, /nativeAssetResponse\(prompt, kind, quality/, "native-only mode must use the validated native asset generator");
 console.log("GENE Chat ↔ Forge integration contract tests passed.");
+
+assert.match(studioPage, /stagedFiles\[base \+ "\/frames\/" \+ frameName\] = String\(frameSvg\)/, "generated 2D frame files must be persisted into the project instead of dropping animation frames");
+assert.match(studioPage, /Object\.entries\(item\.asset\.frameFiles \|\| \{\}\)/, "the build pipeline iterates all generated sprite frames");
