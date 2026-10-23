@@ -16,7 +16,7 @@ assert.equal(hasValidImageSignature("image/webp", new TextEncoder().encode("RIFF
 assert.equal(hasValidImageSignature("image/png", new TextEncoder().encode("not a PNG")), false, "HTML or arbitrary bytes cannot pass as a PNG");
 assert.equal(hasValidImageSignature("image/jpeg", new TextEncoder().encode("<html>error</html>")), false, "HTML error pages cannot pass as JPEGs");
 assert.equal(hasValidImageSignature("image/svg+xml", new TextEncoder().encode("<svg/>")), false, "untrusted SVG is not accepted as a raster model image payload");
-assert.match(researchRoute, /hasValidImageSignature\\(mimeType, bytes\\)/, "downloaded image payloads must pass file-signature validation before reaching the model");
+assert.match(researchRoute, /hasValidImageSignature\(mimeType, bytes\)/, "downloaded image payloads must pass file-signature validation before reaching the model");
 
 const topic = "Geometry Dash gameplay mechanics level editor";
 const results = parseGoogleSearchResults({ items: [
