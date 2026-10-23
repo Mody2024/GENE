@@ -222,7 +222,7 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 ## Research image import workflow increment (2026-10-23)
 
 - Added an explicit **Import to project** action to visual research cards. The user sees the source, license and attribution details before confirming; the call then requires a fresh call-scoped tool approval bound to the exact import inputs.
-- Added a server-side importer restricted to approved HTTPS image hosts, with redirects disabled, a 1.5 MB streamed byte limit, supported raster MIME checks, real file-signature validation, and SHA-256 of the exact downloaded bytes. The response preserves source-page/license/attribution metadata; it does not independently certify a license.
+- Added a server-side importer restricted to approved HTTPS image hosts, with redirects disabled, a 350 KB streamed byte limit, supported raster MIME checks, real file-signature validation, and SHA-256 of the exact downloaded bytes. The response preserves source-page/license/attribution metadata; it does not independently certify a license.
 - Imported images are saved into the project file map and a build-version checkpoint as `assets/<id>/reference.png|jpg|webp` plus `asset.json`. Runtime bundling now accepts these bounded reference/texture paths, and SHA-256 verification decodes the stored data URL so it verifies the original raster bytes rather than the URL text.
 - The imported image remains a reference asset by default; it is **not** automatically applied as a texture or claimed to be a playable/game-ready asset. That needs a separate supported sprite/UV-material assignment path.
 
