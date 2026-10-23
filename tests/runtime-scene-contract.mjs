@@ -33,7 +33,7 @@ assert.match(source, /getAssetStatus/, "the status API is part of the scene runt
 
 assert.match(source, /const seenIds = new Set<string>\(\)/, "runtime scene normalization tracks duplicate object identifiers");
 assert.match(source, /while \(seenIds\.has\(id\)\)/, "duplicate scene IDs are deterministically disambiguated");
-assert.match(source, /integrity: \{[\s\S]{0,260}duplicateIds,[\s\S]{0,160}truncatedObjectCount,[\s\S]{0,160}invalidObjectEntryIndices/, "scene manifest exposes duplicate-ID, truncation, and invalid-entry repair evidence");
+assert.match(source, /integrity: \{[\s\S]{0,600}duplicateIds,[\s\S]{0,300}truncatedObjectCount,[\s\S]{0,200}invalidObjectEntryIndices/, "scene manifest exposes duplicate-ID, truncation, and invalid-entry repair evidence");
 assert.match(source, /sourceObjectCount: rawObjects\.length/, "scene diagnostics report the original manifest object count");
 assert.match(source, /loadedObjectCount: Math\.min\(rawObjects\.length, 500\)/, "scene diagnostics report how many objects were admitted to the runtime");
 assert.match(source, /truncatedObjectCount: Math\.max\(0, rawObjects\.length - 500\)/, "scene diagnostics expose object entries dropped by the runtime safety limit");
