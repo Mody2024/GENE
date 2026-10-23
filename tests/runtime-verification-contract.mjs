@@ -40,3 +40,6 @@ assert.match(runtimeAssets, /Collision shapes must be supplied by scene integrat
 assert.match(runtimeAssets, /validation:report/, "resolving a runtime asset returns its validation report");
 
 assert.match(runtimeAssets, /frame-\\\\d\{2,3\}/, "sprite asset paths must accept three-digit frame numbers emitted by the manifest renderer");
+
+assert.match(runtimeAssets, /contentIntegrity:m\.contentIntegrity\|\|null/, "runtime asset listings expose exact-file fingerprints");
+assert.match(runtimeAssets, /Exact OBJ\/MTL SHA-256 fingerprints are missing or invalid/, "runtime asset validation warns on manifests without valid fingerprints");
