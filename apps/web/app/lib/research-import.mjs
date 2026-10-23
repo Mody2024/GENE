@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { hasValidImageSignature } from "./research-sources.mjs";
 
-export const MAX_RESEARCH_IMPORT_BYTES = 1_500_000;
+export const MAX_RESEARCH_IMPORT_BYTES = 350_000;
 export const RESEARCH_IMPORT_HOSTS = new Set([
   "upload.wikimedia.org",
   "images.unsplash.com",
