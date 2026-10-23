@@ -205,17 +205,17 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
     }
   } else if (shape === "arch") {
     const segments = 16;
-    const outerRadius = Math.max(0.05, Math.min(scale[0] / 2, scale[1] / 2));
+    const outerX = Math.max(0.05, scale[0] / 2), outerY = Math.max(0.05, scale[1]);
     const thickness = Math.max(0.025, Math.min(scale[0] * 0.14, scale[1] * 0.14));
-    const innerRadius = Math.max(0.02, outerRadius - thickness);
-    const centerY = -scale[1] / 2 + outerRadius;
+    const innerX = Math.max(0.02, outerX - thickness), innerY = Math.max(0.02, outerY - thickness);
+    const centerY = -scale[1] / 2;
     const zFront = scale[2] / 2, zBack = -scale[2] / 2;
-    const point = (radius: number, angle: number, z: number): Vec3 => [radius * Math.cos(angle), centerY + radius * Math.sin(angle), z];
+    const point = (xRadius: number, yRadius: number, angle: number, z: number): Vec3 => [xRadius * Math.cos(angle), centerY + yRadius * Math.sin(angle), z];
     for (let i = 0; i < segments; i++) {
       const a0 = i / segments * Math.PI, a1 = (i + 1) / segments * Math.PI;
       const start = vertices.length + 1;
-      vertices.push(point(outerRadius,a0,zFront),point(outerRadius,a1,zFront),point(innerRadius,a1,zFront),point(innerRadius,a0,zFront),
-        point(outerRadius,a0,zBack),point(outerRadius,a1,zBack),point(innerRadius,a1,zBack),point(innerRadius,a0,zBack));
+      vertices.push(point(outerX,outerY,a0,zFront),point(outerX,outerY,a1,zFront),point(innerX,innerY,a1,zFront),point(innerX,innerY,a0,zFront),
+        point(outerX,outerY,a0,zBack),point(outerX,outerY,a1,zBack),point(innerX,innerY,a1,zBack),point(innerX,innerY,a0,zBack));
       const v = (n: number) => start + n;
       faces.push([v(0),v(1),v(2)],[v(0),v(2),v(3)],[v(4),v(7),v(6)],[v(4),v(6),v(5)],
         [v(0),v(4),v(5)],[v(0),v(5),v(1)],[v(3),v(2),v(6)],[v(3),v(6),v(7)],
