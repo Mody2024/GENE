@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { planVisualReferenceQueries } from "../apps/web/app/lib/visual-reference-planner.mjs";
+import { planVisualReferenceQueries, rankVisualReferenceResults } from "../apps/web/app/lib/visual-reference-planner.mjs";
 import { buildResearchBundle } from "../apps/web/app/lib/research-sources.mjs";
 import { createProjectCoverSvg, projectCoverDataUrl } from "../apps/web/app/lib/project-cover.mjs";
 import { readFileSync } from "node:fs";
@@ -13,7 +13,7 @@ const gameQueries = planVisualReferenceQueries({ topic: "3D skeleton city advent
 assert.deepEqual(gameQueries.map(item => item.id), ["ui-menus", "gameplay", "characters", "environments"]);
 assert.ok(gameQueries.every(item => item.query.includes("3D skeleton city adventure")));
 assert.ok(gameQueries.every(item => item.query.length <= 220));
-assert.match(gameQueries.find(item => item.id === "characters").query, /character design|animation pose/i);
+assert.match(gameQueries.find(item => item.id === "characters").query, /character sprite model animation/i);
 
 const categoryIds = ["ui-menus", "gameplay", "characters", "environments"];
 const categorizedBundle = buildResearchBundle({
@@ -31,6 +31,14 @@ const appQueries = planVisualReferenceQueries({ topic: "Project dashboard and ta
 assert.deepEqual(appQueries.map(item => item.id), ["ui-layout", "interaction-patterns", "visual-style", "illustrations-icons"]);
 assert.equal(planVisualReferenceQueries({ topic: "City runner", images: false }).length, 0);
 assert.equal(planVisualReferenceQueries({ topic: "x" }).length, 0);
+
+const rankedImages = rankVisualReferenceResults([
+  { id: "good", title: "Skeleton character turnaround", category: "characters" },
+  { id: "bad", title: "Banana smoothie recipe", category: "characters" },
+  { id: "city", title: "City street buildings", category: "environments" },
+  { id: "generic", title: "Random photograph", category: "environments" }
+], "3D skeleton city adventure");
+assert.deepEqual(rankedImages.map(image => image.id), ["good", "city"], "off-topic image results should be filtered and topic matches prioritized");
 
 const coverA = createProjectCoverSvg({ name: "Skeleton City", kind: "game", engine: "webgl3d", prompt: "third person skeleton in a city" });
 const coverB = createProjectCoverSvg({ name: "Budget Board", kind: "app", engine: "webapp", prompt: "dashboard and budget charts" });
