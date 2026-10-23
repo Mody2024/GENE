@@ -37,7 +37,7 @@ const bundle = buildResearchBundle({
   links: [],
   unavailable: []
 });
-assert.equal(bundle.webResults.length, 2);
+assert.equal(bundle.webResults.length, 1, "unrelated results are removed from the assembled research bundle");
 assert.equal(bundle.webResults[0].integrationState, "reference-only");
 assert.equal(bundle.facts[0].resultType, "encyclopedic-context");
 assert.equal(bundle.facts[0].integrationState, "reference-only", "encyclopedic context is not an imported asset");
