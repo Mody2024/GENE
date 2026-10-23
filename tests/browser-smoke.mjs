@@ -124,6 +124,7 @@ try {
   assert.equal(won?.score, 4, "all four objectives can be reached and scored through input");
   assert.equal(won?.won, true, "the game reaches its defined win condition");
   await page.keyboard.press("r");
+  await page.waitForTimeout(80);
   const restarted = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState);
   assert.equal(restarted?.score, 0, "restart resets the objective score");
   assert.equal(restarted?.playerX, 85, "restart restores the player spawn");
