@@ -98,3 +98,5 @@ assert.match(route, /collisionProxies\.push\(\{[\s\S]{0,240}sourceShape: part\.s
 assert.match(route, /bounds: \{ min: bounds\.min[\s\S]{0,120}max: bounds\.max/, "the asset manifest exposes calculated world-space bounds");
 assert.match(route, /'capsule'\|'stairs'\|'arch'/, "AI recipe schema accepts all implemented procedural geometry types");
 assert.match(route, /conservative axis-aligned box proxies are provided in collisionProxies/, "manifest documents the difference between proxy metadata and engine-bound colliders");
+
+assert.match(route, /sourceUrl: safeHttpsUrl\(ref\.sourceUrl \|\| ref\.full \|\| ref\.url\)/, "Forge preserves source URLs from saved research image references");
