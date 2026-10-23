@@ -1910,9 +1910,14 @@ export default function Home() {
       }
       const assetId = targetId || ("asset-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6));
       const prefix = "assets/" + assetId + "/";
+      let previousAssetVersion = 0;
+      if (targetId) {
+        try { previousAssetVersion = Number(JSON.parse(project.files[prefix + "asset.json"] || "{}").version) || 0; } catch {}
+      }
       const manifest = {
         ...JSON.parse(data.asset.files["asset.json"]),
         assetId,
+        version: Math.max(1, previousAssetVersion + 1),
         name: data.asset.name,
         kind: data.asset.kind,
         style: data.asset.style,
