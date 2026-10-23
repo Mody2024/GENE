@@ -16,7 +16,17 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   let totalBytes = 0;
   // The cap applies to the serialized asset map too, including path names and JSON escaping.
   let totalPayloadBytes = 2; // "{}"
-  for (const [path, content] of Object.entries(files || {})) {
+  const entries = Object.entries(files || {}).sort(([a], [b]) => {
+    const priority = (path: string) => {
+      if (/\/asset(?:-2d)?\.json$/i.test(path) || /\/models\/[^/]+\.json$/i.test(path) || /\/forge2d\/(?:character|tileset|background)\.json$/i.test(path)) return 0;
+      if (RUNTIME_ART_PATH.test(path) || /\.(?:obj|mtl)$/i.test(path)) return 1;
+      if (/\/(?:sprite-sheet|atlas|texture)\.(?:png|jpe?g|webp)$/i.test(path)) return 2;
+      if (/\/reference\.(?:png|jpe?g|webp)$/i.test(path)) return 3;
+      return 4;
+    };
+    return priority(a) - priority(b) || a.localeCompare(b);
+  });
+  for (const [path, content] of entries) {
     if (!/^assets\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.(?:obj|mtl)$/i.test(path) && !/^assets\/[a-zA-Z0-9_-]+\/(?:asset\.json|asset-2d\.json)$/i.test(path) && !/^assets\/models\/[a-zA-Z0-9_-]+\.json$/i.test(path) && !/^assets\/forge2d\/(?:character|tileset|background)\.json$/i.test(path) && !(RUNTIME_RASTER_PATH.test(path) && typeof content === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,/i.test(content)) && !RUNTIME_ART_PATH.test(path)) continue;
     if (typeof content !== "string") continue;
     // Count UTF-8 bytes, not UTF-16 code units, so non-ASCII SVG/manifest text cannot bypass the runtime payload cap.
