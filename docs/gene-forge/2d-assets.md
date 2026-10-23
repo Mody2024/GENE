@@ -31,3 +31,20 @@ Character sheets are four 128×128 vector poses in a horizontal strip. The frame
 This feature is the **GENE native procedural 2D generator**, not an external image-generation model. It uses prompt keywords and a small curated palette to build safe vector shapes. It does not download artwork, use external references, or produce detailed painterly images. Use licensed external artwork or a configured image model when the game needs higher-fidelity illustrations.
 
 The SVG is intended for safe integration into projects that support SVG. For engines requiring raster images, convert it using an approved local image-conversion worker and verify the resulting dimensions/alpha channel before importing. Never claim that the file has been imported into a game unless the workspace integration actually writes it and a build/test confirms it.
+
+
+## Runtime animation controller
+
+The isolated game iframe exposes `window.GENE_SPRITES`. For a manifest stored at `assets/forge2d/character.json` with frames at `assets/forge2d/character/frames/frame-00.svg` and matching names:
+
+```js
+const animator = window.GENE_SPRITES.createController("assets/forge2d/character");
+function updatePlayer(vx, vy) {
+  animator.update(vx, vy); // chooses idle/walk/run and directional clips when present
+}
+function drawPlayer(ctx, x, y, width, height, now) {
+  return animator.draw(ctx, x, y, width, height, now);
+}
+```
+
+The controller exposes `setClip(name)`, `getClip()`, `getFacing()`, and `clips()`. It selects clips from the manifest, defaults to `idle` when available, and selects `walk-left`/`walk-right` when those clips exist. The game still owns movement physics, collision, facing transforms, and when the controller is called. A successful draw returns `true`; missing assets or not-yet-loaded images return `false` so the caller can retain a safe fallback. This helper is not an automatic animation-to-gameplay binding.
