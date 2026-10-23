@@ -24,11 +24,18 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       };
       return { x: axis("x"), y: axis("y"), z: axis("z") };
     };
+    const seenIds = new Set<string>();
+    const duplicateIds: string[] = [];
     scene = {
       version: 1,
       objects: rawObjects.slice(0, 500).map((entry, index) => {
         const raw = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
-        const id = typeof raw.id === "string" ? raw.id.slice(0, 120) : "scene-object-" + (index + 1);
+        const requestedId = typeof raw.id === "string" && raw.id.trim() ? raw.id.slice(0, 120) : "scene-object-" + (index + 1);
+        let id = requestedId;
+        let suffix = 2;
+        while (seenIds.has(id)) { id = requestedId.slice(0, 110) + "-" + suffix++; }
+        if (id !== requestedId) duplicateIds.push(requestedId);
+        seenIds.add(id);
         const name = typeof raw.name === "string" ? raw.name.slice(0, 120) : "Object " + (index + 1);
         const color = typeof raw.color === "string" && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : "#8b9bb4";
         return {
@@ -37,7 +44,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           modelPath: typeof raw.modelPath === "string" && /^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(raw.modelPath) ? raw.modelPath.slice(0, 240) : "",
           position: vector(raw.position ?? raw.position3d ?? raw.translation, { x: 0, y: 0, z: 0 }),
           rotation: vector(raw.rotation ?? raw.rotation3d, { x: 0, y: 0, z: 0 }),
-          scale: vector(raw.scale ?? raw.scale3d, { x: 1, y: 1, z: 1 }),
+          scale: (() => { const s = vector(raw.scale ?? raw.scale3d, { x: 1, y: 1, z: 1 }); return { x: Math.max(0.001, Math.min(100000, Math.abs(s.x))), y: Math.max(0.001, Math.min(100000, Math.abs(s.y))), z: Math.max(0.001, Math.min(100000, Math.abs(s.z))) }; })(),
           size: (() => { const d = vector(raw.size ?? raw.dimensions ?? raw.bounds, { x: 1, y: 1, z: 1 }); return { x: Math.max(0.01, Math.abs(d.x)), y: Math.max(0.01, Math.abs(d.y)), z: Math.max(0.01, Math.abs(d.z)) }; })(),
           color,
           visible: raw.visible !== false,
@@ -45,7 +52,8 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           light: (() => { const l = raw.light && typeof raw.light === "object" ? raw.light as Record<string, unknown> : {}; const intensity = Number(l.intensity); return { intensity: Number.isFinite(intensity) ? Math.max(0, Math.min(20, intensity)) : 1, color: typeof l.color === "string" && /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : color }; })(),
           camera: (() => { const c = raw.camera && typeof raw.camera === "object" ? raw.camera as Record<string, unknown> : {}; const fov = Number(c.fov); return { fov: Number.isFinite(fov) ? Math.max(10, Math.min(120, fov)) : 60 }; })()
         };
-      })
+      }),
+      integrity: { duplicateIds }
     };
   } catch {
     scene = { version: 1, objects: [], error: "Invalid game-spec.json scene manifest" };
