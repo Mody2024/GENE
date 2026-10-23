@@ -12,3 +12,8 @@ assert.match(source, /Referenced OBJ file is absent from the runtime asset bundl
 assert.match(source, /OBJ file contains no renderable triangle groups/, "scene diagnostics reject empty or non-renderable mesh files");
 assert.match(source, /ready-with-warnings/, "scene diagnostics distinguish usable assets with missing materials");
 assert.match(source, /getAssetStatus/, "the status API is part of the scene runtime bootstrap");
+
+assert.match(source, /const seenIds = new Set<string>\(\)/, "runtime scene normalization tracks duplicate object identifiers");
+assert.match(source, /while \(seenIds\.has\(id\)\)/, "duplicate scene IDs are deterministically disambiguated");
+assert.match(source, /integrity: \{ duplicateIds \}/, "scene manifest exposes duplicate-ID repair evidence");
+assert.match(source, /Math\.max\(0\.001, Math\.min\(100000, Math\.abs\(s\.x\)\)\)/, "zero or negative initial scale values are normalized to visible positive magnitudes");
