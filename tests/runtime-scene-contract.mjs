@@ -17,3 +17,7 @@ assert.match(source, /const seenIds = new Set<string>\(\)/, "runtime scene norma
 assert.match(source, /while \(seenIds\.has\(id\)\)/, "duplicate scene IDs are deterministically disambiguated");
 assert.match(source, /integrity: \{ duplicateIds \}/, "scene manifest exposes duplicate-ID repair evidence");
 assert.match(source, /Math\.max\(0\.001, Math\.min\(100000, Math\.abs\(s\.x\)\)\)/, "zero or negative initial scale values are normalized to visible positive magnitudes");
+
+assert.match(source, /getAssetStatusVerified=async function\(id\)/, "scene status can verify asset hashes before treating a mesh as ready");
+assert.match(source, /registry\.verifyContentIntegrity\(manifestPath\)/, "scene integration invokes the runtime asset integrity verifier");
+assert.match(source, /status="integrity-failed"/, "scene status blocks assets whose exact file hashes do not match");
