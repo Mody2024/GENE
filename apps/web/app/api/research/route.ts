@@ -158,9 +158,11 @@ export async function POST(request: NextRequest) {
       { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
-  // Prefer category-tagged Commons results first so the model sees a varied reference set
-  // instead of four near-duplicate encyclopedia thumbnails.
-  const imageCandidates = [...bundle.images.filter((image: any) => image.category), ...bundle.images.filter((image: any) => !image.category)];
+  // Topic relevance wins when selecting the small set of actual image bytes sent to the model.
+  // The research bundle itself already preserves category diversity for browsing.
+  const imageCandidates = [...bundle.images].sort((a: any, b: any) =>
+    Number(b.relevanceScore || 0) - Number(a.relevanceScore || 0)
+  );
   const imageData = wantsImages
     ? (await Promise.all(imageCandidates.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];
