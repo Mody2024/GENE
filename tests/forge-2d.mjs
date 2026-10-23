@@ -104,7 +104,7 @@ assert.ok(drawCalls.includes("translate:42:0"), "mirroring anchors the sprite at
 assert.ok(drawCalls.includes("restore"), "sprite draw restores canvas transform state after mirroring");
 assert.equal(spriteController.clips().join(","), "idle,walk,move-left,move-right", "controller exposes the manifest's actual clips");
 
-assert.equal(runtimeRegistry.list().length, 3, "runtime registry should index 2D, direct 3D, and assets/models Forge manifests");
+assert.equal(runtimeRegistry.list().length, 4, "runtime registry should index 2D, direct 3D, verified-integrity, and assets/models Forge manifests");
 assert.equal(runtimeRegistry.findById("gene3d-skeleton-1234").path, "assets/skeleton/asset.json", "stable 3D asset IDs should resolve to the current manifest path");
 assert.equal(runtimeRegistry.resolve("gene2d-character-5678").manifest.runtimeCompatibility.renderer, "Canvas 2D", "registry should preserve capability metadata when resolving 2D assets");
 assert.equal(runtimeRegistry.findById("gene3d-environment-9012").path, "assets/models/environment.json", "the runtime registry must index the actual Forge 3D manifest path");
