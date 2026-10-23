@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     return fail(400, "REDIRECT_NOT_ALLOWED", "Redirected image URLs are not accepted; use the final direct URL and review that source.");
   }
   const image = await readBoundedImageResponse(response, MAX_RESEARCH_IMPORT_BYTES);
-  if (!image.ok) return fail(image.code === "IMAGE_TOO_LARGE" ? 413 : 422, image.code, image.message);
+  if (!image.ok) return fail(image.code === "IMAGE_TOO_LARGE" ? 413 : 422, image.code ?? "INVALID_RESEARCH_IMAGE", image.message ?? "The research image could not be imported.");
   return NextResponse.json({
     ok: true,
     asset: {
