@@ -890,7 +890,7 @@ export default function Home() {
             const kept = (nextProject.references || []).filter(item => item.name !== note.name && !/^research-image-/.test(item.name));
             // The model accepts at most 4 reference images; the user's own attachments always win.
             const freeSlots = Math.max(0, 4 - kept.filter(item => item.kind === "image").length);
-            const imageRefs = imageData.slice(0, freeSlots).map((image, index) => ({ id: uid(), name: "research-image-" + (index + 1) + "-" + String(image.name || "reference").replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40) + (image.mimeType === "image/png" ? ".png" : image.mimeType === "image/webp" ? ".webp" : image.mimeType === "image/gif" ? ".gif" : ".jpg"), mimeType: image.mimeType, kind: "image" as const, dataBase64: image.dataBase64, size: Math.round(image.dataBase64.length * 0.75) }));
+            const imageRefs = imageData.slice(0, freeSlots).map((image, index) => { const sourceImage = (researchData.bundle.images || []).find((candidate: any) => candidate.id === image.id) || {}; return { id: uid(), sourceId: String(image.id || ""), name: "research-image-" + (index + 1) + "-" + String(image.name || "reference").replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40) + (image.mimeType === "image/png" ? ".png" : image.mimeType === "image/webp" ? ".webp" : ".jpg"), mimeType: image.mimeType, kind: "image" as const, dataBase64: image.dataBase64, size: Number(image.byteSize || Math.round(image.dataBase64.length * 0.75)), byteSize: Number(image.byteSize || 0), sha256: String(image.sha256 || ""), source: String(sourceImage.source || ""), sourceUrl: String(sourceImage.full || sourceImage.thumb || ""), sourcePage: String(sourceImage.page || ""), license: String(sourceImage.license || ""), attribution: String(sourceImage.credit || "") }; });
             const bundle: ResearchBundle = { ...researchData.bundle, sent: { notes: true, images: imageRefs.length } };
             const references = [...kept, note, ...imageRefs];
             const attach = (messages: GeneProject["messages"]) => { const index = messages.map(item => item.role).lastIndexOf("user"); return index < 0 ? messages : messages.map((item, position) => position === index ? { ...item, research: bundle } : item); };
@@ -1205,7 +1205,7 @@ export default function Home() {
                             kind: ["character", "vehicle", "building", "environment", "prop", "weapon"].includes(String(request?.kind)) ? String(request.kind) : "prop",
                             quality,
                             projectStyle: [nextProject.initialPrompt, nextProject.plan?.summary, spec.artDirection, spec.visualStyle].filter(Boolean).join("\n").slice(0, 1600),
-                            references: (nextProject.references || []).filter(ref => ref.kind === "text").slice(0, 2)
+                            references: [...(nextProject.references || []).filter(ref => ref.kind === "text").slice(0, 2), ...(nextProject.references || []).filter(ref => ref.kind === "image" && ref.dataBase64).slice(0, 2)]
                           })
                         });
                         const forgeData = await forgeResponse.json().catch(() => null);
@@ -1997,7 +1997,7 @@ export default function Home() {
           quality: forgeQuality,
           existingRecipe,
           projectStyle: [project.initialPrompt, project.plan?.summary, project.plan?.title].filter(Boolean).join("\n"),
-          references: (project.references || []).slice(0, 2)
+          references: [...(project.references || []).filter(ref => ref.kind === "text").slice(0, 2), ...(project.references || []).filter(ref => ref.kind === "image" && ref.dataBase64).slice(0, 2)]
         })
       });
       const data = await response.json().catch(() => ({}));
