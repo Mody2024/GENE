@@ -13,7 +13,7 @@ function runtimeScriptArray(name) {
   return runtimeAssets.slice(bodyStart, end).split("\n")
     .map(line => line.match(/^\s*("(?:\\.|[^"\\])*")\s*,?$/))
     .filter(Boolean)
-    .map(match => JSON.parse(match[1]))
+    .map(match => vm.runInNewContext(match[1]))
     .join("");
 }
 for (const name of ["runtime", "art", "diagnostics"]) {
