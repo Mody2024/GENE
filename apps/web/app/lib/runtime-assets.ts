@@ -3,7 +3,7 @@ import { buildRuntimeKitScript } from "./runtime-kit.mjs";
 export const MAX_RUNTIME_ASSET_BYTES = 1_500_000;
 /** Illustration SVGs live at assets/art/<name>.svg and are exposed to the game as window.GENE_ART. */
 export const RUNTIME_ART_PATH = /^assets\/(?:art\/[a-zA-Z0-9_-]+\.svg|[a-zA-Z0-9_-]+\/(?:sprite|sprite-sheet|atlas)\.svg|[a-zA-Z0-9_-]+\/frames\/frame-\d{2,3}\.svg|forge2d\/(?:character|tileset|background)\.svg|forge2d\/(?:character|tileset)\/frames\/frame-\d{2,3}\.svg)$/i;
-export const RUNTIME_RASTER_PATH = /^assets\/[a-zA-Z0-9_-]+\/(?:sprite-sheet|atlas)\.(?:png|jpe?g|webp|gif)$/i;
+export const RUNTIME_RASTER_PATH = /^assets\/[a-zA-Z0-9_-]+\/(?:sprite-sheet|atlas|reference|texture)\.(?:png|jpe?g|webp)$/i;
 
 /**
  * Exposes saved GENE Forge text assets and a small dependency-free OBJ/MTL
