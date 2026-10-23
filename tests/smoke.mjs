@@ -633,7 +633,7 @@ assert.ok(page.includes("Playable prototype published.") && page.includes('statu
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
 const genePrompts = read("apps/web/app/lib/prompts.ts");
-assert.match(genePrompts, /AUTONOMOUS TOOL ORCHESTRATION/, "GENE prompt explains transparent tool orchestration and consent boundaries");
+assert.match(genePrompts, /EXPLICIT TOOL PERMISSIONS/, "GENE prompt requires explicit consent for every tool call");
 assert.match(genePrompts, /LARGE REQUEST DECOMPOSITION/, "GENE prompt decomposes long requests into dependency-aware stages");
 assert.match(genePrompts, /SINGLE AUDIO OWNER \/ NO DUPLICATE SETTINGS/, "GENE prompt prevents duplicate audio controls and loops");
 assert.match(api, /data-gene-audio-settings/, "automatic audio repair has an idempotent guard against duplicate settings panels");
