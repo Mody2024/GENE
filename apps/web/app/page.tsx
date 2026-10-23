@@ -1257,7 +1257,7 @@ export default function Home() {
                   files: { ...current.files, ...stagedFiles },
                   plan: stagedPlan,
                   buildRun: activeBuildRun,
-                  livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: true },
+                  livingPreview: { status: "booting", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: false },
                   updatedAt: now()
                 } : current);
                 setPreviewOpen(true);
@@ -1265,7 +1265,7 @@ export default function Home() {
                 setRuntimeState("loaded");
                 setSection("chat");
                 setCanQueueBuildRequests(true);
-                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
+                persistRun(activeBuildRun, "booting", stagedFiles, ["Core project files are present; awaiting a visible runtime render"], [], "prototype-ready");
                 addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
               }
             } catch (stageException) {
