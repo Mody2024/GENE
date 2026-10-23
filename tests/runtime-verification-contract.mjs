@@ -14,9 +14,9 @@ console.log("Runtime verification contract passed (build/source checks cannot ma
 
 assert.match(runtimeAssets, /canvasSize:/, "runtime diagnostics expose canvas dimensions for blank or off-screen render diagnosis");
 assert.match(runtimeAssets, /hasWebGLContext:/, "runtime diagnostics distinguish a canvas element from a live WebGL context");
-assert.match(runtimeAssets, /renderEvidence:\\{canvasEntityOps:state\\.canvasEntityOps,webglDrawCalls:state\\.webglDrawCalls,animationFrames:state\\.animationFrames\\}/, "runtime snapshots include observed draw and frame evidence");
-assert.match(runtimeAssets, /inputObserved:state\\.inputEvents>0/, "runtime snapshots distinguish observed input from a successful gameplay response");
-assert.match(runtimeAssets, /hasRuntimeErrors:state\\.errors\\.length>0/, "runtime snapshots expose whether runtime errors were captured");
+assert.match(runtimeAssets, /renderEvidence:\{canvasEntityOps:state\.canvasEntityOps,webglDrawCalls:state\.webglDrawCalls,animationFrames:state\.animationFrames\}/, "runtime snapshots include observed draw and frame evidence");
+assert.match(runtimeAssets, /inputObserved:state\.inputEvents>0/, "runtime snapshots distinguish observed input from a successful gameplay response");
+assert.match(runtimeAssets, /hasRuntimeErrors:state\.errors\.length>0/, "runtime snapshots expose whether runtime errors were captured");
 
 assert.match(runtimeAssets, /renderAssessment:state\.errors\.length\?'runtime-errors'/, "runtime diagnostics classify observed render/error evidence");
 assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemetry'/, "draw calls and input events never claim gameplay was verified");
