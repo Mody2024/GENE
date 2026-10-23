@@ -2,14 +2,14 @@
 
 import type { ResearchBundle } from "../lib/types";
 
-type Props = { bundle: ResearchBundle };
+type Props = { bundle: ResearchBundle; onImportImage?: (image: any) => void };
 
 function Count({ n, label }: { n: number; label: string }) {
   return n > 0 ? <span className="rc-count">{n} {label}{n === 1 ? "" : "s"}</span> : null;
 }
 
 /** Viewable research that was attached to a message and sent to GENE as reference material. */
-export default function ResearchCard({ bundle }: Props) {
+export default function ResearchCard({ bundle, onImportImage }: Props) {
   const sent = bundle.sent;
   const total = bundle.facts.length + bundle.images.length + bundle.models.length + bundle.music.tracks.length + bundle.music.styles.length + bundle.games.length;
   return (
@@ -37,7 +37,7 @@ export default function ResearchCard({ bundle }: Props) {
         <div className="rc-grid">{bundle.images.map(image => <a key={image.id} className="rc-image" href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
+          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>{onImportImage && <button type="button" className="rc-import-image" onClick={event => { event.preventDefault(); event.stopPropagation(); onImportImage(image); }} disabled={!image.full || !image.page}>Import to project</button>}
         </a>)}</div>
       </section>}
 
