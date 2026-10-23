@@ -84,8 +84,31 @@ async function fetchImageData(image: { id: string; title: string; thumb: string 
     if (!response.ok) return null;
     const mimeType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return null;
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_IMAGE_BYTES) {
+      await response.body?.cancel().catch(() => {});
+      return null;
+    }
+    if (!response.body) return null;
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_IMAGE_BYTES) {
+          await reader.cancel().catch(() => {});
+          return null;
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (!totalBytes) return null;
+    const bytes = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), totalBytes);
     return { id: image.id, name: image.title, mimeType, dataBase64: bytes.toString("base64") };
   } catch {
     return null;
