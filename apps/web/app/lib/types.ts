@@ -114,7 +114,7 @@ export type BuildRun = {
   fullGame?: { targetMinutes?: number; estimatedMinutes: number; contentTargets: string[]; acceptance: string[] };
   lastError?: string;
 };
-export type LivingPreviewStatus = "not-started" | "booting" | "playable" | "stale" | "error";
+export type LivingPreviewStatus = "not-started" | "booting" | "rendered" | "playable" | "stale" | "error";
 export type LivingBuildPreview = {
   status: LivingPreviewStatus;
   lastKnownGoodVersion?: number;
