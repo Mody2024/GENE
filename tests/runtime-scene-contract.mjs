@@ -12,6 +12,10 @@ assert.match(source, /POSSIBLE_OBJECT_OVERLAP/, "layout analysis reports near-co
 assert.match(source, /Heuristic checks are advisory/, "layout analysis explicitly avoids claiming every overlap is a defect");
 console.log("Runtime scene contract passed (callback binding and OBJ draw dispatch).");
 
+assert.match(source, /getIntegrityReport=function\(\)/, "scene runtime exposes a unified manifest integrity report");
+assert.match(source, /MISSING_RUNTIME_MESH_ASSETS/, "scene integrity report identifies assigned meshes missing from the runtime bundle");
+assert.match(source, /SCENE_OBJECT_LIMIT_REACHED/, "scene integrity report surfaces objects dropped by the runtime limit");
+assert.match(source, /Presence checks do not guarantee a mesh parses/, "scene integrity report distinguishes file presence from actual renderability");
 assert.match(source, /getAssetStatus=function\(id\)/, "scene runtime exposes asset integration status per object");
 assert.match(source, /Referenced OBJ file is absent from the runtime asset bundle/, "scene diagnostics catch missing model files before rendering");
 assert.match(source, /OBJ file contains no renderable triangle groups/, "scene diagnostics reject empty or non-renderable mesh files");
