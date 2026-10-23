@@ -74,8 +74,8 @@ assert.match(researchRoute, /Prefer category-tagged Commons results first/, "mul
 assert.match(workspace, /images: true/, "the build workspace always requests visual references by default");
 assert.match(workspace, /assets\/project-cover\.svg/, "new builds save a local cover inside the project");
 assert.match(workspace, /section === "projects"/, "the workspace exposes a dedicated Projects page");
-assert.match(prompts, /invoke configured, in-scope tools automatically/, "configured routine tools run autonomously");
+assert.match(prompts, /EXPLICIT TOOL PERMISSIONS:[\s\S]{0,450}request explicit approval/i, "every tool call must request explicit approval");
 assert.match(liveProgress, /run\.build\.passed/, "build progress is based on verified task statuses");
 assert.match(liveProgress, /Current task:/, "progress shows the currently running build task");
-assert.doesNotMatch(prompts, /Before each optional external or specialist tool is used[\s\S]{0,300}ask for approval with Use \/ Skip/, "routine research and Forge operations should not prompt for each approval");
+assert.match(prompts, /Server-side enforcement is mandatory; UI-only prompts are insufficient/i, "permission policy must require server-side enforcement");
 console.log("Visual-reference planner, autonomous-tool contract, Projects gallery, and local cover tests passed.");
