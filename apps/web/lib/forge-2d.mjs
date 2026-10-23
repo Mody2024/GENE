@@ -76,6 +76,23 @@ export function buildNative2DAsset({ prompt = "", kind = "character", quality = 
   const params = { prompt: cleanPrompt, colors, style: String(style).slice(0, 80) };
   const built = kind === "character" ? characterSvg(params) : kind === "tileset" ? tilesetSvg(params) : kind === "ui" ? uiSvg(params) : kind === "background" ? backgroundSvg(params) : iconSvg(params);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${built.width}" height="${built.height}" viewBox="${built.viewBox}" role="img" aria-label="${esc(cleanPrompt || kind)}"><title>${esc(cleanPrompt || "GENE " + kind)}</title><desc>Procedurally generated, self-contained 2D game asset sheet. No external resources or scripts.</desc>${built.body}</svg>`;
+  // Export each atlas cell as a separately loadable SVG as well as retaining the source sheet.
+  // The viewBox crops the original vector geometry without rasterizing or duplicating its design.
+  const frameFiles = {};
+  if (built.frames > 1 && built.frameWidth > 0 && built.frameHeight > 0) {
+    for (let index = 0; index < built.frames; index++) {
+      const x = (index % Math.max(1, Math.floor(built.width / built.frameWidth))) * built.frameWidth;
+      const y = Math.floor(index / Math.max(1, Math.floor(built.width / built.frameWidth))) * built.frameHeight;
+      const name = String(index).padStart(2, "0");
+      frameFiles["frame-" + name + ".svg"] = `<svg xmlns="http://www.w3.org/2000/svg" width="${built.frameWidth}" height="${built.frameHeight}" viewBox="${x} ${y} ${built.frameWidth} ${built.frameHeight}"><title>${esc((built.frameNames[index] || kind) + " frame " + index)}</title>${built.body}</svg>`;
+    }
+  }
+  const animationClips = kind === "character" ? [
+    { name: "idle", frames: [0], frameDurationMs: 220, loop: true },
+    { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 110, loop: true },
+    { name: "move-left", frames: [1, 2, 3, 0], frameDurationMs: 110, loop: true },
+    { name: "move-right", frames: [3, 2, 1, 0], frameDurationMs: 110, loop: true }
+  ] : [];
   const partCount = (svg.match(/<rect|<path|<circle|<ellipse|<g\b/g) || []).length;
   const warnings = [];
   if (cleanPrompt.length < 3) warnings.push({ code: "GENERIC_BRIEF", severity: "info", message: "A short prompt produced a generic procedural asset; add visual details for a more tailored result." });
@@ -87,7 +104,8 @@ export function buildNative2DAsset({ prompt = "", kind = "character", quality = 
     kind, style: params.style, quality: safeLevel,
     mimeType: "image/svg+xml",
     svg,
-    manifest: { format: "gene-forge-2d-v1", kind, width: built.width, height: built.height, frameWidth: built.frameWidth, frameHeight: built.frameHeight, frames: built.frames, frameNames: built.frameNames, origin: "top-left", animation: kind === "character" ? "frame-strip; not rigged" : "static", palette: colors, prompt: cleanPrompt, source: "GENE native procedural 2D generator" },
+    manifest: { format: "gene-forge-2d-v1", kind, width: built.width, height: built.height, frameWidth: built.frameWidth, frameHeight: built.frameHeight, frames: built.frames, frameNames: built.frameNames, frameFiles: Object.keys(frameFiles), animationClips, frameRate: kind === "character" ? 9 : 0, origin: "top-left", animation: kind === "character" ? "frame-strip-with-cropped-frames; not rigged" : "static", palette: colors, prompt: cleanPrompt, source: "GENE native procedural 2D generator" },
+    frameFiles,
     qualityReport: report
   };
 }
