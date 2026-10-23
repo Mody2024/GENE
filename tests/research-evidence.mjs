@@ -26,7 +26,8 @@ assert.equal(models[0].integrationState, "catalog-reference", "catalog matches a
 
 const bundle = buildResearchBundle({
   topic,
-  wiki: [{ title: "Rhythm platformer", extract: "A game genre.", url: "https://en.wikipedia.org/wiki/Rhythm_game" }],
+  wiki: [{ title: "Rhythm platformer", extract: "A game genre.", url: "https://en.wikipedia.org/wiki/Rhythm_game", thumb: "https://upload.wikimedia.org/example-thumb.png" }],
+  models: [{ id: "chair", name: "Chair", tags: ["furniture"], url: "https://polyhaven.com/a/chair" }],
   webResults: [
     { title: "Geometry Dash gameplay", snippet: "Timing and level editor", link: "https://example.org/gameplay" },
     { title: "Unrelated gardening", snippet: "Planting flowers", link: "https://example.org/garden" }
@@ -40,6 +41,9 @@ assert.ok(bundle.webResults[0].relevance >= bundle.webResults[1].relevance);
 const notes = formatResearchNotes(bundle);
 assert.match(notes, /Web research \(ranked by topic relevance\)/);
 assert.match(notes, /relevance \d+\/100/);
-if (bundle.images.length) assert.match(notes, /reference-only images, not imported project assets/i);
-if (bundle.models.length) assert.match(notes, /catalog matches \(Poly Haven; not imported\)/);
+assert.ok(bundle.images.length > 0, "fixture includes a visual reference");
+assert.match(notes, /reference-only images, not imported project assets/i);
+assert.ok(bundle.models.length > 0, "fixture includes a model catalog reference");
+assert.match(notes, /catalog matches \(Poly Haven; not imported\)/);
+assert.match(notes, /catalog reference only, not downloaded or added to the project/i);
 console.log("Research evidence tests passed (HTTPS filtering, relevance ranking, and builder notes).");
