@@ -69,7 +69,26 @@ export function rankVisualReferenceResults(images, topic) {
   });
   // If the query is specific, a generic category match is not enough: reject unrelated
   // images instead of filling slots with irrelevant material. Keep topic-matching items first.
+  const seen = new Set();
   return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || (terms.length === 1 && item.categoryHits >= 2)))
     .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || a.index - b.index)
+    .filter(item => {
+      const raw = String(item.image?.full || item.image?.url || item.image?.thumb || item.image?.page || "").trim();
+      let key = raw.toLowerCase();
+      if (raw) {
+        try {
+          const url = new URL(raw);
+          url.hash = "";
+          for (const parameter of Array.from(url.searchParams.keys())) {
+            if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid|ref_src)$/i.test(parameter)) url.searchParams.delete(parameter);
+          }
+          key = url.toString().toLowerCase();
+        } catch {}
+      }
+      if (!key) key = String(item.image?.title || "").trim().toLowerCase();
+      if (key && seen.has(key)) return false;
+      if (key) seen.add(key);
+      return true;
+    })
     .map(item => ({ ...item.image, relevanceScore: item.score }));
 }
