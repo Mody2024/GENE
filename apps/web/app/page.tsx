@@ -54,7 +54,7 @@ function approvalPrompt(tool: string, input: any): string {
   const label = tool === "research" ? "Research" : tool === "researchAssetImport" ? "Research image import" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
   const detail = (tool === "researchAssetImport"
     ? [input?.title, input?.sourceUrl, input?.sourcePage, "License: " + String(input?.license || "not stated")].filter(Boolean).join(" · ")
-    : String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request")).trim().slice(0, 240);
+    : String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request")).trim().slice(0, tool === "researchAssetImport" ? 560 : 240);
   return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
     "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
 }
