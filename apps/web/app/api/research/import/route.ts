@@ -16,10 +16,11 @@ export async function POST(request: NextRequest) {
     return fail(403, "TOOL_APPROVAL_REQUIRED", "Explicit approval for these exact research-import inputs is required.");
   }
   const validated = validateResearchImportRequest(body);
-  if (!validated.ok) return fail(400, validated.code ?? "INVALID_RESEARCH_IMPORT", validated.message ?? "The research import request is invalid.");
+  if (!validated.ok || !validated.candidate) return fail(400, validated.code ?? "INVALID_RESEARCH_IMPORT", validated.message ?? "The research import request is invalid.");
+  const candidate = validated.candidate;
   let response: Response;
   try {
-    response = await fetch(validated.candidate.sourceUrl, {
+    response = await fetch(candidate.sourceUrl, {
       method: "GET",
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
@@ -38,11 +39,11 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     asset: {
-      title: validated.candidate.title,
-      sourceUrl: validated.candidate.sourceUrl,
-      sourcePage: validated.candidate.sourcePage,
-      license: validated.candidate.license,
-      attribution: validated.candidate.attribution,
+      title: candidate.title,
+      sourceUrl: candidate.sourceUrl,
+      sourcePage: candidate.sourcePage,
+      license: candidate.license,
+      attribution: candidate.attribution,
       licenseReviewConfirmed: true,
       importedAt: new Date().toISOString(),
       mimeType: image.mimeType,
