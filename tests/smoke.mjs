@@ -629,7 +629,7 @@ assert.ok(page.includes("function explainAgentError") && page.includes("quota or
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
-assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "booting"') && page.includes('status: "rendered"'), "build completion waits for a real render and distinguishes it from verified gameplay");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
 const genePrompts = read("apps/web/app/lib/prompts.ts");
