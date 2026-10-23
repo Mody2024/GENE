@@ -23,13 +23,17 @@ const deduplicated = parseGoogleSearchResults({ items: [
 ]}, topic, 5);
 assert.equal(deduplicated.length, 2, "tracking parameters and URL fragments must not create duplicate research slots");
 
-const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "File:sample.png", index: 1, imageinfo: [{ url: "https://upload.wikimedia.org/sample.png", thumburl: "https://upload.wikimedia.org/sample-thumb.png", mime: "image/png", descriptionurl: "https://commons.wikimedia.org/wiki/File:sample.png", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Sample Artist" } } }] } } } });
+const commons = parseCommonsFiles({ query: { pages: { "1": { pageid: 1, title: "File:sample.png", index: 1, imageinfo: [{ url: "https://upload.wikimedia.org/sample.png", thumburl: "https://upload.wikimedia.org/sample-thumb.png", mime: "image/png", size: 12345, width: 640, height: 480, sha1: "0123456789abcdef0123456789abcdef01234567", descriptionurl: "https://commons.wikimedia.org/wiki/File:sample.png", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Sample Artist" } } }] } } } });
 assert.equal(commons.length, 1);
 assert.equal(commons[0].integrationState, "reference-only", "a research result is not silently treated as imported");
 assert.equal(commons[0].licenseState, "source-declared-review-per-asset");
 assert.equal(commons[0].downloadState, "candidate-not-imported", "a direct URL is not misrepresented as an imported project file");
 assert.equal(commons[0].downloadUrl, "https://upload.wikimedia.org/sample.png", "the source's actual download URL is preserved");
 assert.equal(commons[0].mimeType, "image/png", "the source MIME type is preserved for future safe import validation");
+assert.equal(commons[0].fileSizeBytes, 12345, "source byte size is preserved for import limits");
+assert.equal(commons[0].width, 640, "source image width is preserved for compatibility checks");
+assert.equal(commons[0].height, 480, "source image height is preserved for compatibility checks");
+assert.equal(commons[0].sha1, "0123456789abcdef0123456789abcdef01234567", "a valid source checksum is normalized for integrity tracking");
 assert.match(commons[0].attribution, /Sample Artist.*CC BY-SA 4.0/, "credit and license are available together for attribution");
 
 const models = filterPolyHaven({ chair: { name: "Chair", tags: ["furniture"], categories: ["interior"] } }, "chair", 3);
