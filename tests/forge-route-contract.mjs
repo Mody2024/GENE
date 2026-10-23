@@ -9,6 +9,7 @@ const twoDRoute = readFileSync(new URL("../apps/web/app/api/forge/2d/route.ts", 
 const twoDModule = readFileSync(new URL("../apps/web/lib/forge-2d.mjs", import.meta.url), "utf8");
 const studioPage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
+const runtimeScene = readFileSync(new URL("../apps/web/app/lib/runtime-scene.ts", import.meta.url), "utf8");
 const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 const researchSources = readFileSync(new URL("../apps/web/app/lib/research-sources.mjs", import.meta.url), "utf8");
 
@@ -27,6 +28,7 @@ assert.match(route, /assetId: manifest\.assetId, version: manifest\.version, man
 assert.match(route, /try the bounded native generator before returning an error/, "invalid provider recipes must attempt native fallback");
 assert.match(route, /shape === "capsule"/, "mesh builder must generate capsule geometry for better limbs and organic forms");
 assert.match(route, /"model\.obj": mesh\.obj/, "Forge must export real OBJ geometry");
+assert.ok(runtimeScene.includes('o.modelPath.replace(/\\\\.obj$/i,".mtl")'), "Scene Studio must resolve the matching MTL file for any Forge model filename, including assets/models/character.obj");
 assert.match(route, /"model\.mtl": mesh\.mtl/, "Forge must export material definitions");
 assert.match(route, /"asset\.json": JSON\.stringify\(manifest, null, 2\)/, "Forge must export the canonical versioned asset manifest");
 assert.match(route, /analyzeForgeRecipe\(recipe\)/, "Forge must run deterministic structural QA before returning an asset");
