@@ -607,8 +607,13 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
         throw new Error("Build rejected: the spec promises controller support but game.js does not read the Gamepad API.");
       }
       if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+      if (spec.engine === "canvas2d" && !/(?:\.fillRect\s*\(|\.strokeRect\s*\(|\.drawImage\s*\(|\.putImageData\s*\(|\.fill\s*\(|\.stroke\s*\(|\.fillText\s*\()/i.test(runtimeSource)) {
+        throw new Error("Build rejected: the assembled Canvas 2D project has no detectable visible drawing operations. A game loop and audio are not enough; draw the world, characters, UI, or narrative content in the runtime before saving the build.");
+      }
       if (spec.engine === "webgl3d") {
         if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+        if (!/drawArrays\s*\(|drawElements\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the assembled 3D project never submits visible geometry to WebGL. Audio and scene metadata do not count as a playable rendered game.");
+        if (!/viewport\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the 3D renderer never configures the WebGL viewport, so the scene may remain invisible or render incorrectly.");
         for (const [pattern, requirement] of [
           [/createShader\s*\(/, "shader creation"],
           [/shaderSource\s*\(/, "shader source"],
