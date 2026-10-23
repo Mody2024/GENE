@@ -58,3 +58,5 @@ assert.match(page, /state === "gameplay-event"[\s\S]{0,500}not independent gamep
 
 assert.match(runtimeAssets, /Sprite manifest\/frame integrity failed:/, "asset registry rejects animation manifests with missing or invalid frames");
 assert.match(runtimeAssets, /GENE_SPRITES\.validateManifest\(spriteBase\)/, "asset registry delegates sprite frame validation to the animation runtime");
+
+assert.match(runtimeAssets, /referenceInputs:Array\.isArray\(m\.referenceInputs\)\?m\.referenceInputs:\[\]/, "runtime asset listings expose recorded source-reference provenance");
