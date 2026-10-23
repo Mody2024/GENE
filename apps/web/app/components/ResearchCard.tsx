@@ -34,11 +34,15 @@ export default function ResearchCard({ bundle, onImportImage }: Props) {
 
       {bundle.images.length > 0 && <section>
         <h4>Images</h4>
-        <div className="rc-grid">{bundle.images.map(image => <a key={image.id} className="rc-image" href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>{onImportImage && <button type="button" className="rc-import-image" onClick={event => { event.preventDefault(); event.stopPropagation(); onImportImage(image); }} disabled={!image.full || !image.page}>Import to project</button>}
-        </a>)}</div>
+        <div className="rc-grid">{bundle.images.map(image => <div key={image.id} className="rc-image">
+          <a href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
+            <span>{image.title}</span>
+          </a>
+          <small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
+          {onImportImage && <button type="button" className="rc-import-image" onClick={() => onImportImage(image)} disabled={!image.full || !image.page}>Import to project</button>}
+        </div>)}</div>
       </section>}
 
       {bundle.facts.length > 0 && <section>
