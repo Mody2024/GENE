@@ -65,3 +65,7 @@ assert.match(route, /function attachContentIntegrity\(manifest: any, obj: string
 assert.match(route, /createHash\("sha256"\)\.update\(obj, "utf8"\)\.digest\("hex"\)/, "the exported OBJ receives a SHA-256 fingerprint");
 assert.match(route, /createHash\("sha256"\)\.update\(mtl, "utf8"\)\.digest\("hex"\)/, "the exported MTL receives a SHA-256 fingerprint");
 assert.equal((route.match(/attachContentIntegrity\(withForgeAssetMetadata/g) || []).length, 2, "native and AI Forge outputs both receive file fingerprints");
+
+assert.match(twoDRoute, /createHash\("sha256"\)\.update\(asset\.svg, "utf8"\)\.digest\("hex"\)/, "native 2D sprite SVG receives a SHA-256 fingerprint");
+assert.match(twoDRoute, /integrityFiles\["frames\/" \+ name\] = createHash\("sha256"\)/, "every cropped animation frame receives its own fingerprint");
+assert.match(twoDRoute, /contentIntegrity: \{ algorithm: "sha256", files: integrityFiles \}/, "2D asset manifest stores exact source and frame fingerprints");
