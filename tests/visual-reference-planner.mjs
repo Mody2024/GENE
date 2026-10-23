@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { planVisualReferenceQueries } from "../apps/web/app/lib/visual-reference-planner.mjs";
+import { planVisualReferenceQueries, rankVisualReferenceResults } from "../apps/web/app/lib/visual-reference-planner.mjs";
 import { buildResearchBundle } from "../apps/web/app/lib/research-sources.mjs";
 import { createProjectCoverSvg, projectCoverDataUrl } from "../apps/web/app/lib/project-cover.mjs";
 import { readFileSync } from "node:fs";
@@ -13,7 +13,7 @@ const gameQueries = planVisualReferenceQueries({ topic: "3D skeleton city advent
 assert.deepEqual(gameQueries.map(item => item.id), ["ui-menus", "gameplay", "characters", "environments"]);
 assert.ok(gameQueries.every(item => item.query.includes("3D skeleton city adventure")));
 assert.ok(gameQueries.every(item => item.query.length <= 220));
-assert.match(gameQueries.find(item => item.id === "characters").query, /character design|animation pose/i);
+assert.match(gameQueries.find(item => item.id === "characters").query, /character sprite model animation/i);
 
 const categoryIds = ["ui-menus", "gameplay", "characters", "environments"];
 const categorizedBundle = buildResearchBundle({
@@ -31,6 +31,21 @@ const appQueries = planVisualReferenceQueries({ topic: "Project dashboard and ta
 assert.deepEqual(appQueries.map(item => item.id), ["ui-layout", "interaction-patterns", "visual-style", "illustrations-icons"]);
 assert.equal(planVisualReferenceQueries({ topic: "City runner", images: false }).length, 0);
 assert.equal(planVisualReferenceQueries({ topic: "x" }).length, 0);
+
+const rankedImages = rankVisualReferenceResults([
+  { id: "good", title: "Skeleton character turnaround", category: "characters" },
+  { id: "bad", title: "Banana smoothie recipe", category: "characters" },
+  { id: "city", title: "City street buildings", category: "environments" },
+  { id: "generic", title: "Random photograph", category: "environments" }
+], "3D skeleton city adventure");
+assert.deepEqual(rankedImages.map(image => image.id), ["good", "city"], "off-topic image results should be filtered and topic matches prioritized");
+const relevanceTie = rankVisualReferenceResults([
+  { id: "specific", title: "Skeleton character concept", category: "characters" },
+  { id: "generic-category", title: "City street buildings skyline", category: "environments" },
+  { id: "off-topic", title: "Cooking pasta recipe", category: "environments" }
+], "skeleton character in city");
+assert.equal(relevanceTie[0].id, "specific", "generic category keywords must not outrank direct subject matches");
+assert.ok(!relevanceTie.some(image => image.id === "off-topic"), "unrelated results must be discarded instead of passed as visual references");
 
 const coverA = createProjectCoverSvg({ name: "Skeleton City", kind: "game", engine: "webgl3d", prompt: "third person skeleton in a city" });
 const coverB = createProjectCoverSvg({ name: "Budget Board", kind: "app", engine: "webapp", prompt: "dashboard and budget charts" });
@@ -70,12 +85,12 @@ for (const svg of [coverA, coverB]) {
 }
 assert.match(researchRoute, /body\?\.images !== false/, "visual references are enabled by default");
 assert.match(researchRoute, /visualQueries\.map/, "research executes category-specific image searches");
-assert.match(researchRoute, /Prefer category-tagged Commons results first/, "multimodal references should favor category diversity");
+assert.match(researchRoute, /Topic relevance wins when selecting the small set of actual image bytes sent to the model/, "model image inputs must prioritize relevant references");
 assert.match(workspace, /images: true/, "the build workspace always requests visual references by default");
 assert.match(workspace, /assets\/project-cover\.svg/, "new builds save a local cover inside the project");
 assert.match(workspace, /section === "projects"/, "the workspace exposes a dedicated Projects page");
-assert.match(prompts, /invoke configured, in-scope tools automatically/, "configured routine tools run autonomously");
+assert.match(prompts, /EXPLICIT TOOL PERMISSIONS:[\s\S]{0,450}request explicit approval/i, "every tool call must request explicit approval");
 assert.match(liveProgress, /run\.build\.passed/, "build progress is based on verified task statuses");
 assert.match(liveProgress, /Current task:/, "progress shows the currently running build task");
-assert.doesNotMatch(prompts, /Before each optional external or specialist tool is used[\s\S]{0,300}ask for approval with Use \/ Skip/, "routine research and Forge operations should not prompt for each approval");
+assert.match(prompts, /Server-side enforcement is mandatory; UI-only prompts are insufficient/i, "permission policy must require server-side enforcement");
 console.log("Visual-reference planner, autonomous-tool contract, Projects gallery, and local cover tests passed.");

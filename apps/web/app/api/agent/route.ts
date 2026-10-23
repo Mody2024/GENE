@@ -8,6 +8,7 @@ import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 import { nextInterviewQuestion } from "../../lib/design-doc";
 import { createNativeResult } from "../../../lib/native-generator.mjs";
+import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -606,9 +607,16 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
       if (/gamepad|controller/.test(controlsContract) && !/(getGamepads|gamepadconnected|gamepaddisconnected)/i.test(runtimeSource)) {
         throw new Error("Build rejected: the spec promises controller support but game.js does not read the Gamepad API.");
       }
-      if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(js)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+      if (spec.engine === "canvas2d" && !/getContext\s*\(\s*["']2d["'](?:\s*,[^)]*)?\s*\)/.test(runtimeSource)) throw new Error("Build rejected: a canvas2d game must create a CanvasRenderingContext2D.");
+      if (spec.engine === "canvas2d" && !/(?:\.fillRect\s*\(|\.strokeRect\s*\(|\.drawImage\s*\(|\.putImageData\s*\(|\.fill\s*\(|\.stroke\s*\(|\.fillText\s*\()/i.test(runtimeSource)) {
+        throw new Error("Build rejected: the assembled Canvas 2D project has no detectable visible drawing operations. A game loop and audio are not enough; draw the world, characters, UI, or narrative content in the runtime before saving the build.");
+      }
       if (spec.engine === "webgl3d") {
-        if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(js)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+        if (!/getContext\s*\(\s*["'](?:webgl2?|experimental-webgl)["'](?:\s*,[^)]*)?\s*\)/i.test(runtimeSource)) throw new Error("Build rejected: a webgl3d game must request a real WebGL context.");
+        if (!/drawArrays\s*\(|drawElements\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the assembled 3D project never submits visible geometry to WebGL. Audio and scene metadata do not count as a playable rendered game.");
+        if (!/viewport\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the 3D renderer never configures the WebGL viewport, so the scene may remain invisible or render incorrectly.");
+        if (!/clear\s*\(/i.test(runtimeSource)) throw new Error("Build rejected: the 3D renderer never clears its frame buffers, so stale or undefined pixels may hide the scene.");
+        if (!/(camera|lookAt|viewMatrix|projection|perspective|uMVP|mvp|modelMatrix|viewProjection)/i.test(runtimeSource)) throw new Error("Build rejected: the 3D runtime has no detectable camera or view/projection transform. Define camera framing and transforms so generated geometry can appear in the viewport.");
         for (const [pattern, requirement] of [
           [/createShader\s*\(/, "shader creation"],
           [/shaderSource\s*\(/, "shader source"],
@@ -617,9 +625,9 @@ function validateFiles(files: Array<{ path: string; content: string }>, operatio
           [/linkProgram\s*\(/, "shader program linking"],
           [/bufferData\s*\(/, "GPU geometry buffers"],
           [/drawArrays\s*\(|drawElements\s*\(/, "GPU geometry draw calls"]
-        ] as Array<[RegExp, string]>) if (!pattern.test(js)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
+        ] as Array<[RegExp, string]>) if (!pattern.test(runtimeSource)) throw new Error("Build rejected: WebGL game is missing " + requirement + ".");
       }
-      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(js)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
+      if (!/fillRect|fillText|drawImage|drawArrays|drawElements|stroke\(|\.fill\(/.test(runtimeSource)) throw new Error("Build rejected: no detectable draw operation was found. The runtime would likely be blank.");
     }
   }
   return normalized;
@@ -632,6 +640,7 @@ export async function POST(request: NextRequest) {
   const allowedOperations = ["interview", "plan", "build", "buildPart", "validateBuild", "edit", "chat", "research", "surprise", "enhancePrompt"];
   const projectKind: "game" | "app" = body.project?.kind === "app" ? "app" : "game";
   if (!allowedOperations.includes(body.operation)) return jsonError("Unknown GENE operation.");
+  if (body.operation === "research" && !hasToolApproval(body, "agentResearch")) return jsonError("GENE did not run web research because explicit approval for this exact research request is missing or expired.", 403, "TOOL_APPROVAL_REQUIRED");
   if (!["plan", "build"].includes(body.mode)) return jsonError("Mode must be plan or build.");
   if (body.mode === "plan" && ["build", "buildPart", "edit", "surprise"].includes(body.operation)) {
     return jsonError("Plan mode is read-only. Switch to Build mode before creating or changing project files.", 409, "GENE_PLAN_MODE_READ_ONLY");
@@ -690,6 +699,10 @@ export async function POST(request: NextRequest) {
       const message = error instanceof Error ? error.message : "Assembled project failed validation.";
       return jsonError("The staged project did not pass final validation: " + message + " No files were saved. Retry the build or ask GENE to repair the specific stage.", 422, "GENE_STAGED_BUILD_VALIDATION_FAILED");
     }
+  }
+
+  if (["interview", "plan"].includes(body.operation) && (body.thinking === "native" || process.env.GENE_NATIVE_ONLY === "true")) {
+    return jsonError("GENE interview and planning require a real configured AI provider. Native deterministic mode is not used for these operations. Choose an AI mode and configure an available provider; your project and answers were preserved.", 503, "GENE_AI_REQUIRED");
   }
 
   // Explicit native mode is a hard boundary: this branch returns before any provider keys,
@@ -852,13 +865,24 @@ export async function POST(request: NextRequest) {
     if (/\b(vehicle|truck|car|van|driving|racing|bus)\b/i.test(lowerPrompt)) requestedKinds.push({ kind: "vehicle", prompt: "Create the main vehicle for this game. " + forgePrompt });
     if (/\b(furniture|chair|table|sofa|bed|cabinet|crate|prop)\b/i.test(lowerPrompt) && requestedKinds.length < 3) requestedKinds.push({ kind: "prop", prompt: "Create the most important gameplay prop for this game. " + forgePrompt });
     const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
-    const toolResults = await Promise.all(requestedKinds.slice(0, 3).map(async item => {
+    const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
+    const approvedKinds = requestedKinds.filter(item => {
+      const toolBody = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge3d")) : null;
+      return Boolean(entry);
+    });
+    const toolResults = await Promise.all(approvedKinds.slice(0, 3).map(async item => {
       try {
         const endpoint = new URL("/api/forge", request.url);
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle: String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200), nativeOnly: true }),
+          body: JSON.stringify({
+            prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true,
+            toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({
+              prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true, toolApproval: candidate.approval
+            }, "forge3d"))?.approval
+          }),
           signal: request.signal,
           cache: "no-store"
         });
@@ -883,7 +907,7 @@ export async function POST(request: NextRequest) {
 
   // GENE Forge 2D bridge: generate native vector assets during ordinary 2D game builds,
   // pass the real asset paths into the model context, and return the actual files with the game.
-  let forge2DAssets: Array<{ kind: string; name: string; svg: string; manifest: any; qualityReport: any }> = [];
+  let forge2DAssets: Array<{ kind: string; name: string; svg: string; manifest: any; qualityReport: any; frameFiles?: Record<string, string> }> = [];
   const wants2DForge = ["build", "surprise"].includes(body.operation) && projectKind === "game" && !wants3DForge &&
     (body.project?.preferredEngine === "canvas2d" || body.project?.plan?.engine === "canvas2d" ||
       (!body.project?.preferredEngine && !body.project?.plan?.engine && !/\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(forgePrompt)));
@@ -896,12 +920,22 @@ export async function POST(request: NextRequest) {
         prompt: "Create a matching 2D " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lowerPrompt) ? "game tileset" : "game background") + " for this game. " + forgePrompt }
     ];
     const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
-    const results = await Promise.all(kinds.map(async item => {
+    const approvedKinds = kinds.filter(item => {
+      const toolBody = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge2d")) : null;
+      return Boolean(entry);
+    });
+    const results = await Promise.all(approvedKinds.map(async item => {
       try {
         const response = await fetch(new URL("/api/forge/2d", request.url), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" }),
+          body: JSON.stringify({
+            prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art",
+            toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({
+              prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art", toolApproval: candidate.approval
+            }, "forge2d"))?.approval
+          }),
           signal: request.signal,
           cache: "no-store"
         });
@@ -1126,36 +1160,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (!payload && body.operation === "interview") {
-    // Interviews must not dead-end just because every optional AI provider is unavailable.
-    // Use the same deterministic decision tree as the no-key fallback, then return a valid starter plan.
-    const answers = body.answers || {};
-    const original = String(body.project?.initialPrompt || body.message || (projectKind === "app" ? "Untitled app" : "Untitled game"));
-    const question = nextInterviewQuestion(projectKind, answers, original);
-    if (question) {
-      return NextResponse.json({
-        ok: true, aiMode: "fallback", model: "Gene Interview (deterministic fallback)",
-        result: { reply: "A configured AI provider was unavailable, so GENE is continuing the interview with its built-in decision tree. You can still answer this question and keep going.", question, plan: null, files: [], complete: false, needsUserDecision: true }
-      });
-    }
-    const isApp = projectKind === "app";
-    const answersSummary = Object.entries(answers).map(([key, value]) => key + ": " + String(value)).join("; ");
-    const existingPlan = body.project?.plan;
-    const plan = existingPlan && typeof existingPlan === "object" ? existingPlan : {
-      title: original.split(/[.!?]/)[0].slice(0, 64) || (isApp ? "Untitled app" : "Untitled game"),
-      kind: projectKind,
-      summary: "Starter plan from the original request and interview answers (" + answersSummary.slice(0, 420) + "). AI provider access failed, so this plan uses deterministic defaults and is ready to refine.",
-      engine: isApp ? "webapp" : (body.project?.preferredEngine === "webgl3d" ? "webgl3d" : "canvas2d"),
-      tasks: isApp
-        ? ["Define the main user flow", "Build responsive screens and navigation", "Implement working interactions and validation", "Add persistence where needed", "Validate primary flows"]
-        : ["Implement the core genre-specific gameplay loop", "Wire controls, collisions and state transitions", "Build a complete first level or representative slice", "Add feedback, progression and restart/win states", "Validate the assembled game"],
-      mechanics: isApp ? ["Responsive navigation", "Working forms and controls", "Clear success and recoverable error states"] : ["Responsive controls", "A clear objective", "Meaningful challenge and feedback", "Restart and reachable win/loss states"],
-      performanceBudget: { targetFps: 60, maxEnemies: 12, maxObjects: 250, maxParticles: 80 }
-    };
-    return NextResponse.json({
-      ok: true, aiMode: "fallback", model: "Gene Interview (deterministic fallback)",
-      result: { reply: "GENE couldn't reach an AI provider, so it completed the interview using your answers and safe defaults. You can continue to build; this starter plan was not written by an AI model.", question: null, plan, files: [], complete: true, needsUserDecision: false }
-    });
+  if (!payload && ["interview", "plan"].includes(body.operation)) {
+    // Interview and planning are explicitly AI operations. Never silently substitute
+    // the deterministic interview tree when all configured providers fail.
+    return jsonError(
+      "GENE could not complete this AI " + body.operation + " because every configured AI provider failed. Your answers and existing project are preserved. Retry when a provider is available. Native mode is intentionally unavailable for interview and planning.",
+      503,
+      "GENE_AI_PROVIDER_UNAVAILABLE"
+    );
   }
 
   if (!payload && body.operation === "buildPart" && !request.signal.aborted) {
@@ -1492,6 +1504,16 @@ export async function POST(request: NextRequest) {
       const manifest = JSON.stringify({ ...asset.manifest, kind: asset.kind, name: asset.name, source: "GENE Native 2D Forge", qualityReport: asset.qualityReport }, null, 2);
       if (asset.svg.length <= 300_000 && isSafeProjectPath(base + ".svg")) generatedAssetFiles.push({ path: base + ".svg", content: asset.svg });
       if (manifest.length <= 100_000 && isSafeProjectPath(base + ".json")) generatedAssetFiles.push({ path: base + ".json", content: manifest });
+      // Include separately cropped frame assets so runtime loaders do not mistake the entire
+      // atlas for a single character image. Keep the source atlas for editing/re-import.
+      if (asset.frameFiles && typeof asset.frameFiles === "object") {
+        for (const [frameName, frameSvg] of Object.entries(asset.frameFiles)) {
+          const framePath = base + "/frames/" + frameName;
+          if (typeof frameSvg === "string" && frameSvg.length <= 100_000 && isSafeProjectPath(framePath)) {
+            generatedAssetFiles.push({ path: framePath, content: frameSvg });
+          }
+        }
+      }
     }
     const paths = new Set(generatedAssetFiles.map(file => file.path));
     result.files = [...result.files.filter((file: any) => !paths.has(file.path)), ...generatedAssetFiles];

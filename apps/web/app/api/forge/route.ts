@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
+import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -302,15 +303,46 @@ function buildMesh(recipe: Recipe) {
   return { obj: obj.join("\n") + "\n", mtl: mtl.join("\n") + "\n", asset };
 }
 
+function stableForgeAssetId(kind: string, prompt: string, style: string) {
+  const input = [kind, prompt, style].join("\\u001f");
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return "gene3d-" + kind + "-" + (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function withForgeAssetMetadata(asset: any, prompt: string, mode: "native" | "ai", provider: string, model: string) {
+  const assetId = stableForgeAssetId(String(asset.kind || "prop"), prompt, String(asset.style || "default"));
+  return {
+    ...asset,
+    assetId,
+    version: 1,
+    provenance: {
+      origin: "generated",
+      generator: "GENE Forge",
+      mode,
+      provider,
+      model,
+      sourcePrompt: prompt.slice(0, 4000),
+      externalDependencies: [],
+      license: "GENE-generated; no third-party source embedded"
+    },
+    intendedScene: null
+  };
+}
+
 function nativeAssetResponse(prompt: string, kind: string, quality: string, projectStyle: string): NextResponse | null {
   if (kind === "weapon") return null;
   try {
     const recipe = normalizeRecipe(buildNativeForgeRecipe({ prompt, kind, quality, projectStyle }), kind, quality);
     const mesh = buildMesh(recipe);
+    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "native", "gene-native", "gene-native-forge-v1");
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
-      "asset.json": JSON.stringify(mesh.asset, null, 2)
+      "asset.json": JSON.stringify(manifest, null, 2)
     };
     if (files["model.obj"].length > 1_500_000) return null;
     return json(200, {
@@ -318,10 +350,11 @@ function nativeAssetResponse(prompt: string, kind: string, quality: string, proj
       aiMode: "native",
       model: "gene-native-forge-v1",
       asset: {
+        assetId: manifest.assetId, version: manifest.version, manifest,
         name: recipe.name, kind: recipe.kind, style: recipe.style,
-        partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount,
-        vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "",
-        qualityReport: mesh.asset.qualityReport, recipe, files
+        partCount: recipe.parts.length, triangleCount: manifest.triangleCount,
+        vertexCount: manifest.vertexCount, notes: recipe.notes || "",
+        qualityReport: manifest.qualityReport, recipe, files
       }
     });
   } catch {
@@ -338,6 +371,7 @@ function extractJson(text: string) {
 export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return fail(400, "BAD_JSON", "Request body must be JSON."); }
+  if (!hasToolApproval(body, "forge3d")) return fail(403, "TOOL_APPROVAL_REQUIRED", "GENE did not run this tool because explicit approval for these exact inputs is missing or expired.");
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   const kind = KINDS.has(body.kind) ? body.kind : "prop";
   const quality = ["performance", "standard", "high"].includes(body.quality) ? body.quality : "standard";
@@ -493,17 +527,18 @@ export async function POST(request: NextRequest) {
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
+    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel);
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
-      "asset.json": JSON.stringify(mesh.asset, null, 2)
+      "asset.json": JSON.stringify(manifest, null, 2)
     };
     if (files["model.obj"].length > 1_500_000) return fail(413, "MESH_TOO_LARGE", "Generated mesh exceeded the 1.5 MB mesh budget.");
     return json(200, {
       ok: true,
       aiMode: successfulProvider,
       model: successfulModel,
-      asset: { name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: mesh.asset.triangleCount, vertexCount: mesh.asset.vertexCount, notes: recipe.notes || "", qualityReport: mesh.asset.qualityReport, recipe, files }
+      asset: { assetId: manifest.assetId, version: manifest.version, manifest, name: recipe.name, kind: recipe.kind, style: recipe.style, partCount: recipe.parts.length, triangleCount: manifest.triangleCount, vertexCount: manifest.vertexCount, notes: recipe.notes || "", qualityReport: manifest.qualityReport, recipe, files }
     });
   } catch (e) {
     // Provider output is untrusted: if its recipe fails validation or mesh construction,

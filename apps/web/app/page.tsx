@@ -27,6 +27,7 @@ import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/p
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
+import { createToolApproval } from "./lib/tool-permissions.mjs";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -46,6 +47,86 @@ function readText(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsText(file);
   });
+}
+
+type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; approval: ReturnType<typeof createToolApproval> };
+function approvalPrompt(tool: string, input: any): string {
+  const label = tool === "research" ? "Research" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
+  const detail = String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request").trim().slice(0, 240);
+  return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
+    "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
+}
+function buildNestedToolApprovals(body: any): { entries: ToolApprovalEntry[]; summary: string[] } {
+  const entries: ToolApprovalEntry[] = [], summary: string[] = [];
+  const prompt = String(body.message || body.project?.initialPrompt || "");
+  const kind = body.project?.kind === "app" ? "app" : "game";
+  const operation = body.operation;
+  if (!["build", "surprise"].includes(operation) || kind !== "game") return { entries, summary };
+  const wants3D = body.project?.projectIntent === "game-3d" || body.project?.preferredEngine === "webgl3d" ||
+    body.project?.plan?.engine === "webgl3d" || /\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(prompt);
+  const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
+  if (wants3D) {
+    const lower = prompt.toLowerCase();
+    const requested: Array<{ kind: string; prompt: string }> = [
+      { kind: "character", prompt: "Create the main playable character for this game. " + prompt },
+      { kind: "environment", prompt: "Create a recognizable environment landmark and ground-contact forms for this game world. " + prompt }
+    ];
+    if (/\b(vehicle|truck|car|van|driving|racing|bus)\b/i.test(lower)) requested.push({ kind: "vehicle", prompt: "Create the main vehicle for this game. " + prompt });
+    if (/\b(furniture|chair|table|sofa|bed|cabinet|crate|prop)\b/i.test(lower) && requested.length < 3) requested.push({ kind: "prop", prompt: "Create the most important gameplay prop for this game. " + prompt });
+    const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
+    for (const item of requested.slice(0, 3)) {
+      const input = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
+      entries.push({ tool: "forge3d", approval: createToolApproval("forge3d", input) });
+      summary.push("3D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
+    }
+  } else {
+    const explicit2D = body.project?.preferredEngine === "canvas2d" || body.project?.plan?.engine === "canvas2d";
+    const noEngine = !body.project?.preferredEngine && !body.project?.plan?.engine;
+    if (explicit2D || (noEngine && !/\b(3d|three[- ]dimensional|webgl|third[- ]person|first[- ]person)\b/i.test(prompt))) {
+      const lower = prompt.toLowerCase();
+      const requested = [
+        { kind: "character", prompt: "Create the main recognizable 2D playable character sprite for this game. " + prompt },
+        { kind: /city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lower) ? "tileset" : "background",
+          prompt: "Create a matching 2D " + (/city|street|platform|tile|level|maze|map|world|forest|dungeon|terrain/i.test(lower) ? "game tileset" : "game background") + " for this game. " + prompt }
+      ];
+      for (const item of requested) {
+        const input = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
+        entries.push({ tool: "forge2d", approval: createToolApproval("forge2d", input) });
+        summary.push("2D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
+      }
+    }
+  }
+  return { entries, summary };
+}
+async function fetchWithToolApproval(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = String(input);
+  let payload: any = null;
+  if (typeof init?.body === "string") { try { payload = JSON.parse(init.body); } catch { payload = null; } }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fetch(input, init);
+  let tool: string | null = null;
+  if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
+  else if (/\/api\/forge\/2d(?:\?|$)/.test(url)) tool = "forge2d";
+  else if (/\/api\/forge(?:\?|$)/.test(url)) tool = "forge3d";
+  if (tool) {
+    if (typeof window !== "undefined" && !window.confirm(approvalPrompt(tool, payload))) throw new DOMException("Tool call canceled by the user.", "AbortError");
+    payload.toolApproval = createToolApproval(tool, payload);
+    return fetch(input, { ...init, body: JSON.stringify(payload) });
+  }
+  if (/\/api\/agent(?:\?|$)/.test(url)) {
+    if (payload.operation === "research") {
+      if (typeof window !== "undefined" && !window.confirm(approvalPrompt("agentResearch", payload))) throw new DOMException("AI research canceled by the user.", "AbortError");
+      payload.toolApproval = createToolApproval("agentResearch", payload);
+    }
+    const batch = buildNestedToolApprovals(payload);
+    if (batch.entries.length) {
+      const message = "GENE wants to run the following specialist tool calls as one explicit batch:\n\n" + batch.summary.map((item, index) => (index + 1) + ". " + item).join("\n") +
+        "\n\nApprove this exact batch? Each listed call will receive its own call-scoped approval. Cancel skips all Forge calls; the AI build may continue without those generated assets.";
+      if (typeof window !== "undefined" && window.confirm(message)) payload.toolApprovals = batch.entries;
+      else payload.toolApprovals = [];
+    }
+    return fetch(input, { ...init, body: JSON.stringify(payload) });
+  }
+  return fetch(input, init);
 }
 
 function uid() {
@@ -518,7 +599,7 @@ export default function Home() {
     const engine = (() => { try { return JSON.parse(spec).engine === "webgl3d" ? "webgl3d" : "canvas2d"; } catch { return "canvas2d"; } })();
     const monitor = [
       "(function(){",
-      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){var b=document.body;var controls=b&&b.querySelector('button,input,select,textarea,[role=button],[role=radio],[role=option],a[href],form,[tabindex]');var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||controls));if(visible){window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:'rendered',renderer:'dom-text-game',controls:!!controls},'*');}else{parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'dom-text-game'},'*');}return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0;gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);var base=[pixels[0]||0,pixels[1]||0,pixels[2]||0];for(var i=0;i<pixels.length;i+=step){if(pixels[i+3]>0){alpha++;if(Math.abs(pixels[i]-base[0])+Math.abs(pixels[i+1]-base[1])+Math.abs(pixels[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),base=[d[0]||0,d[1]||0,d[2]||0];for(var i=0;i<d.length;i+=step){if(d[i+3]>0){alpha++;if(Math.abs(d[i]-base[0])+Math.abs(d[i+1]-base[1])+Math.abs(d[i+2]-base[2])>36)n++;}}if(n>12||alpha>12)window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
+      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){var b=document.body;var controls=b&&b.querySelector('button,input,select,textarea,[role=button],[role=radio],[role=option],a[href],form,[tabindex]');var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||controls));if(visible){window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:'rendered',renderer:'dom-text-game',controls:!!controls},'*');}else{parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'dom-text-game'},'*');}return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0,samples=0,colors=Object.create(null);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);for(var i=0;i<pixels.length;i+=step){samples++;if(pixels[i+3]>0){alpha++;var key=pixels[i]+','+pixels[i+1]+','+pixels[i+2];if(!colors[key]){colors[key]=1;n++;}}}if((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,samples=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),colors=Object.create(null);for(var i=0;i<d.length;i+=step){samples++;if(d[i+3]>0){alpha++;var key=d[i]+','+d[i+1]+','+d[i+2];if(!colors[key]){colors[key]=1;n++;}}}if((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:(e.message||'script error')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno+':'+e.colno:''),stack:e.error&&e.error.stack?String(e.error.stack).slice(0,900):''},'*');});",
       "window.addEventListener('unhandledrejection',function(e){var r=e.reason;parent.postMessage({type:'gene-runtime',state:'error',message:'Unhandled promise rejection: '+String(r&&r.message||r||'unknown rejection'),stack:r&&r.stack?String(r.stack).slice(0,900):''},'*');});",
       "window.addEventListener('message',function(e){if(e.data&&e.data.type==='gene-custom-edit-mode'){window.__geneCustomEdit=!!e.data.enabled;document.documentElement.style.cursor=window.__geneCustomEdit?'crosshair':'';}});",
@@ -527,7 +608,7 @@ export default function Home() {
       "})();"
     ].join("\n");
     const instrumentation = "(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;var all=[];function Wrapped(a){var c=new AC(a);all.push(c);return c;}Wrapped.prototype=AC.prototype;try{window.AudioContext=Wrapped;window.webkitAudioContext=Wrapped;}catch(e){}function unlock(){all.forEach(function(c){if(c.state==='suspended'){try{c.resume();}catch(e){}}});}['pointerdown','touchstart','keydown','click'].forEach(function(t){window.addEventListener(t,unlock,true);});})();(function(){var original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attributes){if(typeof type==='string'&&/webgl/i.test(type)){attributes=Object.assign({},attributes||{},{preserveDrawingBuffer:true});}return original.call(this,type,attributes);};})();";
-    const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files);
+    const assetBootstrap = buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files);
     return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'\"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:#fff;font-family:Inter,Arial,sans-serif}*{box-sizing:border-box}" + css + "</style></head><body data-gene-spec='" + spec.replace(/&/g,"&amp;").replace(/'/g,"&#39;") + "' data-gene-engine='" + engine + "'><script>" + instrumentation + "<\/script>" + assetBootstrap + html + "<script>" + monitor + "<\/script>" + (moduleScripts ? "<script>" + moduleScripts + "<\/script>" : "") + "<script>" + js + "<\/script></body></html>";
   }, [project?.files, project?.id, previewKey]);
 
@@ -682,7 +763,7 @@ export default function Home() {
     activeRunControllers.current.add(runController);
     const runFetch = (input: RequestInfo | URL, init?: RequestInit) => {
       if (runController.signal.aborted) throw new DOMException("Run cancelled", "AbortError");
-      return fetch(input, { ...init, signal: runController.signal });
+      return fetchWithToolApproval(input, { ...init, signal: runController.signal });
     };
     const isFirstIdea = !project.initialPrompt;
     const inferredKind = isFirstIdea ? inferProjectKind(prompt, project.kind || "game") : project.kind || "game";
@@ -1784,7 +1865,7 @@ export default function Home() {
     setForgeNotice("");
     addActivity((targetId ? "Editing existing mesh " + targetId : "Generating a new 3D mesh") + " through GENE Forge");
     try {
-      const response = await fetch("/api/forge", {
+      const response = await fetchWithToolApproval("/api/forge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1869,7 +1950,7 @@ export default function Home() {
     setForgeNotice("");
     addActivity("Generating native procedural 2D " + forge2DKind + " artwork through GENE Forge");
     try {
-      const response = await fetch("/api/forge/2d", {
+      const response = await fetchWithToolApproval("/api/forge/2d", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: forgePrompt.trim(), kind: forge2DKind, quality: forgeQuality, style: "project-matched stylized game art" })
@@ -2590,7 +2671,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE project";
-      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
+      const html = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
@@ -2651,7 +2732,7 @@ export default function Home() {
       const jsName = projectKind === "app" ? "app.js" : "game.js";
       const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
       const title = project.plan?.title || project.name || "GENE Project";
-      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
+      const mainHtml = standaloneDocument(project.files["game.html"] || "", title, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
       const manifest = {
         name: title, short_name: title.slice(0, 24), description: project.plan?.summary || project.initialPrompt || title,
         start_url: "./index.html", scope: "./", display: "standalone", background_color: "#101411", theme_color: "#101411",
@@ -2723,7 +2804,7 @@ export default function Home() {
     const jsName = projectKind === "app" ? "app.js" : "game.js";
     const specName = projectKind === "app" ? "app-spec.json" : "game-spec.json";
     const projectTitle = project.plan?.title || project.name || "GENE project";
-    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
+    const mainHtml = standaloneDocument(project.files["game.html"] || "", projectTitle, cssName, jsName, buildRuntimeAssetBootstrap(project.files) + buildRuntimeSceneBootstrap(project.files) + buildRuntimeAudioBootstrap(project.files), moduleScriptPaths(project.files, projectKind));
     Object.entries(project.files).forEach(([path, source]) => {
       if (path === "game.html") return;
       zip.file(exportProjectPath(path, projectKind), source);
@@ -2792,7 +2873,7 @@ export default function Home() {
         zip.file(prefix + exportProjectPath(path, projectKind), source);
       });
       zip.file(prefix + "source/game.html", version.files["game.html"] || "");
-      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files) + buildRuntimeSceneBootstrap(version.files) + buildRuntimeAudioBootstrap(version.files) + buildRuntimeAudioBootstrap(version.files), moduleScriptPaths(version.files, projectKind)));
+      zip.file(prefix + "index.html", standaloneDocument(version.files["game.html"] || "", projectTitle + " v" + version.number, cssName, jsName, buildRuntimeAssetBootstrap(version.files) + buildRuntimeSceneBootstrap(version.files) + buildRuntimeAudioBootstrap(version.files), moduleScriptPaths(version.files, projectKind)));
       zip.file(prefix + "version.json", JSON.stringify({ number: version.number, label: version.label, createdAt: version.createdAt, testSummary: version.testSummary }, null, 2));
     });
     zip.file("gene.project.json", JSON.stringify({

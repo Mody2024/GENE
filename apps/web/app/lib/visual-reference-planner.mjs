@@ -1,15 +1,15 @@
 const CATEGORIES_GAME = [
-  { id: "ui-menus", label: "UI and menus", suffix: "video game user interface HUD main menu pause menu layout design reference" },
-  { id: "gameplay", label: "Gameplay and camera", suffix: "gameplay screenshot level layout camera perspective player obstacles reference" },
-  { id: "characters", label: "Characters and animation", suffix: "game character design turnaround animation pose silhouette reference" },
-  { id: "environments", label: "Environments and props", suffix: "game environment level art buildings props lighting background reference" }
+  { id: "ui-menus", label: "UI and menus", suffix: "game HUD menu interface layout" },
+  { id: "gameplay", label: "Gameplay and camera", suffix: "gameplay screenshot level camera perspective" },
+  { id: "characters", label: "Characters and animation", suffix: "character sprite model animation design" },
+  { id: "environments", label: "Environments and props", suffix: "environment architecture buildings props setting" }
 ];
 
 const CATEGORIES_APP = [
-  { id: "ui-layout", label: "UI and layout", suffix: "web application interface dashboard layout responsive design reference" },
-  { id: "interaction-patterns", label: "Interaction patterns", suffix: "website navigation form controls interaction design user interface reference" },
-  { id: "visual-style", label: "Visual style and typography", suffix: "web design typography color palette cards spacing component design reference" },
-  { id: "illustrations-icons", label: "Illustrations and icons", suffix: "web app illustration icon set visual asset design reference" }
+  { id: "ui-layout", label: "UI and layout", suffix: "application dashboard interface layout" },
+  { id: "interaction-patterns", label: "Interaction patterns", suffix: "navigation form controls interaction" },
+  { id: "visual-style", label: "Visual style and typography", suffix: "typography color palette components" },
+  { id: "illustrations-icons", label: "Illustrations and icons", suffix: "illustration icon set" }
 ];
 
 function cleanTopic(value) {
@@ -38,4 +38,38 @@ export function planVisualReferenceQueries({ topic, kind = "game", engine = "aut
     const query = (subject + " " + suffix).replace(/\s+/g, " ").trim().slice(0, 220);
     return { id: category.id, label: category.label, query };
   });
+}
+
+const STOPWORDS = new Set(["a","an","the","and","or","for","with","from","into","game","video","gameplay","design","style","reference","model","models","art","asset","assets","3d","2d","webgl","canvas","make","create","build","like","about","based","using"]);
+function topicTerms(topic) {
+  return cleanTopic(topic).toLowerCase().split(/[^a-z0-9\u0600-\u06ff]+/i)
+    .filter(word => word.length >= 3 && !STOPWORDS.has(word)).slice(0, 12);
+}
+const CATEGORY_TERMS = {
+  "ui-menus": ["ui","menu","hud","interface","button","screen","layout","dashboard"],
+  gameplay: ["gameplay","level","camera","player","obstacle","platform","screenshot","game"],
+  characters: ["character","sprite","skeleton","person","figure","portrait","animation","model","hero","creature"],
+  environments: ["environment","architecture","building","city","street","landscape","room","forest","road","world","interior","exterior"],
+  "ui-layout": ["ui","interface","dashboard","layout","application","website","screen"],
+  "interaction-patterns": ["navigation","form","controls","interaction","button","menu"],
+  "visual-style": ["typography","color","palette","components","font","cards","design"],
+  "illustrations-icons": ["illustration","icon","icons","drawing","artwork","symbol"]
+};
+/** Rank actual image results against both the user's topic and the requested visual category. */
+export function rankVisualReferenceResults(images, topic) {
+  const terms = topicTerms(topic);
+  const ranked = (Array.isArray(images) ? images : []).map((image, index) => {
+    const title = String(image?.title || "").toLowerCase();
+    const category = String(image?.category || "");
+    const categoryTerms = CATEGORY_TERMS[category] || [];
+    const topicHits = terms.filter(term => title.includes(term));
+    const categoryHits = categoryTerms.filter(term => title.includes(term));
+    const score = topicHits.length * 4 + (categoryHits.length ? 1 : 0);
+    return { image, index, score, topicHits: topicHits.length, categoryHits: categoryHits.length };
+  });
+  // If the query is specific, a generic category match is not enough: reject unrelated
+  // images instead of filling slots with irrelevant material. Keep topic-matching items first.
+  return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || item.categoryHits >= 2))
+    .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || a.index - b.index)
+    .map(item => ({ ...item.image, relevanceScore: item.score }));
 }

@@ -15,9 +15,13 @@ assert.match(research, /planVisualReferenceQueries/, "visual research must query
 assert.match(research, /if \(!wantsImages\) bundle\.images = \[\]/, "Wikipedia thumbnails must not leak into research when images are disabled");
 assert.match(research, /researchIsGeometryDash/, "Geometry Dash must get a genre-specific research path");
 assert.match(research, /rhythm-based precision platformer/, "Geometry Dash research must prioritize mechanics rather than generic pictures");
-assert.match(agent, /!payload && body\.operation === "interview"/, "interview must continue when configured AI providers all fail");
-assert.match(agent, /Gene Interview \(deterministic fallback\)/, "interview fallback must be explicitly labelled");
+assert.match(agent, /GENE_AI_PROVIDER_UNAVAILABLE/, "interview must surface provider failure instead of silently continuing with deterministic questions");
+assert.match(agent, /Native mode is intentionally unavailable for interview and planning/, "provider recovery must not suggest native interview or planning as an alternative");
+assert.doesNotMatch(agent, /Gene Interview \(deterministic fallback\)/, "AI interview must not be mislabeled deterministic fallback");
 assert.match(agent, /GENE Native Recovery/, "staged builds must have a truthful local fallback when all AI providers fail");
+const prompts = read("apps/web/app/lib/prompts.ts");
+assert.match(prompts, /VISIBLE RUNTIME ACCEPTANCE/, "build instructions must reject audio-only or blank rendered scenes");
+assert.match(prompts, /do not mistake an opaque gl\.clear color for rendered geometry/, "3D instructions must distinguish background clearing from visible geometry");
 assert.match(agent, /const safeFiles = validateFiles\(normalized\.files/, "native fallback must pass the same server-side validation boundary");
 assert.match(page, /Connecting to GENE Forge for/, "Forge connection must be visible in the activity stream");
 assert.match(page, /stage: "forge", forge: \{ asset: assetId, status: "modelling"/, "live state must show Forge modelling");

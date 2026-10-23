@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildNative2DAsset } from "../../../../lib/forge-2d.mjs";
+import { hasToolApproval } from "../../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return fail(400, "BAD_JSON", "Request body must be valid JSON.");
   }
+  if (!hasToolApproval(body, "forge2d")) return fail(403, "TOOL_APPROVAL_REQUIRED", "GENE did not run this tool because explicit approval for these exact inputs is missing or expired.");
   if (!body || typeof body !== "object" || Array.isArray(body)) return fail(400, "BAD_BODY", "Request body must be a JSON object.");
   const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 300) : "";
   if (prompt.length < 3) return fail(400, "PROMPT_REQUIRED", "Describe the 2D asset in at least three characters.");
@@ -50,7 +52,8 @@ export async function POST(request: NextRequest) {
       asset,
       files: {
         "sprite.svg": asset.svg,
-        "asset.json": JSON.stringify({ ...asset.manifest, qualityReport: asset.qualityReport }, null, 2)
+        "asset.json": JSON.stringify({ ...asset.manifest, qualityReport: asset.qualityReport }, null, 2),
+        ...Object.fromEntries(Object.entries(asset.frameFiles || {}).map(([name, svg]) => ["frames/" + name, svg]))
       }
     });
   } catch (error) {
