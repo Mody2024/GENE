@@ -69,7 +69,7 @@ export function rankVisualReferenceResults(images, topic) {
   });
   // If the query is specific, a generic category match is not enough: reject unrelated
   // images instead of filling slots with irrelevant material. Keep topic-matching items first.
-  return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || item.categoryHits >= 2))
+  return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || (terms.length === 1 && item.categoryHits >= 2)))
     .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || a.index - b.index)
     .map(item => ({ ...item.image, relevanceScore: item.score }));
 }
