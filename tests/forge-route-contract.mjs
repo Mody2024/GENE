@@ -26,7 +26,7 @@ assert.match(route, /"model\.obj": mesh\.obj/, "Forge must export real OBJ geome
 assert.match(route, /"model\.mtl": mesh\.mtl/, "Forge must export material definitions");
 assert.match(route, /"asset\.json": JSON\.stringify\(manifest, null, 2\)/, "Forge must export the canonical versioned asset manifest");
 assert.match(route, /analyzeForgeRecipe\(recipe\)/, "Forge must run deterministic structural QA before returning an asset");
-assert.match(route, /qualityReport: mesh\.asset\.qualityReport/, "Forge response must expose its QA report");
+assert.match(route, /qualityReport: manifest\.qualityReport/, "Forge response must expose the canonical manifest QA report");
 assert.match(quality, /scope: "structural-only"/, "QA must disclose that checks are structural, not visual");
 assert.match(quality, /DUPLICATE_PART_NAMES/, "QA must flag duplicate part names");
 assert.match(quality, /POSSIBLE_FLOATING_ASSET/, "QA must flag likely floating assets");
