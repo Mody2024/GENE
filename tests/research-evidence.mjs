@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildResearchBundle, filterPolyHaven, formatResearchNotes, parseCommonsFiles, parseGoogleSearchResults } from "../apps/web/app/lib/research-sources.mjs";
+import { buildResearchBundle, filterPolyHaven, formatResearchNotes, hasValidImageSignature, parseCommonsFiles, parseGoogleSearchResults } from "../apps/web/app/lib/research-sources.mjs";
 
 const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 assert.match(researchRoute, /isAppResearch\s*\?\s*normalizedTopic \+ " UI design interaction patterns accessibility official documentation"/, "app research must query interface and interaction guidance instead of game mechanics");
@@ -9,6 +9,15 @@ assert.match(researchRoute, /iiprop=url%7Cmime%7Csize%7Csha1%7Cextmetadata/, "Co
 assert.match(researchRoute, /getReader\(\)/, "image reference downloads must stream instead of buffering an unbounded response");
 assert.match(researchRoute, /totalBytes > MAX_IMAGE_BYTES/, "image reference downloads enforce the byte cap during streaming");
 assert.match(researchRoute, /declaredLength > MAX_IMAGE_BYTES/, "oversized declared image responses are rejected before reading");
+assert.equal(hasValidImageSignature("image/png", Uint8Array.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00])), true, "PNG signature is accepted");
+assert.equal(hasValidImageSignature("image/jpeg", Uint8Array.from([0xff,0xd8,0xff,0xdb])), true, "JPEG signature is accepted");
+assert.equal(hasValidImageSignature("image/gif", new TextEncoder().encode("GIF89a")), true, "GIF signature is accepted");
+assert.equal(hasValidImageSignature("image/webp", new TextEncoder().encode("RIFFxxxxWEBP")), true, "WebP RIFF signature is accepted");
+assert.equal(hasValidImageSignature("image/png", new TextEncoder().encode("not a PNG")), false, "HTML or arbitrary bytes cannot pass as a PNG");
+assert.equal(hasValidImageSignature("image/jpeg", new TextEncoder().encode("<html>error</html>")), false, "HTML error pages cannot pass as JPEGs");
+assert.equal(hasValidImageSignature("image/svg+xml", new TextEncoder().encode("<svg/>")), false, "untrusted SVG is not accepted as a raster model image payload");
+assert.match(researchRoute, /hasValidImageSignature\\(mimeType, bytes\\)/, "downloaded image payloads must pass file-signature validation before reaching the model");
+
 const topic = "Geometry Dash gameplay mechanics level editor";
 const results = parseGoogleSearchResults({ items: [
   { title: "A gameplay guide to Geometry Dash", snippet: "Rhythm platformer mechanics, editor workflows and level design.", link: "https://example.org/geometry-dash-guide" },
