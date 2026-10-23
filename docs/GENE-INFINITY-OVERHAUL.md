@@ -219,6 +219,13 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Procedural 3D mesh manifests now calculate transformed world-space bounds and derive conservative per-part axis-aligned box collision proxies from the same vertices written to OBJ. The proxy records include center, positive dimensions, and source primitive type.
 - Runtime asset validation now checks bounds and proxy metadata, rejects malformed proxy dimensions, and warns when older static models have no collision metadata. These are data contracts only: no physics-engine collider is instantiated automatically yet, and AABB proxies can be conservative for rotated/curved shapes.
 
+## Research image import workflow increment (2026-10-23)
+
+- Added an explicit **Import to project** action to visual research cards. The user sees the source, license and attribution details before confirming; the call then requires a fresh call-scoped tool approval bound to the exact import inputs.
+- Added a server-side importer restricted to approved HTTPS image hosts, with redirects disabled, a 1.5 MB streamed byte limit, supported raster MIME checks, real file-signature validation, and SHA-256 of the exact downloaded bytes. The response preserves source-page/license/attribution metadata; it does not independently certify a license.
+- Imported images are saved into the project file map and a build-version checkpoint as `assets/<id>/reference.png|jpg|webp` plus `asset.json`. Runtime bundling now accepts these bounded reference/texture paths, and SHA-256 verification decodes the stored data URL so it verifies the original raster bytes rather than the URL text.
+- The imported image remains a reference asset by default; it is **not** automatically applied as a texture or claimed to be a playable/game-ready asset. That needs a separate supported sprite/UV-material assignment path.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
