@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const agent = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 const forge = readFileSync(new URL("../apps/web/app/api/forge/route.ts", import.meta.url), "utf8");
 const page = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
+const researchCard = readFileSync(new URL("../apps/web/app/components/ResearchCard.tsx", import.meta.url), "utf8");
 
 assert.match(agent, /GENE Forge tool bridge/, "the unified agent route must invoke Forge during relevant 3D builds");
 assert.match(agent, /body\.project\?\.projectIntent === "game-3d"/, "explicit 3D project intent must trigger Forge");
@@ -36,3 +37,7 @@ assert.match(page, /contentIntegrity: \{ algorithm: "sha256", files: \{ \[imageP
 assert.match(page, /automaticallyAppliedAsTexture: false/, "reference import does not falsely claim automatic texture application");
 assert.match(page, /<ResearchCard bundle=\{msg\.research\} onImportImage=\{importResearchImage\}/, "the research card is connected to project import");
 assert.match(page, /researchAssetImport/, "the tool approval helper recognizes research image import");
+
+assert.match(researchCard, /onImportImage\?: \(image: any\) => void/, "research cards expose an optional import callback");
+assert.match(researchCard, /Import to project/, "each eligible visual reference has a clear import action");
+assert.match(researchCard, /<a href=\{image\.page\}[\s\S]{0,700}<\/a>[\s\S]{0,220}Import to project/, "the import action is a separate control rather than nested inside the source link");
