@@ -961,6 +961,9 @@ export default function Home() {
               const base = "assets/forge2d/" + item.kind;
               stagedFiles[base + ".svg"] = String(item.asset.svg);
               stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport }, null, 2);
+              for (const [frameName, frameSvg] of Object.entries(item.asset.frameFiles || {})) {
+                stagedFiles[base + "/frames/" + frameName] = String(frameSvg);
+              }
             }
             const generated = forgeResults.filter(Boolean) as Array<{kind:string;asset:any}>;
             if (generated.length) {
