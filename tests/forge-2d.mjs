@@ -12,8 +12,19 @@ for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
   assert.match(asset.svg, /<title>/);
   assert.ok(asset.qualityReport.svgBytes > 100);
   assert.equal(asset.manifest.source, "GENE native procedural 2D generator");
+  assert.match(asset.assetId, /^gene2d-[a-z]+-[a-f0-9]{8}$/);
+  assert.equal(asset.manifest.assetId, asset.assetId, "manifest and asset must share a stable identity");
+  assert.equal(asset.manifest.version, 1, "newly generated assets must be versioned");
+  assert.equal(asset.manifest.provenance.origin, "generated", "asset provenance must distinguish generated from imported assets");
+  assert.deepEqual(asset.manifest.provenance.externalDependencies, [], "native assets must disclose their external dependency list");
+
   assert.ok(!/<script|<image|href=/i.test(asset.svg), "asset should not contain scripts or externally embedded resources");
 }
+const stableA = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
+const stableB = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
+assert.equal(stableA.assetId, stableB.assetId, "same brief and style should produce a stable identity");
+const different = buildNative2DAsset({ prompt: "A different asset", kind: "character", style: "cartoon" });
+assert.notEqual(stableA.assetId, different.assetId, "different briefs should not collide by default");
 const character = buildNative2DAsset({ prompt: "A skeleton player sprite", kind: "character" });
 assert.equal(character.manifest.frames, 4);
 assert.ok(character.manifest.frameNames.includes("walk-left"));
