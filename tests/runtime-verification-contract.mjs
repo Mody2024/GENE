@@ -31,3 +31,10 @@ assert.match(runtimeAssets, /MANIFEST_INVALID_JSON/, "sprite validation detects 
 assert.match(runtimeAssets, /FRAMES_MISSING/, "sprite validation detects referenced animation frames that were not imported");
 assert.match(runtimeAssets, /Duplicate animation clip:/, "sprite validation detects duplicate clip names");
 assert.match(runtimeAssets, /invalid frame duration/, "sprite validation catches invalid animation timing");
+
+assert.match(runtimeAssets, /R\.validate=function\(p\)/, "runtime asset registry validates manifests against imported files");
+assert.match(runtimeAssets, /ASSET_INTEGRITY_FAILED/, "runtime asset validation reports broken assets");
+assert.match(runtimeAssets, /OBJ mesh is missing or has no recognizable geometry records/, "runtime asset validation rejects absent or empty mesh files");
+assert.match(runtimeAssets, /MTL material file is missing/, "runtime asset validation identifies missing material definitions");
+assert.match(runtimeAssets, /Collision shapes must be supplied by scene integration/, "runtime asset validation discloses required scene integration work");
+assert.match(runtimeAssets, /validation:report/, "resolving a runtime asset returns its validation report");
