@@ -21,3 +21,6 @@ assert.match(source, /Math\.max\(0\.001, Math\.min\(100000, Math\.abs\(s\.x\)\)\
 assert.match(source, /getAssetStatusVerified=async function\(id\)/, "scene status can verify asset hashes before treating a mesh as ready");
 assert.match(source, /registry\.verifyContentIntegrity\(manifestPath\)/, "scene integration invokes the runtime asset integrity verifier");
 assert.match(source, /status="integrity-failed"/, "scene status blocks assets whose exact file hashes do not match");
+
+assert.match(source, /verifyAllAssets=async function\(\)/, "runtime exposes a scene-wide asset verification pass");
+assert.match(source, /targets\.map\(async function\(o\)\{var status=await scene\.getAssetStatusVerified\(o\.id\)/, "scene-wide verification checks every visible mesh object against actual asset hashes");
