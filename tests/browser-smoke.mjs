@@ -237,13 +237,18 @@ try {
   await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
   const sceneCanvasBox = await sceneCanvas.boundingBox();
   assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
-  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.5, sceneCanvasBox.y + sceneCanvasBox.height * 0.533);
-  await page.mouse.down();
-  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.53, sceneCanvasBox.y + sceneCanvasBox.height * 0.55, { steps: 4 });
-  await page.mouse.up();
+  // The freshly added 2D object is centered at the canvas origin. Start at that exact
+  // origin so hit-testing is deterministic, then drag far enough to exceed rounding.
+  const dragStart = { x: sceneCanvasBox.x + sceneCanvasBox.width * 0.5, y: sceneCanvasBox.y + sceneCanvasBox.height * 0.5 };
+  const dragEnd = { x: sceneCanvasBox.x + sceneCanvasBox.width * 0.58, y: sceneCanvasBox.y + sceneCanvasBox.height * 0.58 };
   const positionX = page.locator(".scene-vector").first().locator("input").first();
-  await page.waitForFunction(() => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==0; }, { timeout: 5000 });
-  assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
+  const initialPositionX = Number(await positionX.inputValue());
+  await page.mouse.move(dragStart.x, dragStart.y);
+  await page.mouse.down();
+  await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForFunction((before) => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==before; }, initialPositionX, { timeout: 8000 });
+  assert.notEqual(Number(await positionX.inputValue()), initialPositionX, "dragging a scene object changes its real position transform");
   await page.getByLabel("Name", { exact: true }).fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
   const saveSceneButton = page.getByRole("button", { name: "Save scene data" });
