@@ -241,6 +241,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 - Project research references now retain source URL/page, license, attribution, source identifier, byte size, and image SHA-256 alongside the actual image pixels. Both automatic game builds and manual 3D Forge requests send up to two image references alongside up to two text notes; the Forge API already enforces the aggregate decoded-byte and signature checks and records provenance in generated manifests.
 - User-supplied image attachments remain in the same reference pool and are preferred by insertion order; source metadata is optional for user-owned images. Forge's reference manifest fingerprints the exact validated bytes it received, and no automatic third-party license approval is implied.
 
+## Imported reference asset library increment (2026-10-23)
+
+- Imported research images now appear in the project's asset library with license/attribution details, a source link, image download, manifest download, and removal action. They remain clearly labeled as reference-only assets until a supported sprite or UV-material assignment path is used.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
