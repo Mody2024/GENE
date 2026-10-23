@@ -19,6 +19,21 @@ for (const name of ["runtime", "art", "diagnostics"]) {
   assert.doesNotThrow(() => new vm.Script(runtimeScriptArray(name)), "runtime " + name + " JavaScript must parse before it is injected into a game iframe");
 }
 
+const observedMessages = [];
+const inputListeners = {};
+const diagnosticWindow = {
+  document: { querySelector: () => null, images: [] },
+  parent: { postMessage: message => observedMessages.push(message) },
+  addEventListener: (type, callback) => { (inputListeners[type] ||= []).push(callback); },
+  requestAnimationFrame: null
+};
+vm.runInNewContext(runtimeScriptArray("diagnostics"), { window: diagnosticWindow });
+for (const callback of inputListeners.keydown || []) callback();
+const runtimeDiagnostics = diagnosticWindow.GENE_DIAGNOSTICS.snapshot();
+assert.equal(runtimeDiagnostics.inputEvents, 1, "runtime diagnostics count actual key input received by the iframe");
+assert.deepEqual(Array.from(runtimeDiagnostics.inputTypes), ["keydown"], "runtime diagnostics preserve the observed input type");
+assert.equal(observedMessages.filter(message => message.state === "input-observed").length, 1, "the first input emits one diagnostic event without claiming gameplay verification");
+
 const runtimeSandbox = { window: { __GENE_ASSETS__: {
   "assets/skeleton/asset.json": JSON.stringify({ assetId: "gene3d-skeleton-1234", version: 1, name: "Skeleton", kind: "character", provenance: { origin: "generated" }, runtimeCompatibility: { format: "OBJ/MTL" } }),
   "assets/forge2d/character/frames/frame-00.svg": "<svg></svg>",
