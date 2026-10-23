@@ -8,8 +8,9 @@ const results = parseGoogleSearchResults({ items: [
   { title: "Unsafe non-HTTPS", snippet: "Ignore this", link: "http://example.org/geometry-dash" },
   { title: "Missing snippet", link: "https://example.org/no-snippet" }
 ]}, topic, 5);
-assert.equal(results.length, 2, "only complete HTTPS search results should survive");
-assert.ok(results[0].relevance > results[1].relevance, "results should be ranked by query relevance");
+assert.equal(results.length, 1, "only complete HTTPS results with meaningful topic relevance should survive");
+assert.ok(results[0].relevance >= 15, "weak or unrelated results should be filtered out");
+assert.ok(!results.some(result => /vegetables/i.test(result.title)), "unrelated search results must not be shown as useful research");
 assert.match(results[0].url, /^https:\/\//);
 assert.equal(results[0].source, "example.org");
 assert.equal(results[0].resultType, "technical-evidence");
