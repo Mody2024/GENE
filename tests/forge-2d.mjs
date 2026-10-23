@@ -84,6 +84,8 @@ assert.match(agentRoute, /no detectable camera or view\/projection transform/, "
 const workspace = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.match(workspace, /colors=Object\.create\(null\)/, "preview visibility checks must count distinct rendered colors");
 assert.doesNotMatch(workspace, /if\(n>12\|\|alpha>12\)window\.__geneFrameConfirmed=true/, "opaque clear-color buffers must not count as a visible 3D game");
+assert.match(workspace, /geometryDraws>0&&\(\(n>1&&alpha>12\)/, "3D visibility confirmation must require actual WebGL geometry draw calls");
+assert.match(workspace, /drawOps>1&&\(\(n>1&&alpha>12\)/, "2D visibility confirmation must require more than a lone background draw");
 assert.match(workspace, /alpha<samples\*0\.9/, "sparse visible sprites on transparent canvases should still be detectable");
 assert.doesNotMatch(workspace, /buildRuntimeAudioBootstrap\((?:project|version)\.files\)\s*\+\s*buildRuntimeAudioBootstrap/, "game audio bootstrap must not be injected twice into one preview");
 console.log("Native 2D Forge tests passed.");
