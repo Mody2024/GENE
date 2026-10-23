@@ -184,3 +184,13 @@ assert.match(workspace, /Preview visible · verify gameplay/, "the workspace mus
 assert.match(workspace, /alpha<samples\*0\.9/, "sparse visible sprites on transparent canvases should still be detectable");
 assert.doesNotMatch(workspace, /buildRuntimeAudioBootstrap\((?:project|version)\.files\)\s*\+\s*buildRuntimeAudioBootstrap/, "game audio bootstrap must not be injected twice into one preview");
 console.log("Native 2D Forge tests passed.");
+
+const gameplayEvents = [];
+const gameplayWindow = { parent: { postMessage: message => gameplayEvents.push(message) }, document: { querySelector: () => null, images: [] }, addEventListener() {}, requestAnimationFrame: null };
+vm.runInNewContext(runtimeScriptArray("diagnostics"), { window: gameplayWindow });
+assert.equal(gameplayWindow.GENE_GAMEPLAY.registerContract({ genre: "platformer", controls: "Arrow keys", objective: "Reach the exit", requiredEvents: ["game-started", "player-moved", "bogus"] }), true);
+assert.deepEqual(Array.from(gameplayWindow.GENE_GAMEPLAY.snapshot().contract.requiredEvents), ["game-started", "player-moved"], "gameplay contracts keep only recognized runtime signals");
+assert.equal(gameplayWindow.GENE_GAMEPLAY.report("player-moved", "x changed"), true);
+assert.equal(gameplayWindow.GENE_GAMEPLAY.report("fake-verified", "no"), false, "arbitrary event names cannot masquerade as runtime signals");
+assert.equal(gameplayWindow.GENE_GAMEPLAY.snapshot().verified, false, "game-authored telemetry remains reported evidence, not proof of gameplay verification");
+assert.equal(gameplayEvents.filter(message => message.state === "gameplay-event").length, 1, "gameplay telemetry is emitted to the preview host");
