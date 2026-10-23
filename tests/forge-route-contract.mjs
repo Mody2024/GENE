@@ -61,7 +61,7 @@ assert.match(prompt, /GENE FORGE — MANDATORY MODELLING COURSE/, "the detailed 
 
 console.log("GENE Forge route contract tests passed (imports, no-key fallback, provider failure recovery, validated exports, size limits, and mandatory agent routing).");
 
-assert.match(forgeRoute, /function attachContentIntegrity\(manifest: any, obj: string, mtl: string\)/, "Forge manifests expose a reusable exact-file integrity helper");
-assert.match(forgeRoute, /createHash\("sha256"\)\.update\(obj, "utf8"\)\.digest\("hex"\)/, "the exported OBJ receives a SHA-256 fingerprint");
-assert.match(forgeRoute, /createHash\("sha256"\)\.update\(mtl, "utf8"\)\.digest\("hex"\)/, "the exported MTL receives a SHA-256 fingerprint");
-assert.equal((forgeRoute.match(/attachContentIntegrity\(withForgeAssetMetadata/g) || []).length, 2, "native and AI Forge outputs both receive file fingerprints");
+assert.match(route, /function attachContentIntegrity\(manifest: any, obj: string, mtl: string\)/, "Forge manifests expose a reusable exact-file integrity helper");
+assert.match(route, /createHash\("sha256"\)\.update\(obj, "utf8"\)\.digest\("hex"\)/, "the exported OBJ receives a SHA-256 fingerprint");
+assert.match(route, /createHash\("sha256"\)\.update\(mtl, "utf8"\)\.digest\("hex"\)/, "the exported MTL receives a SHA-256 fingerprint");
+assert.equal((route.match(/attachContentIntegrity\(withForgeAssetMetadata/g) || []).length, 2, "native and AI Forge outputs both receive file fingerprints");
