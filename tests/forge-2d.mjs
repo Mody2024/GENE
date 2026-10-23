@@ -43,7 +43,7 @@ assert.ok(runtimeAssets.includes(String.raw`/^assets\/models\/[a-zA-Z0-9_-]+\.js
 
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 const promptCourse = readFileSync(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
-assert.match(promptCourse, /GENE_SPRITES\\.createController/, "game generation instructions should use the movement-aware animation controller when integrating generated character sprites");
+assert.match(promptCourse, /GENE_SPRITES\.createController/, "game generation instructions should use the movement-aware animation controller when integrating generated character sprites");
 
 for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
   const asset = buildNative2DAsset({ prompt: "A cheerful cartoon skeleton in a city game", kind, quality: "standard" });
