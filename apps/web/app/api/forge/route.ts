@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
@@ -347,12 +348,25 @@ function withForgeAssetMetadata(asset: any, prompt: string, mode: "native" | "ai
   };
 }
 
+function attachContentIntegrity(manifest: any, obj: string, mtl: string) {
+  return {
+    ...manifest,
+    contentIntegrity: {
+      algorithm: "sha256",
+      files: {
+        "model.obj": createHash("sha256").update(obj, "utf8").digest("hex"),
+        "model.mtl": createHash("sha256").update(mtl, "utf8").digest("hex")
+      }
+    }
+  };
+}
+
 function nativeAssetResponse(prompt: string, kind: string, quality: string, projectStyle: string): NextResponse | null {
   if (kind === "weapon") return null;
   try {
     const recipe = normalizeRecipe(buildNativeForgeRecipe({ prompt, kind, quality, projectStyle }), kind, quality);
     const mesh = buildMesh(recipe);
-    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "native", "gene-native", "gene-native-forge-v1");
+    const manifest = attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "native", "gene-native", "gene-native-forge-v1"), mesh.obj, mesh.mtl);
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
@@ -541,7 +555,7 @@ export async function POST(request: NextRequest) {
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
-    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel);
+    const manifest = attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel), mesh.obj, mesh.mtl);
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
