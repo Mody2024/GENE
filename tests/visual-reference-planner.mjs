@@ -39,6 +39,13 @@ const rankedImages = rankVisualReferenceResults([
   { id: "generic", title: "Random photograph", category: "environments" }
 ], "3D skeleton city adventure");
 assert.deepEqual(rankedImages.map(image => image.id), ["good", "city"], "off-topic image results should be filtered and topic matches prioritized");
+const relevanceTie = rankVisualReferenceResults([
+  { id: "specific", title: "Skeleton character concept", category: "characters" },
+  { id: "generic-category", title: "City street buildings skyline", category: "environments" },
+  { id: "off-topic", title: "Cooking pasta recipe", category: "environments" }
+], "skeleton character in city");
+assert.equal(relevanceTie[0].id, "specific", "generic category keywords must not outrank direct subject matches");
+assert.ok(!relevanceTie.some(image => image.id === "off-topic"), "unrelated results must be discarded instead of passed as visual references");
 
 const coverA = createProjectCoverSvg({ name: "Skeleton City", kind: "game", engine: "webgl3d", prompt: "third person skeleton in a city" });
 const coverB = createProjectCoverSvg({ name: "Budget Board", kind: "app", engine: "webapp", prompt: "dashboard and budget charts" });
@@ -78,7 +85,7 @@ for (const svg of [coverA, coverB]) {
 }
 assert.match(researchRoute, /body\?\.images !== false/, "visual references are enabled by default");
 assert.match(researchRoute, /visualQueries\.map/, "research executes category-specific image searches");
-assert.match(researchRoute, /Prefer category-tagged Commons results first/, "multimodal references should favor category diversity");
+assert.match(researchRoute, /Topic relevance wins when selecting the small set of actual image bytes sent to the model/, "model image inputs must prioritize relevant references");
 assert.match(workspace, /images: true/, "the build workspace always requests visual references by default");
 assert.match(workspace, /assets\/project-cover\.svg/, "new builds save a local cover inside the project");
 assert.match(workspace, /section === "projects"/, "the workspace exposes a dedicated Projects page");
