@@ -3,8 +3,8 @@
  *
  * GENE cannot download binary assets inside its sandboxed game runtime (the preview blocks all network access
  * by design), so "automatic asset research" means: gather factual and visual context from free APIs, list
- * verifiably CC0 3D models, and give the user one-click searches on the major free libraries. Everything here
- * is free to use; licences are stated per source and must still be checked on each asset page.
+ * verifiably CC0 3D models, and give the user one-click searches on the major free libraries.
+ * Discovery may be free, but reuse rights vary by item. Licenses are stated where available and must be checked on each asset page.
  */
 
 import { matchGameKnowledge, musicStylesFor } from "./game-knowledge.mjs";
