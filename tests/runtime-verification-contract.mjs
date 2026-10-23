@@ -64,3 +64,5 @@ assert.match(runtimeAssets, /referenceInputs:Array\.isArray\(m\.referenceInputs\
 assert.match(runtimeAssets, /World-space mesh bounds are missing or invalid/, "runtime asset validation reports absent or malformed model bounds");
 assert.match(runtimeAssets, /Collision proxy metadata is missing/, "runtime asset validation warns when static models lack collision proxies");
 assert.match(runtimeAssets, /Collision proxy '\+index\+' is malformed/, "runtime asset validation rejects malformed collision proxy dimensions");
+
+assert.match(runtimeAssets, /sprite-sheet\|atlas\|reference\|texture/, "runtime asset bundles accept bounded imported reference and texture raster paths");
