@@ -90,3 +90,6 @@ console.log("Research evidence tests passed (HTTPS filtering, relevance ranking,
 
 assert.match(researchRoute, /sha256: createHash\("sha256"\)\.update\(bytes\)\.digest\("hex"\)/, "the exact raster bytes sent to the model must have a traceable SHA-256 fingerprint");
 assert.match(researchRoute, /byteSize: bytes\.byteLength/, "the exact downloaded payload size must be recorded");
+
+assert.match(researchSources, /requiredChecks: \["review-license-and-attribution"[\s\S]{0,240}"record-source-provenance"\]/, "external asset candidates list the checks required before import");
+assert.match(researchSources, /blockers: \["license-review-not-confirmed", "asset-import-not-implemented"\]/, "research candidates clearly remain blocked from automatic project import");
