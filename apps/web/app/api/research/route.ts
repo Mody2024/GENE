@@ -10,7 +10,7 @@ import {
   parseCommonsFiles,
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
-import { planVisualReferenceQueries } from "../../lib/visual-reference-planner.mjs";
+import { planVisualReferenceQueries, rankVisualReferenceResults } from "../../lib/visual-reference-planner.mjs";
 import { hasToolApproval } from "../../lib/tool-permissions.mjs";
 
 export const runtime = "nodejs";
@@ -131,7 +131,8 @@ export async function POST(request: NextRequest) {
     googleSearch(googleQuery),
     ...(wantsAudio ? musicSearchTerms(topic).map(term => commons(term, "audio", 3)) : [])
   ]);
-  const commonsImages = (visualImageSets as any[][]).flat().filter((image, index, all) => all.findIndex(other => other.thumb === image.thumb || other.full === image.full) === index);
+  const rawCommonsImages = (visualImageSets as any[][]).flat().filter((image, index, all) => all.findIndex(other => other.thumb === image.thumb || other.full === image.full) === index);
+  const commonsImages = rankVisualReferenceResults(rawCommonsImages, normalizedTopic);
   const commonsAudio = audioSets.flat().filter((track: any, index: number, all: any[]) => all.findIndex(other => other.url === track.url) === index);
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
