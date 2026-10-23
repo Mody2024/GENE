@@ -70,6 +70,7 @@ runtimeSandbox.window.__GENE_ASSETS__["assets/verified/model.obj"] = verifiedObj
 vm.runInNewContext(runtimeScriptArray("art"), { window: runtimeSandbox.window, Image: function Image() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; Object.defineProperty(this, "src", { set() {} }); } });
 const spriteValidation = runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character");
 assert.equal(spriteValidation.ok, true, "complete sprite manifests pass frame-integrity validation");
+assert.equal(runtimeRegistry.validate("assets/forge2d/character.json").ok, true, "the asset registry accepts a complete animation manifest and its frame files");
 assert.equal(spriteValidation.frameCount, 13, "sprite validation counts frames across animation clips, including repeated frame references");
 const spriteIntegrity = await runtimeRegistry.verifyContentIntegrity("assets/forge2d/character.json");
 assert.equal(spriteIntegrity.ok, true, "2D sheet and frame fingerprints verify against project paths");
@@ -80,6 +81,7 @@ const missingFrameAssets = { ...runtimeSandbox.window.__GENE_ASSETS__ };
 delete missingFrameAssets["assets/forge2d/character/frames/frame-03.svg"];
 runtimeSandbox.window.__GENE_ASSETS__ = missingFrameAssets;
 assert.equal(runtimeSandbox.window.GENE_SPRITES.validateManifest("assets/forge2d/character").ok, false, "missing referenced animation frames are caught");
+assert.equal(runtimeRegistry.validate("assets/forge2d/character.json").ok, false, "the asset registry propagates missing sprite frame failures");
 runtimeSandbox.window.__GENE_ASSETS__ = { ...missingFrameAssets, "assets/forge2d/character/frames/frame-03.svg": "<svg></svg>" };
 const spriteController = runtimeSandbox.window.GENE_SPRITES.createController("assets/forge2d/character");
 assert.equal(spriteController.getClip(), "idle", "new sprite controllers start on idle when available");
