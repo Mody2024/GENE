@@ -96,3 +96,10 @@ assert.match(liveProgress, /run\.build\.passed/, "build progress is based on ver
 assert.match(liveProgress, /Current task:/, "progress shows the currently running build task");
 assert.match(prompts, /Server-side enforcement is mandatory; UI-only prompts are insufficient/i, "permission policy must require server-side enforcement");
 console.log("Visual-reference planner, autonomous-tool contract, Projects gallery, and local cover tests passed.");
+
+const duplicatedVisuals = rankVisualReferenceResults([
+  { title: "Skeleton city character concept", category: "characters", full: "https://images.example.org/skeleton.png?utm_source=one" },
+  { title: "Skeleton city character concept duplicate", category: "characters", full: "https://images.example.org/skeleton.png?utm_source=two#preview" },
+  { title: "Skeleton city street", category: "environments", full: "https://images.example.org/street.png" }
+], "skeleton city");
+assert.equal(duplicatedVisuals.length, 2, "visual search must not show the same source URL repeatedly under tracking variants");
