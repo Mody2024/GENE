@@ -19,3 +19,6 @@ console.log("GENE Chat ↔ Forge integration contract tests passed.");
 
 assert.match(page, /stagedFiles\[base \+ "\/frames\/" \+ frameName\] = String\(frameSvg\)/, "generated 2D frame files must be persisted into the project instead of dropping animation frames");
 assert.match(page, /Object\.entries\(item\.asset\.frameFiles \|\| \{\}\)/, "the build pipeline iterates all generated sprite frames");
+
+assert.match(page, /Object\.entries\(data\.asset\.frameFiles \|\| \{\}\)\.map\(\(\[name, svg\]\) => \[prefix \+ "frames\/" \+ name, String\(svg\)\]\)/, "manual 2D asset saving must persist frame files next to the manifest");
+assert.match(page, /and " \+ Object\.keys\(data\.asset\.frameFiles \|\| \{\}\)\.length \+ " animation frame files/, "activity log reports how many cropped frames were actually saved");
