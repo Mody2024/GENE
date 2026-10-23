@@ -17,6 +17,9 @@ for (const [path, tool] of [
   const source = readFileSync(new URL(path, import.meta.url), "utf8");
   assert.match(source, new RegExp('hasToolApproval\\(body, "' + tool + '"\\)'), path + " must enforce approvals server-side");
 }
+const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
+assert.match(agentRoute, /GENE_AI_REQUIRED/, "interview and planning must not use deterministic native mode");
+assert.match(agentRoute, /GENE_AI_PROVIDER_UNAVAILABLE/, "provider failures must be surfaced instead of falling back to a native interview");
 const workspace = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.match(workspace, /window\.confirm\(approvalPrompt/, "the user must explicitly approve direct tool calls");
 assert.match(workspace, /buildNestedToolApprovals/, "nested Forge calls must be listed and approved as a batch");
