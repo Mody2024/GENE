@@ -31,7 +31,7 @@ assert.match(twoDRoute, /sprite\.svg/, "2D Forge API must return an SVG asset fi
 assert.match(twoDRoute, /GENE_2D_RATE_LIMIT/, "2D Forge API must have a request rate limit");
 assert.match(twoDModule, /gene-forge-2d-v1/, "2D assets must have a versioned manifest format");
 assert.match(twoDModule, /NO_SKELETON_RIG/, "2D character output must disclose that it is not a rigged model");
-assert.match(studioPage, /fetch\("\/api\/forge\/2d"/, "asset workshop must call the native 2D endpoint");
+assert.match(studioPage, /fetchWithToolApproval\("\/api\/forge\/2d"/, "asset workshop must call the native 2D endpoint through explicit consent");
 assert.match(studioPage, /generateForge2DAsset/, "asset workshop must save native 2D output");
 assert.match(studioPage, /Integrate the generated 2D asset/, "2D assets must offer a game-integration action");
 assert.match(studioPage, /Saved artwork/, "asset workshop must list saved 2D assets");
