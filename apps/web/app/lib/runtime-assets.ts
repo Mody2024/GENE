@@ -15,9 +15,12 @@ export function buildRuntimeAssetBootstrap(files: Record<string, string> | undef
   let totalBytes = 0;
   for (const [path, content] of Object.entries(files || {})) {
     if (!/^assets\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.(?:obj|mtl)$/i.test(path) && !/^assets\/[a-zA-Z0-9_-]+\/(?:asset\.json|asset-2d\.json)$/i.test(path) && !/^assets\/models\/[a-zA-Z0-9_-]+\.json$/i.test(path) && !/^assets\/forge2d\/(?:character|tileset|background)\.json$/i.test(path) && !(RUNTIME_RASTER_PATH.test(path) && typeof content === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,/i.test(content)) && !RUNTIME_ART_PATH.test(path)) continue;
-    if (typeof content !== "string" || totalBytes + content.length > MAX_RUNTIME_ASSET_BYTES) continue;
+    if (typeof content !== "string") continue;
+    // Count UTF-8 bytes, not UTF-16 code units, so non-ASCII SVG/manifest text cannot bypass the runtime payload cap.
+    const contentBytes = new TextEncoder().encode(content).byteLength;
+    if (totalBytes + contentBytes > MAX_RUNTIME_ASSET_BYTES) continue;
     assets[path] = content;
-    totalBytes += content.length;
+    totalBytes += contentBytes;
   }
   // Escape "<" so imported text cannot terminate this inline bootstrap script.
   const serialized = JSON.stringify(assets).replace(/</g, "\\u003c");
