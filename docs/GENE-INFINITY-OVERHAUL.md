@@ -198,6 +198,10 @@ Start with the highest-risk correctness fixes and shared contracts, then wire th
 
 - Every procedural 3D primitive is now checked before OBJ serialization for non-empty geometry, finite vertex coordinates, valid face lengths, and in-range integer indices. A malformed generated primitive is rejected before it can be saved as a model.
 
+## Reference-image safety increment (2026-10-23)
+
+- Forge now decodes supplied reference images, enforces a decoded-byte budget in addition to the base64 character cap, validates the actual file signature against the declared JPEG/PNG/WebP MIME type, and forwards only the validated bytes. A client-supplied MIME label alone is no longer accepted as evidence of a valid image.
+
 ## Latest implementation increment (2026-10-23)
 
 - Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
