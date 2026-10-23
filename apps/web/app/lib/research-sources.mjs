@@ -190,7 +190,7 @@ export function buildResearchBundle(input) {
     id: String(input.id || "research-" + Date.now().toString(36)),
     topic,
     createdAt: String(input.createdAt || new Date().toISOString()),
-    facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb })),
+    facts: wiki.map(page => ({ title: page.title, extract: String(page.extract).replace(/\s+/g, " ").slice(0, 520), url: page.url, thumb: page.thumb, resultType: "encyclopedic-context", integrationState: "reference-only" })),
     webResults,
     images: visualImages.slice(0, 12),
     models,
