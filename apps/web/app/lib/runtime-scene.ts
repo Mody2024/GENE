@@ -41,7 +41,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           color,
           visible: raw.visible !== false,
           material: (() => { const m = raw.material && typeof raw.material === "object" ? raw.material as Record<string, unknown> : {}; const finite = (v: unknown, fallback: number) => Number.isFinite(Number(v)) ? Math.max(0, Math.min(1, Number(v))) : fallback; return { roughness: finite(m.roughness, 0.65), metalness: finite(m.metalness, 0), emissive: typeof m.emissive === "string" && /^#[0-9a-f]{6}$/i.test(m.emissive) ? m.emissive : "#000000" }; })(),
-          light: (() => { const l = raw.light && typeof raw.light === "object" ? raw.light as Record<string, unknown> : {}; const intensity = Number(l.intensity); return { intensity: Number.isFinite(intensity) ? Math.max(0, Math.min(20, intensity)) : 1, color: typeof l.color === "string" && /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : color }; })(),
+          light: (() => { const l = raw.light && typeof raw.light === "object" ? raw.light as Record<string, unknown> : {}; const intensity = Number(l.intensity), ambient = Number(l.ambient); return { intensity: Number.isFinite(intensity) ? Math.max(0, Math.min(20, intensity)) : 1, ambient: Number.isFinite(ambient) ? Math.max(0, Math.min(1, ambient)) : 0.18, direction: vector(l.direction, { x: -0.4, y: 0.8, z: 0.3 }), color: typeof l.color === "string" && /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : color }; })(),
           camera: (() => { const c = raw.camera && typeof raw.camera === "object" ? raw.camera as Record<string, unknown> : {}; const fov = Number(c.fov); return { fov: Number.isFinite(fov) ? Math.max(10, Math.min(120, fov)) : 60 }; })()
         };
       })
@@ -166,11 +166,11 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     var rgb=hex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;});
     gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(normal,3,gl.FLOAT,false,24,12);
     gl.uniformMatrix4fv(mvpLoc,false,mul(viewProjection,mat));if(modelLoc)gl.uniformMatrix4fv(modelLoc,false,mat);if(colorLoc)gl.uniform4f(colorLoc,rgb[0],rgb[1],rgb[2],1);
-    var light=m.light||{},lightHex=/^#[0-9a-f]{6}$/i.test(light.color)?light.color:"#ffffff",lightRgb=lightHex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;}),intensity=Math.max(0,Math.min(20,Number(light.intensity)||1));
+    var light=m.light||{},lightHex=/^#[0-9a-f]{6}$/i.test(light.color)?light.color:"#ffffff",lightRgb=lightHex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;}),rawIntensity=Number(light.intensity),intensity=Number.isFinite(rawIntensity)?Math.max(0,Math.min(20,rawIntensity)):1;
     var direction=light.direction&&typeof light.direction==="object"?light.direction:{x:-0.4,y:0.8,z:0.3},dx=Number(direction.x)||-0.4,dy=Number(direction.y)||0.8,dz=Number(direction.z)||0.3,dlen=Math.hypot(dx,dy,dz)||1;
     if(lightDirectionLoc)gl.uniform3f(lightDirectionLoc,dx/dlen,dy/dlen,dz/dlen);
     if(lightColorLoc)gl.uniform3f(lightColorLoc,lightRgb[0]*intensity,lightRgb[1]*intensity,lightRgb[2]*intensity);
-    if(ambientLoc)gl.uniform1f(ambientLoc,Math.max(0,Math.min(1,Number(light.ambient)||0.18)));
+    if(ambientLoc){var rawAmbient=Number(light.ambient);gl.uniform1f(ambientLoc,Number.isFinite(rawAmbient)?Math.max(0,Math.min(1,rawAmbient)):0.18);}
     gl.drawArrays(gl.TRIANGLES,0,m.vertexCount);drawn++;
   });
   return drawn;
