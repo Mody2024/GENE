@@ -19,10 +19,13 @@ export function inspectSceneManifest(spec, files = {}) {
     ids.add(id);
     if (object.visible !== false) visibleCount += 1;
     if (typeof object.modelPath === "string" && object.modelPath) {
-      if (!object.modelPath.startsWith("assets/") || !object.modelPath.endsWith(".obj")) {
-        errors.push(id + ": unsupported model path");
-      } else if (typeof files[object.modelPath] !== "string") {
-        missingModelAssets.push({ id, path: object.modelPath });
+      const path = object.modelPath;
+      // Accept only normalized project-relative OBJ paths; reject traversal, backslashes,
+      // query fragments and unusual characters before resolving a generated asset.
+      if (!/^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(path)) {
+        errors.push(id + ": unsafe or unsupported model path");
+      } else if (!Object.prototype.hasOwnProperty.call(files, path) || typeof files[path] !== "string") {
+        missingModelAssets.push({ id, path });
       }
     }
   }
