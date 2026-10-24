@@ -11,6 +11,9 @@ export function inspectSceneManifest(spec, files = {}) {
   const ids = new Set();
   const duplicateIds = new Set();
   let visibleCount = 0;
+  if (objects.length > 500) {
+    errors.push("Scene contains " + objects.length + " objects; the runtime limit is 500. Split the scene into smaller sections.");
+  }
   const missingModelAssets = [];
   for (const [index, item] of objects.slice(0, 500).entries()) {
     const object = item && typeof item === "object" ? item : {};
