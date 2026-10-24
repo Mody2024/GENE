@@ -51,6 +51,11 @@ assert.match(presets, /part\("left upper arm","capsule"/, "native characters mus
 assert.match(presets, /export function buildNativeForgeRecipe/, "native recipe generator must be exported");
 assert.match(presets, /kind\s*===\s*"weapon"\)\s*throw new Error/, "unsupported native categories must fail explicitly");
 assert.match(prompt, /GENE FORGE MANDATORY WORKFLOW/, "the unified agent must be instructed to route 3D requests through Forge");
+const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
+assert.match(agentRoute, /missingModelIntegration = forgeToolAssets\.filter/, "post-generation audit must flag 3D Forge meshes whose loading cannot be confirmed");
+assert.match(agentRoute, /GENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed/, "GENE must distinguish exported 3D files from confirmed in-game models");
+assert.match(agentRoute, /visible gameplay remain unverified until runtime acceptance/, "source-level 3D references must not be presented as proof of playable rendered models");
+
 assert.match(prompt, /GENE FORGE — MANDATORY MODELLING COURSE/, "the detailed modelling curriculum must be present in the agent system prompt");
 
 console.log("GENE Forge route contract tests passed (imports, no-key fallback, provider failure recovery, validated exports, size limits, and mandatory agent routing).");
