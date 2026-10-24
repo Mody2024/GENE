@@ -10,10 +10,10 @@
 
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
-- **Wave 2 — 3D scene reliability and playable geometry: 66%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
+- **Wave 2 — 3D scene reliability and playable geometry: 68%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
 - **Wave 3 — persistent workspace, checkpoints, resumable repair: 30%** (durable snapshots serialize writes; startup reconciles both stores; checkpoint recovery verifies file fingerprints; explicit resume clears stale failure state; end-to-end recovery acceptance remains).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
-- **Wave 5 — evidence-based self-improvement and release acceptance: 24%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
+- **Wave 5 — evidence-based self-improvement and release acceptance: 25%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
 
 
 This document records the next implementation sequence for the existing GENE workspace. It is a living plan; a checkbox should be marked complete only after the corresponding code and verification exist.
@@ -34,6 +34,8 @@ This document records the next implementation sequence for the existing GENE wor
 - [x] Expose optional WebGL lighting uniforms (`uLightDirection`, `uLightColor`, `uAmbient`) and preserve clamped per-object light direction/intensity/ambient values, including explicit zero values; generated-game contract documents their use.
 - [x] Extend focused scene diagnostics to reject unsupported WebGL types and mesh/custom placeholders without OBJ paths, and accept the supported primitive/light/camera type set; add regression cases (9 scene-diagnostic tests are now defined, but still require execution in the repository environment).
 - [x] Scene diagnostics now reject non-finite/malformed position, rotation and scale transforms, warn about zero/huge scales, and validate supplied OBJ contents/size/count bounds (maximum 2 MB and 100,000 vertex/face records); regression cases added, execution still pending.
+- [x] Fix OBJ validation's escaped regular expressions so standard whitespace-prefixed `v` and `f` records are actually recognized; regression cases cover valid and malformed OBJ data.
+- [x] Align runtime vector normalization with diagnostics: scene transforms can be supplied as either `[x, y, z]` arrays or `{x, y, z}` objects, with finite-value checks and bounded components.
 - [ ] Preserve a last-known-good revision before any automated repair.
 - [ ] Run the complete CI suite and record the exact failing tests before changing generation logic.
 - [ ] Keep 2D, text-based, and web-app generation as independent regression targets.
