@@ -155,3 +155,12 @@ test("rejects transform arrays with more than three components", () => {
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /invalid position transform/i);
 });
+
+test("accepts OBJ geometry records with inline comments and ignores comment-only lines", () => {
+  const source = "# a triangle\nv 0 0 0 # origin\nv 1 0 0 # right\nv 0 1 0 # top\nf 1 2 3 # triangle\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
+});
