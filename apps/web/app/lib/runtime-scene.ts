@@ -133,7 +133,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
   function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
   var eye=vec(camera.eye||camera.position,[0,5,10]),target=vec(camera.target||camera.lookAt,[0,0,0]),up=normalize(vec(camera.up,[0,1,0]));
   if(Math.hypot(eye[0]-target[0],eye[1]-target[1],eye[2]-target[2])<0.001)eye=[target[0],target[1]+1,target[2]+10];
-  var z=normalize([eye[0]-target[0],eye[1]-target[1],eye[2]-target[2]]),x=normalize(cross(up,z)),y=cross(z,x);
+  var z=normalize([eye[0]-target[0],eye[1]-target[1],eye[2]-target[2]]),side=cross(up,z);if(Math.hypot(side[0],side[1],side[2])<0.001)side=cross([0,0,1],z);var x=normalize(side),y=cross(z,x);
   var view=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);
   var fov=Math.max(10,Math.min(120,Number(camera.fov)||60))*Math.PI/180,ratio=Math.max(0.01,Math.min(100,Number(aspect)||1)),near=Math.max(0.01,Math.min(10,Number(camera.near)||0.1)),far=Math.max(near+1,Math.min(100000,Number(camera.far)||1000)),f=1/Math.tan(fov/2),nf=1/(near-far);
   var projection=new Float32Array([f/ratio,0,0,0,0,f,0,0,0,0,(far+near)*nf,-1,0,0,2*far*near*nf,0]),out=new Float32Array(16);
