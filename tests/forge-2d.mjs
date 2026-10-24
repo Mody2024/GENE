@@ -24,6 +24,9 @@ assert.match(agentRoute, /frameFiles:\s*asset\.frameFiles/, "agent bridge preser
 assert.match(agentRoute, /window\.GENE_SPRITES\.draw\(ctx, \\"assets\/forge2d\/character\\", clipName, x, y, width, height, performance\.now\(\)\)/, "agent instructions require drawing character frames through the runtime animation helper");
 assert.match(agentRoute, /window\.GENE_ART\.image\/draw/, "agent instructions direct static Forge art through the local runtime art helper");
 assert.match(agentRoute, /animationClips: Array\.isArray\(asset\.manifest\.animationClips\)/, "agent prompt receives actual animation clip metadata rather than just frame counts");
+assert.match(agentRoute, /missingForgeIntegration = forge2DAssets\.filter/, "post-generation audit detects Forge assets that are not referenced by game scripts");
+assert.match(agentRoute, /packaged assets, not verified in-game artwork/, "GENE must disclose when Forge assets exist in files but are not confirmed in gameplay");
+assert.match(agentRoute, /actual browser visibility and animation still require runtime acceptance/, "source references must not be misreported as proof of visible runtime rendering");
 assert.match(agentRoute, /asset\.frameFiles && typeof asset\.frameFiles === "object"/, "agent bridge treats absent frame files safely without failing the whole game build");
 
 
