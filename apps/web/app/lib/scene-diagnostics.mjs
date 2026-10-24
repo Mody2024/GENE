@@ -75,8 +75,11 @@ export function inspectSceneManifest(spec, files = {}) {
             const trimmed = line.split("#", 1)[0].trim();
             if (!trimmed) continue;
             if (/^v(?:\s|$)/.test(trimmed)) {
-              const vertexMatch = trimmed.match(/^v\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)(?:\s|$)/);
-              if (!vertexMatch || vertexMatch.slice(1, 4).some(component => !Number.isFinite(Number(component)))) {
+              const parts = trimmed.split(/\s+/);
+              // Standard XYZ/XYZW and common vertex-color OBJ extensions are accepted.
+              // Reject trailing garbage rather than treating a malformed line as a valid vertex.
+              const allowedCounts = parts.length === 4 || parts.length === 5 || parts.length === 7 || parts.length === 8;
+              if (parts[0] !== "v" || !allowedCounts || parts.slice(1).some(component => !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(component) || !Number.isFinite(Number(component)))) {
                 malformedVertex = true;
                 break;
               }
@@ -117,7 +120,6 @@ export function inspectSceneManifest(spec, files = {}) {
   if (objects.length && !visibleCount) errors.push("All scene objects are hidden.");
   if (duplicateIds.size) errors.push("Duplicate scene object IDs: " + [...duplicateIds].join(", "));
   if (missingModelAssets.length) warnings.push(missingModelAssets.length + " OBJ asset(s) are missing.");
-  if (objects.length > 500) warnings.push("Only the first 500 objects were inspected.");
   return {
     ok: errors.length === 0,
     objectCount: objects.length,
