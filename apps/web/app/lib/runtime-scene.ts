@@ -111,10 +111,17 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     seen++;
     try{
       var groups=[],materials={},modelPath=o.modelPath||"";
-      if(modelPath&&window.GENE3D&&typeof window.GENE3D.parseOBJ==="function"){
-        groups=window.GENE3D.parseOBJ(modelPath);
-        var mtlPath=modelPath.replace(/\\.obj$/i,".mtl");
-        if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+      if(modelPath){
+        if(window.GENE3D&&typeof window.GENE3D.parseOBJ==="function"){
+          groups=window.GENE3D.parseOBJ(modelPath)||[];
+          var mtlPath=modelPath.replace(/\\.obj$/i,".mtl");
+          if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+        }
+        if(!groups.length){
+          groups=[{material:"",positions:primitiveData("box")}];
+          window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
+          window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:modelPath,message:"OBJ geometry could not be loaded; showing a placeholder. Check the asset package and GENE3D parser."});
+        }
       }else if(type==="mesh"&&!modelPath){
         // Generic mesh objects without an assigned OBJ should still be visible and testable.
         // Keep this fallback limited to an absent path: a declared-but-unavailable asset
