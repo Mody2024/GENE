@@ -75,7 +75,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     }
     function quad(a,b,c,d){tri(a,b,c);tri(a,c,d);}
     if(type==="plane"){
-      quad([-0.5,0,-0.5],[0.5,0,-0.5],[0.5,0,0.5],[-0.5,0,0.5]);
+      quad([-0.5,0,0.5],[0.5,0,0.5],[0.5,0,-0.5],[-0.5,0,-0.5]);
     }else if(type==="sphere"){
       var lat=8,lon=12;
       function point(i,j){var phi=Math.PI*i/lat,theta=2*Math.PI*j/lon;return[Math.sin(phi)*Math.cos(theta)*0.5,Math.cos(phi)*0.5,Math.sin(phi)*Math.sin(theta)*0.5];}
