@@ -156,7 +156,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
   if(pos<0||normal<0||!mvpLoc)return 0;
   function model(o){
     var r=o.rotation||{},p=o.position||{},s=o.scale||{},rx=(Number(r.x)||0)*Math.PI/180,ry=(Number(r.y)||0)*Math.PI/180,rz=(Number(r.z)||0)*Math.PI/180;
-    var sx=Math.max(.001,Math.min(100,Math.abs(Number(s.x)||1))),sy=Math.max(.001,Math.min(100,Math.abs(Number(s.y)||1))),sz=Math.max(.001,Math.min(100,Math.abs(Number(s.z)||1))),cx=Math.cos(rx),sxr=Math.sin(rx),cy=Math.cos(ry),syr=Math.sin(ry),cz=Math.cos(rz),szr=Math.sin(rz);
+    function scaleAxis(value){var n=Number(value);if(!Number.isFinite(n))return 1;return n===0?0:Math.max(.001,Math.min(100,Math.abs(n)));}var sx=scaleAxis(s.x),sy=scaleAxis(s.y),sz=scaleAxis(s.z),cx=Math.cos(rx),sxr=Math.sin(rx),cy=Math.cos(ry),syr=Math.sin(ry),cz=Math.cos(rz),szr=Math.sin(rz);
     var r00=cy*cz,r01=cy*szr,r02=-syr,r10=sxr*syr*cz-cx*szr,r11=sxr*syr*szr+cx*cz,r12=sxr*cy,r20=cx*syr*cz+sxr*szr,r21=cx*syr*szr-sxr*cz,r22=cx*cy;
     return new Float32Array([r00*sx,r10*sx,r20*sx,0,r01*sy,r11*sy,r21*sy,0,r02*sz,r12*sz,r22*sz,0,Number(p.x)||0,Number(p.y)||0,Number(p.z)||0,1]);
   }
