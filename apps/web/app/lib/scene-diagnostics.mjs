@@ -67,7 +67,9 @@ export function inspectSceneManifest(spec, files = {}) {
           // Parse in one pass: negative OBJ indices are relative to vertices already declared,
           // and repeated identical face lines must not confuse source-position lookups.
           for (const line of source.split(/\r?\n/)) {
-            const trimmed = line.trim();
+            // Wavefront OBJ permits comments after geometry records; ignore them before tokenizing.
+            const trimmed = line.split("#", 1)[0].trim();
+            if (!trimmed) continue;
             if (/^v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/.test(trimmed)) {
               vertices += 1;
               if (vertices > 100_000) break;
