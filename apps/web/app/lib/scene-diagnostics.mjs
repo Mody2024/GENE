@@ -23,7 +23,7 @@ export function inspectSceneManifest(spec, files = {}) {
       if (object[field] === undefined || object[field] === null) continue;
       const value = object[field];
       const components = Array.isArray(value)
-        ? value.slice(0, 3)
+        ? value
         : value && typeof value === "object"
           ? [value.x, value.y, value.z]
           : null;
