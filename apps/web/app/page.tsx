@@ -569,6 +569,24 @@ export default function Home() {
               : version)
           };
         });
+        void writeDurableProjectSnapshot(
+          [project, ...projects.filter(item => item.id !== project.id)].slice(0, 8).map(item => {
+            if (item.id !== project.id) return item;
+            const existing = item.livingPreview?.runtimeErrors || [];
+            return {
+              ...item,
+              livingPreview: {
+                status: item.livingPreview?.status || "booting",
+                lastKnownGoodVersion: item.livingPreview?.lastKnownGoodVersion,
+                updatedAt: now(),
+                runtimeErrors: [...existing.filter(entry => entry !== warningText), warningText].slice(-10),
+                currentObjectives: item.livingPreview?.currentObjectives || [],
+                canContinuePlaying: item.livingPreview?.canContinuePlaying ?? false
+              }
+            };
+          }),
+          project.id
+        ).catch(() => setPersistenceWarning("A 3D runtime warning was detected, but its durable save failed. Export the project ZIP if you need a separate backup."));
         return;
       }
       if (event.data?.type === "gene-custom-selection") {
