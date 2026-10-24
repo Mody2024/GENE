@@ -117,3 +117,24 @@ test("accepts a small OBJ with vertices and faces", () => {
   assert.equal(report.ok, true);
   assert.equal(report.missingModelAssets.length, 0);
 });
+
+test("rejects OBJ faces with out-of-range or invalid vertex indices", () => {
+  for (const face of ["f 1 2 4", "f 1 nope 3", "f 0 2 3", "f -1 -2 -9"]) {
+    const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\n" + face + "\n";
+    const report = inspectSceneManifest(
+      { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+      { "assets/mesh.obj": source }
+    );
+    assert.equal(report.ok, false, "expected invalid face to fail: " + face);
+    assert.match(report.errors.join(" "), /invalid vertex indices/i);
+  }
+});
+
+test("accepts valid OBJ face references using slash notation and negative indices", () => {
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1/1 2/2 3/3\nf -3 -2 -1\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
+});
