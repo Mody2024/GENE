@@ -57,3 +57,28 @@ test("snapshot merge chooses a valid timestamp when the other is invalid", () =>
   const result = mergeDurableProjectSnapshots(current, recovered);
   assert.equal(result.savedAt, "2026-10-24T12:00:00.000Z");
 });
+
+test("normalization bounds workspace size, references, versions, and identifiers", () => {
+  const tooLongId = "x".repeat(257);
+  const projects = [
+    { ...project("bounded"), references: Array.from({ length: 120 }, (_, i) => ({ id: i })), versions: Array.from({ length: 12 }, (_, i) => ({ number: i })) },
+    project(tooLongId),
+    ...Array.from({ length: 10 }, (_, i) => project("project-" + i))
+  ];
+  const result = normalizeDurableProjectSnapshot({
+    projects,
+    activeProjectId: "bounded",
+    savedAt: "2026-10-24T12:00:00.000Z",
+    deletedProjectIds: []
+  });
+  assert.ok(result.projects.length <= 8);
+  assert.equal(result.projects.some(item => item.id === tooLongId), false);
+  assert.equal(result.projects.find(item => item.id === "bounded").references.length, 100);
+  assert.equal(result.projects.find(item => item.id === "bounded").versions.length, 8);
+});
+
+test("normalization safely handles non-object and malformed snapshot input", () => {
+  assert.equal(normalizeDurableProjectSnapshot(null), null);
+  assert.equal(normalizeDurableProjectSnapshot("not a snapshot"), null);
+  assert.equal(normalizeDurableProjectSnapshot({ projects: "invalid" }), null);
+});
