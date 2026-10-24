@@ -10,9 +10,9 @@
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
 - **Wave 2 — 3D scene reliability and playable geometry: 42%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
-- **Wave 3 — persistent workspace, checkpoints, resumable repair: 20%** (local project/version foundations exist; durable task/project storage and resume semantics remain).
+- **Wave 3 — persistent workspace, checkpoints, resumable repair: 25%** (durable snapshots now serialize writes and startup reconciles IndexedDB with localStorage; task-level resume semantics and recovery acceptance remain).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
-- **Wave 5 — evidence-based self-improvement and release acceptance: 10%** (roadmap and regression foundations exist; held-out evaluation and full release gate remain).
+- **Wave 5 — evidence-based self-improvement and release acceptance: 12%** (the syntax gate no longer falsely rejects static ES-module imports/exports; module-aware parsing and held-out end-to-end acceptance remain).
 
 
 This document records the next implementation sequence for the existing GENE workspace. It is a living plan; a checkbox should be marked complete only after the corresponding code and verification exist.
