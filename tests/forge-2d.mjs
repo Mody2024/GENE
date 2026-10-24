@@ -37,6 +37,22 @@ for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
 
   assert.ok(!/<script|<image|href=/i.test(asset.svg), "asset should not contain scripts or externally embedded resources");
 }
+const { buildNative2DAssetFiles } = await import("../apps/web/lib/forge-2d.mjs");
+const packaged = buildNative2DAssetFiles({ prompt: "A skeleton player", kind: "character" });
+assert.ok(packaged.files["assets/forge2d/character.svg"].startsWith("<svg "), "runtime package includes the original sprite atlas");
+const runtimeManifestPath = "assets/forge2d/character.json";
+assert.ok(packaged.files[runtimeManifestPath], "runtime package includes the animation manifest at the path expected by GENE_SPRITES");
+const runtimeManifest = JSON.parse(packaged.files[runtimeManifestPath]);
+assert.deepEqual(runtimeManifest.animationClips.map(clip => clip.name), ["idle", "walk", "move-left", "move-right"]);
+for (const frame of runtimeManifest.frameFiles) {
+  const runtimePath = "assets/forge2d/character/frames/" + frame;
+  assert.ok(packaged.files[runtimePath], "runtime package includes every referenced frame: " + runtimePath);
+  assert.match(packaged.files[runtimePath], /^<svg /);
+}
+assert.equal(Object.keys(packaged.files).length, 6, "character package contains atlas, manifest and four independently addressable frames");
+const packagedTiles = buildNative2DAssetFiles({ prompt: "City street tileset", kind: "tileset" });
+assert.ok(packagedTiles.files["assets/forge2d/tileset.json"], "tileset package includes its manifest");
+assert.equal(Object.keys(packagedTiles.files).filter(path => /\\/frames\\//.test(path)).length, 4, "tileset package includes each separate tile frame");
 const stableA = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
 const stableB = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
 assert.equal(stableA.assetId, stableB.assetId, "same brief and style should produce a stable identity");
