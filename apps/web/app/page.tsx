@@ -2507,20 +2507,28 @@ export default function Home() {
         }
         if (String(object.type || "").toLowerCase() === "mesh" && object.modelPath) {
           const modelPath = String(object.modelPath);
-          if (!Object.prototype.hasOwnProperty.call(files, modelPath)) {
-            sceneIssues.push((id || "Scene entry " + (index + 1)) + " references missing model file " + modelPath + ".");
-          } else if (!/\.obj$/i.test(modelPath)) {
-            sceneIssues.push((id || "Scene entry " + (index + 1)) + " modelPath must point to an OBJ file.");
+          const label = id || "Scene entry " + (index + 1);
+          // A project-relative file may exist while still escaping the intended asset folder.
+          // Validate references as strictly as uploaded file paths before resolving them.
+          if (!/^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(modelPath)) {
+            sceneIssues.push(label + " has an unsafe or unsupported modelPath: " + modelPath + ".");
+          } else if (!Object.prototype.hasOwnProperty.call(files, modelPath) || typeof files[modelPath] !== "string") {
+            sceneIssues.push(label + " references missing model file " + modelPath + ".");
           } else {
             const modelSource = files[modelPath] || "";
             const hasVertices = /^\s*v\s+[-+\d.]/m.test(modelSource);
             const hasFaces = /^\s*f\s+\S+\s+\S+\s+\S+/m.test(modelSource);
-            if (!hasVertices || !hasFaces) sceneIssues.push((id || "Scene entry " + (index + 1)) + " references an OBJ without recognizable vertex/face data.");
+            if (!hasVertices || !hasFaces) sceneIssues.push(label + " references an OBJ without recognizable vertex/face data.");
             const mtlMatch = modelSource.match(/^\s*mtllib\s+(.+)\s*$/m);
             if (mtlMatch) {
-              const folder = modelPath.includes("/") ? modelPath.slice(0, modelPath.lastIndexOf("/") + 1) : "";
-              const materialPath = folder + mtlMatch[1].trim();
-              if (!Object.prototype.hasOwnProperty.call(files, materialPath)) sceneIssues.push((id || "Scene entry " + (index + 1)) + " references missing material file " + materialPath + ".");
+              const folder = modelPath.slice(0, modelPath.lastIndexOf("/") + 1);
+              const materialName = mtlMatch[1].trim();
+              const materialPath = folder + materialName;
+              if (!/^[a-zA-Z0-9_-]+\.mtl$/i.test(materialName)) {
+                sceneIssues.push(label + " references an unsafe or unsupported material filename: " + materialName + ".");
+              } else if (!Object.prototype.hasOwnProperty.call(files, materialPath) || typeof files[materialPath] !== "string") {
+                sceneIssues.push(label + " references missing material file " + materialPath + ".");
+              }
             }
           }
         }
