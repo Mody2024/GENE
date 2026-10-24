@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:scene": "node --test app/lib/scene-diagnostics.test.mjs"
   },
   "dependencies": {
     "next": "14.2.35",
