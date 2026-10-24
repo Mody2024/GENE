@@ -119,3 +119,40 @@ export function writeDurableProjectSnapshot(
   writeQueue = operation;
   return operation;
 }
+
+/** Merge a recovered snapshot without reviving deleted or duplicate project IDs. */
+export function mergeDurableProjectSnapshots(
+  currentValue: unknown,
+  recoveredValue: unknown
+): DurableProjectSnapshot | null {
+  const current = normalizeDurableProjectSnapshot(currentValue);
+  const recovered = normalizeDurableProjectSnapshot(recoveredValue);
+  if (!current && !recovered) return null;
+  if (!current) return recovered;
+  if (!recovered) return current;
+
+  const deletedProjectIds = [...new Set([
+    ...current.deletedProjectIds,
+    ...recovered.deletedProjectIds
+  ])].slice(-500);
+  const deleted = new Set(deletedProjectIds);
+  const merged = new Map<string, GeneProject>();
+
+  // Prefer current workspace state; recovered snapshots fill missing IDs only.
+  for (const project of current.projects) {
+    if (!deleted.has(project.id)) merged.set(project.id, project);
+  }
+  for (const project of recovered.projects) {
+    if (!deleted.has(project.id) && !merged.has(project.id)) merged.set(project.id, project);
+  }
+  const projects = [...merged.values()].slice(0, 8);
+  const activeCandidate = current.activeProjectId || recovered.activeProjectId;
+  const activeProjectId = projects.some(project => project.id === activeCandidate) ? activeCandidate : "";
+  const currentTime = Date.parse(current.savedAt);
+  const recoveredTime = Date.parse(recovered.savedAt);
+  const savedAt = Number.isFinite(currentTime) && Number.isFinite(recoveredTime)
+    ? new Date(Math.max(currentTime, recoveredTime)).toISOString()
+    : current.savedAt || recovered.savedAt;
+
+  return { projects, activeProjectId, savedAt, deletedProjectIds };
+}
