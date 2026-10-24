@@ -54,3 +54,28 @@ test("does not treat inherited object properties as uploaded assets", () => {
   const report = inspectSceneManifest({ scene: { objects: [{ id: "player", modelPath: "assets/player.obj" }] } }, files);
   assert.equal(report.missingModelAssets.length, 1);
 });
+
+test("rejects unsupported WebGL scene types and mesh placeholders without OBJ files", () => {
+  const unsupported = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "mystery", type: "unicorn" }
+  ] } });
+  assert.equal(unsupported.ok, false);
+  assert.match(unsupported.errors.join(" "), /unsupported WebGL scene type/i);
+
+  const placeholder = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "empty-mesh", type: "mesh" }
+  ] } });
+  assert.equal(placeholder.ok, false);
+  assert.match(placeholder.errors.join(" "), /no OBJ model path/i);
+});
+
+test("accepts supported WebGL primitive geometry without OBJ files", () => {
+  const report = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "floor", type: "plane" },
+    { id: "player", type: "box" },
+    { id: "orb", type: "sphere" },
+    { id: "light", type: "light" },
+    { id: "camera", type: "camera" }
+  ] } });
+  assert.equal(report.ok, true);
+});
