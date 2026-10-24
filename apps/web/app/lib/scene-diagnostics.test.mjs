@@ -263,3 +263,28 @@ test("rejects OBJ texture references that use index zero", () => {
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /invalid vertex indices/i);
 });
+
+test("rejects OBJ material libraries that are missing or use unsafe paths", () => {
+  const manifest = { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } };
+  const missing = inspectSceneManifest(manifest, {
+    "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib mesh.mtl\n"
+  });
+  const unsafe = inspectSceneManifest(manifest, {
+    "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib ../outside.mtl\n"
+  });
+  assert.equal(missing.ok, false);
+  assert.match(missing.errors.join(" "), /references missing material file/i);
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join(" "), /unsafe or unsupported material filename/i);
+});
+
+test("accepts an OBJ material library that exists beside the model", () => {
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/models/mesh.obj" }] } },
+    {
+      "assets/models/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib mesh.mtl\n",
+      "assets/models/mesh.mtl": "newmtl default\nKd 0.8 0.8 0.8\n"
+    }
+  );
+  assert.equal(report.ok, true);
+});
