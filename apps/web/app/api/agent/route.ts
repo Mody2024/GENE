@@ -1552,6 +1552,32 @@ export async function POST(request: NextRequest) {
     result.files = [...result.files.filter((file: any) => !assetPaths.has(file.path)), ...generatedAssetFiles];
     result.reply += "\n\nGENE Forge — completed stages: building " + forgeToolAssets.map(asset => asset.kind).join(", building ") + "; applying per-part colours and material types; validating geometry and bounds; exporting matching OBJ/MTL/JSON files; passing the generated recipes into the game build.\n\nForge generated " + forgeToolAssets.length + " validated 3D asset recipe(s) (" + forgeToolAssets.map(asset => asset.kind + ": " + asset.partCount + " parts").join(", ") + "). Source assets are included under assets/models/.";
   }
+  // Do not report generated Forge assets as integrated merely because files were packaged.
+  // Inspect the submitted JavaScript and clearly distinguish available project assets from
+  // assets that the playable game actually references.
+  if (Array.isArray(result.files) && forge2DAssets.length) {
+    const gameScripts = result.files
+      .filter((file: any) => /\\.(?:m?js|cjs)$/i.test(file.path))
+      .map((file: any) => String(file.content || ""))
+      .join("\\n");
+    const missingForgeIntegration = forge2DAssets.filter(asset => {
+      const assetPath = "assets/forge2d/" + asset.kind;
+      if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
+        return !gameScripts.includes("GENE_SPRITES.draw") || !gameScripts.includes(assetPath);
+      }
+      return !gameScripts.includes(assetPath + ".svg") &&
+        !gameScripts.includes("GENE_ART") &&
+        !gameScripts.includes("GENE_ART.image") &&
+        !gameScripts.includes("GENE_ART.draw");
+    });
+    if (missingForgeIntegration.length) {
+      result.reply += "\\n\\nGENE Forge integration check: these assets are included in the project but could not be confirmed as used by the game's JavaScript: " +
+        missingForgeIntegration.map(asset => asset.kind).join(", ") +
+        ". They are packaged assets, not verified in-game artwork. The build needs a follow-up repair to load and draw them before claiming they are visible in gameplay.";
+    } else {
+      result.reply += "\\n\\nGENE Forge integration check: generated 2D assets have matching references in the game's JavaScript. This confirms code references only; actual browser visibility and animation still require runtime acceptance.";
+    }
+  }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }
