@@ -102,7 +102,7 @@ export function inspectSceneManifest(spec, files = {}) {
           } else if (vertices > 100_000 || faces > 100_000) {
             errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
           } else if (malformedVertex) {
-            errors.push(id + ": OBJ asset contains a vertex with non-finite coordinates");
+            errors.push(id + ": OBJ asset contains a malformed vertex record or non-finite coordinates");
           } else if (malformedFace) {
             errors.push(id + ": OBJ asset contains a face with invalid vertex indices or too few vertices");
           }
