@@ -174,3 +174,13 @@ test("rejects OBJ vertices with non-finite numeric coordinates", () => {
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /non-finite coordinates/i);
 });
+
+test("rejects malformed OBJ vertex records even when other valid vertices exist", () => {
+  const source = "v 0 0 0\nv nope 0 0\nv 0 1 0\nf 1 2 3\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /non-finite coordinates/i);
+});
