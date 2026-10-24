@@ -60,12 +60,22 @@ export function rankVisualReferenceResults(images, topic) {
   const terms = topicTerms(topic);
   const ranked = (Array.isArray(images) ? images : []).map((image, index) => {
     const title = String(image?.title || "").toLowerCase();
+    const alt = String(image?.alt || image?.altText || image?.description || "").toLowerCase();
+    const metadata = [image?.tags, image?.keywords, image?.caption]
+      .flatMap(value => Array.isArray(value) ? value : value == null ? [] : [value])
+      .join(" ").toLowerCase();
     const category = String(image?.category || "");
     const categoryTerms = CATEGORY_TERMS[category] || [];
-    const topicHits = terms.filter(term => title.includes(term));
-    const categoryHits = categoryTerms.filter(term => title.includes(term));
-    const score = topicHits.length * 4 + (categoryHits.length ? 1 : 0);
-    return { image, index, score, topicHits: topicHits.length, categoryHits: categoryHits.length };
+    // Prefer title evidence, but use descriptive metadata when a useful asset has a
+    // generic filename. Keep the match count separate from weighted relevance.
+    const titleHits = terms.filter(term => title.includes(term));
+    const altHits = terms.filter(term => alt.includes(term));
+    const metadataHits = terms.filter(term => metadata.includes(term));
+    const matchedTerms = new Set([...titleHits, ...altHits, ...metadataHits]);
+    const topicHits = matchedTerms.size;
+    const categoryHits = categoryTerms.filter(term => title.includes(term) || alt.includes(term) || metadata.includes(term));
+    const score = titleHits.length * 4 + altHits.length * 3 + metadataHits.length * 2 + (categoryHits.length ? 1 : 0);
+    return { image, index, score, topicHits, categoryHits: categoryHits.length };
   });
   // If the query is specific, a generic category match is not enough: reject unrelated
   // images instead of filling slots with irrelevant material. Keep topic-matching items first.
