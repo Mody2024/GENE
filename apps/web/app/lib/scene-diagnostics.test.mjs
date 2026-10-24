@@ -147,3 +147,11 @@ test("validates repeated OBJ face lines without confusing their source positions
   );
   assert.equal(report.ok, true);
 });
+
+test("rejects transform arrays with more than three components", () => {
+  const report = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "bad-position", type: "box", position: [0, 1, 2, 3] }
+  ] } });
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /invalid position transform/i);
+});
