@@ -9,6 +9,7 @@ export type DurableProjectSnapshot = {
   projects: GeneProject[];
   activeProjectId: string;
   savedAt: string;
+  deletedProjectIds: string[];
 };
 
 /** Normalize untrusted browser data before it reaches workspace hydration. */
@@ -27,7 +28,10 @@ export function normalizeDurableProjectSnapshot(value: unknown): DurableProjectS
   return {
     projects: projects.slice(0, 8),
     activeProjectId: typeof candidate.activeProjectId === "string" ? candidate.activeProjectId : "",
-    savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : ""
+    savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : "",
+    deletedProjectIds: Array.isArray(candidate.deletedProjectIds)
+      ? [...new Set(candidate.deletedProjectIds.filter((id): id is string => typeof id === "string" && id.trim()))].slice(-500)
+      : []
   };
 }
 
@@ -71,19 +75,31 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 export function writeDurableProjectSnapshot(
   projects: GeneProject[],
-  activeProjectId: string
+  activeProjectId: string,
+  deletedProjectId?: string
 ): Promise<void> {
-  const snapshot: DurableProjectSnapshot = {
-    projects,
-    activeProjectId,
-    savedAt: new Date().toISOString()
-  };
   const operation = writeQueue.catch(() => undefined).then(async () => {
     const database = await openDatabase();
     try {
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction(STORE, "readwrite");
-        transaction.objectStore(STORE).put(snapshot, WORKSPACE_KEY);
+        const store = transaction.objectStore(STORE);
+        const previousRequest = store.get(WORKSPACE_KEY);
+        previousRequest.onsuccess = () => {
+          const previous = normalizeDurableProjectSnapshot(previousRequest.result);
+          const deletedProjectIds = new Set(previous?.deletedProjectIds || []);
+          if (deletedProjectId) deletedProjectIds.add(deletedProjectId);
+          // A later save must not erase deletion history; only an explicit restore flow
+          // should ever remove a tombstone.
+          const snapshot: DurableProjectSnapshot = {
+            projects: projects.filter(project => !deletedProjectIds.has(project.id)),
+            activeProjectId: deletedProjectIds.has(activeProjectId) ? "" : activeProjectId,
+            savedAt: new Date().toISOString(),
+            deletedProjectIds: [...deletedProjectIds].slice(-500)
+          };
+          store.put(snapshot, WORKSPACE_KEY);
+        };
+        previousRequest.onerror = () => reject(previousRequest.error || new Error("Could not read previous durable snapshot."));
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error || new Error("Could not save durable project storage."));
         transaction.onabort = () => reject(transaction.error || new Error("Durable project storage transaction was aborted."));
