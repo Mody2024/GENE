@@ -81,6 +81,23 @@ export function inspectSceneManifest(spec, files = {}) {
                 errors.push(id + ": OBJ asset contains an unsafe or unsupported material filename (" + library + ")");
               } else if (!Object.prototype.hasOwnProperty.call(files, folder + library) || typeof files[folder + library] !== "string") {
                 errors.push(id + ": OBJ asset references missing material file (" + folder + library + ")");
+              } else {
+                const materialSource = files[folder + library];
+                if (materialSource.length > 500_000) {
+                  errors.push(id + ": material file exceeds the 500 KB validation limit (" + folder + library + ")");
+                  continue;
+                }
+                for (const materialRow of materialSource.split(/\r?\n/)) {
+                  const materialRecord = materialRow.split("#", 1)[0].trim();
+                  if (!/^(?:map_[a-z0-9_]+|bump|disp|decal|refl|norm)(?:\s|$)/i.test(materialRecord)) continue;
+                  const fields = materialRecord.split(/\s+/);
+                  const texture = fields[fields.length - 1];
+                  if (!texture || !/^[a-zA-Z0-9_.-]+\.(?:png|jpe?g|webp|bmp|tga|gif)$/i.test(texture) || texture === "." || texture === "..") {
+                    errors.push(id + ": material file contains an unsafe or unsupported texture path (" + texture + ")");
+                  } else if (!Object.prototype.hasOwnProperty.call(files, folder + texture) || typeof files[folder + texture] !== "string") {
+                    errors.push(id + ": material file references missing texture (" + folder + texture + ")");
+                  }
+                }
               }
             }
           }
