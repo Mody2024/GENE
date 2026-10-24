@@ -943,7 +943,14 @@ export async function POST(request: NextRequest) {
         const data = await response.json();
         const asset = data?.ok ? data.asset : null;
         if (!asset || typeof asset.svg !== "string" || !asset.manifest || !asset.qualityReport) return null;
-        return { kind: item.kind, name: String(asset.name || item.kind), svg: asset.svg, manifest: asset.manifest, qualityReport: asset.qualityReport };
+        return {
+          kind: item.kind,
+          name: String(asset.name || item.kind),
+          svg: asset.svg,
+          manifest: asset.manifest,
+          qualityReport: asset.qualityReport,
+          frameFiles: asset.frameFiles && typeof asset.frameFiles === "object" ? asset.frameFiles as Record<string, string> : {}
+        };
       } catch {
         return null;
       }
