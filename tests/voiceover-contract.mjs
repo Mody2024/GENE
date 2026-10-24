@@ -19,4 +19,8 @@ assert.ok(runtime.includes("voiceOvers.push({ id: item.id"), "runtime maps saved
 assert.ok(runtime.includes("data:audio\\/[a-z0-9.+-]+;base64,"), "runtime only embeds base64 audio data URLs");
 assert.ok(runtime.includes("voiceBytes + approximateBytes > 2_000_000"), "runtime enforces a combined voice-over asset size budget");
 assert.ok(runtime.includes("if(!item||!item.src||!cfg.enabled)return false"), "runtime respects the game's audio-disabled setting");
+const studioAfterRemoval = read("apps/web/app/components/VoiceOverStudio.tsx");
+assert.ok(studioAfterRemoval.includes("delete nextFiles[removedLine.path]"), "removing the final reference to a voice-over also removes its unused asset");
+assert.ok(studioAfterRemoval.includes("existingVoiceBytes + incomingVoiceBytes > 2_000_000"), "voice-over editor rejects assets beyond the runtime's combined embed budget");
+assert.ok(studioAfterRemoval.includes("incomingVoiceBytes > 1_500_000"), "voice-over editor enforces the runtime's per-file size ceiling");
 console.log("Voice-over asset workflow contract passed.\n");
