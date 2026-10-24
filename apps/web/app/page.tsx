@@ -546,7 +546,29 @@ export default function Home() {
         const warning = event.data.warning && typeof event.data.warning === "object" ? event.data.warning : {};
         const message = String(warning.message || "The 3D renderer reported a warning.").slice(0, 600);
         const objectLabel = String(warning.id || "").slice(0, 100);
-        setNotice("3D runtime warning" + (objectLabel ? " (" + objectLabel + ")" : "") + ": " + message);
+        const warningText = "3D runtime warning" + (objectLabel ? " (" + objectLabel + ")" : "") + ": " + message;
+        setNotice(warningText);
+        // Persist runtime warnings with the active project's preview report so the
+        // diagnostic survives toast dismissal and is available to later repair work.
+        setProject(current => {
+          if (!current) return current;
+          const existing = current.livingPreview?.runtimeErrors || [];
+          const runtimeErrors = [...existing.filter(item => item !== warningText), warningText].slice(-10);
+          return {
+            ...current,
+            livingPreview: {
+              status: current.livingPreview?.status || "booting",
+              lastKnownGoodVersion: current.livingPreview?.lastKnownGoodVersion,
+              updatedAt: now(),
+              runtimeErrors,
+              currentObjectives: current.livingPreview?.currentObjectives || [],
+              canContinuePlaying: current.livingPreview?.canContinuePlaying ?? false
+            },
+            versions: current.versions.map((version, index) => index === 0
+              ? { ...version, testSummary: "3D runtime warning: " + message }
+              : version)
+          };
+        });
         return;
       }
       if (event.data?.type === "gene-custom-selection") {
