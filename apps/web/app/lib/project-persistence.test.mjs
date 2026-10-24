@@ -82,3 +82,21 @@ test("normalization safely handles non-object and malformed snapshot input", () 
   assert.equal(normalizeDurableProjectSnapshot("not a snapshot"), null);
   assert.equal(normalizeDurableProjectSnapshot({ projects: "invalid" }), null);
 });
+
+test("snapshot merge falls back to a valid recovered active project when current selection is stale", () => {
+  const current = {
+    projects: [project("current")],
+    activeProjectId: "deleted-current-selection",
+    savedAt: "2026-10-24T12:00:00.000Z",
+    deletedProjectIds: ["deleted-current-selection"]
+  };
+  const recovered = {
+    projects: [project("recovered")],
+    activeProjectId: "recovered",
+    savedAt: "2026-10-24T11:00:00.000Z",
+    deletedProjectIds: []
+  };
+  const result = mergeDurableProjectSnapshots(current, recovered);
+  assert.equal(result.activeProjectId, "recovered");
+  assert.deepEqual(result.projects.map(item => item.id), ["current", "recovered"]);
+});
