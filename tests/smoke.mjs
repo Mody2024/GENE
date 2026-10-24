@@ -99,7 +99,7 @@ assert.ok(read("apps/web/app/lib/runtime-kit.mjs").includes("GA.hasSavedSettings
 assert.ok(page.includes("buildRuntimeAudioBootstrap(project.files)") && page.includes("buildRuntimeAudioBootstrap(version.files)"), "live preview, standalone export, and version exports inject the audio manifest bridge");
 assert.ok(prompts.includes("AUDIO MANIFEST RUNTIME INTEGRATION") && prompts.includes("GeneAudio.sfx(eventName)"), "generated games receive explicit shared audio runtime integration guidance");
 assert.ok(runtimeScene.includes("modelPath: typeof raw.modelPath") && runtimeScene.includes(".obj$/i"), "Scene Studio OBJ assignments are preserved into the isolated runtime scene manifest");
-assert.ok(runtimeScene.includes("getMesh=function(id)") && runtimeScene.includes("drawMesh2D=function") && runtimeScene.includes("this.drawMesh2D(ctx,o,unit,ox,oy)"), "runtime scene bridge resolves assigned OBJ geometry and draws it into Canvas 2D scene layers");
+assert.ok(runtimeScene.includes("getMesh=function(id)") && runtimeScene.includes("drawMesh2D=function") && runtimeScene.includes("scene.drawMesh2D(ctx,o,unit,ox,oy)"), "runtime scene bridge resolves assigned OBJ geometry and draws it into Canvas 2D scene layers");
 assert.ok(runtimeScene.includes("createWebGLMeshes=function(gl)") && runtimeScene.includes("positionOffset:0,normalOffset:12") && runtimeScene.includes("deleteBuffer(m.buffer)"), "runtime scene bridge exposes bounded OBJ GPU buffers with transforms and explicit cleanup");
 assert.ok(runtimeScene.includes("drawWebGLMeshes=function(gl,program,viewProjection,resources,locations)") && runtimeScene.includes("drawArrays(gl.TRIANGLES,0,m.vertexCount)") && runtimeScene.includes("vertexAttribPointer(normal,3,gl.FLOAT,false,24,12)"), "runtime scene bridge can draw assigned OBJ meshes with saved transforms through WebGL");
 assert.ok(prompts.includes("drawWebGLMeshes(gl, program, viewProjection, resources)"), "3D generation contract documents the runtime WebGL mesh draw helper");
@@ -497,6 +497,12 @@ const sceneVm = await import("node:vm");
 const sceneWindow = {};
 sceneVm.runInNewContext(sceneBootstrap.replace(/^<script>/, "").replace("</script>", ""), { window: sceneWindow });
 assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getTransform("crate"))), { position: { x: 2, y: 1, z: -3 }, rotation: { x: 0, y: 0, z: 45 }, scale: { x: 2, y: 1, z: 1 } }, "runtime scene bootstrap round-trips saved transforms");
+assert.deepEqual(JSON.parse(JSON.stringify(sceneWindow.GENE_SCENE.getBounds("crate"))), { minX: 0.9393398282201786, maxX: 3.0606601717798214, minY: -0.06066017177982119, maxY: 2.060660171779821, minZ: -3.5, maxZ: -2.5 }, "collision bounds account for saved position, scale, dimensions and rotation");
+assert.equal(sceneWindow.GENE_SCENE.intersects("crate", { minX: 3, maxX: 5, minY: 1, maxY: 2, minZ: -4, maxZ: -2 }), true, "collision helper detects overlapping 3D bounds");
+assert.equal(sceneWindow.GENE_SCENE.intersects("crate", { minX: 5, maxX: 6, minY: 1, maxY: 2, minZ: -4, maxZ: -2 }), false, "collision helper rejects separated bounds");
+assert.equal(sceneWindow.GENE_SCENE.setTransform("crate", { position: { x: 4, y: 1, z: -3 } }), true, "gameplay can update scene transforms");
+assert.equal(sceneWindow.GENE_SCENE.getTransform("crate").position.x, 4, "transform updates are reflected by the scene API");
+
 assert.equal(sceneWindow.GENE_SCENE.getVisibleObjects().length, 1, "runtime scene bootstrap preserves hidden object state");
 assert.equal(sceneWindow.GENE_SCENE.getObject("crate").material.metalness, 0.8, "runtime scene bootstrap preserves material properties");
 const drawCalls = [];
@@ -629,7 +635,7 @@ assert.ok(page.includes("function explainAgentError") && page.includes("quota or
 
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "conversation-only chat can run during a playable build preview while edits queue");
 assert.ok(page.includes("pendingBuildRequests.current.push(prompt)") && page.includes("pendingBuildRequests.current.shift()"), "build-time changes are queued and processed in order");
-assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"'), "the live preview becomes playable before the complete project build ends");
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "booting"') && page.includes('status: "rendered"'), "build completion waits for a real render and distinguishes it from verified gameplay");
 assert.ok(page.includes("setCanQueueBuildRequests(true)") && page.includes("Continue playing and chatting"), "the workspace enables chat and safely queues code changes during builds");
 assert.ok(page.includes("Describe what to update, fix, or add to this project"), "update planning composer explains its intended task");
 const genePrompts = read("apps/web/app/lib/prompts.ts");
@@ -715,11 +721,11 @@ assert.ok(page.includes("Add app modules only when the actual requested feature 
 assert.ok(page.includes("const safeManifest =") && page.includes("spec.additionalFiles = safeManifest"), "manifest paths and generated extra files stay synchronized after filtering unsafe paths");
 assert.ok(api.includes(String.raw`if (/\.(?:m?js|cjs)$/i.test(file.path)) new Function(file.content);`) && api.includes("declared project module/asset"), "every generated JavaScript module is syntax-checked and every declared extra file must exist");
 
-assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "booting"') && page.includes('status: "rendered"') && page.includes("Continue playing and chatting"), "the core prototype is exposed while preview readiness stays separate from gameplay verification");
 assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\"") && page.includes("messages: [...current.messages, ...appendedMessages]"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
 assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");
 
-assert.ok(page.includes("Playable prototype published.") && page.includes('status: "playable"') && page.includes("Continue playing and chatting"), "the core game is exposed in the live workspace before full-game expansion completes");
+assert.ok(page.includes("Playable prototype published.") && page.includes('status: "booting"') && page.includes('status: "rendered"') && page.includes("Continue playing and chatting"), "the core prototype is exposed while preview readiness stays separate from gameplay verification");
 assert.ok(page.includes("const canChatDuringBuild = buildInProgress && canQueueBuildRequests && isReadOnlyConversation") && page.includes("setParallelChatInProgress(true)"), "read-only AI chat can run concurrently with the playable prototype build");
 assert.ok(page.includes("const isReadOnlyReply = operation === \"chat\" || operation === \"research\"") && page.includes("messages: [...current.messages, ...appendedMessages]"), "concurrent chat replies cannot overwrite newer build files or checkpoints");
 assert.ok(page.includes('setTaskStatus(activeBuildRun, "validate-assembled", "skipped"') && page.includes("Skipped release completion because the final-content task failed"), "failed full-game expansion remains a recoverable partial build without breaking task dependencies");

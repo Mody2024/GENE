@@ -34,6 +34,16 @@ const missingObjectiveAudit = auditSceneLayout({ objects: [], spawnId: "missing-
 assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_SPAWN_OBJECT"));
 assert.ok(missingObjectiveAudit.warnings.some(item => item.code === "MISSING_GOAL_OBJECT"));
 
+const malformedBounds = auditSceneLayout({ objects: [], bounds: { min: [10, 0, 0], max: [-10, 1, 1] } });
+assert.ok(malformedBounds.warnings.some(item => item.code === "INVALID_WORLD_BOUNDS"), "inverted world bounds must be rejected");
+const malformedTransform = auditSceneLayout({ objects: [{ id: "bad", position: [0, Number.NaN, 0], scale: [1, 1, 1] }] });
+assert.ok(malformedTransform.warnings.some(item => item.code === "INVALID_OBJECT_TRANSFORM"), "non-finite transforms must be reported");
+const duplicateIds = auditSceneLayout({ objects: [
+  { id: "spawn", role: "player", position: [0, 1, 0], scale: [1, 2, 1] },
+  { id: "spawn", role: "hazard", position: [8, 1, 0], scale: [1, 1, 1] }
+], spawnId: "spawn" });
+assert.ok(duplicateIds.warnings.some(item => item.code === "DUPLICATE_OBJECT_ID"), "duplicate IDs must be reported without silently replacing the first referenced object");
+
 const jump = recommendJumpLayout({ horizontalSpeed: 5, jumpVelocity: 8, gravity: 16, playerWidth: 1, safetyMargin: 0.5 });
 assert.equal(jump.airtimeSeconds, 1);
 assert.equal(jump.theoreticalDistance, 5);

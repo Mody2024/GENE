@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { analyzeForgeRecipe } from "../apps/web/lib/forge-quality.mjs";
 
 const part = (name, position = [0, 0.5, 0], extra = {}) => ({
@@ -31,9 +32,44 @@ const rotated = analyzeForgeRecipe({ parts: [
 assert.ok(rotated.bounds.size[0] > 2.8, "bounds should account for rotation");
 assert.ok(rotated.bounds.size[1] > 2.8, "rotated beam should expand its world-space bounds");
 
+const mirrored = analyzeForgeRecipe({ parts: [part("mirrored", [0, 0.5, 0], { scale: [-4, 1, 1] })] });
+assert.deepEqual(mirrored.bounds.size, [4, 1, 1], "negative scale mirrors geometry but world-space bounds must remain non-negative");
+assert.deepEqual(mirrored.bounds.min, [-2, 0, -0.5], "mirrored bounds should preserve the correct world-space minimum");
+
 const palette = analyzeForgeRecipe({ parts: Array.from({ length: 14 }, (_, i) =>
   part("color-" + i, [i * 0.5, 0.5, 0], { color: "#" + i.toString(16).padStart(6, "0") })
 ) });
 assert.ok(palette.warnings.some(w => w.code === "PALETTE_FRAGMENTATION"));
 assert.ok(palette.score >= 0 && palette.score <= 100);
 console.log("Forge structural QA tests passed (bounds, rotation, duplicates, palette, and honest QA scope).");
+
+const empty = analyzeForgeRecipe({ parts: [] });
+assert.equal(empty.status, "invalid", "an empty recipe must not be reported as a clean asset");
+assert.ok(empty.warnings.some(w => w.code === "EMPTY_ASSET"));
+const malformed = analyzeForgeRecipe({ parts: [
+  part("bad-shape", [0, 0.5, 0], { shape: "magicMesh" }),
+  part("bad-transform", [0, 0.5], { scale: [1, 1, 1] }),
+  part("zero-scale", [0, 0.5, 0], { scale: [1, 0, 1] })
+] });
+assert.equal(malformed.status, "invalid", "unknown shapes and unusable transforms must fail structural QA");
+assert.ok(malformed.warnings.some(w => w.code === "UNSUPPORTED_SHAPE"));
+assert.ok(malformed.warnings.some(w => w.code === "INVALID_TRANSFORM"));
+assert.ok(malformed.warnings.some(w => w.code === "DEGENERATE_SCALE"));
+assert.ok(malformed.score < 100, "structural errors must affect the quality score");
+
+const incompleteMaterials = analyzeForgeRecipe({ parts: [
+  part("", [0, 0.5, 0], { color: "not-a-color" })
+] });
+assert.ok(incompleteMaterials.warnings.some(w => w.code === "MISSING_PART_NAME"));
+assert.ok(incompleteMaterials.warnings.some(w => w.code === "INVALID_COLOR"));
+
+const forgeRouteSource = readFileSync(new URL("../apps/web/app/api/forge/route.ts", import.meta.url), "utf8");
+assert.match(forgeRouteSource, /if \(qualityReport\.status === "invalid"\)/, "Forge API must stop invalid geometry from being exported");
+assert.match(forgeRouteSource, /Forge structural QA rejected this recipe/, "Forge API must return a meaningful failure to its existing safe fallback");
+
+const architecture = analyzeForgeRecipe({ parts: [
+  part("staircase", [0, 0.5, 0], { shape: "stairs", scale: [3, 2, 4] }),
+  part("door-arch", [0, 1, 0], { shape: "arch", scale: [2.4, 2.4, 0.4] })
+] });
+assert.equal(architecture.estimatedTriangles, 252, "stair and arch meshes receive explicit complexity estimates");
+assert.equal(architecture.status, "structurally-clean", "new architectural forms pass structural checks with valid transforms");

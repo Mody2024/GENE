@@ -41,19 +41,36 @@ export function aabbIntersects(a, b, padding = 0) {
   return [0, 1, 2].every(axis => a.min[axis] <= b.max[axis] + pad && a.max[axis] + pad >= b.min[axis]);
 }
 
+function isFiniteVec3(value) {
+  const parts = Array.isArray(value) ? value : value && typeof value === "object" ? [value.x, value.y, value.z] : null;
+  return Array.isArray(parts) && parts.length === 3 && parts.every(part => typeof part === "number" && Number.isFinite(part));
+}
+
 export function auditSceneLayout({ objects = [], bounds, spawnId, goalId, camera } = {}) {
   const warnings = [];
   const ids = new Set();
   const byId = new Map();
-  const world = bounds && Array.isArray(bounds.min) && Array.isArray(bounds.max)
-    ? { min: vec3(bounds.min), max: vec3(bounds.max) }
-    : null;
+  let world = null;
+  if (bounds !== undefined && bounds !== null) {
+    const validBounds = Array.isArray(bounds.min) && Array.isArray(bounds.max) &&
+      isFiniteVec3(bounds.min) && isFiniteVec3(bounds.max) &&
+      [0, 1, 2].every(axis => bounds.min[axis] <= bounds.max[axis]);
+    if (validBounds) world = { min: [...bounds.min], max: [...bounds.max] };
+    else warnings.push({ code: "INVALID_WORLD_BOUNDS", message: "World bounds must contain finite three-axis min/max vectors in ascending order." });
+  }
   for (const object of objects) {
     const id = String(object?.id || object?.name || "object-" + (ids.size + 1));
-    if (ids.has(id)) warnings.push({ code: "DUPLICATE_OBJECT_ID", id, message: "Object IDs must be unique." });
+    const duplicate = ids.has(id);
+    if (duplicate) warnings.push({ code: "DUPLICATE_OBJECT_ID", id, message: "Object IDs must be unique; the first object with this ID remains authoritative for spawn/goal references." });
     ids.add(id);
+    for (const field of ["position", "translation", "scale", "size", "rotation"]) {
+      if (object?.[field] !== undefined && object?.[field] !== null && !isFiniteVec3(object[field])) {
+        warnings.push({ code: "INVALID_OBJECT_TRANSFORM", id, message: "Object " + field + " must be a finite three-axis vector." });
+        break;
+      }
+    }
     const aabb = getWorldAabb(object);
-    byId.set(id, { object, aabb });
+    if (!duplicate) byId.set(id, { object, aabb });
     if (world && [0, 1, 2].some(axis => aabb.min[axis] < world.min[axis] || aabb.max[axis] > world.max[axis])) {
       warnings.push({ code: "OUTSIDE_PLAYABLE_BOUNDS", id, message: "Object extends beyond the declared playable world bounds." });
     }

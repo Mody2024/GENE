@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
 import { hasToolApproval } from "../../lib/tool-permissions.mjs";
+import { hasValidImageSignature } from "../../lib/research-sources.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus" | "capsule";
+type Shape = "box" | "beveledBox" | "sphere" | "cylinder" | "cone" | "wedge" | "torus" | "capsule" | "stairs" | "arch";
 type Surface = "matte" | "metal" | "rubber" | "glass" | "emissive";
 type Vec3 = [number, number, number];
 type Part = {
@@ -22,7 +24,7 @@ type Part = {
 type Recipe = { name: string; kind: string; style: string; parts: Part[]; notes?: string };
 
 const KINDS = new Set(["character", "vehicle", "building", "environment", "prop", "weapon"]);
-const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule"]);
+const SHAPES = new Set<Shape>(["box", "beveledBox", "sphere", "cylinder", "cone", "wedge", "torus", "capsule", "stairs", "arch"]);
 const SURFACES = new Set<Surface>(["matte", "metal", "rubber", "glass", "emissive"]);
 const SHAPE_LIMITS: Record<string, number> = { performance: 32, standard: 54, high: 76 };
 
@@ -190,6 +192,36 @@ function geometry(shape: Shape, scale: Vec3): { vertices: Vec3[]; faces: number[
       const d = (ring + 1) * segments + i + 1;
       faces.push([a, d, b], [b, d, c]);
     }
+  } else if (shape === "stairs") {
+    const steps = 5;
+    const stepDepth = scale[2] / steps, stepHeight = scale[1] / steps;
+    const [x0, x1] = [-scale[0] / 2, scale[0] / 2];
+    for (let i = 0; i < steps; i++) {
+      const y0 = -scale[1] / 2, y1 = y0 + (i + 1) * stepHeight;
+      const z0 = -scale[2] / 2 + i * stepDepth, z1 = z0 + stepDepth;
+      const start = vertices.length + 1;
+      vertices.push([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
+      const q = [[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]];
+      for (const face of q) faces.push([start+face[0],start+face[1],start+face[2]],[start+face[0],start+face[2],start+face[3]]);
+    }
+  } else if (shape === "arch") {
+    const segments = 16;
+    const outerX = Math.max(0.05, scale[0] / 2), outerY = Math.max(0.05, scale[1]);
+    const thickness = Math.max(0.025, Math.min(scale[0] * 0.14, scale[1] * 0.14));
+    const innerX = Math.max(0.02, outerX - thickness), innerY = Math.max(0.02, outerY - thickness);
+    const centerY = -scale[1] / 2;
+    const zFront = scale[2] / 2, zBack = -scale[2] / 2;
+    const point = (xRadius: number, yRadius: number, angle: number, z: number): Vec3 => [xRadius * Math.cos(angle), centerY + yRadius * Math.sin(angle), z];
+    for (let i = 0; i < segments; i++) {
+      const a0 = i / segments * Math.PI, a1 = (i + 1) / segments * Math.PI;
+      const start = vertices.length + 1;
+      vertices.push(point(outerX,outerY,a0,zFront),point(outerX,outerY,a1,zFront),point(innerX,innerY,a1,zFront),point(innerX,innerY,a0,zFront),
+        point(outerX,outerY,a0,zBack),point(outerX,outerY,a1,zBack),point(innerX,innerY,a1,zBack),point(innerX,innerY,a0,zBack));
+      const v = (n: number) => start + n;
+      faces.push([v(0),v(1),v(2)],[v(0),v(2),v(3)],[v(4),v(7),v(6)],[v(4),v(6),v(5)],
+        [v(0),v(4),v(5)],[v(0),v(5),v(1)],[v(3),v(2),v(6)],[v(3),v(6),v(7)],
+        [v(0),v(3),v(7)],[v(0),v(7),v(4)],[v(1),v(5),v(6)],[v(1),v(6),v(2)]);
+    }
   } else if (shape === "sphere") {
     const rings = 5;
     const segments = 10;
@@ -261,13 +293,33 @@ function transformPoint(point: Vec3, part: Part): Vec3 {
     Number((nz + part.position[2]).toFixed(5))
   ];
 }
+function assertValidPrimitiveMesh(mesh: { vertices: Vec3[]; faces: number[][] }, partName: string) {
+  if (!Array.isArray(mesh.vertices) || mesh.vertices.length < 3 || !Array.isArray(mesh.faces) || !mesh.faces.length) {
+    throw new Error("Generated primitive " + partName + " contains no usable geometry.");
+  }
+  for (let index = 0; index < mesh.vertices.length; index++) {
+    const vertex = mesh.vertices[index];
+    if (!Array.isArray(vertex) || vertex.length !== 3 || !vertex.every(Number.isFinite)) {
+      throw new Error("Generated primitive " + partName + " contains a non-finite vertex at " + index + ".");
+    }
+  }
+  for (let index = 0; index < mesh.faces.length; index++) {
+    const face = mesh.faces[index];
+    if (!Array.isArray(face) || face.length < 3 || face.some(vertex => !Number.isInteger(vertex) || vertex < 1 || vertex > mesh.vertices.length)) {
+      throw new Error("Generated primitive " + partName + " contains an invalid face at " + index + ".");
+    }
+  }
+}
 function buildMesh(recipe: Recipe) {
   const obj: string[] = ["# Generated by GENE Forge", "mtllib model.mtl", "o " + recipe.name.replace(/\s+/g, "_")];
   const mtl: string[] = ["# Generated by GENE Forge"];
   let vertexOffset = 0;
   let triangles = 0;
+  const collisionProxies: Array<{ name: string; shape: "box"; center: Vec3; size: Vec3; sourceShape: Shape }> = [];
+  const bounds = { min: [Infinity, Infinity, Infinity] as Vec3, max: [-Infinity, -Infinity, -Infinity] as Vec3 };
   recipe.parts.forEach((part, index) => {
     const mesh = geometry(part.shape, part.scale);
+    assertValidPrimitiveMesh(mesh, part.name);
     const material = "mat_" + String(index + 1).padStart(3, "0");
     const [r, g, b] = rgb(part.color);
     const surface = part.surface || "matte";
@@ -275,10 +327,25 @@ function buildMesh(recipe: Recipe) {
     const shininess = surface === "metal" ? 96 : surface === "glass" ? 120 : surface === "emissive" ? 48 : surface === "rubber" ? 4 : 18;
     mtl.push("newmtl " + material, "Kd " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "Ka 0.05 0.05 0.05", "Ks " + specular.map(value => value.toFixed(3)).join(" "), "Ns " + shininess, ...(surface === "glass" ? ["d 0.42", "illum 4"] : surface === "emissive" ? ["Ke " + r.toFixed(4) + " " + g.toFixed(4) + " " + b.toFixed(4), "illum 2"] : ["illum 2"]), "");
     obj.push("", "o " + part.name, "usemtl " + material);
-    for (const vertex of mesh.vertices) {
-      const p = transformPoint(vertex, part);
+    const worldVertices = mesh.vertices.map(vertex => transformPoint(vertex, part));
+    const partMin: Vec3 = [Infinity, Infinity, Infinity];
+    const partMax: Vec3 = [-Infinity, -Infinity, -Infinity];
+    for (const p of worldVertices) {
       obj.push("v " + p[0] + " " + p[1] + " " + p[2]);
+      for (let axis = 0; axis < 3; axis++) {
+        bounds.min[axis] = Math.min(bounds.min[axis], p[axis]);
+        bounds.max[axis] = Math.max(bounds.max[axis], p[axis]);
+        partMin[axis] = Math.min(partMin[axis], p[axis]);
+        partMax[axis] = Math.max(partMax[axis], p[axis]);
+      }
     }
+    collisionProxies.push({
+      name: part.name,
+      shape: "box",
+      center: partMin.map((value, axis) => Number(((value + partMax[axis]) / 2).toFixed(5))) as Vec3,
+      size: partMin.map((value, axis) => Number(Math.max(0.001, partMax[axis] - value).toFixed(5))) as Vec3,
+      sourceShape: part.shape
+    });
     for (const face of mesh.faces) {
       obj.push("f " + face.map(indexInPart => indexInPart + vertexOffset).join(" "));
       if (face.length === 3) triangles++;
@@ -287,6 +354,9 @@ function buildMesh(recipe: Recipe) {
     vertexOffset += mesh.vertices.length;
   });
   const qualityReport = analyzeForgeRecipe(recipe);
+  if (qualityReport.status === "invalid") {
+    throw new Error("Forge structural QA rejected this recipe: " + qualityReport.warnings.filter((warning: any) => warning.severity === "error").map((warning: any) => warning.code).join(", "));
+  }
   const asset = {
     format: "gene-forge-asset-v1",
     qualityReport,
@@ -298,13 +368,15 @@ function buildMesh(recipe: Recipe) {
     triangleCount: triangles,
     vertexCount: vertexOffset,
     partCount: recipe.parts.length,
+    bounds: { min: bounds.min.map(value => Number(value.toFixed(5))), max: bounds.max.map(value => Number(value.toFixed(5))) },
+    collisionProxies,
     recipe
   };
   return { obj: obj.join("\n") + "\n", mtl: mtl.join("\n") + "\n", asset };
 }
 
 function stableForgeAssetId(kind: string, prompt: string, style: string) {
-  const input = [kind, prompt, style].join("\\u001f");
+  const input = [kind, prompt, style].join("\u001f");
   let hash = 2166136261;
   for (let index = 0; index < input.length; index++) {
     hash ^= input.charCodeAt(index);
@@ -329,7 +401,35 @@ function withForgeAssetMetadata(asset: any, prompt: string, mode: "native" | "ai
       externalDependencies: [],
       license: "GENE-generated; no third-party source embedded"
     },
-    intendedScene: null
+    intendedScene: null,
+    runtimeCompatibility: {
+      format: "OBJ/MTL",
+      geometry: "static-mesh",
+      materialSupport: ["diffuse-color"],
+      textures: "not-included",
+      uvMaps: "not-exported-by-current-pipeline",
+      rigging: "not-supported-by-current-pipeline",
+      animation: "not-included",
+      colliders: "per-part conservative axis-aligned box proxies are provided in collisionProxies; physics-engine binding is still required",
+      qualityEvidence: "structural-only; no automatic visual equivalence claim"
+    }
+  };
+}
+
+function safeHttpsUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString().slice(0, 1200) : null; } catch { return null; }
+}
+function attachContentIntegrity(manifest: any, obj: string, mtl: string) {
+  return {
+    ...manifest,
+    contentIntegrity: {
+      algorithm: "sha256",
+      files: {
+        "model.obj": createHash("sha256").update(obj, "utf8").digest("hex"),
+        "model.mtl": createHash("sha256").update(mtl, "utf8").digest("hex")
+      }
+    }
   };
 }
 
@@ -338,7 +438,7 @@ function nativeAssetResponse(prompt: string, kind: string, quality: string, proj
   try {
     const recipe = normalizeRecipe(buildNativeForgeRecipe({ prompt, kind, quality, projectStyle }), kind, quality);
     const mesh = buildMesh(recipe);
-    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "native", "gene-native", "gene-native-forge-v1");
+    const manifest = attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "native", "gene-native", "gene-native-forge-v1"), mesh.obj, mesh.mtl);
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,
@@ -400,10 +500,10 @@ export async function POST(request: NextRequest) {
   const fallbackModels = [model, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter((value, index, all) => all.indexOf(value) === index);
   const system = [
     "You are GENE Forge, a practical low-poly/game-asset modelling director.",
-    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'capsule',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
+    "Return JSON only with shape {name:string,kind:string,style:string,notes:string,parts:[{name:string,shape:'box'|'beveledBox'|'sphere'|'cylinder'|'cone'|'wedge'|'torus'|'capsule'|'stairs'|'arch',surface:'matte'|'metal'|'rubber'|'glass'|'emissive',position:[x,y,z],scale:[width,height,depth],rotation:[degreesX,degreesY,degreesZ],color:'#RRGGBB'}]}.",
     "This recipe is converted into a real OBJ mesh and MTL material file by the application. Optimize for a distinctive silhouette and correct proportions, not an arbitrary pile of shapes. Treat the parts like a senior hard-surface/prop artist: primary mass, secondary functional structures, tertiary bevel-like trims, layered panels, vents, fasteners, handles and material breaks. Use beveledBox for light-catching chamfered panels, torus for rings/handles/rims, wedge for ramps/roof armor/angled shells, cylinders for axles/barrels, rubber for tires/grips, glass for windows, metal for exposed hardware and emissive for small lights. Use spheres only where curvature makes sense. Avoid intersecting clutter, floating pieces, identical repeated primitives, impossible proportions and colors without a coherent palette.",
     "Use a coherent art direction, clear primary/secondary/tertiary forms, deliberate color blocking, aligned components, clean silhouette, believable proportions, functional detail placement, and a clear focal feature. Position Y is vertical. The asset is centered around world origin with a ground-level bottom near Y=0 when practical. Place trim, seams, layered plates, bezels, hinges, vents, rivets, grips or panel breaks only where they make sense for the requested asset; avoid arbitrary decoration. Vary material response intentionally: metal should have higher specular and shininess, rubber should be dark and matte, glass should be translucent in MTL, and emissive should identify small lights rather than large surfaces.",
-    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus, capsule. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
+    "Use 3 to 32 parts for performance quality, 3 to 54 for standard, and 3 to 76 for high. Allowed shapes: box, beveledBox, sphere, cylinder, cone, wedge, torus, capsule, stairs, arch. Use stairs for stepped forms and arch for curved doorways/portals. Allowed surfaces: matte, metal, rubber, glass, emissive. Scale values must be >0.03 and <=20; position absolute values <=40; rotations within +/-360 degrees. Give each part a functional name and consistent object-local coordinate system; keep the whole asset centered and grounded near y=0.",
     "For vehicles make a body, cabin, wheels, windows and characteristic details. For characters make a torso, head, limbs and distinctive silhouette. For buildings make a foundation, wall masses, roof and openings. For weapons make a body, grip, barrel/blade and details. For nature assets make a trunk/stem and layered canopy/forms.",
     "If an existing recipe is supplied, modify that exact asset to match the user's edit; preserve its identity and unaffected parts. Do not just rename the asset or repeat the same recipe."
   ].join("\n");
@@ -420,7 +520,9 @@ export async function POST(request: NextRequest) {
   const references = Array.isArray(body.references) ? body.references : [];
   const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
   let totalImageChars = 0;
+  let totalImageBytes = 0;
   let imageCount = 0;
+  const acceptedReferenceProvenance: Array<Record<string, unknown>> = [];
   for (const ref of references) {
     if (ref?.kind !== "image" || typeof ref.dataBase64 !== "string") continue;
     if (imageCount >= 2) break;
@@ -428,7 +530,22 @@ export async function POST(request: NextRequest) {
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(ref.dataBase64)) return fail(400, "REFERENCE_INVALID", "A reference image is not valid base64.");
     totalImageChars += ref.dataBase64.length;
     if (ref.dataBase64.length > 550_000 || totalImageChars > 750_000) return fail(413, "REFERENCE_TOO_LARGE", "Forge image references exceed the request budget. Attach smaller images or fewer references.");
-    parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.dataBase64 } });
+    const referenceBytes = Buffer.from(ref.dataBase64, "base64");
+    totalImageBytes += referenceBytes.byteLength;
+    if (!referenceBytes.byteLength || referenceBytes.byteLength > 400_000 || totalImageBytes > 550_000) return fail(413, "REFERENCE_TOO_LARGE", "Decoded Forge reference images exceed the byte budget.");
+    if (!hasValidImageSignature(ref.mimeType, referenceBytes)) return fail(400, "REFERENCE_SIGNATURE_MISMATCH", "A Forge reference image does not match its declared raster MIME type.");
+    acceptedReferenceProvenance.push({
+      title: typeof ref.title === "string" ? ref.title.trim().slice(0, 160) : "",
+      source: typeof ref.source === "string" ? ref.source.trim().slice(0, 120) : "",
+      sourcePage: safeHttpsUrl(ref.sourcePage || ref.page),
+      sourceUrl: safeHttpsUrl(ref.sourceUrl || ref.full || ref.url),
+      license: typeof ref.license === "string" ? ref.license.trim().slice(0, 120) : "",
+      attribution: typeof ref.attribution === "string" ? ref.attribution.trim().slice(0, 240) : "",
+      mimeType: ref.mimeType,
+      byteSize: referenceBytes.byteLength,
+      sha256: createHash("sha256").update(referenceBytes).digest("hex")
+    });
+    parts.push({ inlineData: { mimeType: ref.mimeType, data: referenceBytes.toString("base64") } });
     imageCount++;
   }
 
@@ -527,7 +644,7 @@ export async function POST(request: NextRequest) {
   try {
     const recipe = normalizeRecipe(extractJson(text), kind, quality);
     const mesh = buildMesh(recipe);
-    const manifest = withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel);
+    const manifest = { ...attachContentIntegrity(withForgeAssetMetadata(mesh.asset, prompt, "ai", successfulProvider, successfulModel), mesh.obj, mesh.mtl), referenceInputs: acceptedReferenceProvenance };
     const files = {
       "model.obj": mesh.obj,
       "model.mtl": mesh.mtl,

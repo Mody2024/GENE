@@ -2,14 +2,14 @@
 
 import type { ResearchBundle } from "../lib/types";
 
-type Props = { bundle: ResearchBundle };
+type Props = { bundle: ResearchBundle; onImportImage?: (image: any) => void };
 
 function Count({ n, label }: { n: number; label: string }) {
   return n > 0 ? <span className="rc-count">{n} {label}{n === 1 ? "" : "s"}</span> : null;
 }
 
 /** Viewable research that was attached to a message and sent to GENE as reference material. */
-export default function ResearchCard({ bundle }: Props) {
+export default function ResearchCard({ bundle, onImportImage }: Props) {
   const sent = bundle.sent;
   const total = bundle.facts.length + bundle.images.length + bundle.models.length + bundle.music.tracks.length + bundle.music.styles.length + bundle.games.length;
   return (
@@ -34,11 +34,15 @@ export default function ResearchCard({ bundle }: Props) {
 
       {bundle.images.length > 0 && <section>
         <h4>Images</h4>
-        <div className="rc-grid">{bundle.images.map(image => <a key={image.id} className="rc-image" href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
-          <span>{image.title}</span><small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
-        </a>)}</div>
+        <div className="rc-grid">{bundle.images.map(image => <div key={image.id} className="rc-image">
+          <a href={image.page} target="_blank" rel="noreferrer noopener" title={image.title + " — " + image.license + " — " + image.credit}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.thumb} alt={image.title} loading="lazy" referrerPolicy="no-referrer" />
+            <span>{image.title}</span>
+          </a>
+          <small>{image.categoryLabel ? image.categoryLabel + " · " : ""}{image.license} · {image.source}</small>
+          {onImportImage && <button type="button" className="rc-import-image" style={{ display: "block", marginTop: "8px", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: "8px", background: "#fff", color: "#334155", fontSize: "12px", cursor: "pointer" }} onClick={() => onImportImage(image)} disabled={!image.full || !image.page}>Import to project</button>}
+        </div>)}</div>
       </section>}
 
       {bundle.facts.length > 0 && <section>

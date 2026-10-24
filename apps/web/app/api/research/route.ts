@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import {
   buildResearchBundle,
   buildSearchLinks,
   cleanQuery,
   filterPolyHaven,
   formatResearchNotes,
+  hasValidImageSignature,
   keywords,
   musicSearchTerms,
   parseCommonsFiles,
@@ -62,7 +64,7 @@ async function commons(query: string, kind: "image" | "audio", limit: number) {
   const filter = kind === "audio" ? "filetype:audio" : "filetype:bitmap";
   const url = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=" + limit +
     "&gsrsearch=" + encodeURIComponent(query + " " + filter) +
-    "&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=480&iiextmetadatafilter=LicenseShortName%7CArtist&origin=*";
+    "&prop=imageinfo&iiprop=url%7Cmime%7Csize%7Csha1%7Cextmetadata&iiurlwidth=480&iiextmetadatafilter=LicenseShortName%7CArtist&origin=*";
   return parseCommonsFiles(await getJson(url, 6_000), kind);
 }
 
@@ -84,9 +86,33 @@ async function fetchImageData(image: { id: string; title: string; thumb: string 
     if (!response.ok) return null;
     const mimeType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return null;
-    return { id: image.id, name: image.title, mimeType, dataBase64: bytes.toString("base64") };
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_IMAGE_BYTES) {
+      await response.body?.cancel().catch(() => {});
+      return null;
+    }
+    if (!response.body) return null;
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_IMAGE_BYTES) {
+          await reader.cancel().catch(() => {});
+          return null;
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (!totalBytes) return null;
+    const bytes = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), totalBytes);
+    if (!hasValidImageSignature(mimeType, bytes)) return null;
+    return { id: image.id, name: image.title, mimeType, byteSize: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex"), dataBase64: bytes.toString("base64") };
   } catch {
     return null;
   }
@@ -121,9 +147,12 @@ export async function POST(request: NextRequest) {
   const wants3DModels = body?.engine === "webgl3d" || /\b(3d|three.?dimensional|voxel|low.?poly|blender|3d model|model pack)\b/i.test(lowerTopic);
   const wantsAudio = body?.kind !== "app" && !/\b(no music|silent|no audio|without sound)\b/i.test(lowerTopic);
 
+  const isAppResearch = body?.kind === "app";
   const googleQuery = researchIsGeometryDash
     ? "Geometry Dash gameplay mechanics level editor rhythm platformer design"
-    : normalizedTopic + " game design mechanics level design official documentation";
+    : isAppResearch
+      ? normalizedTopic + " UI design interaction patterns accessibility official documentation"
+      : normalizedTopic + " game design mechanics level design official documentation";
   const [wiki, catalog, visualImageSets, google, ...audioSets] = await Promise.all([
     wikipedia(searchText, wikiHost),
     wants3DModels ? polyHavenCatalog() : Promise.resolve(null),
@@ -137,7 +166,9 @@ export async function POST(request: NextRequest) {
   const models = wants3DModels ? filterPolyHaven(catalog, topic, 6) : [];
   const links = buildSearchLinks(researchIsGeometryDash
     ? "Geometry Dash level design editor obstacles rhythm platformer gameplay"
-    : topic + " game design mechanics level design");
+    : isAppResearch
+      ? topic + " interface UI design interaction patterns accessibility"
+      : topic + " game design mechanics level design");
 
 
   const unavailable: string[] = [];
@@ -149,6 +180,9 @@ export async function POST(request: NextRequest) {
   if (wants3DModels && !catalog) unavailable.push("the Poly Haven 3D model catalog could not be reached");
 
   const bundle = buildResearchBundle({ topic, wiki, commonsImages, commonsAudio, models, webResults: google.items, links, unavailable, createdAt: new Date().toISOString() } as any);
+  // Apply relevance ranking to the actual bundle, not just the model-image shortlist.
+  // This prevents unrelated thumbnails from being shown in the research UI as "references".
+  bundle.images = rankVisualReferenceResults(bundle.images as any[], topic) as any;
   if (!wantsImages) bundle.images = [];
   if (researchIsGeometryDash) {
     bundle.facts = [
@@ -158,11 +192,8 @@ export async function POST(request: NextRequest) {
       { title: "Research priority", extract: "Prioritize playable mechanics, jump timing, collision fairness, restart speed, level progression, and original synthesized or properly licensed audio over unrelated image search results.", url: "https://www.robtopgames.com/" }
     ];
   }
-  // Topic relevance wins when selecting the small set of actual image bytes sent to the model.
-  // The research bundle itself already preserves category diversity for browsing.
-  const imageCandidates = [...bundle.images].sort((a: any, b: any) =>
-    Number(b.relevanceScore || 0) - Number(a.relevanceScore || 0)
-  );
+  // The bundle is already relevance-ranked and filtered above; preserve that exact order.
+  const imageCandidates = [...bundle.images];
   const imageData = wantsImages
     ? (await Promise.all(imageCandidates.slice(0, MAX_IMAGES_SENT + 2).map(fetchImageData))).filter(Boolean).slice(0, MAX_IMAGES_SENT)
     : [];

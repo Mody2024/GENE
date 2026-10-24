@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { buildNative2DAsset } from "../../../../lib/forge-2d.mjs";
 import { hasToolApproval } from "../../../lib/tool-permissions.mjs";
 
@@ -45,6 +46,9 @@ export async function POST(request: NextRequest) {
       style: typeof body.style === "string" ? body.style.slice(0, 80) : "stylized"
     });
     if (asset.qualityReport.svgBytes > 300_000) return fail(500, "ASSET_SIZE_LIMIT", "Generated SVG exceeded the safe output size.");
+    const integrityFiles: Record<string, string> = { "sprite.svg": createHash("sha256").update(asset.svg, "utf8").digest("hex") };
+    for (const [name, svg] of Object.entries(asset.frameFiles || {})) integrityFiles["frames/" + name] = createHash("sha256").update(String(svg), "utf8").digest("hex");
+    asset.manifest = { ...asset.manifest, contentIntegrity: { algorithm: "sha256", files: integrityFiles } } as typeof asset.manifest;
     return response(200, {
       ok: true,
       provider: "GENE Native 2D",

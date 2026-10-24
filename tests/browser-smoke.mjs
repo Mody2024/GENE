@@ -26,9 +26,9 @@ const fixture = {
     performanceBudget: { targetFps: 60, maxEnemies: 4, maxObjects: 40, maxParticles: 8 }
   },
   files: {
-    "game.html": '<main class="game-shell"><canvas id="game-canvas" width="800" height="480" tabindex="0" aria-label="Runner game canvas"></canvas><div class="game-hud"><b>OUTPOST RUN</b><span>Score <strong id="score-value">0</strong></span></div><div class="game-controls">ARROWS / WASD MOVE · COLLECT THE GOLD ORBS</div></main>',
+    "game.html": '<main class="game-shell"><canvas id="game-canvas" width="800" height="480" tabindex="0" aria-label="Runner game canvas"></canvas><div class="game-hud"><b>OUTPOST RUN</b><span>Score <strong id="score-value">0</strong></span><b id="game-status">Collect all four orbs</b></div><div class="game-controls">ARROWS / WASD MOVE · COLLECT THE GOLD ORBS</div></main>',
     "game.css": '.game-shell{position:relative;width:100vw;height:100vh;overflow:hidden;background:#151e2b;color:#fff;font:12px Arial,sans-serif}#game-canvas{display:block;width:100%;height:100%;outline:none}.game-hud{position:absolute;left:18px;top:15px;right:18px;display:flex;justify-content:space-between;letter-spacing:.08em;text-shadow:0 2px 6px #000}.game-hud b{color:#a4e6cb}.game-controls{position:absolute;left:18px;bottom:14px;font-size:10px;letter-spacing:.1em;color:#d6e0e9}',
-    "game.js": '(function(){const canvas=document.getElementById("game-canvas");if(!canvas)throw new Error("canvas missing");const ctx=canvas.getContext("2d");if(!ctx)throw new Error("2d context missing");const s={x:85,y:325,score:0,frame:0};const coins=[{x:240,y:270},{x:355,y:190},{x:515,y:295},{x:670,y:225}];function draw(){s.frame++;ctx.fillStyle="#142133";ctx.fillRect(0,0,canvas.width,canvas.height);const grad=ctx.createLinearGradient(0,0,0,480);grad.addColorStop(0,"#1d3552");grad.addColorStop(1,"#0b101b");ctx.fillStyle=grad;ctx.fillRect(0,0,800,480);ctx.fillStyle="#29445a";for(let i=0;i<8;i++){const x=i*120;ctx.beginPath();ctx.moveTo(x,360);ctx.lineTo(x+60,180+(i%3)*32);ctx.lineTo(x+130,360);ctx.fill()}ctx.fillStyle="#365d54";ctx.fillRect(0,365,800,115);ctx.fillStyle="#6b9c7c";ctx.fillRect(0,365,800,4);for(const coin of coins){if(coin.collected)continue;ctx.beginPath();ctx.fillStyle="#ffcf76";ctx.arc(coin.x,coin.y,11+Math.sin(s.frame*.06+coin.x)*2,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.strokeStyle="#fff0bf";ctx.lineWidth=2;ctx.arc(coin.x,coin.y,5,0,Math.PI*2);ctx.stroke();if(Math.abs(s.x-coin.x)<23&&Math.abs(s.y-coin.y)<28){coin.collected=true;s.score+=1;document.getElementById("score-value").textContent=String(s.score)}}ctx.fillStyle="#a6e8cb";ctx.fillRect(s.x-11,s.y-25,22,25);ctx.fillStyle="#effff7";ctx.fillRect(s.x-6,s.y-32,12,9);ctx.fillStyle="#101a24";ctx.fillRect(s.x+2,s.y-29,3,3);ctx.fillStyle="#c8d7e1";ctx.font="12px Arial";ctx.fillText("COLLECT THE ORBS",580,36);window.__geneSmokeState={playerX:s.x,frame:s.frame,score:s.score};requestAnimationFrame(draw)}function move(dx,dy){s.x=Math.max(18,Math.min(782,s.x+dx));s.y=Math.max(85,Math.min(355,s.y+dy));}window.addEventListener("keydown",function(e){const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup","arrowdown"," "].includes(k))e.preventDefault();if(k==="arrowright"||k==="d")move(18,0);if(k==="arrowleft"||k==="a")move(-18,0);if(k==="arrowup"||k==="w"||k===" ")move(0,-18);if(k==="arrowdown"||k==="s")move(0,18);});draw()})();',
+    "game.js": '(function(){const canvas=document.getElementById("game-canvas");if(!canvas)throw new Error("canvas missing");const ctx=canvas.getContext("2d");if(!ctx)throw new Error("2d context missing");const s={x:85,y:325,score:0,frame:0,restartCount:0};const coins=[{x:240,y:270},{x:355,y:190},{x:515,y:295},{x:670,y:225}];function draw(){s.frame++;ctx.fillStyle="#142133";ctx.fillRect(0,0,canvas.width,canvas.height);const grad=ctx.createLinearGradient(0,0,0,480);grad.addColorStop(0,"#1d3552");grad.addColorStop(1,"#0b101b");ctx.fillStyle=grad;ctx.fillRect(0,0,800,480);ctx.fillStyle="#29445a";for(let i=0;i<8;i++){const x=i*120;ctx.beginPath();ctx.moveTo(x,360);ctx.lineTo(x+60,180+(i%3)*32);ctx.lineTo(x+130,360);ctx.fill()}ctx.fillStyle="#365d54";ctx.fillRect(0,365,800,115);ctx.fillStyle="#6b9c7c";ctx.fillRect(0,365,800,4);for(const coin of coins){if(coin.collected)continue;ctx.beginPath();ctx.fillStyle="#ffcf76";ctx.arc(coin.x,coin.y,11+Math.sin(s.frame*.06+coin.x)*2,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.strokeStyle="#fff0bf";ctx.lineWidth=2;ctx.arc(coin.x,coin.y,5,0,Math.PI*2);ctx.stroke();if(Math.abs(s.x-coin.x)<23&&Math.abs(s.y-coin.y)<28){coin.collected=true;s.score+=1;document.getElementById("score-value").textContent=String(s.score);if(s.score===coins.length)document.getElementById("game-status").textContent="OUTPOST CLEARED"}}ctx.fillStyle="#a6e8cb";ctx.fillRect(s.x-11,s.y-25,22,25);ctx.fillStyle="#effff7";ctx.fillRect(s.x-6,s.y-32,12,9);ctx.fillStyle="#101a24";ctx.fillRect(s.x+2,s.y-29,3,3);ctx.fillStyle="#c8d7e1";ctx.font="12px Arial";ctx.fillText("COLLECT THE ORBS",580,36);window.__geneSmokeState={playerX:s.x,playerY:s.y,frame:s.frame,score:s.score,won:s.score===coins.length,restartCount:s.restartCount};requestAnimationFrame(draw)}function move(dx,dy){s.x=Math.max(18,Math.min(782,s.x+dx));s.y=Math.max(85,Math.min(355,s.y+dy));}window.addEventListener("keydown",function(e){const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup","arrowdown"," "].includes(k))e.preventDefault();if(k==="r"){s.x=85;s.y=325;s.score=0;s.restartCount++;coins.forEach(c=>delete c.collected);document.getElementById("score-value").textContent="0";document.getElementById("game-status").textContent="Collect all four orbs";return;}if(k==="arrowright"||k==="d")move(18,0);if(k==="arrowleft"||k==="a")move(-18,0);if(k==="arrowup"||k==="w"||k===" ")move(0,-18);if(k==="arrowdown"||k==="s")move(0,18);});draw()})();',
     "game-spec.json": JSON.stringify({
       title: "Playwright Canvas Runner",
       genre: "arcade runner",
@@ -114,7 +114,24 @@ try {
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(700);
   const afterX = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState?.playerX);
-  assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game's player position");
+  assert.ok(typeof beforeX === "number" && typeof afterX === "number" && afterX > beforeX, "keyboard input changes the actual game player position");
+  // Exercise objective completion and restart, not only rendering and movement.
+  for (const [key, count] of [["ArrowRight", 8], ["ArrowUp", 3], ["ArrowRight", 6], ["ArrowUp", 4], ["ArrowRight", 9], ["ArrowDown", 5], ["ArrowRight", 9], ["ArrowUp", 4]]) {
+    for (let i = 0; i < count; i++) {
+      await gameFrame.locator("body").evaluate((body, keyName) => window.dispatchEvent(new KeyboardEvent("keydown", { key: keyName, bubbles: true })), key);
+      await page.waitForTimeout(18);
+    }
+  }
+  const won = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState);
+  assert.equal(won?.score, 4, "all four objectives can be reached and scored through input; observed state: " + JSON.stringify(won));
+  await gameFrame.getByText("OUTPOST CLEARED", { exact: true }).waitFor({ timeout: 1000 });
+  assert.equal(won?.won, true, "the game reaches its defined win condition");
+  await page.keyboard.press("r");
+  await page.waitForTimeout(80);
+  const restarted = await gameFrame.locator("body").evaluate(() => window.__geneSmokeState);
+  assert.equal(restarted?.score, 0, "restart resets the objective score");
+  assert.equal(restarted?.playerX, 85, "restart restores the player spawn");
+  assert.equal(restarted?.restartCount, 1, "restart path was executed");
 
   // DOM-based quiz games must render and respond to real answer-button clicks without a canvas.
   const quizFixture = {
@@ -220,16 +237,37 @@ try {
   await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
   const sceneCanvasBox = await sceneCanvas.boundingBox();
   assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
-  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.5, sceneCanvasBox.y + sceneCanvasBox.height * 0.533);
+  // Select the actual object first, then derive its canvas hit point from the live
+  // inspector transform instead of assuming every add/redo path starts at world origin.
+  await page.locator(".scene-object-row").first().click();
+  const positionInputs = page.locator(".scene-inspector .scene-vector").first().locator("input");
+  const initialPositionX = Number(await positionInputs.nth(0).inputValue());
+  const initialPositionY = Number(await positionInputs.nth(1).inputValue());
+  const positionX = positionInputs.nth(0);
+  const dragStart = {
+    x: sceneCanvasBox.x + ((480 + initialPositionX * 32) / 960) * sceneCanvasBox.width,
+    y: sceneCanvasBox.y + ((270 - initialPositionY * 32) / 540) * sceneCanvasBox.height
+  };
+  const dragEnd = { x: dragStart.x + sceneCanvasBox.width * 0.08, y: dragStart.y + sceneCanvasBox.height * 0.06 };
+  await page.mouse.move(dragStart.x, dragStart.y);
   await page.mouse.down();
-  await page.mouse.move(sceneCanvasBox.x + sceneCanvasBox.width * 0.53, sceneCanvasBox.y + sceneCanvasBox.height * 0.55, { steps: 4 });
+  await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 8 });
   await page.mouse.up();
-  const positionX = page.locator(".scene-vector").first().locator("input").first();
-  await page.waitForFunction(() => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==0; }, { timeout: 5000 });
-  assert.notEqual(Number(await positionX.inputValue()), 0, "dragging a scene object changes its real position transform");
+  // Scope the wait to the selected object's position inspector. Other vector groups
+  // (rotation/scale and any later inspector panels) must not satisfy or block this check.
+  await page.waitForFunction((before) => {
+    const inspector = document.querySelector(".scene-inspector");
+    const positionGroup = inspector?.querySelector(".scene-vector");
+    const input = positionGroup?.querySelector("input");
+    return !!input && Number(input.value) !== before;
+  }, initialPositionX, { timeout: 8000 });
+  assert.notEqual(Number(await positionX.inputValue()), initialPositionX, "dragging a scene object changes its real position transform");
   await page.getByLabel("Name", { exact: true }).fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
-  await page.getByRole("button", { name: "Save scene data" }).click();
+  const saveSceneButton = page.getByRole("button", { name: "Save scene data" });
+  await saveSceneButton.waitFor({ state: "visible", timeout: 5000 });
+  // Scene Studio can replace its control subtree while syncing transforms; dispatch the actual button click without requiring a long stability window.
+  await saveSceneButton.evaluate(button => button.click());
   await page.locator('.rail button[title="Files"]').click();
   await page.getByRole("heading", { name: "Project files" }).waitFor({ timeout: 5000 });
   const savedSceneSpec = await page.locator(".code-editor").inputValue();

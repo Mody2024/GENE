@@ -222,20 +222,39 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     return { x:(event.clientX-rect.left)*960/rect.width, y:(event.clientY-rect.top)*540/rect.height };
   };
   const onViewportPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if(readOnly)return;
-    const point=viewportPoint(event);
-    const hit=[...objects].reverse().filter(o=>o.visible).find(o=>{
+    if (readOnly || event.button !== 0) return;
+    const point = viewportPoint(event);
+    const pickable = [...objects].reverse().filter(object => object.visible);
+    const centerOf = (object: SceneObject) => is2D
+      ? { x: 480 + object.position.x * 32, y: 270 - object.position.y * 32 }
+      : { x: 480 + (object.position.x - object.position.z) * 32, y: 540 * .58 + (object.position.x + object.position.z) * 16 - object.position.y * 38 - 25 * object.scale.y };
+    const hit = pickable.find(object => {
+      const center = centerOf(object);
       if (is2D) {
-        const x = 480 + o.position.x * 32, y = 270 - o.position.y * 32;
-        return Math.abs(point.x - x) < 24 * Math.max(1, Math.abs(o.scale.x)) && Math.abs(point.y - y) < 22 * Math.max(1, Math.abs(o.scale.y));
+        const halfWidth = Math.max(24, 15 * Math.abs(object.scale.x) + 8);
+        const halfHeight = Math.max(22, 13 * Math.abs(object.scale.y) + 8);
+        return Math.abs(point.x - center.x) <= halfWidth && Math.abs(point.y - center.y) <= halfHeight;
       }
-      const x=480+(o.position.x-o.position.z)*32,y=540*.58+(o.position.x+o.position.z)*16-o.position.y*38;
-      return Math.abs(point.x-x)<32*Math.max(1,Math.abs(o.scale.x))&&Math.abs(point.y-(y-25*o.scale.y))<34*Math.max(1,Math.abs(o.scale.y));
-    });
-    if(!hit)return;
+      return Math.abs(point.x - center.x) <= 32 * Math.max(1, Math.abs(object.scale.x)) &&
+        Math.abs(point.y - center.y) <= 34 * Math.max(1, Math.abs(object.scale.y));
+    }) || pickable
+      // Small visual labels and thin primitives can be difficult to hit precisely.
+      // A bounded nearest-object fallback makes the editor forgiving without letting
+      // a click anywhere on the canvas unexpectedly move a distant object.
+      .map(object => ({ object, center: centerOf(object) }))
+      .map(entry => ({ ...entry, distance: Math.hypot(point.x - entry.center.x, point.y - entry.center.y) }))
+      .filter(entry => entry.distance <= 48)
+      .sort((a, b) => a.distance - b.distance)[0]?.object;
+    if (!hit) return;
     setSelectedId(hit.id);
-    dragRef.current={id:hit.id,startX:point.x,startY:point.y,original:objects.map(o=>({...o,position:{...o.position},rotation:{...o.rotation},scale:{...o.scale}})),originalPosition:{...hit.position}};
-    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      id: hit.id,
+      startX: point.x,
+      startY: point.y,
+      original: objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } })),
+      originalPosition: { ...hit.position }
+    };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* Pointer capture may be unavailable in embedded previews. */ }
   };
   const onViewportPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag=dragRef.current;if(!drag||readOnly)return;
@@ -263,10 +282,26 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
-    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
+    // Place new entries in a predictable grid instead of stacking every new object
+    // at the origin, where the latest object can hide the others and be hard to pick.
+    const slot = objects.length;
+    // Keep the first object at the familiar origin; place later objects in a
+    // deterministic expanding grid so newly added entries do not stack together.
+    const layout = [
+      [0, 0], [2.2, 0], [-2.2, 0], [0, 1.8], [0, -1.8],
+      [2.2, 1.8], [-2.2, 1.8], [2.2, -1.8], [-2.2, -1.8]
+    ] as const;
+    const [gridX, gridY] = layout[slot] || [
+      ((Math.floor((slot - 1) / 2) % 5) - 2) * 2.2,
+      (Math.floor((slot - 1) / 10) + 2) * (slot % 2 ? 1 : -1) * 1.8
+    ];
+    const position = is2D
+      ? { x: gridX, y: gridY, z: 0 }
+      : { x: gridX, y: 0, z: gridY };
+    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position, rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
-    setStatus("New scene entry added. Save it to write the manifest.");
+    setStatus("New scene entry added in an open layout slot. Save scene data to persist it.");
   };
   const deleteSelected = () => {
     if (!selected) return;

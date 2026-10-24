@@ -1,10 +1,11 @@
 const SHAPE_TRIANGLE_ESTIMATES = {
   box: 12, beveledBox: 44, sphere: 80, cylinder: 44,
-  cone: 24, wedge: 8, torus: 256, capsule: 168
+  cone: 24, wedge: 8, torus: 256, capsule: 168, stairs: 60, arch: 192
 };
 
 function rotateHalfExtents(scale, rotation) {
-  const [x, y, z] = scale.map(value => value / 2);
+  // Mirroring with negative scale must not create negative half-extents in world bounds.
+  const [x, y, z] = scale.map(value => Math.abs(value) / 2);
   const toRad = value => value * Math.PI / 180;
   const [rx, ry, rz] = rotation.map(toRad);
   const cx = Math.cos(rx), sx = Math.sin(rx);
@@ -33,28 +34,45 @@ export function analyzeForgeRecipe(recipe) {
   const colors = new Set();
   const surfaces = new Set();
   let estimatedTriangles = 0;
+  let invalidShapeCount = 0;
+  let invalidTransformCount = 0;
+  let degenerateScaleCount = 0;
+  let missingNameCount = 0;
+  let invalidColorCount = 0;
   let min = [Infinity, Infinity, Infinity];
   let max = [-Infinity, -Infinity, -Infinity];
 
   for (const part of parts) {
     const name = String(part?.name || "").trim();
     const key = name.toLowerCase();
+    if (!name) missingNameCount++;
     nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
-    colors.add(String(part?.color || "").toLowerCase());
+    const color = String(part?.color || "").toLowerCase();
+    if (!/^#[0-9a-f]{6}$/i.test(color)) invalidColorCount++;
+    colors.add(color);
     surfaces.add(String(part?.surface || "matte"));
-    estimatedTriangles += SHAPE_TRIANGLE_ESTIMATES[part?.shape] || 48;
+    if (Object.prototype.hasOwnProperty.call(SHAPE_TRIANGLE_ESTIMATES, part?.shape)) estimatedTriangles += SHAPE_TRIANGLE_ESTIMATES[part.shape];
+    else invalidShapeCount++;
 
     const transformKey = JSON.stringify([part?.shape, part?.position, part?.scale, part?.rotation, part?.color, part?.surface]);
     transformCounts.set(transformKey, (transformCounts.get(transformKey) || 0) + 1);
 
-    if (!Array.isArray(part?.position) || !Array.isArray(part?.scale) || !Array.isArray(part?.rotation)) continue;
-    if (![...part.position, ...part.scale, ...part.rotation].every(Number.isFinite)) continue;
+    if (!Array.isArray(part?.position) || part.position.length !== 3 || !Array.isArray(part?.scale) || part.scale.length !== 3 || !Array.isArray(part?.rotation) || part.rotation.length !== 3) { invalidTransformCount++; continue; }
+    if (![...part.position, ...part.scale, ...part.rotation].every(Number.isFinite)) { invalidTransformCount++; continue; }
+    if (part.scale.some(value => Math.abs(value) < 0.0001)) { degenerateScaleCount++; continue; }
     const extents = rotateHalfExtents(part.scale, part.rotation);
     for (let axis = 0; axis < 3; axis++) {
       min[axis] = Math.min(min[axis], part.position[axis] - extents[axis]);
       max[axis] = Math.max(max[axis], part.position[axis] + extents[axis]);
     }
   }
+
+  if (!parts.length) warnings.push({ code: "EMPTY_ASSET", severity: "error", message: "No geometry parts were supplied; this is an empty asset, not a finished model." });
+  if (invalidShapeCount) warnings.push({ code: "UNSUPPORTED_SHAPE", severity: "error", message: "Some parts use unknown shapes and cannot be estimated reliably.", count: invalidShapeCount });
+  if (invalidTransformCount) warnings.push({ code: "INVALID_TRANSFORM", severity: "error", message: "Some parts have missing, malformed or non-finite transforms; bounds exclude those parts.", count: invalidTransformCount });
+  if (degenerateScaleCount) warnings.push({ code: "DEGENERATE_SCALE", severity: "error", message: "Some parts have near-zero scale and may be invisible or unusable.", count: degenerateScaleCount });
+  if (missingNameCount) warnings.push({ code: "MISSING_PART_NAME", severity: "warning", message: "Every part should have a stable, non-empty name for editing and diagnostics.", count: missingNameCount });
+  if (invalidColorCount) warnings.push({ code: "INVALID_COLOR", severity: "warning", message: "Some parts have missing or invalid hex colors; the runtime may fall back to a default material.", count: invalidColorCount });
 
   const duplicateNames = [...nameCounts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
   if (duplicateNames.length) warnings.push({ code: "DUPLICATE_PART_NAMES", severity: "warning", message: "Some parts share names; rename them for reliable editing and debugging.", parts: duplicateNames.slice(0, 8) });
@@ -79,12 +97,12 @@ export function analyzeForgeRecipe(recipe) {
   } : { min: [0, 0, 0], max: [0, 0, 0], size: [0, 0, 0] };
   if (bounds.size.some(size => size > 35)) warnings.push({ code: "LARGE_WORLD_BOUNDS", severity: "warning", message: "The assembled asset spans a large world-space area; verify scale and origin.", size: bounds.size });
 
-  const penalties = warnings.reduce((sum, warning) => sum + (warning.severity === "warning" ? 12 : 4), 0);
+  const penalties = warnings.reduce((sum, warning) => sum + (warning.severity === "error" ? 25 : warning.severity === "warning" ? 12 : 4), 0);
   const score = Math.max(0, 100 - penalties);
   return {
     version: 1,
     scope: "structural-only",
-    status: warnings.some(item => item.severity === "warning") ? "review-recommended" : "structurally-clean",
+    status: warnings.some(item => item.severity === "error") ? "invalid" : warnings.some(item => item.severity === "warning") ? "review-recommended" : "structurally-clean",
     score,
     partCount: parts.length,
     distinctColors: colors.size,

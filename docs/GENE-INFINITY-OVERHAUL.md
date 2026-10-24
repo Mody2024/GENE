@@ -25,6 +25,17 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 - **Dependency-aware work graph:** tasks and artifacts are linked by inputs/outputs. Plan only the dependencies needed for the selected game, and permit independent work to run in parallel after explicit approval.
 - **Runtime adapters:** support only engines with real working adapters. The current browser runtime is centered on Canvas 2D and raw WebGL; do not claim native engine/export support by name alone.
 
+## Current implementation checkpoint (2026-10-23)
+
+- Added a movement-aware sprite controller to the runtime bridge. It resolves named clips from manifests, selects idle/walk and directional clips from velocity, and keeps facing state; gameplay physics and automatic scene binding remain separate work.
+- Added focused contract coverage for clip selection and facing state.
+- Latest GitHub Actions results from the earlier checkpoint do not cover all subsequent commits; current-head CI/Playground verification is intentionally deferred until the user asks to check the completed implementation.
+- Build/source checkpoints can no longer set the gameplay-verified status; the live preview remains "rendered" until gameplay is separately verified.
+- Expanded the browser smoke fixture to exercise all four reachable objectives, confirm the win state, and verify restart resets the score and spawn. This is an end-to-end test fixture, not proof that every generated game is verified.
+- Research now suppresses low-relevance web results and labels encyclopedic context, image references and model catalog entries as reference-only until actual import occurs.
+- App research now uses interface, interaction-pattern and accessibility queries rather than game-mechanics searches.
+- Wikimedia candidates expose source byte size, dimensions and checksum when available. Thumbnail downloads are streamed with a strict byte cap rather than buffering an unbounded response. Automatic external-asset import is not yet implemented; candidates explicitly require license, MIME, signature and size review.
+
 ## Wave 1 — Trustworthy AI, permissions and playable runtime
 
 ### 1. AI interview and planning
@@ -139,6 +150,109 @@ Make GENE a coherent AI-first game creation studio in which chat/brain, planning
 Start with the highest-risk correctness fixes and shared contracts, then wire them into the actual endpoints and UI. Implement in coherent batches, reusing existing modules/tests and avoiding parallel duplicate systems. This roadmap is the target; completed work must be recorded separately with code, commits and verification evidence.
 
 
+## Wave 2 implementation checkpoint (2026-10-23)
+
+- Research results now distinguish **technical evidence** from **asset references** using explicit `resultType` / `integrationState` metadata. Search results and Wikimedia visual/audio results are labelled reference-only; a research result is not silently treated as an imported project asset.
+- Commons results expose a declared-license state that still requires per-asset review. Wikipedia thumbnail references are explicitly license-unverified until the source page is checked. Poly Haven model matches are labelled catalog references with source-declared CC0 metadata, not downloaded/imported files.
+- Added regression assertions for the provenance/integration-state contract in `tests/research-evidence.mjs`.
+- These latest provenance commits still require CI and Playground verification. This is a focused Wave 2 increment, not completion of the full research or Forge roadmap.
+
+## Continued implementation increment (2026-10-23)
+
+- Forge's actual mesh-export path now rejects a recipe when structural QA marks it invalid instead of attaching a warning and exporting it anyway. The existing safe fallback can then handle the failed provider recipe.
+- Sprite animation manifests now have a runtime validator that reports missing/invalid manifests, duplicate clip names, invalid frame indices or timing, missing referenced frames, and missing asset identity. Three-digit frame filenames are accepted consistently by both the runtime allowlist and the drawing helper.
+- The runtime asset registry now validates manifests against actual OBJ/MTL files, reports broken geometry, missing materials, static-only limitations and required collision integration; resolving an asset includes the validation report.
+- Scene integration now reports mesh readiness per scene object, including missing OBJ files, unrenderable geometry, and absent material files. Scene manifest normalization disambiguates duplicate object IDs and prevents zero/negative initial scales from silently making scene objects invisible.
+- These are integration/diagnostic improvements, not proof of visual fidelity or playable gameplay. User-side web checks remain outstanding as requested.
+
+## Asset-pipeline continuation (2026-10-23)
+
+- Fixed a real 2D integration gap: both build-time Forge staging and manual asset saving now persist the cropped frame SVG files, not only the sprite sheet and manifest. Animation clips can now resolve their frame files from the project bundle.
+- Native 2D manifests fingerprint the source sheet and each frame. The save paths relocate fingerprint entries alongside the actual project file paths.
+- Native and AI 3D Forge manifests now fingerprint the exact OBJ and MTL outputs with SHA-256; runtime asset listings expose these fingerprints and warn when a legacy or incomplete manifest lacks valid hashes.
+- Added regression coverage for sprite-manifest validation, missing frame detection, 2D frame persistence, scene mesh status, and Forge file-integrity metadata. These tests are committed for the user's later verification; they have not been reported as run on the current head.
+
+## Forge modelling increment (2026-10-23)
+
+- Expanded the 3D recipe vocabulary with real procedural **stairs** and curved **arch** meshes, including bounds and triangle-complexity estimates. The AI recipe instructions now describe when to use them, and the deterministic native building preset uses them when an arched entrance or staircase is requested.
+- Corrected the arch's ellipse dimensions so the generated geometry spans the declared width and height instead of collapsing to a short semicircle.
+- Added focused regression cases for both geometry options and their native building-preset use. These remain procedural static meshes: they do not imply rigging, UV textures, collision generation or gameplay integration.
+
+## Runtime contract continuation (2026-10-23)
+
+- Added a bounded `GENE_GAMEPLAY` reporting interface for games to declare their genre, controls, objective and expected event types, then report real start/movement/interaction/objective/win/lose/restart transitions. The API labels these as game-authored reports and never sets `verified=true`.
+- The preview host now surfaces those reports as self-reported telemetry without changing the preview's verification status. Builder instructions tell generated games to report only actual state transitions, not placeholder signals.
+- Runtime asset integrity can now asynchronously verify SHA-256 against the exact imported project-file text using Web Crypto. Scene-level verified status composes mesh readiness with those fingerprints and returns an explicit integrity failure if bytes changed.
+- This improves observability and traceability but does not replace independent browser interaction tests; the user plans to perform the web checks after implementation is finished.
+
+## Gameplay coverage increment (2026-10-23)
+
+- The gameplay telemetry snapshot now summarizes observed event names and required-but-unreported events for a declared game contract. It always returns `reportedOnly: true` and `verified: false`; these signals are useful for diagnosis but cannot satisfy independent gameplay verification on their own.
+- The workspace records game-reported events with that limitation stated explicitly, while preserving the existing visible-render-versus-playable distinction.
+
+## Asset versioning continuation (2026-10-23)
+
+- Editing an existing Forge model now reads its previous manifest version and increments it in the saved asset manifest, rather than resetting the stable asset to version 1. Project-wide build checkpoints remain separate from per-asset versions.
+
+## Mesh validation increment (2026-10-23)
+
+- Every procedural 3D primitive is now checked before OBJ serialization for non-empty geometry, finite vertex coordinates, valid face lengths, and in-range integer indices. A malformed generated primitive is rejected before it can be saved as a model.
+
+## Reference-image safety increment (2026-10-23)
+
+- Forge now decodes supplied reference images, enforces a decoded-byte budget in addition to the base64 character cap, validates the actual file signature against the declared JPEG/PNG/WebP MIME type, and forwards only the validated bytes. A client-supplied MIME label alone is no longer accepted as evidence of a valid image.
+
+## Research-to-Forge provenance increment (2026-10-23)
+
+- AI-generated 3D Forge manifests now retain sanitized source page/direct URL, declared license and attribution, MIME type, exact byte size, and SHA-256 of each validated reference image actually sent to the provider. Unsafe/non-HTTPS metadata links are omitted. A declared license remains metadata, not an automatic license approval.
+
+## Scene-wide asset verification increment (2026-10-23)
+
+- Added an asynchronous scene-wide verification helper that checks each visible scene mesh through the mesh-readiness report and SHA-256 integrity verifier. It returns per-object results and does not alter the render/playability state by itself.
+
+## Research import readiness increment (2026-10-23)
+
+- Wikimedia asset candidates now carry explicit import blockers and a required-check list covering license/attribution review, downloaded size, response MIME, file signature, project path, and source provenance. This makes the boundary clear: finding a downloadable candidate is not the same as approving or importing it.
+
+## Forge-to-runtime collision metadata increment (2026-10-23)
+
+- Procedural 3D mesh manifests now calculate transformed world-space bounds and derive conservative per-part axis-aligned box collision proxies from the same vertices written to OBJ. The proxy records include center, positive dimensions, and source primitive type.
+- Runtime asset validation now checks bounds and proxy metadata, rejects malformed proxy dimensions, and warns when older static models have no collision metadata. These are data contracts only: no physics-engine collider is instantiated automatically yet, and AABB proxies can be conservative for rotated/curved shapes.
+
+## Research image import workflow increment (2026-10-23)
+
+- Added an explicit **Import to project** action to visual research cards. The user sees the source, license and attribution details before confirming; the call then requires a fresh call-scoped tool approval bound to the exact import inputs.
+- Added a server-side importer restricted to approved HTTPS image hosts, with redirects disabled, a 350 KB streamed byte limit, supported raster MIME checks, real file-signature validation, and SHA-256 of the exact downloaded bytes. The response preserves source-page/license/attribution metadata; it does not independently certify a license.
+- Imported images are saved into the project file map and a build-version checkpoint as `assets/<id>/reference.png|jpg|webp` plus `asset.json`. Runtime bundling now accepts these bounded reference/texture paths, and SHA-256 verification decodes the stored data URL so it verifies the original raster bytes rather than the URL text.
+- The imported image remains a reference asset by default; it is **not** automatically applied as a texture or claimed to be a playable/game-ready asset. That needs a separate supported sprite/UV-material assignment path.
+
+## Research import hardening increment (2026-10-23)
+
+- Reduced the import ceiling to 350 KB to limit base64 expansion and project/version storage growth in the browser. The import action retains only three snapshots for this import checkpoint rather than duplicating a large image across the full version history.
+- Exact source URL, source page, and declared license are now shown in the separate call-scoped approval prompt. Unsupported MIME types and declared oversized responses are canceled immediately; streamed bodies are canceled if they cross the byte ceiling.
+
+## Scene collision-adapter contract increment (2026-10-23)
+
+- `GENE_SCENE.getCollisionProxyData(id)` now reads the mesh manifest and transforms each proxy center and dimensions through the scene object's scale, position, and rotation. It returns oriented-box adapter data and a status that explicitly says the data is ready but no physics collider has been instantiated.
+- This gives a future/current game-engine adapter a stable contract without pretending GENE has already connected a physics backend. Proxy fidelity remains conservative; curved and rotated source primitives may need tighter collision geometry for production.
+
+## Research-to-Forge image handoff increment (2026-10-23)
+
+- Project research references now retain source URL/page, license, attribution, source identifier, byte size, and image SHA-256 alongside the actual image pixels. Both automatic game builds and manual 3D Forge requests send up to two image references alongside up to two text notes; the Forge API already enforces the aggregate decoded-byte and signature checks and records provenance in generated manifests.
+- User-supplied image attachments remain in the same reference pool and are preferred by insertion order; source metadata is optional for user-owned images. Forge's reference manifest fingerprints the exact validated bytes it received, and no automatic third-party license approval is implied.
+
+## Imported reference asset library increment (2026-10-23)
+
+- Imported research images now appear in the project's asset library with license/attribution details, a source link, image download, manifest download, and removal action. They remain clearly labeled as reference-only assets until a supported sprite or UV-material assignment path is used.
+
+## Latest implementation increment (2026-10-23)
+
+- Runtime diagnostics now expose observed canvas dimensions, renderer context types, drawing/frame counts, input observations, and captured runtime errors. Context detection wraps the game's own `getContext` calls rather than creating a competing context that could break startup. The diagnostic assessment explicitly says gameplay remains unverified by telemetry alone.
+- Research image payloads are streamed under a hard byte cap, checked against raster file signatures, and returned with exact byte size and SHA-256 fingerprint. External research candidates remain reference-only until an approved importer validates license, type, signature and size.
+- Visual references are deduplicated by canonical URL, ignoring fragments and common tracking parameters.
+- Forge structural QA now flags empty assets, unsupported shapes, malformed transforms, near-zero scales, missing part names and invalid colors; severe structural errors produce an `invalid` status. This remains structural QA, not visual-quality proof.
+- Focused tests were added for these contracts. The newest commits have not been run through current-head CI or Game Playground; the user requested implementation first and will perform the web checks after the full update.
+
 ## Implementation log — current branch
 
 The following code changes have been started on `gene-infinity-overhaul` (not yet merged to `main`):
@@ -149,7 +263,10 @@ The following code changes have been started on `gene-infinity-overhaul` (not ye
 - Added Canvas/WebGL source contracts that reject builds with no detectable visible drawing operations, no WebGL draw submission, or no WebGL viewport setup. Renderer checks inspect the assembled module graph rather than only one file.
 - Native 2D Forge now exports cropped frame SVG files and animation clip metadata in addition to the source atlas. The runtime exposes `GENE_SPRITES.draw` / `GENE_SPRITES.clips`, and generated frame files are included in the runtime asset allowlist.
 - Updated the AI build instructions to use frame-based animation clips and not stretch the full sprite sheet into a static character.
-- Tightened visual-reference queries and added topic/category relevance filtering before image references are handed to the research bundle.
-- Added focused regression tests for sprite slicing, runtime animation support, visible-renderer contracts, image relevance, and call-scoped tool approvals.
+- Tightened visual-reference queries and added topic/category relevance filtering to both the displayed research bundle and the image bytes sent to the model. Category-only results no longer pass for specific multi-term topics.
+- Added stable asset IDs, version and provenance metadata to native 2D assets; added honest runtime capability metadata to 2D/3D manifests, including unsupported textures, UVs, rigs and colliders.
+- Added a shared `GENE_ASSET_REGISTRY` for manifest lookup by path or stable ID. Fixed the runtime allowlist so actual Forge manifests under `assets/models/<kind>.json` are loaded and indexed.
+- Strengthened preview acceptance: a WebGL clear/background buffer is not enough; 3D needs real geometry draw calls. Canvas2D needs non-uniform pixels plus entity drawing distinct from background clearing. A visible frame is now labeled `rendered`, not `playable`, until gameplay verification exists.
+- Added focused regression coverage for sprite slicing, runtime animation, manifest registry behavior, actual Forge manifest paths, visible-renderer contracts, image relevance, AI-only planning recovery, and call-scoped tool approvals.
 
-Verification status: repository files and branch commits were inspected through GitHub. A local build/test run has not yet been completed in this environment because the repository could not be cloned from the container network. CI should be used to verify the branch before merge. Do not interpret this log as a claim that the full overhaul is complete.
+Verification status: the CI contract suite passed on an earlier commit containing the research-filter correction and runtime asset registry. Subsequent commits add further runtime, sprite, scene, Forge, and provenance work and have not been run through current-head CI/Playground, at the user's request. The user will perform web checks after implementation is finished. Do not interpret this log as a claim that the full overhaul is complete.

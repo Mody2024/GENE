@@ -9,6 +9,7 @@ const twoDRoute = readFileSync(new URL("../apps/web/app/api/forge/2d/route.ts", 
 const twoDModule = readFileSync(new URL("../apps/web/lib/forge-2d.mjs", import.meta.url), "utf8");
 const studioPage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 const runtimeAssets = readFileSync(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url), "utf8");
+const runtimeScene = readFileSync(new URL("../apps/web/app/lib/runtime-scene.ts", import.meta.url), "utf8");
 const researchRoute = readFileSync(new URL("../apps/web/app/api/research/route.ts", import.meta.url), "utf8");
 const researchSources = readFileSync(new URL("../apps/web/app/lib/research-sources.mjs", import.meta.url), "utf8");
 
@@ -17,12 +18,17 @@ assert.match(route, /if \(!apiKeys\.length\)\s*\{\s*const native = nativeAssetRe
 assert.match(route, /if \(!text\)\s*\{\s*const native = nativeAssetResponse/, "native generation must recover from provider failures");
 assert.match(route, /function stableForgeAssetId/, "3D assets must receive stable IDs");
 assert.match(route, /function withForgeAssetMetadata/, "3D assets must carry a canonical versioned manifest");
+assert.match(route, /runtimeCompatibility:/, "3D assets must expose runtime capability metadata");
+assert.match(route, /textures: "not-included"/, "3D manifests must not imply texture support when textures are not exported");
+assert.match(route, /rigging: "not-supported-by-current-pipeline"/, "3D manifests must clearly disclose missing rigging support");
+assert.match(route, /qualityEvidence: "structural-only; no automatic visual equivalence claim"/, "structural QA must not be presented as proof of visual fidelity");
 assert.match(route, /externalDependencies: \[\]/, "native and AI-generated meshes must disclose their external dependency list");
 assert.match(route, /sourcePrompt: prompt\.slice/, "3D asset provenance must retain the source brief");
 assert.match(route, /assetId: manifest\.assetId, version: manifest\.version, manifest/, "API response and exported manifest must share one identity");
 assert.match(route, /try the bounded native generator before returning an error/, "invalid provider recipes must attempt native fallback");
 assert.match(route, /shape === "capsule"/, "mesh builder must generate capsule geometry for better limbs and organic forms");
 assert.match(route, /"model\.obj": mesh\.obj/, "Forge must export real OBJ geometry");
+assert.ok(runtimeScene.includes('o.modelPath.replace(/\\\\.obj$/i,".mtl")'), "Scene Studio must resolve the matching MTL file for any Forge model filename, including assets/models/character.obj");
 assert.match(route, /"model\.mtl": mesh\.mtl/, "Forge must export material definitions");
 assert.match(route, /"asset\.json": JSON\.stringify\(manifest, null, 2\)/, "Forge must export the canonical versioned asset manifest");
 assert.match(route, /analyzeForgeRecipe\(recipe\)/, "Forge must run deterministic structural QA before returning an asset");
@@ -54,3 +60,43 @@ assert.match(prompt, /GENE FORGE MANDATORY WORKFLOW/, "the unified agent must be
 assert.match(prompt, /GENE FORGE — MANDATORY MODELLING COURSE/, "the detailed modelling curriculum must be present in the agent system prompt");
 
 console.log("GENE Forge route contract tests passed (imports, no-key fallback, provider failure recovery, validated exports, size limits, and mandatory agent routing).");
+
+assert.match(route, /function attachContentIntegrity\(manifest: any, obj: string, mtl: string\)/, "Forge manifests expose a reusable exact-file integrity helper");
+assert.match(route, /createHash\("sha256"\)\.update\(obj, "utf8"\)\.digest\("hex"\)/, "the exported OBJ receives a SHA-256 fingerprint");
+assert.match(route, /createHash\("sha256"\)\.update\(mtl, "utf8"\)\.digest\("hex"\)/, "the exported MTL receives a SHA-256 fingerprint");
+assert.equal((route.match(/attachContentIntegrity\(withForgeAssetMetadata/g) || []).length, 2, "native and AI Forge outputs both receive file fingerprints");
+
+assert.match(twoDRoute, /createHash\("sha256"\)\.update\(asset\.svg, "utf8"\)\.digest\("hex"\)/, "native 2D sprite SVG receives a SHA-256 fingerprint");
+assert.match(twoDRoute, /integrityFiles\["frames\/" \+ name\] = createHash\("sha256"\)/, "every cropped animation frame receives its own fingerprint");
+assert.match(twoDRoute, /contentIntegrity: \{ algorithm: "sha256", files: integrityFiles \}/, "2D asset manifest stores exact source and frame fingerprints");
+
+assert.match(route, /"stairs" \| "arch"/, "Forge accepts useful procedural architectural shapes");
+assert.match(route, /const steps = 5/, "stair geometry is generated from bounded step segments");
+assert.match(route, /const segments = 16/, "arched geometry uses a curved segmented mesh rather than a flat placeholder");
+assert.match(route, /Allowed shapes: box, beveledBox[\s\S]{0,180}stairs, arch/, "AI modelling instructions describe the new shapes");
+
+assert.match(route, /function assertValidPrimitiveMesh\(/, "Forge validates generated primitive geometry before export");
+assert.match(route, /contains a non-finite vertex/, "non-finite mesh coordinates are rejected");
+assert.match(route, /contains an invalid face/, "invalid face indices cannot be written into an OBJ file");
+assert.match(route, /assertValidPrimitiveMesh\(mesh, part\.name\)/, "every generated part passes topology validation");
+
+assert.match(route, /hasValidImageSignature\(ref\.mimeType, referenceBytes\)/, "Forge validates the actual uploaded reference bytes against the declared image MIME");
+assert.match(route, /REFERENCE_SIGNATURE_MISMATCH/, "Forge rejects image payloads disguised as another raster format");
+assert.match(route, /totalImageBytes > 550_000/, "Forge enforces a decoded byte budget in addition to base64 character limits");
+assert.match(route, /referenceBytes\.toString\("base64"\)/, "only the validated decoded bytes are forwarded to the provider");
+
+assert.match(prompt, /every frameFiles entry[\s\S]{0,140}preserve animationClips and remap contentIntegrity paths/, "Forge course requires persisting all animation frames and their integrity metadata");
+
+assert.match(route, /function safeHttpsUrl\(value: unknown\)/, "Forge sanitizes reference source URLs before recording provenance");
+assert.match(route, /referenceInputs: acceptedReferenceProvenance/, "AI-generated Forge manifests retain reference provenance");
+assert.match(route, /sourcePage: safeHttpsUrl\(ref\.sourcePage \|\| ref\.page\)/, "reference manifests preserve a safe source page link");
+assert.match(route, /license: typeof ref\.license === "string"/, "reference manifests preserve declared license metadata without claiming approval");
+assert.match(route, /sha256: createHash\("sha256"\)\.update\(referenceBytes\)/, "reference provenance fingerprints the exact validated image bytes sent to the provider");
+
+assert.match(route, /collisionProxies: Array<\{ name: string; shape: "box"; center: Vec3; size: Vec3; sourceShape: Shape \}>/, "Forge represents collision proxies explicitly in the asset manifest");
+assert.match(route, /collisionProxies\.push\(\{[\s\S]{0,500}sourceShape: part\.shape/, "each generated mesh part gets a conservative AABB proxy derived from transformed vertices");
+assert.match(route, /bounds: \{ min: bounds\.min[\s\S]{0,120}max: bounds\.max/, "the asset manifest exposes calculated world-space bounds");
+assert.match(route, /'capsule'\|'stairs'\|'arch'/, "AI recipe schema accepts all implemented procedural geometry types");
+assert.match(route, /conservative axis-aligned box proxies are provided in collisionProxies/, "manifest documents the difference between proxy metadata and engine-bound colliders");
+
+assert.match(route, /sourceUrl: safeHttpsUrl\(ref\.sourceUrl \|\| ref\.full \|\| ref\.url\)/, "Forge preserves source URLs from saved research image references");

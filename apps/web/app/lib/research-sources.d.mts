@@ -16,6 +16,7 @@ export type ResearchBundle = {
   unavailable: string[];
   sent?: { notes: boolean; images: number };
 };
+export function hasValidImageSignature(mimeType: string, input: Uint8Array | ArrayLike<number>): boolean;
 export function cleanQuery(value: unknown): string;
 export function keywords(value: unknown): string[];
 export function buildSearchLinks(query: string): ResearchLink[];

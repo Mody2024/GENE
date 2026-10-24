@@ -51,8 +51,10 @@ function readText(file: File): Promise<string> {
 
 type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; approval: ReturnType<typeof createToolApproval> };
 function approvalPrompt(tool: string, input: any): string {
-  const label = tool === "research" ? "Research" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
-  const detail = String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request").trim().slice(0, 240);
+  const label = tool === "research" ? "Research" : tool === "researchAssetImport" ? "Research image import" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
+  const detail = (tool === "researchAssetImport"
+    ? [input?.title, input?.sourceUrl, input?.sourcePage, "License: " + String(input?.license || "not stated")].filter(Boolean).join(" · ")
+    : String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request")).trim().slice(0, tool === "researchAssetImport" ? 560 : 240);
   return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
     "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
 }
@@ -104,7 +106,8 @@ async function fetchWithToolApproval(input: RequestInfo | URL, init?: RequestIni
   if (typeof init?.body === "string") { try { payload = JSON.parse(init.body); } catch { payload = null; } }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fetch(input, init);
   let tool: string | null = null;
-  if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
+  if (/\/api\/research\/import(?:\?|$)/.test(url)) tool = "researchAssetImport";
+  else if (/\/api\/research(?:\?|$)/.test(url)) tool = "research";
   else if (/\/api\/forge\/2d(?:\?|$)/.test(url)) tool = "forge2d";
   else if (/\/api\/forge(?:\?|$)/.test(url)) tool = "forge3d";
   if (tool) {
@@ -505,6 +508,25 @@ export default function Home() {
         setDraft(current => (current.trim() ? current.trim() + "\n\n" : "") + "Edit the selected live-preview element " + target + ". Preserve other working features and change only what I describe: ");
         setNotice("Element selected. Describe the exact change in the composer, then send it.");
       }
+      if (event.data?.type === "gene-runtime" && event.data.state === "gameplay-event") {
+        const eventName = String(event.data.event?.name || "unknown").slice(0, 40);
+        addActivity("Game-reported gameplay event: " + eventName + " (self-reported telemetry only; not independent gameplay verification).");
+        setNotice("Game-reported event: " + eventName + ". This is telemetry from the generated game, not independent proof that the mechanic works.");
+        return;
+      }
+      if (event.data?.type === "gene-runtime" && event.data.state === "input-observed") {
+        const inputType = String(event.data.inputType || "user input").slice(0, 40);
+        setNotice("The preview received " + inputType + ". This confirms input reached the game frame, not that gameplay responded. Verify movement, interaction, and the core objective.");
+        setProject(current => current ? {
+          ...current,
+          livingPreview: current.livingPreview ? {
+            ...current.livingPreview,
+            currentObjectives: ["Input reached the preview; confirm the game reacted", "Verify interaction and the core objective", "Check restart or reset behavior where available"],
+            updatedAt: now()
+          } : current.livingPreview
+        } : current);
+        return;
+      }
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
@@ -516,7 +538,7 @@ export default function Home() {
           setProject(current => current ? {
             ...current,
             buildRun: current.buildRun ? { ...current.buildRun, prototype: current.buildRun.prototype ? { ...current.buildRun.prototype, ready: true } : current.buildRun.prototype, updatedAt: now() } : current.buildRun,
-            livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Play and verify the core gameplay loop"], canContinuePlaying: true },
+            livingPreview: { status: "rendered", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: ["Verify player controls, interaction, and the core gameplay loop"], canContinuePlaying: true },
             versions: current.versions.map((v, index) => index === 0 ? { ...v, testSummary: "Source checks passed; browser runtime reported a visible render surface. Gameplay objectives still require manual verification." } : v)
           } : current);
         }
@@ -599,7 +621,7 @@ export default function Home() {
     const engine = (() => { try { return JSON.parse(spec).engine === "webgl3d" ? "webgl3d" : "canvas2d"; } catch { return "canvas2d"; } })();
     const monitor = [
       "(function(){",
-      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){var b=document.body;var controls=b&&b.querySelector('button,input,select,textarea,[role=button],[role=radio],[role=option],a[href],form,[tabindex]');var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||controls));if(visible){window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:'rendered',renderer:'dom-text-game',controls:!!controls},'*');}else{parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'dom-text-game'},'*');}return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0,samples=0,colors=Object.create(null);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);for(var i=0;i<pixels.length;i+=step){samples++;if(pixels[i+3]>0){alpha++;var key=pixels[i]+','+pixels[i+1]+','+pixels[i+2];if(!colors[key]){colors[key]=1;n++;}}}if((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,samples=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),colors=Object.create(null);for(var i=0;i<d.length;i+=step){samples++;if(d[i+3]>0){alpha++;var key=d[i]+','+d[i+1]+','+d[i+2];if(!colors[key]){colors[key]=1;n++;}}}if((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
+      "function report(){if(window.__geneFrameConfirmed)return;try{var c=document.getElementById('game-canvas')||document.querySelector('canvas');if(!c){var b=document.body;var controls=b&&b.querySelector('button,input,select,textarea,[role=button],[role=radio],[role=option],a[href],form,[tabindex]');var visible=!!(b&&b.children.length&&(b.innerText.trim().length>0||controls));if(visible){window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:'rendered',renderer:'dom-text-game',controls:!!controls},'*');}else{parent.postMessage({type:'gene-runtime',state:'loaded',renderer:'dom-text-game'},'*');}return;}var spec={};try{spec=JSON.parse(document.body.getAttribute('data-gene-spec')||'{}')}catch(e){}if(document.body.getAttribute('data-gene-engine')==='webgl3d'){var gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:'WebGL context unavailable'},'*');return;}requestAnimationFrame(function(){try{var w=gl.drawingBufferWidth||1,h=gl.drawingBufferHeight||1,pixels=new Uint8Array(w*h*4),step=Math.max(4,Math.floor(pixels.length/5000/4)*4),n=0,alpha=0,samples=0,colors=Object.create(null);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);for(var i=0;i<pixels.length;i+=step){samples++;if(pixels[i+3]>0){alpha++;var key=pixels[i]+','+pixels[i+1]+','+pixels[i+2];if(!colors[key]){colors[key]=1;n++;}}}var diag=window.GENE_DIAGNOSTICS&&window.GENE_DIAGNOSTICS.snapshot?window.GENE_DIAGNOSTICS.snapshot():null;var geometryDraws=diag&&Number(diag.webglDrawCalls)||0;if(geometryDraws>0&&((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9)))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,geometryDrawCalls:geometryDraws,renderer:'webgl'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',renderer:'webgl',message:String(e)},'*');}});return;}var ctx=c.getContext('2d');if(!ctx){parent.postMessage({type:'gene-runtime',state:'error',renderer:'canvas2d',message:'Canvas 2D context unavailable'},'*');return;}var w=c.width||1,h=c.height||1,d=ctx.getImageData(0,0,w,h).data,n=0,alpha=0,samples=0,step=Math.max(4,Math.floor(d.length/5000/4)*4),colors=Object.create(null);for(var i=0;i<d.length;i+=step){samples++;if(d[i+3]>0){alpha++;var key=d[i]+','+d[i+1]+','+d[i+2];if(!colors[key]){colors[key]=1;n++;}}}var diag=window.GENE_DIAGNOSTICS&&window.GENE_DIAGNOSTICS.snapshot?window.GENE_DIAGNOSTICS.snapshot():null;var drawOps=diag&&Number(diag.canvasEntityOps)||0;if(drawOps>0&&((n>1&&alpha>12)||(alpha>12&&alpha<samples*0.9)))window.__geneFrameConfirmed=true;parent.postMessage({type:'gene-runtime',state:window.__geneFrameConfirmed?'rendered':'loaded',visiblePixels:n,opaquePixels:alpha,canvasDrawOps:drawOps,renderer:'canvas2d'},'*');}catch(e){parent.postMessage({type:'gene-runtime',state:'error',message:String(e)},'*');}}",
       "window.addEventListener('error',function(e){parent.postMessage({type:'gene-runtime',state:'error',message:(e.message||'script error')+(e.filename?' @ '+e.filename.split('/').pop()+':'+e.lineno+':'+e.colno:''),stack:e.error&&e.error.stack?String(e.error.stack).slice(0,900):''},'*');});",
       "window.addEventListener('unhandledrejection',function(e){var r=e.reason;parent.postMessage({type:'gene-runtime',state:'error',message:'Unhandled promise rejection: '+String(r&&r.message||r||'unknown rejection'),stack:r&&r.stack?String(r.stack).slice(0,900):''},'*');});",
       "window.addEventListener('message',function(e){if(e.data&&e.data.type==='gene-custom-edit-mode'){window.__geneCustomEdit=!!e.data.enabled;document.documentElement.style.cursor=window.__geneCustomEdit?'crosshair':'';}});",
@@ -690,6 +712,20 @@ export default function Home() {
         try { manifest = JSON.parse(source); } catch {}
         return { id, name: String(manifest.name || id), kind: String(manifest.kind || "character"), svgPath: "assets/" + id + "/sprite.svg", manifestPath: path, width: Number(manifest.width || 0), height: Number(manifest.height || 0), frames: Number(manifest.frames || 1) };
       });
+  }, [project?.files, project?.id]);
+
+  const savedResearchImages = useMemo(() => {
+    if (!project) return [];
+    return Object.entries(project.files)
+      .filter(([path]) => /^assets\/[a-zA-Z0-9_-]+\/asset\.json$/.test(path))
+      .map(([manifestPath, source]) => {
+        let manifest: any = {};
+        try { manifest = JSON.parse(source); } catch {}
+        if (manifest.kind !== "reference-image") return null;
+        const imagePath = Object.keys(manifest.contentIntegrity?.files || {}).find(path => /\/reference\.(?:png|jpe?g|webp)$/i.test(path)) || "";
+        return { id: String(manifest.assetId || manifestPath.split("/")[1]), name: String(manifest.name || "Research reference"), manifestPath, imagePath, license: String(manifest.provenance?.license || "License not recorded"), attribution: String(manifest.provenance?.attribution || ""), sourcePage: String(manifest.provenance?.sourcePage || "") };
+      })
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset?.imagePath && project.files[asset.imagePath]));
   }, [project?.files, project?.id]);
 
   const addActivity = (entry: string) => {
@@ -863,12 +899,12 @@ export default function Home() {
           const researchResponse = await runFetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: researchQuery, kind: nextProject.kind === "app" ? "app" : "game", engine: nextProject.plan?.engine || nextProject.preferredEngine || "auto", images: true }) });
           const researchData = await researchResponse.json().catch(() => null);
           if (researchResponse.ok && researchData?.ok && researchData.bundle && typeof researchData.notes === "string" && researchData.notes.trim()) {
-            const imageData: Array<{ name: string; mimeType: string; dataBase64: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
+            const imageData: Array<{ id?: string; name: string; mimeType: string; dataBase64: string; byteSize?: number; sha256?: string }> = Array.isArray(researchData.imageData) ? researchData.imageData : [];
             const note = { id: uid(), name: "research-notes.md", mimeType: "text/markdown", kind: "text" as const, textContent: String(researchData.notes).slice(0, 20000), size: String(researchData.notes).length };
             const kept = (nextProject.references || []).filter(item => item.name !== note.name && !/^research-image-/.test(item.name));
             // The model accepts at most 4 reference images; the user's own attachments always win.
             const freeSlots = Math.max(0, 4 - kept.filter(item => item.kind === "image").length);
-            const imageRefs = imageData.slice(0, freeSlots).map((image, index) => ({ id: uid(), name: "research-image-" + (index + 1) + "-" + String(image.name || "reference").replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40) + (image.mimeType === "image/png" ? ".png" : image.mimeType === "image/webp" ? ".webp" : image.mimeType === "image/gif" ? ".gif" : ".jpg"), mimeType: image.mimeType, kind: "image" as const, dataBase64: image.dataBase64, size: Math.round(image.dataBase64.length * 0.75) }));
+            const imageRefs = imageData.slice(0, freeSlots).map((image, index) => { const sourceImage = (researchData.bundle.images || []).find((candidate: any) => candidate.id === image.id) || {}; return { id: uid(), sourceId: String(image.id || ""), name: "research-image-" + (index + 1) + "-" + String(image.name || "reference").replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40) + (image.mimeType === "image/png" ? ".png" : image.mimeType === "image/webp" ? ".webp" : ".jpg"), mimeType: image.mimeType, kind: "image" as const, dataBase64: image.dataBase64, size: Number(image.byteSize || Math.round(image.dataBase64.length * 0.75)), byteSize: Number(image.byteSize || 0), sha256: String(image.sha256 || ""), source: String(sourceImage.source || ""), sourceUrl: String(sourceImage.full || sourceImage.thumb || ""), sourcePage: String(sourceImage.page || ""), license: String(sourceImage.license || ""), attribution: String(sourceImage.credit || "") }; });
             const bundle: ResearchBundle = { ...researchData.bundle, sent: { notes: true, images: imageRefs.length } };
             const references = [...kept, note, ...imageRefs];
             const attach = (messages: GeneProject["messages"]) => { const index = messages.map(item => item.role).lastIndexOf("user"); return index < 0 ? messages : messages.map((item, position) => position === index ? { ...item, research: bundle } : item); };
@@ -947,7 +983,15 @@ export default function Home() {
               if (!item) continue;
               const base = "assets/forge2d/" + item.kind;
               stagedFiles[base + ".svg"] = String(item.asset.svg);
-              stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport }, null, 2);
+              const sourceIntegrity = item.asset.manifest.contentIntegrity;
+              const projectIntegrityFiles = sourceIntegrity?.files ? {
+                [base + ".svg"]: sourceIntegrity.files["sprite.svg"],
+                ...Object.fromEntries(Object.entries(item.asset.frameFiles || {}).map(([frameName]) => [base + "/frames/" + frameName, sourceIntegrity.files["frames/" + frameName]]))
+              } : undefined;
+              stagedFiles[base + ".json"] = JSON.stringify({ ...item.asset.manifest, kind: item.kind, name: item.asset.name, source: "GENE Native 2D Forge", qualityReport: item.asset.qualityReport, contentIntegrity: sourceIntegrity ? { ...sourceIntegrity, files: projectIntegrityFiles } : undefined }, null, 2);
+              for (const [frameName, frameSvg] of Object.entries(item.asset.frameFiles || {})) {
+                stagedFiles[base + "/frames/" + frameName] = String(frameSvg);
+              }
             }
             const generated = forgeResults.filter(Boolean) as Array<{kind:string;asset:any}>;
             if (generated.length) {
@@ -1000,9 +1044,9 @@ export default function Home() {
         if (recovery) addActivity("Resuming from checkpoint " + (recovery.run.checkpoints[recovery.run.checkpoints.length - 1]?.id || "latest") + "; previously passed file stages will be preserved.");
         setProject({ ...nextProject, buildRun: activeBuildRun, livingPreview: { status: "booting", updatedAt: now(), runtimeErrors: [], currentObjectives: ["Generating a playable project"], canContinuePlaying: false } });
         addActivity("GENE 2.0 build coordinator started with " + buildTasks.length + " dependency-aware tasks; checkpoints are enabled.");
-        const persistRun = (run: BuildRun, previewStatus: "booting" | "playable" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
+        const persistRun = (run: BuildRun, previewStatus: "booting" | "stale" | "error" = "booting", sourceFiles: Record<string, string> = stagedFiles, passed: string[] = [], failed: string[] = [], reason: "task-complete" | "prototype-ready" | "repair-failed" = "task-complete") => {
           activeBuildRun = checkpointBuild(run, sourceFiles, { passed, failed }, reason, "Resume from this source snapshot and retry only unfinished or failed tasks.");
-          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: previewStatus === "playable" } } : current);
+          setProject(current => current && current.id === nextProject.id ? { ...current, buildRun: activeBuildRun, livingPreview: { status: previewStatus, lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: failed, currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: false } } : current);
           setLiveRun(current => current ? { ...current, build: { tasks: run.tasks.map(task => ({ id: task.id, title: task.title, status: task.status })), total: run.tasks.length, passed: run.tasks.filter(task => task.status === "passed").length, activeTask: run.tasks.find(task => task.status === "running")?.title } } : current);
         };
         let finalContentPassSucceeded = false;
@@ -1175,7 +1219,7 @@ export default function Home() {
                             kind: ["character", "vehicle", "building", "environment", "prop", "weapon"].includes(String(request?.kind)) ? String(request.kind) : "prop",
                             quality,
                             projectStyle: [nextProject.initialPrompt, nextProject.plan?.summary, spec.artDirection, spec.visualStyle].filter(Boolean).join("\n").slice(0, 1600),
-                            references: (nextProject.references || []).filter(ref => ref.kind === "text").slice(0, 2)
+                            references: [...(nextProject.references || []).filter(ref => ref.kind === "text").slice(0, 2), ...(nextProject.references || []).filter(ref => ref.kind === "image" && ref.dataBase64).slice(0, 2)]
                           })
                         });
                         const forgeData = await forgeResponse.json().catch(() => null);
@@ -1257,7 +1301,7 @@ export default function Home() {
                   files: { ...current.files, ...stagedFiles },
                   plan: stagedPlan,
                   buildRun: activeBuildRun,
-                  livingPreview: { status: "playable", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: true },
+                  livingPreview: { status: "booting", lastKnownGoodVersion: current.versions[0]?.number, updatedAt: now(), runtimeErrors: [], currentObjectives: activeBuildRun?.prototype?.completedObjectives || [], canContinuePlaying: false },
                   updatedAt: now()
                 } : current);
                 setPreviewOpen(true);
@@ -1265,7 +1309,7 @@ export default function Home() {
                 setRuntimeState("loaded");
                 setSection("chat");
                 setCanQueueBuildRequests(true);
-                persistRun(activeBuildRun, "playable", stagedFiles, ["Core project files are present and ready for preview"], [], "prototype-ready");
+                persistRun(activeBuildRun, "booting", stagedFiles, ["Core project files are present; awaiting a visible runtime render"], [], "prototype-ready");
                 addActivity("Playable prototype published. Continue playing and chatting while GENE builds the remaining modules and full-game content.");
               }
             } catch (stageException) {
@@ -1848,6 +1892,99 @@ export default function Home() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  async function importResearchImage(image: any) {
+    if (!project || !image || typeof image.full !== "string" || typeof image.page !== "string") return;
+    const license = String(image.license || "").trim();
+    const attribution = String(image.credit || image.attribution || "").trim();
+    const title = String(image.title || "Research reference").trim().slice(0, 160);
+    const accepted = typeof window !== "undefined" && window.confirm(
+      "Import this external image into the current project?\n\n" +
+      title + "\nLicense: " + (license || "not stated") + "\nAttribution: " + (attribution || "not stated") +
+      "\nSource page: " + image.page +
+      "\n\nReview the source page and license first. GENE will record your review and the source metadata, but cannot independently certify the license."
+    );
+    if (!accepted) return;
+    try {
+      const response = await fetchWithToolApproval("/api/research/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: image.full,
+          sourcePage: image.page,
+          title,
+          license,
+          attribution,
+          licenseReviewConfirmed: true
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok || !result.asset?.dataBase64 || !result.asset?.sha256) {
+        addActivity("Research image was not imported: " + String(result?.error?.message || "source validation failed") + ".");
+        setNotice("Image import failed: " + String(result?.error?.message || "source validation failed"));
+        return;
+      }
+      const imported = result.asset;
+      const assetId = ("research-" + uid()).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 64);
+      const prefix = "assets/" + assetId + "/";
+      const extension = imported.mimeType === "image/png" ? "png" : imported.mimeType === "image/webp" ? "webp" : "jpg";
+      const imagePath = prefix + "reference." + extension;
+      const manifestPath = prefix + "asset.json";
+      const manifest = {
+        assetId,
+        version: 1,
+        name: imported.title,
+        kind: "reference-image",
+        createdAt: imported.importedAt,
+        provenance: {
+          origin: "external-research",
+          sourceUrl: imported.sourceUrl,
+          sourcePage: imported.sourcePage,
+          license: imported.license,
+          attribution: imported.attribution,
+          licenseReviewConfirmed: true,
+          reviewedAt: now(),
+          byteSize: imported.byteSize,
+          sha256: imported.sha256
+        },
+        contentIntegrity: { algorithm: "sha256", files: { [imagePath]: imported.sha256 } },
+        runtimeCompatibility: { format: "raster-reference", role: "reference-image", automaticallyAppliedAsTexture: false }
+      };
+      const files = {
+        ...project.files,
+        [imagePath]: "data:" + imported.mimeType + ";base64," + imported.dataBase64,
+        [manifestPath]: JSON.stringify(manifest, null, 2)
+      };
+      const versionNumber = (project.versions[0]?.number || 0) + 1;
+      const version: BuildVersion = {
+        number: versionNumber,
+        label: "Imported research reference: " + imported.title,
+        files: { ...files },
+        createdAt: now(),
+        testSummary: "Imported reviewed external raster bytes with source/license metadata and SHA-256 fingerprint. Automatic texture application and scene integration are not claimed."
+      };
+      const reply = message("assistant",
+        "Imported **" + imported.title + "** into " + imagePath + ". The project now contains the image and its source/license manifest. Its exact bytes are fingerprinted; it remains a reference image until you assign it to a supported sprite or texture workflow.",
+        "build"
+      );
+      const updated: GeneProject = {
+        ...project,
+        files,
+        versions: [version, ...project.versions].slice(0, 3),
+        messages: [...project.messages, reply],
+        updatedAt: now()
+      };
+      setProject(updated);
+      setSection("assets");
+      addActivity("Imported research image " + imported.title + " (" + imported.byteSize + " bytes; " + imported.license + ").");
+      setNotice("Research image saved in project version " + versionNumber + "; source metadata and SHA-256 were recorded.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      const reason = error instanceof Error ? error.message : "unknown error";
+      addActivity("Research image import failed: " + reason);
+      setNotice("Research image import failed: " + reason);
+    }
+  }
+
   async function generateForgeAsset() {
     if (!project || forgeBusy || !forgePrompt.trim()) return;
     const targetId = forgeTargetId;
@@ -1874,7 +2011,7 @@ export default function Home() {
           quality: forgeQuality,
           existingRecipe,
           projectStyle: [project.initialPrompt, project.plan?.summary, project.plan?.title].filter(Boolean).join("\n"),
-          references: (project.references || []).slice(0, 2)
+          references: [...(project.references || []).filter(ref => ref.kind === "text").slice(0, 2), ...(project.references || []).filter(ref => ref.kind === "image" && ref.dataBase64).slice(0, 2)]
         })
       });
       const data = await response.json().catch(() => ({}));
@@ -1883,9 +2020,14 @@ export default function Home() {
       }
       const assetId = targetId || ("asset-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6));
       const prefix = "assets/" + assetId + "/";
+      let previousAssetVersion = 0;
+      if (targetId) {
+        try { previousAssetVersion = Number(JSON.parse(project.files[prefix + "asset.json"] || "{}").version) || 0; } catch {}
+      }
       const manifest = {
         ...JSON.parse(data.asset.files["asset.json"]),
         assetId,
+        version: Math.max(1, previousAssetVersion + 1),
         name: data.asset.name,
         kind: data.asset.kind,
         style: data.asset.style,
@@ -1961,8 +2103,21 @@ export default function Home() {
       }
       const assetId = "art-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
       const prefix = "assets/" + assetId + "/";
-      const manifest = { ...JSON.parse(data.files["asset.json"]), assetId, name: data.asset.name, kind: data.asset.kind, width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider };
-      const files = { ...project.files, [prefix + "sprite.svg"]: String(data.asset.svg), [prefix + "asset-2d.json"]: JSON.stringify(manifest, null, 2) };
+      const sourceManifest = JSON.parse(data.files["asset.json"]);
+      const manifest = {
+        ...sourceManifest, assetId, name: data.asset.name, kind: data.asset.kind,
+        width: data.asset.manifest.width, height: data.asset.manifest.height, source: data.provider,
+        contentIntegrity: sourceManifest.contentIntegrity ? {
+          ...sourceManifest.contentIntegrity,
+          files: Object.fromEntries(Object.entries(sourceManifest.contentIntegrity.files || {}).map(([name, hash]) => [prefix + name, hash]))
+        } : undefined
+      };
+      const files = {
+        ...project.files,
+        [prefix + "sprite.svg"]: String(data.asset.svg),
+        [prefix + "asset-2d.json"]: JSON.stringify(manifest, null, 2),
+        ...Object.fromEntries(Object.entries(data.asset.frameFiles || {}).map(([name, svg]) => [prefix + "frames/" + name, String(svg)]))
+      };
       const versionNumber = (project.versions[0]?.number || 0) + 1;
       const version: BuildVersion = { number: versionNumber, label: "Generated 2D asset: " + String(data.asset.name), files: { ...files }, createdAt: now(), testSummary: "Generated a self-contained procedural SVG and a versioned 2D manifest. Visual integration into the running game and raster conversion are not yet verified." };
       const reply = message("assistant", "Generated **" + data.asset.name + "** as native procedural SVG artwork. Saved " + prefix + "sprite.svg and the asset manifest. This generator uses vector shapes and curated palettes; it is not an external image model, and the asset has not been automatically inserted into the game scene.", "build");
@@ -1971,7 +2126,7 @@ export default function Home() {
       setForgePrompt("");
       setSection("assets");
       setForgeNotice("2D artwork saved in version " + versionNumber + ". Use the asset's integration action to request insertion into the playable game; scene integration must be tested separately.");
-      addActivity("Saved " + prefix + "sprite.svg (" + data.asset.qualityReport.svgBytes + " bytes) and asset-2d.json");
+      addActivity("Saved " + prefix + "sprite.svg (" + data.asset.qualityReport.svgBytes + " bytes), asset-2d.json, and " + Object.keys(data.asset.frameFiles || {}).length + " animation frame files.");
       if (localAgentStatus === "connected" && localAgentToken && updated.files["game.html"] && updated.files["game.js"]) {
         try {
           const diskResult = await writeProjectToDisk(updated, localAgentUrl, localAgentToken);
@@ -3064,7 +3219,7 @@ export default function Home() {
                   {msg.role !== "user" && <div className="message-avatar">{msg.role === "system" ? "•" : "G"}</div>}
                   <div className="message-content">
                     {msg.role === "user" ? <div className="user-bubble">{msg.content}</div> : <div className="assistant-copy">{msg.content}</div>}
-                    {msg.research && <ResearchCard bundle={msg.research} />}
+                    {msg.research && <ResearchCard bundle={msg.research} onImportImage={importResearchImage} />}
                     {msg.changes && msg.changes.length > 0 && <div className="change-list" aria-label="Files changed by this request">{msg.changes.map(change => <button type="button" key={change.path} className={"change-row " + change.status} title="Open this file" onClick={() => { setProject(current => current ? { ...current, activeFile: change.path } : current); setSection("files"); }}><span className="change-path">{change.path}</span><span className="change-stat">{change.status === "removed" ? "removed" : <><b>+{change.added}</b> <i>−{change.removed}</i></>}</span></button>)}</div>}
                     {msg.kind === "error" && <div className="message-recovery">
                       <div className="inline-error">Your last saved files are preserved.</div>
@@ -3143,7 +3298,7 @@ export default function Home() {
               <div className="tool-view-heading"><div className="eyebrow">PLANNING & QUALITY</div><h2>Plan & tasks</h2><p>{project.kind === "app" ? "Review the scope, run source/runtime checks, then exercise the app flows and forms that matter." : "Review scope, run source/runtime smoke checks, then play the game to verify the mechanics that matter."}</p></div>
               {designDoc && <DesignDocPanel doc={designDoc} isApp={isApp} />}
               {project.buildRun && <div className="build-check-panel">
-                <div className="build-check-head"><div><div className="eyebrow">GENE BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Preview rendered" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
+                <div className="build-check-head"><div><div className="eyebrow">GENE BUILD SYSTEM</div><h3>Build checkpoints</h3><p>Prototype target: {project.buildRun.prototype?.targetMinutes ? "~" + project.buildRun.prototype.targetMinutes + " min" : "project-specific estimate pending"} · Full-game target: {project.buildRun.fullGame?.targetMinutes ? "~" + project.buildRun.fullGame.targetMinutes + " min" : "project-specific estimate pending"}</p></div><span className={"check-status " + (project.livingPreview?.status === "error" ? "fail" : project.livingPreview?.status === "playable" ? "pass" : "warn")}>{project.livingPreview?.status === "playable" ? "Gameplay verified" : project.livingPreview?.status === "rendered" ? "Preview visible · verify gameplay" : project.livingPreview?.status === "error" ? "Runtime error" : "Checking preview"}</span></div>
                 <div className="task-list">{project.buildRun.tasks.map(task => <div key={task.id}><span>{task.status === "passed" ? "✓" : task.status === "running" ? "…" : task.status === "failed" ? "×" : "○"}</span><p>{task.title}</p><small>{task.status}{task.attempts ? " · attempt " + task.attempts : ""}</small></div>)}</div>
                 <p className="build-check-disclaimer">A validated prototype is not the full game. The full-game target requires additional content, progression, and a separate ending; rendering alone does not prove every gameplay objective.</p>
                 {(project.buildRun.status === "failed" || project.buildRun.status === "recovering" || project.buildRun.tasks.some(task => task.status === "failed" || task.status === "blocked")) && <button className="primary-button" disabled={busy || buildInProgress} onClick={() => void runAgent("Resume this existing GENE build from its latest saved checkpoint. Restore checkpoint files, keep every passed task unchanged, retry only unfinished or failed tasks, then rerun final validation and repair. Do not restart from zero or claim completion unless all required tasks pass.", "build")}>Resume from checkpoint</button>}
@@ -3198,6 +3353,7 @@ export default function Home() {
     {forgeNotice && <div className="forge-notice">{forgeNotice}</div>}
   </div>
   {saved2DAssets.length > 0 && <><div className="forge-assets-heading"><div><div className="eyebrow">2D PROJECT ASSETS</div><h3>Saved artwork <span>{saved2DAssets.length}</span></h3></div><span>SVG · JSON manifest</span></div><div className="forge-asset-grid">{saved2DAssets.map(asset => <article className="forge-asset-card" key={asset.id}><div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.kind} · {asset.width}×{asset.height} · {asset.frames} frame(s)</small></div><button className="icon-button" title="Remove this 2D asset" onClick={() => removeForgeAsset(asset.id)}>×</button></div><div className="forge-2d-preview"><img alt={asset.name + " generated vector artwork"} src={"data:image/svg+xml;charset=utf-8," + encodeURIComponent(project.files[asset.svgPath] || "")} /></div><div className="forge-asset-actions"><button className="primary-button" onClick={() => { setSection("chat"); setDraft("Integrate the generated 2D asset at " + asset.svgPath + " into the actual playable game. Read its manifest at " + asset.manifestPath + ". The isolated runtime exposes the SVG through window.GENE_ART.list(), window.GENE_ART.image(path), and window.GENE_ART.draw(ctx,path,x,y,w,h); use these helpers or a verified equivalent. Use the correct asset kind (" + asset.kind + "), preserve current controls and responsive layout, and crop sprite-sheet frames when needed. Do not claim integration until the live preview visibly uses the saved SVG and a browser test passes."); setNotice("Prepared a specific 2D asset integration request for " + asset.name + ". Review it in Chat and send it to apply."); }}>Integrate into game</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.svgPath)}>SVG ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.manifestPath)}>Manifest ↓</button></div></article>)}</div></>}
+  {savedResearchImages.length > 0 && <><div className="forge-assets-heading"><div><div className="eyebrow">RESEARCH REFERENCES</div><h3>Imported images <span>{savedResearchImages.length}</span></h3></div><span>PNG · JPEG · WebP · source manifest</span></div><div className="forge-asset-grid">{savedResearchImages.map(asset => <article className="forge-asset-card" key={asset.id}><div className="forge-asset-card-title"><div><strong>{asset.name}</strong><small>{asset.license}{asset.attribution ? " · " + asset.attribution : ""}</small></div><button className="icon-button" title="Remove this imported reference" onClick={() => removeForgeAsset(asset.id)}>×</button></div><div className="forge-2d-preview"><img alt={asset.name + " imported research reference"} src={project.files[asset.imagePath]} /></div><div className="forge-asset-actions"><button className="secondary-button" onClick={() => downloadAssetFile(asset.imagePath)}>Image ↓</button><button className="secondary-button" onClick={() => downloadAssetFile(asset.manifestPath)}>Source manifest ↓</button>{asset.sourcePage && <a className="secondary-button" href={asset.sourcePage} target="_blank" rel="noreferrer noopener">Open source ↗</a>}</div><small className="rc-dim">Reference asset only; not automatically applied as a texture.</small></article>)}</div></>}
   <div className="forge-assets-heading"><div><div className="eyebrow">PROJECT ASSETS</div><h3>Saved meshes <span>{savedAssets.length}</span></h3></div><span>OBJ · MTL · JSON recipe</span></div>
   {savedAssets.length === 0 ? <div className="empty-state forge-empty"><div className="asset-symbol">◇</div><strong>No generated meshes yet</strong><p>Start with a prop, vehicle, character, weapon, or building. A successful result creates real files under <code>assets/&lt;asset-id&gt;/</code>. Mesh generation is not the same thing as importing it into a game scene; integration is a separate, testable change.</p></div> : <div className="forge-asset-grid">
     {savedAssets.map(asset => <article className="forge-asset-card" key={asset.id}>
