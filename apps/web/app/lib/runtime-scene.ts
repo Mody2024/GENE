@@ -88,7 +88,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         var q0=[Math.cos(a)*0.5,0.5,Math.sin(a)*0.5],q1=[Math.cos(b)*0.5,0.5,Math.sin(b)*0.5];
         if(type==="cone"){tri(p0,p1,[0,0.5,0]);}else{quad(p0,p1,q1,q0);tri([0,-0.5,0],p1,p0);tri([0,0.5,0],q0,q1);}
       }
-    }else{
+    }else if(type==="box"||type==="cube"||type==="rectangular-prism"){
       var x0=-0.5,x1=0.5,y0=-0.5,y1=0.5,z0=-0.5,z1=0.5;
       quad([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
       quad([x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0]);
@@ -97,6 +97,8 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       quad([x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0]);
       quad([x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]);
     }
+    // Unknown types must not silently masquerade as cubes. The quality gate or
+    // the game's own model integration should resolve unsupported scene entries.
     return out;
   }
   this.getVisibleObjects().forEach(function(o){
