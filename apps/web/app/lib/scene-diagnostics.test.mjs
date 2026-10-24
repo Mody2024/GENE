@@ -316,3 +316,12 @@ test("accepts material files with packaged textures and rejects unsafe texture p
   assert.equal(unsafe.ok, false);
   assert.match(unsafe.errors.join(" "), /unsafe or unsupported texture path/i);
 });
+
+test("3D build gate rejects a manifest without renderer integration", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { fileURLToPath } = await import("node:url");
+  const pagePath = fileURLToPath(new URL("../page.tsx", import.meta.url));
+  const page = await readFile(pagePath, "utf8");
+  assert.match(page, /add\("Scene renderer integration", sceneDrawn \? "warn" : "fail"/);
+  assert.match(page, /Build rejected: the manifest alone cannot draw geometry/);
+});
