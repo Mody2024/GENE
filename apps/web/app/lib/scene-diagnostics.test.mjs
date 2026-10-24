@@ -79,3 +79,20 @@ test("accepts supported WebGL primitive geometry without OBJ files", () => {
   ] } });
   assert.equal(report.ok, true);
 });
+
+test("rejects non-finite or malformed scene transforms", () => {
+  const report = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "nan-position", type: "box", position: [0, "NaN", 2] },
+    { id: "bad-scale", type: "sphere", scale: { x: 1, y: null, z: 1 } }
+  ] } });
+  assert.equal(report.ok, false);
+  assert.equal(report.errors.filter(error => /invalid (position|scale) transform/i.test(error)).length, 2);
+});
+
+test("warns when a scene object has a zero scale", () => {
+  const report = inspectSceneManifest({ engine: "webgl3d", scene: { objects: [
+    { id: "flat", type: "box", scale: [1, 0, 1] }
+  ] } });
+  assert.equal(report.ok, true);
+  assert.match(report.warnings.join(" "), /zero scale/i);
+});
