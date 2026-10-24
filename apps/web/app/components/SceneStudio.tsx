@@ -274,10 +274,18 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   };
   const addObject = () => {
     const id = "scene-object-" + Date.now().toString(36);
-    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position: zero(), rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
+    // Place new entries in a predictable grid instead of stacking every new object
+    // at the origin, where the latest object can hide the others and be hard to pick.
+    const slot = objects.length;
+    const column = (slot % 5) - 2;
+    const row = Math.floor(slot / 5);
+    const position = is2D
+      ? { x: column * 2.2, y: row === 0 ? 0 : -row * 1.8, z: 0 }
+      : { x: column * 1.8, y: 0, z: row * 1.8 };
+    const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position, rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
-    setStatus("New scene entry added. Save it to write the manifest.");
+    setStatus("New scene entry added in an open layout slot. Save scene data to persist it.");
   };
   const deleteSelected = () => {
     if (!selected) return;
