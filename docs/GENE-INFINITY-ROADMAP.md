@@ -3,7 +3,7 @@
 > **Progress snapshot (2026-10-24):** The first foundation batch is committed on `main` at [`9956ac4`](https://github.com/Mody2024/GENE/commit/9956ac40941e409258b4302c91e7f7d4562cf473). Its commit report records CI, interactive-playground, and browser-regression workflows passing. This does not mean the full Infinity overhaul or production end-to-end acceptance is complete. Percentages below are planning estimates, not runtime telemetry.
 
 ## Wave progress estimate
-- **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 85%** (foundation landed; remaining integration and edge-case verification are tracked below).
+- **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
 - **Wave 2 — 3D scene reliability and playable geometry: 35%** (stricter runtime contracts and OBJ/WebGL groundwork exist; real prompt-to-playable-scene acceptance remains).
 - **Wave 3 — persistent workspace, checkpoints, resumable repair: 20%** (local project/version foundations exist; durable task/project storage and resume semantics remain).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
