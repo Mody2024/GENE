@@ -2492,6 +2492,8 @@ export default function Home() {
           continue;
         }
         const id = typeof object.id === "string" ? object.id.trim() : "";
+        const sceneType = String(object.type || "mesh").toLowerCase();
+        const sceneLabel = id || "Scene entry " + (index + 1);
         if (!id) sceneIssues.push("Scene entry " + (index + 1) + " has no stable ID.");
         else if (sceneIds.has(id)) sceneIssues.push("Duplicate scene ID: " + id);
         else sceneIds.add(id);
@@ -2505,14 +2507,19 @@ export default function Home() {
             }
           }
         }
-        if (String(spec.engine || "").toLowerCase() === "webgl3d" &&
-          String(object.type || "").toLowerCase() === "mesh" &&
-          (typeof object.modelPath !== "string" || !object.modelPath.trim())) {
-          sceneIssues.push((id || "Scene entry " + (index + 1)) + " is a mesh without an assigned OBJ model; the WebGL runtime cannot draw imported geometry for it.");
+        if (String(spec.engine || "").toLowerCase() === "webgl3d") {
+          const supportedTypes = new Set(["mesh", "custom", "box", "cube", "rectangular-prism", "sphere", "cylinder", "cone", "plane", "light", "camera"]);
+          if (!supportedTypes.has(sceneType)) {
+            sceneIssues.push(sceneLabel + " uses unsupported WebGL scene type " + sceneType + "; use a supported primitive or provide an OBJ mesh.");
+          }
+          if ((sceneType === "mesh" || sceneType === "custom") &&
+            (typeof object.modelPath !== "string" || !object.modelPath.trim())) {
+            sceneIssues.push(sceneLabel + " is a mesh/custom object without an assigned OBJ model; the WebGL runtime cannot draw imported geometry for it.");
+          }
         }
-        if (String(object.type || "").toLowerCase() === "mesh" && object.modelPath) {
+        if (object.modelPath) {
           const modelPath = String(object.modelPath);
-          const label = id || "Scene entry " + (index + 1);
+          const label = sceneLabel;
           // A project-relative file may exist while still escaping the intended asset folder.
           // Validate references as strictly as uploaded file paths before resolving them.
           if (!/^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.obj$/i.test(modelPath)) {
