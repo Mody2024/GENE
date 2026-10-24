@@ -63,20 +63,62 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     triangles.sort(function(a,b){return a.z-b.z;});ctx.save();ctx.globalAlpha=1;triangles.forEach(function(t){ctx.beginPath();ctx.moveTo(t.v[0].x,t.v[0].y);ctx.lineTo(t.v[1].x,t.v[1].y);ctx.lineTo(t.v[2].x,t.v[2].y);ctx.closePath();ctx.fillStyle=t.c;ctx.fill();});ctx.restore();return triangles.length>0;
   }catch(e){return false;}
 };window.GENE_SCENE.createWebGLMeshes=function(gl){
-  if(!gl||!window.GENE3D||!window.GENE3D.parseOBJ)return{meshes:[],dispose:function(){}};
+  if(!gl)return{meshes:[],dispose:function(){}};
   var meshes=[],seen=0;
+  function primitiveData(type){
+    var out=[];
+    function tri(a,b,c){
+      var ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+      var nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      nx/=len;ny/=len;nz/=len;
+      [a,b,c].forEach(function(p){out.push(p[0],p[1],p[2],nx,ny,nz);});
+    }
+    function quad(a,b,c,d){tri(a,b,c);tri(a,c,d);}
+    if(type==="plane"){
+      quad([-0.5,0,-0.5],[0.5,0,-0.5],[0.5,0,0.5],[-0.5,0,0.5]);
+    }else if(type==="sphere"){
+      var lat=8,lon=12;
+      function point(i,j){var phi=Math.PI*i/lat,theta=2*Math.PI*j/lon;return[Math.sin(phi)*Math.cos(theta)*0.5,Math.cos(phi)*0.5,Math.sin(phi)*Math.sin(theta)*0.5];}
+      for(var i=0;i<lat;i++)for(var j=0;j<lon;j++){var a=point(i,j),b=point(i+1,j),c=point(i+1,j+1),d=point(i,j+1);tri(a,b,d);tri(b,c,d);}
+    }else if(type==="cylinder"||type==="cone"){
+      var segments=16;
+      for(var j=0;j<segments;j++){
+        var a=j*2*Math.PI/segments,b=(j+1)*2*Math.PI/segments;
+        var p0=[Math.cos(a)*0.5,-0.5,Math.sin(a)*0.5],p1=[Math.cos(b)*0.5,-0.5,Math.sin(b)*0.5];
+        var q0=[Math.cos(a)*0.5,0.5,Math.sin(a)*0.5],q1=[Math.cos(b)*0.5,0.5,Math.sin(b)*0.5];
+        if(type==="cone"){tri(p0,p1,[0,0.5,0]);}else{quad(p0,p1,q1,q0);tri([0,-0.5,0],p1,p0);tri([0,0.5,0],q0,q1);}
+      }
+    }else{
+      var x0=-0.5,x1=0.5,y0=-0.5,y1=0.5,z0=-0.5,z1=0.5;
+      quad([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
+      quad([x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0]);
+      quad([x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0]);
+      quad([x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1]);
+      quad([x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0]);
+      quad([x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]);
+    }
+    return out;
+  }
   this.getVisibleObjects().forEach(function(o){
-    if(!o.modelPath||seen>=500)return;
+    if(seen>=500)return;
+    var type=String(o.type||"mesh").toLowerCase();
+    if(type==="light"||type==="camera")return;
     seen++;
     try{
-      var groups=window.GENE3D.parseOBJ(o.modelPath),mtlPath=o.modelPath.replace(/\\.obj$/i,".mtl"),materials={};
-      if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+      var groups=[],materials={},modelPath=o.modelPath||"";
+      if(modelPath&&window.GENE3D&&typeof window.GENE3D.parseOBJ==="function"){
+        groups=window.GENE3D.parseOBJ(modelPath);
+        var mtlPath=modelPath.replace(/\\.obj$/i,".mtl");
+        if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+      }else if(type!=="mesh"){
+        groups=[{material:"",positions:primitiveData(type)}];
+      }
       groups.forEach(function(g){
         var data=g.positions||[];
         if(data.length<18||data.length%6!==0||data.length/6>180000)return;
         var buffer=gl.createBuffer();if(!buffer)return;
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
-        meshes.push({id:o.id,name:o.name,modelPath:o.modelPath,materialName:g.material,material:materials[g.material]||null,buffer:buffer,vertexCount:data.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
+        meshes.push({id:o.id,name:o.name,modelPath:modelPath,materialName:g.material,material:materials[g.material]||null,buffer:buffer,vertexCount:data.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
       });
     }catch(e){}
   });
