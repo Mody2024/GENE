@@ -23,7 +23,7 @@ import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { buildRuntimeAudioBootstrap } from "./lib/runtime-audio";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
-import { normalizeDurableProjectSnapshot, readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/project-persistence";
+import { normalizeDurableProjectSnapshot, readDurableProjectSnapshot, reconcileDurableProjectWorkspace, writeDurableProjectSnapshot } from "./lib/project-persistence";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { inspectSceneManifest } from "./lib/scene-diagnostics.mjs";
@@ -388,51 +388,13 @@ export default function Home() {
         list = [];
       }
 
-      // Reconcile both stores instead of treating localStorage as authoritative.
-      // It can contain an older trimmed snapshot after quota pressure or an interrupted save.
+      // Reconcile legacy localStorage and durable IndexedDB snapshots with one
+      // tested policy: deletion tombstones win, newest duplicate wins, and active ID must exist.
       try {
         const snapshot = await readDurableProjectSnapshot();
-        if (snapshot) {
-          const deletedIds = new Set(snapshot.deletedProjectIds || []);
-          // Tombstones win over both storage sources so a stale local copy cannot resurrect a deletion.
-          list = list.filter(item => !deletedIds.has(item.id));
-          const durable = snapshot.projects
-            .filter((item): item is GeneProject =>
-              Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id && !deletedIds.has(item.id))
-            )
-            .map(item => ({
-              ...item,
-              kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game",
-              references: Array.isArray(item.references) ? item.references : [],
-              versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
-            }));
-          const byId = new Map<string, GeneProject>();
-          for (const item of [...durable, ...list]) {
-            const previous = byId.get(item.id);
-            const currentTime = Date.parse(item.updatedAt || "");
-            const previousTime = previous ? Date.parse(previous.updatedAt || "") : -Infinity;
-            const currentHasTime = Number.isFinite(currentTime);
-            const previousHasTime = Number.isFinite(previousTime);
-            // On equal timestamps prefer the later localStorage item, preserving its
-            // compatibility behavior. If both timestamps are invalid, prefer localStorage too.
-            if (!previous ||
-              (currentHasTime && (!previousHasTime || currentTime >= previousTime)) ||
-              (!currentHasTime && !previousHasTime)) {
-              byId.set(item.id, item);
-            }
-          }
-          const localOrder = list.map(item => item.id);
-          const merged = [...byId.values()].sort((a, b) => {
-            const ai = localOrder.indexOf(a.id);
-            const bi = localOrder.indexOf(b.id);
-            if (ai >= 0 && bi >= 0) return ai - bi;
-            if (ai >= 0) return -1;
-            if (bi >= 0) return 1;
-            return Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || "");
-          });
-          list = merged.slice(0, 8);
-          if (!list.some(item => item.id === activeId) && snapshot.activeProjectId && !deletedIds.has(snapshot.activeProjectId)) activeId = snapshot.activeProjectId;
-        }
+        const reconciled = reconcileDurableProjectWorkspace(list, activeId, snapshot);
+        list = reconciled.projects;
+        activeId = reconciled.activeProjectId;
       } catch {
         // Continue with the localStorage compatibility path when IndexedDB is unavailable.
       }
