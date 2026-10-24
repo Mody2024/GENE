@@ -20,6 +20,9 @@ for (const name of ["runtime", "art", "diagnostics"]) {
 }
 
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
+assert.match(agentRoute, /frameFiles:\s*asset\.frameFiles/, "agent bridge preserves native 2D frame files returned by the approved Forge endpoint");
+assert.match(agentRoute, /asset\.frameFiles && typeof asset\.frameFiles === "object"/, "agent bridge treats absent frame files safely without failing the whole game build");
+
 
 for (const kind of ["character", "tileset", "ui", "background", "icon"]) {
   const asset = buildNative2DAsset({ prompt: "A cheerful cartoon skeleton in a city game", kind, quality: "standard" });
