@@ -378,17 +378,36 @@ export default function Home() {
         list = [];
       }
 
-      // Restore the durable IndexedDB snapshot when localStorage is empty or unreadable.
-      if (!list.length) {
-        try {
-          const snapshot = await readDurableProjectSnapshot();
-          if (snapshot?.projects.length) {
-            list = snapshot.projects.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
-            activeId = snapshot.activeProjectId;
+      // Reconcile both stores instead of treating localStorage as authoritative.
+      // It can contain an older trimmed snapshot after quota pressure or an interrupted save.
+      try {
+        const snapshot = await readDurableProjectSnapshot();
+        if (snapshot?.projects.length) {
+          const durable = snapshot.projects
+            .filter(item => item && typeof item.id === "string" && item.id)
+            .map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+          const byId = new Map<string, GeneProject>();
+          for (const item of [...durable, ...list]) {
+            const previous = byId.get(item.id);
+            const currentTime = Date.parse(item.updatedAt || "");
+            const previousTime = previous ? Date.parse(previous.updatedAt || "") : -Infinity;
+            // On equal timestamps prefer localStorage, preserving its compatibility behavior.
+            if (!previous || (Number.isFinite(currentTime) && currentTime > previousTime)) byId.set(item.id, item);
           }
-        } catch {
-          // Continue with the localStorage compatibility path when IndexedDB is unavailable.
+          const localOrder = list.map(item => item.id);
+          const merged = [...byId.values()].sort((a, b) => {
+            const ai = localOrder.indexOf(a.id);
+            const bi = localOrder.indexOf(b.id);
+            if (ai >= 0 && bi >= 0) return ai - bi;
+            if (ai >= 0) return -1;
+            if (bi >= 0) return 1;
+            return Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || "");
+          });
+          list = merged.slice(0, 8);
+          if (!list.some(item => item.id === activeId) && snapshot.activeProjectId) activeId = snapshot.activeProjectId;
         }
+      } catch {
+        // Continue with the localStorage compatibility path when IndexedDB is unavailable.
       }
       if (cancelled) return;
       const active = list.find(p => p.id === activeId) || list[0] || newProject();
