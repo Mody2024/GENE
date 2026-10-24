@@ -152,7 +152,11 @@ export function mergeDurableProjectSnapshots(
   const recoveredTime = Date.parse(recovered.savedAt);
   const savedAt = Number.isFinite(currentTime) && Number.isFinite(recoveredTime)
     ? new Date(Math.max(currentTime, recoveredTime)).toISOString()
-    : current.savedAt || recovered.savedAt;
+    : Number.isFinite(currentTime)
+      ? current.savedAt
+      : Number.isFinite(recoveredTime)
+        ? recovered.savedAt
+        : "";
 
   return { projects, activeProjectId, savedAt, deletedProjectIds };
 }
