@@ -2644,11 +2644,13 @@ export default function Home() {
           const type = String(object.type || "").toLowerCase();
           return !["mesh", "light", "camera"].includes(type);
         });
-        add("Scene renderer integration", "warn", sceneDrawn
+        // A scene manifest is not a renderer. Reject a 3D build that has no
+        // recognizable renderer bridge instead of accepting an audio-only package.
+        add("Scene renderer integration", sceneDrawn ? "warn" : "fail", sceneDrawn
           ? hasPrimitiveObjects
-            ? "The scene bridge now supports basic box/sphere/cylinder/cone/plane geometry and imported OBJ meshes, but the game must actually build and draw these resources. Source references alone do not prove that the scene is visible or correctly framed."
+            ? "The scene bridge is referenced and supports primitive/imported geometry, but visible framing, camera setup, controls and actual drawing still require runtime verification."
             : "Game source references the shared scene/mesh API; imported geometry, camera, lighting and actual visible output still require runtime verification."
-          : "The WebGL 3D scene has objects, but no recognizable scene-renderer integration was found in game source. The manifest alone does not draw geometry.");
+          : "The WebGL 3D scene has objects, but game source does not reference a recognizable scene-renderer integration. Build rejected: the manifest alone cannot draw geometry.");
       }
       const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
       if (audioConfig.enabled !== false && !isAppSpec) {
