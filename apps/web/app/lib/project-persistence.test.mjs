@@ -149,3 +149,11 @@ test("durable reads wait for transaction completion and reject transaction abort
   assert.match(source, /transaction\.oncomplete = \(\) => \{\s*if \(requestFinished\) resolve\(result\);/);
   assert.match(source, /transaction\.onabort = \(\) => reject\(transaction\.error \|\| new Error\("Durable project read transaction was aborted\."\)\)/);
 });
+
+test("workspace persistence UI distinguishes durable backup failure from local success", async () => {
+  const pagePath = fileURLToPath(new URL("../page.tsx", import.meta.url));
+  const page = await readFile(pagePath, "utf8");
+  assert.match(page, /could not update its durable recovery backup/);
+  assert.match(page, /durable recovery backup also failed/);
+  assert.match(page, /latestPersistenceSave\.current !== saveToken/);
+});
