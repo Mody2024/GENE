@@ -26,6 +26,7 @@ import { buildProjectStorageCandidates } from "./lib/project-storage";
 import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/project-persistence";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
+import { inspectSceneManifest } from "./lib/scene-diagnostics.mjs";
 import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
 import { createToolApproval } from "./lib/tool-permissions.mjs";
 
@@ -2484,6 +2485,13 @@ export default function Home() {
         : Array.isArray(spec.objects) ? spec.objects : [];
       const sceneIssues: string[] = [];
       const sceneWarnings: string[] = [];
+      // Feed the same tested diagnostics used by the regression suite into the real build gate.
+      // Empty Canvas2D editor manifests remain allowed; WebGL scenes must declare real scene content.
+      if (sceneObjects.length > 0 || String(spec.engine || "").toLowerCase() === "webgl3d") {
+        const sharedSceneReport = inspectSceneManifest(spec, files);
+        sceneIssues.push(...sharedSceneReport.errors.map((issue: string) => "Scene diagnostics: " + issue));
+        sceneWarnings.push(...sharedSceneReport.warnings.map((warning: string) => "Scene diagnostics: " + warning));
+      }
       const sceneIds = new Set<string>();
       let visibleSceneObjects = 0;
       for (const [index, object] of sceneObjects.entries()) {
@@ -2550,11 +2558,14 @@ export default function Home() {
         sceneIssues.push("The WebGL 3D specification contains no scene objects. Add visible geometry or provide an explicit renderer-generated world.");
       }
       const sceneStatus = sceneIssues.length ? "fail" : sceneWarnings.length ? "warn" : "pass";
-      add("Scene and OBJ asset integrity", sceneStatus, sceneIssues.length
+      const sceneDetails = sceneIssues.length
         ? sceneIssues.slice(0, 8).join(" | ")
-        : sceneObjects.length
-          ? sceneObjects.length + " scene entries (" + visibleSceneObjects + " visible) have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
-          : "No editor scene objects are declared; renderer-generated geometry, if any, still needs visual verification.");
+        : sceneWarnings.length
+          ? sceneWarnings.slice(0, 8).join(" | ")
+          : sceneObjects.length
+            ? sceneObjects.length + " scene entries (" + visibleSceneObjects + " visible) have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
+            : "No editor scene objects are declared; renderer-generated geometry, if any, still needs visual verification.";
+      add("Scene and OBJ asset integrity", sceneStatus, sceneDetails);
 
       const mainSource = typeof files["game.js"] === "string" ? files["game.js"] : "";
       const moduleSource = Object.entries(files).filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
