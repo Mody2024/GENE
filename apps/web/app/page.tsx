@@ -393,10 +393,13 @@ export default function Home() {
       // It can contain an older trimmed snapshot after quota pressure or an interrupted save.
       try {
         const snapshot = await readDurableProjectSnapshot();
-        if (snapshot?.projects.length) {
+        if (snapshot) {
+          const deletedIds = new Set(snapshot.deletedProjectIds || []);
+          // Tombstones win over both storage sources so a stale local copy cannot resurrect a deletion.
+          list = list.filter(item => !deletedIds.has(item.id));
           const durable = snapshot.projects
             .filter((item): item is GeneProject =>
-              Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id)
+              Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id && !deletedIds.has(item.id))
             )
             .map(item => ({
               ...item,
@@ -429,7 +432,7 @@ export default function Home() {
             return Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || "");
           });
           list = merged.slice(0, 8);
-          if (!list.some(item => item.id === activeId) && snapshot.activeProjectId) activeId = snapshot.activeProjectId;
+          if (!list.some(item => item.id === activeId) && snapshot.activeProjectId && !deletedIds.has(snapshot.activeProjectId)) activeId = snapshot.activeProjectId;
         }
       } catch {
         // Continue with the localStorage compatibility path when IndexedDB is unavailable.
@@ -2428,7 +2431,7 @@ export default function Home() {
     // Keep the durable snapshot in sync even when deleting a non-active project.
     // Otherwise IndexedDB can resurrect a deleted project during the next hydration.
     // Use the freshest active project object, not a possibly stale list entry.
-    void writeDurableProjectSnapshot(durableRemaining, next?.id || "").catch(() => {
+    void writeDurableProjectSnapshot(durableRemaining, next?.id || "", projectId).catch(() => {
       setPersistenceWarning("A project was removed from the visible workspace, but durable cleanup failed. Refresh may restore an older copy; check browser storage before continuing.");
     });
     if (deletingActive) {
