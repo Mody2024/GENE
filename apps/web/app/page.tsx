@@ -2395,13 +2395,22 @@ export default function Home() {
     if (!target) return;
     if (!window.confirm("Delete the chat and local project \"" + target.name + "\"? This removes its saved browser history and cannot be undone.")) return;
     const remaining = projects.filter(item => item.id !== projectId);
+    const deletingActive = project?.id === projectId;
+    const next = deletingActive ? (remaining[0] || newProject(target.kind || "game")) : project;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
-      if (localStorage.getItem(ACTIVE_KEY) === projectId) localStorage.removeItem(ACTIVE_KEY);
+      if (deletingActive || localStorage.getItem(ACTIVE_KEY) === projectId) {
+        if (next?.id) localStorage.setItem(ACTIVE_KEY, next.id);
+        else localStorage.removeItem(ACTIVE_KEY);
+      }
     } catch {}
     setProjects(remaining);
-    if (project?.id === projectId) {
-      const next = remaining[0] || newProject(target.kind || "game");
+    // Keep the durable snapshot in sync even when deleting a non-active project.
+    // Otherwise IndexedDB can resurrect a deleted project during the next hydration.
+    void writeDurableProjectSnapshot(remaining, next?.id || "").catch(() => {
+      setPersistenceWarning("A project was removed from the visible workspace, but durable cleanup failed. Refresh may restore an older copy; check browser storage before continuing.");
+    });
+    if (deletingActive) {
       setProject(next);
       setSection("chat");
       setNotice("Deleted \"" + target.name + "\".");
