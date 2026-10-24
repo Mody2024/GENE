@@ -146,8 +146,8 @@ export function mergeDurableProjectSnapshots(
     if (!deleted.has(project.id) && !merged.has(project.id)) merged.set(project.id, project);
   }
   const projects = [...merged.values()].slice(0, 8);
-  const activeCandidate = current.activeProjectId || recovered.activeProjectId;
-  const activeProjectId = projects.some(project => project.id === activeCandidate) ? activeCandidate : "";
+  const activeProjectId = [current.activeProjectId, recovered.activeProjectId]
+    .find(candidate => Boolean(candidate) && projects.some(project => project.id === candidate)) || "";
   const currentTime = Date.parse(current.savedAt);
   const recoveredTime = Date.parse(recovered.savedAt);
   const savedAt = Number.isFinite(currentTime) && Number.isFinite(recoveredTime)
