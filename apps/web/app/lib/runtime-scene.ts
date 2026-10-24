@@ -133,6 +133,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       }else if(type!=="mesh"){
         groups=[{material:"",positions:primitiveData(type)}];
       }
+      var meshStart=meshes.length;
       groups.forEach(function(g){
         var data=g.positions||[];
         if(data.length<18||data.length%6!==0||data.length/6>180000)return;
@@ -140,6 +141,17 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
         meshes.push({id:o.id,name:o.name,modelPath:modelPath,materialName:g.material,material:materials[g.material]||null,buffer:buffer,vertexCount:data.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
       });
+      // Some OBJ parsers return groups that contain no usable triangles. Checking only
+      // groups.length misses this case and leaves the object invisible despite "success".
+      if(modelPath&&meshes.length===meshStart){
+        var fallbackData=primitiveData("box"),fallbackBuffer=gl.createBuffer();
+        if(fallbackBuffer){
+          gl.bindBuffer(gl.ARRAY_BUFFER,fallbackBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(fallbackData),gl.STATIC_DRAW);
+          meshes.push({id:o.id,name:o.name,modelPath:modelPath,materialName:"",material:null,buffer:fallbackBuffer,vertexCount:fallbackData.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
+        }
+        window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
+        window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:modelPath,message:"OBJ parser produced no usable vertex buffers; a box placeholder is shown. Check mesh groups and triangle data."});
+      }
     }catch(e){}
   });
   return{meshes:meshes,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
