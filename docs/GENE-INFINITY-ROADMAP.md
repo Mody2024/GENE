@@ -4,7 +4,7 @@
 
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
-- **Wave 2 — 3D scene reliability and playable geometry: 35%** (stricter runtime contracts and OBJ/WebGL groundwork exist; real prompt-to-playable-scene acceptance remains).
+- **Wave 2 — 3D scene reliability and playable geometry: 40%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
 - **Wave 3 — persistent workspace, checkpoints, resumable repair: 20%** (local project/version foundations exist; durable task/project storage and resume semantics remain).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
 - **Wave 5 — evidence-based self-improvement and release acceptance: 10%** (roadmap and regression foundations exist; held-out evaluation and full release gate remain).
@@ -14,6 +14,8 @@ This document records the next implementation sequence for the existing GENE wor
 
 ## Phase A — Restore reliability
 - [ ] Reproduce the current 3D-game generation failure from a realistic prompt and inspect the generated project, WebGL output, input bindings, camera, collision, and scene integration.
+- [x] Strengthen static scene checks to recognize scene/sceneObjects/objects aliases and fail when a WebGL scene has no declared objects or every object is hidden.
+- [x] Add a focused Node test suite and `test:scene` command for empty scenes, hidden/duplicate IDs, and missing/present OBJ assets; the five focused tests passed in a local isolated run.
 - [ ] Preserve a last-known-good revision before any automated repair.
 - [ ] Run the complete CI suite and record the exact failing tests before changing generation logic.
 - [ ] Keep 2D, text-based, and web-app generation as independent regression targets.
