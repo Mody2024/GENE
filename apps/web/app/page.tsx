@@ -2453,9 +2453,13 @@ export default function Home() {
         : typeof spec.genre === "string" && Boolean(spec.genre.trim()) && ["canvas2d", "webgl3d"].includes(spec.engine) && Array.isArray(spec.mechanics) && spec.mechanics.length > 0 && Array.isArray(spec.controls) && spec.controls.length > 0 && typeof spec.objective === "string" && Boolean(spec.objective.trim()) && typeof spec.winCondition === "string" && Boolean(spec.winCondition.trim()) && typeof spec.lossCondition === "string" && Boolean(spec.lossCondition.trim()));
     add(isAppSpec ? "App specification" : "Game specification", specValid ? "pass" : "fail", specValid ? (isAppSpec ? "Title, app engine, summary, features, routes and user flows are declared." : "Title, engine, mechanics, controls, objective and end states are declared.") : "The JSON or required project-spec fields are missing or malformed.");
     if (!isAppSpec && specParsed && spec && typeof spec === "object") {
-      const sceneObjects: any[] = Array.isArray(spec.scene?.objects) ? spec.scene.objects : [];
+      const sceneObjects: any[] = Array.isArray(spec.scene?.objects) ? spec.scene.objects
+        : Array.isArray(spec.sceneObjects) ? spec.sceneObjects
+        : Array.isArray(spec.objects) ? spec.objects : [];
       const sceneIssues: string[] = [];
+      const sceneWarnings: string[] = [];
       const sceneIds = new Set<string>();
+      let visibleSceneObjects = 0;
       for (const [index, object] of sceneObjects.entries()) {
         if (!object || typeof object !== "object" || Array.isArray(object)) {
           sceneIssues.push("Scene entry " + (index + 1) + " is not an object.");
@@ -2465,6 +2469,7 @@ export default function Home() {
         if (!id) sceneIssues.push("Scene entry " + (index + 1) + " has no stable ID.");
         else if (sceneIds.has(id)) sceneIssues.push("Duplicate scene ID: " + id);
         else sceneIds.add(id);
+        if (object.visible !== false) visibleSceneObjects += 1;
         for (const key of ["position", "rotation", "scale"]) {
           if (object[key] != null) {
             const vector = object[key];
@@ -2494,12 +2499,16 @@ export default function Home() {
           }
         }
       }
-      const sceneStatus = sceneIssues.length ? "fail" : "pass";
+      if (sceneObjects.length && visibleSceneObjects === 0) sceneIssues.push("All scene objects are hidden; the 3D scene may render as empty.");
+      if (String(spec.engine || "").toLowerCase() === "webgl3d" && sceneObjects.length === 0) {
+        sceneIssues.push("The WebGL 3D specification contains no scene objects. Add visible geometry or provide an explicit renderer-generated world.");
+      }
+      const sceneStatus = sceneIssues.length ? "fail" : sceneWarnings.length ? "warn" : "pass";
       add("Scene and OBJ asset integrity", sceneStatus, sceneIssues.length
         ? sceneIssues.slice(0, 8).join(" | ")
         : sceneObjects.length
-          ? sceneObjects.length + " scene entries have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
-          : "No scene objects are declared; the scene manifest is structurally valid but contains no placed objects.");
+          ? sceneObjects.length + " scene entries (" + visibleSceneObjects + " visible) have unique IDs and valid transforms; referenced OBJ/MTL paths are present."
+          : "No editor scene objects are declared; renderer-generated geometry, if any, still needs visual verification.");
 
       const mainSource = typeof files["game.js"] === "string" ? files["game.js"] : "";
       const moduleSource = Object.entries(files).filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
