@@ -2565,10 +2565,14 @@ export default function Home() {
           : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API.");
       } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "webgl3d") {
         const sceneDrawn = /GENE_SCENE\.(?:createWebGLMeshes|drawWebGLMeshes|getVisibleObjects|getRenderableObject|getMeshData)|GENE3D\.parseOBJ/.test(allRuntimeSource);
-        const primitiveOnly = sceneObjects.every(object => object && typeof object === "object" && String(object.type || "").toLowerCase() !== "mesh");
-        add("Scene renderer integration", sceneDrawn ? "warn" : "warn", sceneDrawn
-          ? primitiveOnly
-            ? "The manifest contains primitive scene objects, but the shared scene bridge only supplies imported OBJ meshes to its WebGL mesh builder. Confirm the game implements visible box/sphere/cylinder/cone/plane geometry or add OBJ assets; source references alone do not prove rendering."
+        const hasPrimitiveObjects = sceneObjects.some(object => {
+          if (!object || typeof object !== "object") return false;
+          const type = String(object.type || "").toLowerCase();
+          return !["mesh", "light", "camera"].includes(type);
+        });
+        add("Scene renderer integration", "warn", sceneDrawn
+          ? hasPrimitiveObjects
+            ? "The scene bridge builds imported OBJ meshes, but this manifest also contains primitive geometry. Confirm the game implements visible box/sphere/cylinder/cone/plane rendering or replace those objects with OBJ assets; source references alone do not prove rendering."
             : "Game source references the shared scene/mesh API; imported geometry, camera, lighting and actual visible output still require runtime verification."
           : "The WebGL 3D scene has objects, but no recognizable scene-renderer integration was found in game source. The manifest alone does not draw geometry.");
       }
