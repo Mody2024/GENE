@@ -237,12 +237,18 @@ try {
   await sceneCanvas.waitFor({ state: "visible", timeout: 5000 });
   const sceneCanvasBox = await sceneCanvas.boundingBox();
   assert.ok(sceneCanvasBox && sceneCanvasBox.width > 100, "Scene Studio renders an interactive canvas viewport");
-  // The freshly added 2D object is centered at the canvas origin. Start at that exact
-  // origin so hit-testing is deterministic, then drag far enough to exceed rounding.
-  const dragStart = { x: sceneCanvasBox.x + sceneCanvasBox.width * 0.5, y: sceneCanvasBox.y + sceneCanvasBox.height * 0.5 };
-  const dragEnd = { x: sceneCanvasBox.x + sceneCanvasBox.width * 0.58, y: sceneCanvasBox.y + sceneCanvasBox.height * 0.58 };
-  const positionX = page.locator(".scene-vector").first().locator("input").first();
-  const initialPositionX = Number(await positionX.inputValue());
+  // Select the actual object first, then derive its canvas hit point from the live
+  // inspector transform instead of assuming every add/redo path starts at world origin.
+  await page.locator(".scene-object-row").first().click();
+  const positionInputs = page.locator(".scene-vector").first().locator("input");
+  const initialPositionX = Number(await positionInputs.nth(0).inputValue());
+  const initialPositionY = Number(await positionInputs.nth(1).inputValue());
+  const positionX = positionInputs.nth(0);
+  const dragStart = {
+    x: sceneCanvasBox.x + ((480 + initialPositionX * 32) / 960) * sceneCanvasBox.width,
+    y: sceneCanvasBox.y + ((270 - initialPositionY * 32) / 540) * sceneCanvasBox.height
+  };
+  const dragEnd = { x: dragStart.x + sceneCanvasBox.width * 0.08, y: dragStart.y + sceneCanvasBox.height * 0.06 };
   await page.mouse.move(dragStart.x, dragStart.y);
   await page.mouse.down();
   await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 8 });
