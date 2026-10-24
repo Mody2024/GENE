@@ -2556,17 +2556,27 @@ export default function Home() {
     const syntaxFiles = Object.entries(files)
       .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string");
     const syntaxFailures: string[] = [];
+    const moduleSyntaxFiles: string[] = [];
     for (const [path, source] of syntaxFiles) {
       try {
         if (source.length > 500_000) throw new Error("JavaScript exceeds the 500 KB build budget.");
+        // Function constructors parse classic scripts, not ES modules. Do not report valid
+        // static import/export syntax as a broken game; disclose that these files need
+        // module-aware validation instead of silently claiming they were parsed.
+        const usesModuleSyntax = /^\s*(?:import\s+(?!\()|export\s+(?:default|const|let|var|function|class|async|\{|\*))/m.test(source);
+        if (usesModuleSyntax) {
+          moduleSyntaxFiles.push(path);
+          continue;
+        }
         new Function(source);
       } catch (error) {
         syntaxFailures.push(path + ": " + (error instanceof Error ? error.message : "Unknown JavaScript syntax error."));
       }
     }
     const syntaxValid = syntaxFiles.length > 0 && syntaxFailures.length === 0;
-    add("JavaScript syntax", syntaxValid ? "pass" : "fail", syntaxValid
-      ? syntaxFiles.length + " JavaScript file(s) parse without executing them."
+    const syntaxStatus: BuildCheckStatus = !syntaxValid ? "fail" : moduleSyntaxFiles.length ? "warn" : "pass";
+    add("JavaScript syntax", syntaxStatus, syntaxValid
+      ? syntaxFiles.length - moduleSyntaxFiles.length + " classic JavaScript file(s) parsed; " + moduleSyntaxFiles.length + " ES module file(s) require module-aware validation" + (moduleSyntaxFiles.length ? " (" + moduleSyntaxFiles.slice(0, 3).join(", ") + ")." : ".")
       : syntaxFailures.slice(0, 5).join(" | ") || "No JavaScript source files were found.");
     const safetyFiles = Object.entries(files)
       .filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string")
