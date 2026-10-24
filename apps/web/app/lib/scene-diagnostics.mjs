@@ -58,6 +58,9 @@ export function inspectSceneManifest(spec, files = {}) {
         errors.push(id + ": unsafe or unsupported model path");
       } else if (!Object.prototype.hasOwnProperty.call(files, path) || typeof files[path] !== "string") {
         missingModelAssets.push({ id, path });
+        if (String(spec && spec.engine || "").toLowerCase() === "webgl3d") {
+          errors.push(id + ": required OBJ asset is missing from the build package (" + path + ")");
+        }
       } else {
         const source = files[path];
         // Check size before scanning lines so an oversized model cannot trigger expensive regex work.
