@@ -51,24 +51,33 @@ export async function readDurableProjectSnapshot(): Promise<DurableProjectSnapsh
   }
 }
 
-export async function writeDurableProjectSnapshot(
+// IndexedDB transactions are asynchronous. Serialize workspace writes so a slower
+// earlier open/transaction cannot finish after a newer snapshot and overwrite it.
+let writeQueue: Promise<void> = Promise.resolve();
+
+export function writeDurableProjectSnapshot(
   projects: GeneProject[],
   activeProjectId: string
 ): Promise<void> {
-  const database = await openDatabase();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE, "readwrite");
-      transaction.objectStore(STORE).put({
-        projects,
-        activeProjectId,
-        savedAt: new Date().toISOString()
-      } satisfies DurableProjectSnapshot, WORKSPACE_KEY);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error("Could not save durable project storage."));
-      transaction.onabort = () => reject(transaction.error || new Error("Durable project storage transaction was aborted."));
-    });
-  } finally {
-    database.close();
-  }
+  const snapshot: DurableProjectSnapshot = {
+    projects,
+    activeProjectId,
+    savedAt: new Date().toISOString()
+  };
+  const operation = writeQueue.catch(() => undefined).then(async () => {
+    const database = await openDatabase();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE, "readwrite");
+        transaction.objectStore(STORE).put(snapshot, WORKSPACE_KEY);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error || new Error("Could not save durable project storage."));
+        transaction.onabort = () => reject(transaction.error || new Error("Durable project storage transaction was aborted."));
+      });
+    } finally {
+      database.close();
+    }
+  });
+  writeQueue = operation;
+  return operation;
 }
