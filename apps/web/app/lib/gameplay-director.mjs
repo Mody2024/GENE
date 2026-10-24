@@ -17,7 +17,7 @@ const PROFILES = [
   },
   {
     id: "exploration-adventure",
-    match: /adventure|exploration|open.?world|dungeon|quest|metroidvania|puzzle/i,
+    match: /adventure|exploration|open.?world|dungeon|quest|metroidvania/i,
     loop: "Notice a landmark or mystery, explore a bounded route, discover a tool/clue, use it, and unlock a meaningful return or next path.",
     pacing: ["Establish a safe landmark and readable goal", "Offer a low-risk discovery", "Use a clue/tool to change the world or unlock a route", "Return with new knowledge and deliver a clear payoff"],
     fairness: ["Keep critical paths distinguishable from optional detours", "Avoid soft locks when an item is missed or used early", "Use consistent interaction affordances", "Give recovery or hint paths after repeated failure"],
