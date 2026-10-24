@@ -73,12 +73,12 @@ export function inspectSceneManifest(spec, files = {}) {
             const malformedFace = faceLines.some(line => {
               const refs = line.trim().split(/\s+/).slice(1);
               if (refs.length < 3) return true;
+              const precedingVertices = source.slice(0, source.indexOf(line)).match(/^\s*v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/gm) || [];
               return refs.some(ref => {
                 const vertexRef = ref.split("/")[0];
                 if (!/^-?\d+$/.test(vertexRef)) return true;
                 const n = Number(vertexRef);
-                // Positive indices are absolute; negative indices are relative to the current vertex list.
-                return n === 0 || n > vertices || n < -vertices;
+                return n === 0 || n > precedingVertices.length || n < -precedingVertices.length;
               });
             });
             if (malformedFace) errors.push(id + ": OBJ asset contains a face with invalid vertex indices");
