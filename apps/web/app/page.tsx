@@ -372,8 +372,18 @@ export default function Home() {
       let activeId = "";
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        const stored: GeneProject[] = raw ? JSON.parse(raw) : [];
-        list = stored.slice(0, 8).map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+        const stored: unknown = raw ? JSON.parse(raw) : [];
+        // Browser storage can be interrupted or edited by extensions/devtools. Validate each
+        // record independently so one malformed project cannot prevent the workspace opening.
+        const validStored = Array.isArray(stored) ? stored.filter((item): item is GeneProject =>
+          Boolean(item && typeof item === "object" && typeof (item as GeneProject).id === "string" && (item as GeneProject).id)
+        ) : [];
+        list = validStored.slice(0, 8).map(item => ({
+          ...item,
+          kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game",
+          references: Array.isArray(item.references) ? item.references : [],
+          versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
+        }));
         activeId = localStorage.getItem(ACTIVE_KEY) || "";
       } catch {
         list = [];
@@ -385,8 +395,15 @@ export default function Home() {
         const snapshot = await readDurableProjectSnapshot();
         if (snapshot?.projects.length) {
           const durable = snapshot.projects
-            .filter(item => item && typeof item.id === "string" && item.id)
-            .map(item => ({ ...item, kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game", references: item.references || [], versions: (item.versions || []).slice(0, 8) }));
+            .filter((item): item is GeneProject =>
+              Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id)
+            )
+            .map(item => ({
+              ...item,
+              kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game",
+              references: Array.isArray(item.references) ? item.references : [],
+              versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
+            }));
           const byId = new Map<string, GeneProject>();
           for (const item of [...durable, ...list]) {
             const previous = byId.get(item.id);
