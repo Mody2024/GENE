@@ -23,7 +23,7 @@ import { buildRuntimeSceneBootstrap } from "./lib/runtime-scene";
 import { buildRuntimeAudioBootstrap } from "./lib/runtime-audio";
 import { mergeConcurrentSourceChanges } from "./lib/project-memory";
 import { buildProjectStorageCandidates } from "./lib/project-storage";
-import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/project-persistence";
+import { normalizeDurableProjectSnapshot, readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/project-persistence";
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { inspectSceneManifest } from "./lib/scene-diagnostics.mjs";
@@ -373,18 +373,17 @@ export default function Home() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const stored: unknown = raw ? JSON.parse(raw) : [];
-        // Browser storage can be interrupted or edited by extensions/devtools. Validate each
-        // record independently so one malformed project cannot prevent the workspace opening.
-        const validStored = Array.isArray(stored) ? stored.filter((item): item is GeneProject =>
-          Boolean(item && typeof item === "object" && typeof (item as GeneProject).id === "string" && (item as GeneProject).id)
-        ) : [];
-        list = validStored.slice(0, 8).map(item => ({
-          ...item,
-          kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" : "game",
-          references: Array.isArray(item.references) ? item.references : [],
-          versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
-        }));
         activeId = localStorage.getItem(ACTIVE_KEY) || "";
+        // Apply the same bounds and duplicate/deletion safeguards to the legacy localStorage
+        // array as to IndexedDB, so a malformed compatibility snapshot cannot bypass validation.
+        const normalized = normalizeDurableProjectSnapshot({
+          projects: Array.isArray(stored) ? stored : [],
+          activeProjectId: activeId,
+          savedAt: "",
+          deletedProjectIds: []
+        });
+        list = normalized?.projects || [];
+        if (normalized && normalized.activeProjectId) activeId = normalized.activeProjectId;
       } catch {
         list = [];
       }
