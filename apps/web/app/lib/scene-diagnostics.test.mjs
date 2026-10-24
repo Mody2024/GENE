@@ -36,7 +36,7 @@ test("reports visible scene objects and missing OBJ assets", () => {
 test("accepts a referenced OBJ file present in project files", () => {
   const report = inspectSceneManifest({ scene: { objects: [
     { id: "player", modelPath: "assets/player.obj" }
-  ] } }, { "assets/player.obj": "v 0 0 0\nf 1 2 3" });
+  ] } }, { "assets/player.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3" });
   assert.equal(report.ok, true);
   assert.equal(report.missingModelAssets.length, 0);
 });
@@ -132,6 +132,15 @@ test("rejects OBJ faces with out-of-range or invalid vertex indices", () => {
 
 test("accepts valid OBJ face references using slash notation and negative indices", () => {
   const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1/1 2/2 3/3\nf -3 -2 -1\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
+});
+
+test("validates repeated OBJ face lines without confusing their source positions", () => {
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nf 1 2 3\n";
   const report = inspectSceneManifest(
     { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
     { "assets/mesh.obj": source }
