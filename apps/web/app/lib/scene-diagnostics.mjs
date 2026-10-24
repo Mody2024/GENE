@@ -67,6 +67,23 @@ export function inspectSceneManifest(spec, files = {}) {
         if (!source.trim() || source.length > 2_000_000) {
           errors.push(id + ": OBJ asset is empty or exceeds the 2 MB validation limit");
         } else {
+          const folder = path.slice(0, path.lastIndexOf("/") + 1);
+          for (const line of source.split(/\r?\n/)) {
+            const materialLine = line.split("#", 1)[0].trim();
+            if (!/^mtllib(?:\s|$)/i.test(materialLine)) continue;
+            const libraries = materialLine.split(/\s+/).slice(1);
+            if (!libraries.length) {
+              errors.push(id + ": OBJ material-library record is empty");
+              continue;
+            }
+            for (const library of libraries) {
+              if (!/^[a-zA-Z0-9_-]+\.mtl$/i.test(library)) {
+                errors.push(id + ": OBJ asset contains an unsafe or unsupported material filename (" + library + ")");
+              } else if (!Object.prototype.hasOwnProperty.call(files, folder + library) || typeof files[folder + library] !== "string") {
+                errors.push(id + ": OBJ asset references missing material file (" + folder + library + ")");
+              }
+            }
+          }
           let vertices = 0;
           let textureCoordinates = 0;
           let normals = 0;
