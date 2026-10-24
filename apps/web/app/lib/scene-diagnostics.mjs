@@ -57,8 +57,8 @@ export function inspectSceneManifest(spec, files = {}) {
         missingModelAssets.push({ id, path });
       } else {
         const source = files[path];
-        const vertices = (source.match(/^\\s*v\\s+[-+0-9.eE]+\\s+[-+0-9.eE]+\\s+[-+0-9.eE]+(?:\\s|$)/gm) || []).length;
-        const faces = (source.match(/^\\s*f\\s+.+$/gm) || []).length;
+        const vertices = (source.match(/^\s*v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/gm) || []).length;
+        const faces = (source.match(/^\s*f\s+.+$/gm) || []).length;
         if (!source.trim() || source.length > 2_000_000) {
           errors.push(id + ": OBJ asset is empty or exceeds the 2 MB validation limit");
         } else if (!vertices || !faces) {
