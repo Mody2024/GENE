@@ -99,12 +99,22 @@ export function writeDurableProjectSnapshot(
           if (deletedProjectId) deletedProjectIds.add(deletedProjectId);
           // A later save must not erase deletion history; only an explicit restore flow
           // should ever remove a tombstone.
-          const snapshot: DurableProjectSnapshot = {
+          const savedAt = new Date().toISOString();
+          const snapshot = normalizeDurableProjectSnapshot({
             projects: projects.filter(project => !deletedProjectIds.has(project.id)),
-            activeProjectId: deletedProjectIds.has(activeProjectId) ? "" : activeProjectId,
-            savedAt: new Date().toISOString(),
+            activeProjectId,
+            savedAt,
             deletedProjectIds: [...deletedProjectIds].slice(-500)
-          };
+          });
+          if (!snapshot) {
+            transaction.abort();
+            reject(new Error("Could not normalize the workspace before saving."));
+            return;
+          }
+          // Never persist an active ID that does not exist in the bounded snapshot.
+          if (!snapshot.projects.some(project => project.id === snapshot.activeProjectId)) {
+            snapshot.activeProjectId = snapshot.projects[0]?.id || "";
+          }
           store.put(snapshot, WORKSPACE_KEY);
         };
         previousRequest.onerror = () => reject(previousRequest.error || new Error("Could not read previous durable snapshot."));
