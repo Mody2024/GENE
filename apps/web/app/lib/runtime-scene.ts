@@ -71,8 +71,12 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
   warning=warning&&typeof warning==="object"?warning:{message:String(warning||"Unknown runtime warning")};
   var key=String(warning.id||"")+"|"+String(warning.modelPath||"")+"|"+String(warning.message||"");
   if(list.some(function(item){return String(item&&item.id||"")+"|"+String(item&&item.modelPath||"")+"|"+String(item&&item.message||"")===key;}))return;
-  list.push(Object.assign({timestamp:Date.now()},warning));
+  var entry=Object.assign({timestamp:Date.now()},warning);
+  list.push(entry);
   if(list.length>100)list.splice(0,list.length-100);
+  // Forward diagnostics to the trusted preview parent; the parent validates
+  // event.source before presenting them to the user.
+  try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:"gene-runtime-warning",warning:{id:String(entry.id||""),modelPath:String(entry.modelPath||""),message:String(entry.message||"3D runtime warning").slice(0,600)}},"*");}catch(e){}
 };
 window.GENE_SCENE.createWebGLMeshes=function(gl){
   if(!gl)return{meshes:[],dispose:function(){}};
