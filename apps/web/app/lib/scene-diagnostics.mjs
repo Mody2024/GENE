@@ -71,15 +71,15 @@ export function inspectSceneManifest(spec, files = {}) {
             // Wavefront OBJ permits comments after geometry records; ignore them before tokenizing.
             const trimmed = line.split("#", 1)[0].trim();
             if (!trimmed) continue;
-            const vertexMatch = trimmed.match(/^v\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)(?:\s|$)/);
-            if (vertexMatch) {
-              if (vertexMatch.slice(1, 4).some(component => !Number.isFinite(Number(component)))) {
+            if (/^v(?:\s|$)/.test(trimmed)) {
+              const vertexMatch = trimmed.match(/^v\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)(?:\s|$)/);
+              if (!vertexMatch || vertexMatch.slice(1, 4).some(component => !Number.isFinite(Number(component)))) {
                 malformedVertex = true;
                 break;
               }
               vertices += 1;
               if (vertices > 100_000) break;
-            } else if (/^f\s+.+$/.test(trimmed)) {
+            } else if (/^f(?:\s|$)/.test(trimmed)) {
               faces += 1;
               const refs = trimmed.split(/\s+/).slice(1);
               if (faces > 100_000 || refs.length < 3) {
