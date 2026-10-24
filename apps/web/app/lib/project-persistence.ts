@@ -47,6 +47,7 @@ function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") return Promise.reject(new Error("IndexedDB is unavailable in this browser."));
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, DATABASE_VERSION);
+    let settled = false;
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE);
@@ -54,10 +55,25 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onsuccess = () => {
       const database = request.result;
       database.onversionchange = () => database.close();
+      // A blocked open may later succeed after this promise has rejected. Close that
+      // late connection rather than leaking a handle that can block future upgrades.
+      if (settled) {
+        database.close();
+        return;
+      }
+      settled = true;
       resolve(database);
     };
-    request.onerror = () => reject(request.error || new Error("Could not open durable project storage."));
-    request.onblocked = () => reject(new Error("Durable project storage is blocked by another open GENE tab."));
+    request.onerror = () => {
+      if (settled) return;
+      settled = true;
+      reject(request.error || new Error("Could not open durable project storage."));
+    };
+    request.onblocked = () => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Durable project storage is blocked by another open GENE tab."));
+    };
   });
 }
 
@@ -67,10 +83,21 @@ export async function readDurableProjectSnapshot(): Promise<DurableProjectSnapsh
     return await new Promise((resolve, reject) => {
       const transaction = database.transaction(STORE, "readonly");
       const request = transaction.objectStore(STORE).get(WORKSPACE_KEY);
+      let result: DurableProjectSnapshot | null = null;
+      let requestFinished = false;
       request.onsuccess = () => {
-        resolve(normalizeDurableProjectSnapshot(request.result));
+        result = normalizeDurableProjectSnapshot(request.result);
+        requestFinished = true;
       };
       request.onerror = () => reject(request.error || new Error("Could not read durable project storage."));
+      // Resolve only after the transaction commits. A successful request alone does
+      // not prove the containing transaction completed successfully.
+      transaction.oncomplete = () => {
+        if (requestFinished) resolve(result);
+        else reject(new Error("Durable project read completed without a result."));
+      };
+      transaction.onerror = () => reject(transaction.error || new Error("Could not complete durable project read."));
+      transaction.onabort = () => reject(transaction.error || new Error("Durable project read transaction was aborted."));
     });
   } finally {
     database.close();
