@@ -2572,7 +2572,7 @@ export default function Home() {
         });
         add("Scene renderer integration", "warn", sceneDrawn
           ? hasPrimitiveObjects
-            ? "The scene bridge builds imported OBJ meshes, but this manifest also contains primitive geometry. Confirm the game implements visible box/sphere/cylinder/cone/plane rendering or replace those objects with OBJ assets; source references alone do not prove rendering."
+            ? "The scene bridge now supports basic box/sphere/cylinder/cone/plane geometry and imported OBJ meshes, but the game must actually build and draw these resources. Source references alone do not prove that the scene is visible or correctly framed."
             : "Game source references the shared scene/mesh API; imported geometry, camera, lighting and actual visible output still require runtime verification."
           : "The WebGL 3D scene has objects, but no recognizable scene-renderer integration was found in game source. The manifest alone does not draw geometry.");
       }
