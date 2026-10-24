@@ -87,7 +87,7 @@ export function buildNative2DAssetFiles(options = {}) {
   const base = "assets/forge2d/" + asset.kind;
   const files = {
     [base + ".svg"]: asset.svg,
-    [base + ".json"]: JSON.stringify(asset.manifest, null, 2) + "\\n"
+    [base + ".json"]: JSON.stringify(asset.manifest, null, 2) + "\n"
   };
   for (const [filename, svg] of Object.entries(asset.frameFiles)) {
     files[base + "/frames/" + filename] = svg;
