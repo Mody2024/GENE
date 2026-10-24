@@ -2397,8 +2397,11 @@ export default function Home() {
     const remaining = projects.filter(item => item.id !== projectId);
     const deletingActive = project?.id === projectId;
     const next = deletingActive ? (remaining[0] || newProject(target.kind || "game")) : project;
+    const durableRemaining = next
+      ? [next, ...remaining.filter(item => item.id !== next.id)].slice(0, 8)
+      : remaining.slice(0, 8);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(durableRemaining));
       if (deletingActive || localStorage.getItem(ACTIVE_KEY) === projectId) {
         if (next?.id) localStorage.setItem(ACTIVE_KEY, next.id);
         else localStorage.removeItem(ACTIVE_KEY);
@@ -2407,7 +2410,8 @@ export default function Home() {
     setProjects(remaining);
     // Keep the durable snapshot in sync even when deleting a non-active project.
     // Otherwise IndexedDB can resurrect a deleted project during the next hydration.
-    void writeDurableProjectSnapshot(remaining, next?.id || "").catch(() => {
+    // Use the freshest active project object, not a possibly stale list entry.
+    void writeDurableProjectSnapshot(durableRemaining, next?.id || "").catch(() => {
       setPersistenceWarning("A project was removed from the visible workspace, but durable cleanup failed. Refresh may restore an older copy; check browser storage before continuing.");
     });
     if (deletingActive) {
