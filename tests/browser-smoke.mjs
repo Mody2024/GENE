@@ -253,7 +253,14 @@ try {
   await page.mouse.down();
   await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 8 });
   await page.mouse.up();
-  await page.waitForFunction((before) => { const input=document.querySelector(".scene-vector input"); return !!input && Number(input.value)!==before; }, initialPositionX, { timeout: 8000 });
+  // Scope the wait to the selected object's position inspector. Other vector groups
+  // (rotation/scale and any later inspector panels) must not satisfy or block this check.
+  await page.waitForFunction((before) => {
+    const inspector = document.querySelector(".scene-inspector");
+    const positionGroup = inspector?.querySelector(".scene-vector");
+    const input = positionGroup?.querySelector("input");
+    return !!input && Number(input.value) !== before;
+  }, initialPositionX, { timeout: 8000 });
   assert.notEqual(Number(await positionX.inputValue()), initialPositionX, "dragging a scene object changes its real position transform");
   await page.getByLabel("Name", { exact: true }).fill("Browser-tested scene prop");
   await page.getByLabel("Type").selectOption("box");
