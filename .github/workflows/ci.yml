@@ -21,6 +21,8 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Run web scene and gameplay-director unit tests
+        run: node --test apps/web/app/lib/*.test.mjs
       - name: Check local agent syntax
         run: npm run check --workspace=@gene/local-agent
       - name: Check cloud build helper syntax
