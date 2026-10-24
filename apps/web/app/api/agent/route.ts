@@ -958,8 +958,15 @@ export async function POST(request: NextRequest) {
     forge2DAssets = results.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
     if (forge2DAssets.length) {
       userInput += "\n\nGENE FORGE 2D TOOL RESULTS — THESE ARE GENERATED VECTOR ASSETS, NOT SUGGESTIONS. Integrate the exact provided local files into the actual playable game where appropriate: " +
-        JSON.stringify(forge2DAssets.map(asset => ({ kind: asset.kind, name: asset.name, svg: "assets/forge2d/" + asset.kind + ".svg", manifest: "assets/forge2d/" + asset.kind + ".json", dimensions: { width: asset.manifest.width, height: asset.manifest.height, frames: asset.manifest.frames } })) ) +
-        "\nUse these local assets in game.js (for example by loading the local SVG as an Image and drawing it to the canvas); do not put executable code in game.html, do not use remote URLs, and do not claim an asset is integrated unless game.js actually loads and renders it. The exact generated files will be included in the project.";
+        JSON.stringify(forge2DAssets.map(asset => ({
+          kind: asset.kind,
+          name: asset.name,
+          svg: "assets/forge2d/" + asset.kind + ".svg",
+          manifest: "assets/forge2d/" + asset.kind + ".json",
+          dimensions: { width: asset.manifest.width, height: asset.manifest.height, frames: asset.manifest.frames },
+          animationClips: Array.isArray(asset.manifest.animationClips) ? asset.manifest.animationClips.map((clip: any) => ({ name: clip.name, frames: clip.frames, frameDurationMs: clip.frameDurationMs, loop: clip.loop })) : []
+        }))) +
+        "\nIntegrate these local files into the actual playable game, not just the project listing. For a character with animationClips, call window.GENE_SPRITES.draw(ctx, \"assets/forge2d/character\", clipName, x, y, width, height, performance.now()) inside the normal canvas render loop; use \"idle\" while stationary and \"walk\" while moving when those clips exist. The helper loads separately cropped frames from the supplied manifest. For a non-animated background or tileset, load its exact local SVG path with window.GENE_ART.image/draw or an Image. Do not put executable code in game.html, do not use remote URLs, and do not claim an asset is integrated unless game.js actually loads and renders it. The exact generated files will be included in the project.";
     } else {
       userInput += "\n\nGENE FORGE 2D STATUS: The native 2D generator did not return validated artwork. Continue with the best playable game possible and do not claim Forge artwork was generated.";
     }
