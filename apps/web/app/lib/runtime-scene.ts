@@ -65,7 +65,16 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     groups.forEach(function(g){var a=g.positions||[],kd=mats[g.material]&&mats[g.material].kd;for(var i=0;i+17<a.length&&triangles.length<12000;i+=18){var v0=project(a[i],a[i+1],a[i+2]),v1=project(a[i+6],a[i+7],a[i+8]),v2=project(a[i+12],a[i+13],a[i+14]);var nz=(a[i+5]+a[i+11]+a[i+17])/3,shade=.58+.42*Math.max(0,nz),rgb=kd&&kd.length>=3?kd:fallback.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;});triangles.push({v:[v0,v1,v2],z:(v0.z+v1.z+v2.z)/3,c:"rgb("+rgb.map(function(v){return Math.round(Math.max(0,Math.min(1,v*shade))*255);}).join(",")+")"});}});
     triangles.sort(function(a,b){return a.z-b.z;});ctx.save();ctx.globalAlpha=1;triangles.forEach(function(t){ctx.beginPath();ctx.moveTo(t.v[0].x,t.v[0].y);ctx.lineTo(t.v[1].x,t.v[1].y);ctx.lineTo(t.v[2].x,t.v[2].y);ctx.closePath();ctx.fillStyle=t.c;ctx.fill();});ctx.restore();return triangles.length>0;
   }catch(e){return false;}
-};window.GENE_SCENE.createWebGLMeshes=function(gl){
+};window.GENE_SCENE.pushRuntimeWarning=function(warning){
+  var scene=window.GENE_SCENE;
+  var list=Array.isArray(scene.runtimeWarnings)?scene.runtimeWarnings:(scene.runtimeWarnings=[]);
+  warning=warning&&typeof warning==="object"?warning:{message:String(warning||"Unknown runtime warning")};
+  var key=String(warning.id||"")+"|"+String(warning.modelPath||"")+"|"+String(warning.message||"");
+  if(list.some(function(item){return String(item&&item.id||"")+"|"+String(item&&item.modelPath||"")+"|"+String(item&&item.message||"")===key;}))return;
+  list.push(Object.assign({timestamp:Date.now()},warning));
+  if(list.length>100)list.splice(0,list.length-100);
+};
+window.GENE_SCENE.createWebGLMeshes=function(gl){
   if(!gl)return{meshes:[],dispose:function(){}};
   var meshes=[],seen=0;
   function primitiveData(type){
@@ -123,8 +132,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         }catch(modelError){modelLoadError=String(modelError&&modelError.message||modelError||"unknown OBJ parser error");groups=[];}
         if(!groups.length){
           groups=[{material:"",positions:primitiveData("box")}];
-          window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
-          window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:modelPath,message:"OBJ geometry could not be loaded; showing a placeholder. "+(modelLoadError||"The OBJ parser returned no geometry.")+" Check the asset package and GENE3D parser."});
+          window.GENE_SCENE.pushRuntimeWarning({id:o.id,modelPath:modelPath,message:"OBJ geometry could not be loaded; showing a placeholder. "+(modelLoadError||"The OBJ parser returned no geometry.")+" Check the asset package and GENE3D parser."});
         }
       }else if(type==="mesh"&&!modelPath){
         // Generic mesh objects without an assigned OBJ should still be visible and testable.
@@ -149,16 +157,14 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
           gl.bindBuffer(gl.ARRAY_BUFFER,fallbackBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(fallbackData),gl.STATIC_DRAW);
           meshes.push({id:o.id,name:o.name,modelPath:modelPath,materialName:"",material:null,buffer:fallbackBuffer,vertexCount:fallbackData.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
         }
-        window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
-        window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:modelPath,message:"OBJ parser produced no usable vertex buffers; a box placeholder is shown. Check mesh groups and triangle data."});
+        window.GENE_SCENE.pushRuntimeWarning({id:o.id,modelPath:modelPath,message:"OBJ parser produced no usable vertex buffers; a box placeholder is shown. Check mesh groups and triangle data."});
       }
     }catch(e){
       // Roll back partially allocated GPU buffers for this object, then surface the
       // failure instead of silently turning a runtime error into a missing model.
       for(var rollback=meshStart;rollback<meshes.length;rollback++){try{gl.deleteBuffer(meshes[rollback].buffer);}catch(cleanupError){}}
       meshes.splice(meshStart);
-      window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
-      window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:o.modelPath||"",message:"3D mesh setup failed: "+String(e&&e.message||e||"unknown WebGL error")});
+      window.GENE_SCENE.pushRuntimeWarning({id:o.id,modelPath:o.modelPath||"",message:"3D mesh setup failed: "+String(e&&e.message||e||"unknown WebGL error")});
     }
   });
   return{meshes:meshes,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
