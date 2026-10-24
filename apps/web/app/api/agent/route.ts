@@ -1569,11 +1569,11 @@ export async function POST(request: NextRequest) {
         !(gameScripts.includes("GENE_ART") || gameScripts.includes("drawImage") || gameScripts.includes("new Image"));
     });
     if (missingForgeIntegration.length) {
-      result.reply += "\\n\\nGENE Forge integration check: these assets are included in the project but could not be confirmed as used by the game's JavaScript: " +
+      result.reply += "\n\nGENE Forge integration check: these assets are included in the project but could not be confirmed as used by the game's JavaScript: " +
         missingForgeIntegration.map(asset => asset.kind).join(", ") +
         ". They are packaged assets, not verified in-game artwork. The build needs a follow-up repair to load and draw them before claiming they are visible in gameplay.";
     } else {
-      result.reply += "\\n\\nGENE Forge integration check: generated 2D assets have matching references in the game's JavaScript. This confirms code references only; actual browser visibility and animation still require runtime acceptance.";
+      result.reply += "\n\nGENE Forge integration check: generated 2D assets have matching references in the game's JavaScript. This confirms code references only; actual browser visibility and animation still require runtime acceptance.";
     }
   }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
