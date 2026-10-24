@@ -2,9 +2,14 @@
 
 > **Progress snapshot (2026-10-24):** The first foundation batch is committed on `main` at [`9956ac4`](https://github.com/Mody2024/GENE/commit/9956ac40941e409258b4302c91e7f7d4562cf473). Its commit report records CI, interactive-playground, and browser-regression workflows passing. This does not mean the full Infinity overhaul or production end-to-end acceptance is complete. Percentages below are planning estimates, not runtime telemetry.
 
+
+- [x] Serialize IndexedDB workspace snapshot writes so delayed earlier saves cannot overwrite later snapshots.
+- [x] Reconcile localStorage and IndexedDB during startup by project ID and updated timestamp, recovering durable projects even if localStorage still contains an older non-empty snapshot.
+- [x] Avoid treating ES-module static import/export syntax as invalid when checked by the classic-script `Function` constructor; report those files as requiring module-aware validation instead.
+
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
-- **Wave 2 — 3D scene reliability and playable geometry: 40%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
+- **Wave 2 — 3D scene reliability and playable geometry: 42%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
 - **Wave 3 — persistent workspace, checkpoints, resumable repair: 20%** (local project/version foundations exist; durable task/project storage and resume semantics remain).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
 - **Wave 5 — evidence-based self-improvement and release acceptance: 10%** (roadmap and regression foundations exist; held-out evaluation and full release gate remain).
