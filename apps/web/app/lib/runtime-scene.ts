@@ -147,6 +147,9 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
   var mvpLoc=locations.mvp==null?gl.getUniformLocation(program,"uMVP"):locations.mvp;
   var modelLoc=locations.model==null?gl.getUniformLocation(program,"uModel"):locations.model;
   var colorLoc=locations.color==null?gl.getUniformLocation(program,"uColor"):locations.color;
+  var lightDirectionLoc=locations.lightDirection==null?gl.getUniformLocation(program,"uLightDirection"):locations.lightDirection;
+  var lightColorLoc=locations.lightColor==null?gl.getUniformLocation(program,"uLightColor"):locations.lightColor;
+  var ambientLoc=locations.ambient==null?gl.getUniformLocation(program,"uAmbient"):locations.ambient;
   if(pos<0||normal<0||!mvpLoc)return 0;
   function model(o){
     var r=o.rotation||{},p=o.position||{},s=o.scale||{},rx=(Number(r.x)||0)*Math.PI/180,ry=(Number(r.y)||0)*Math.PI/180,rz=(Number(r.z)||0)*Math.PI/180;
@@ -163,6 +166,11 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     var rgb=hex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;});
     gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(normal,3,gl.FLOAT,false,24,12);
     gl.uniformMatrix4fv(mvpLoc,false,mul(viewProjection,mat));if(modelLoc)gl.uniformMatrix4fv(modelLoc,false,mat);if(colorLoc)gl.uniform4f(colorLoc,rgb[0],rgb[1],rgb[2],1);
+    var light=m.light||{},lightHex=/^#[0-9a-f]{6}$/i.test(light.color)?light.color:"#ffffff",lightRgb=lightHex.match(/[0-9a-f]{2}/gi).map(function(v){return parseInt(v,16)/255;}),intensity=Math.max(0,Math.min(20,Number(light.intensity)||1));
+    var direction=light.direction&&typeof light.direction==="object"?light.direction:{x:-0.4,y:0.8,z:0.3},dx=Number(direction.x)||-0.4,dy=Number(direction.y)||0.8,dz=Number(direction.z)||0.3,dlen=Math.hypot(dx,dy,dz)||1;
+    if(lightDirectionLoc)gl.uniform3f(lightDirectionLoc,dx/dlen,dy/dlen,dz/dlen);
+    if(lightColorLoc)gl.uniform3f(lightColorLoc,lightRgb[0]*intensity,lightRgb[1]*intensity,lightRgb[2]*intensity);
+    if(ambientLoc)gl.uniform1f(ambientLoc,Math.max(0,Math.min(1,Number(light.ambient)||0.18)));
     gl.drawArrays(gl.TRIANGLES,0,m.vertexCount);drawn++;
   });
   return drawn;
