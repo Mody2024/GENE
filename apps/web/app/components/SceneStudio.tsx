@@ -224,19 +224,27 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
   const onViewportPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (readOnly || event.button !== 0) return;
     const point = viewportPoint(event);
-    const hit = [...objects].reverse().filter(object => object.visible).find(object => {
+    const pickable = [...objects].reverse().filter(object => object.visible);
+    const centerOf = (object: SceneObject) => is2D
+      ? { x: 480 + object.position.x * 32, y: 270 - object.position.y * 32 }
+      : { x: 480 + (object.position.x - object.position.z) * 32, y: 540 * .58 + (object.position.x + object.position.z) * 16 - object.position.y * 38 - 25 * object.scale.y };
+    const hit = pickable.find(object => {
+      const center = centerOf(object);
       if (is2D) {
-        const x = 480 + object.position.x * 32;
-        const y = 270 - object.position.y * 32;
         const halfWidth = Math.max(24, 15 * Math.abs(object.scale.x) + 8);
         const halfHeight = Math.max(22, 13 * Math.abs(object.scale.y) + 8);
-        return Math.abs(point.x - x) <= halfWidth && Math.abs(point.y - y) <= halfHeight;
+        return Math.abs(point.x - center.x) <= halfWidth && Math.abs(point.y - center.y) <= halfHeight;
       }
-      const x = 480 + (object.position.x - object.position.z) * 32;
-      const y = 540 * .58 + (object.position.x + object.position.z) * 16 - object.position.y * 38;
-      return Math.abs(point.x - x) <= 32 * Math.max(1, Math.abs(object.scale.x)) &&
-        Math.abs(point.y - (y - 25 * object.scale.y)) <= 34 * Math.max(1, Math.abs(object.scale.y));
-    });
+      return Math.abs(point.x - center.x) <= 32 * Math.max(1, Math.abs(object.scale.x)) &&
+        Math.abs(point.y - center.y) <= 34 * Math.max(1, Math.abs(object.scale.y));
+    }) || pickable
+      // Small visual labels and thin primitives can be difficult to hit precisely.
+      // A bounded nearest-object fallback makes the editor forgiving without letting
+      // a click anywhere on the canvas unexpectedly move a distant object.
+      .map(object => ({ object, center: centerOf(object) }))
+      .map(entry => ({ ...entry, distance: Math.hypot(point.x - entry.center.x, point.y - entry.center.y) }))
+      .filter(entry => entry.distance <= 48)
+      .sort((a, b) => a.distance - b.distance)[0]?.object;
     if (!hit) return;
     setSelectedId(hit.id);
     dragRef.current = {
