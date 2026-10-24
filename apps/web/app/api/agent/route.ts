@@ -1557,9 +1557,9 @@ export async function POST(request: NextRequest) {
   // assets that the playable game actually references.
   if (Array.isArray(result.files) && forge2DAssets.length) {
     const gameScripts = result.files
-      .filter((file: any) => /\\.(?:m?js|cjs)$/i.test(file.path))
+      .filter((file: any) => /\.(?:m?js|cjs)$/i.test(file.path))
       .map((file: any) => String(file.content || ""))
-      .join("\\n");
+      .join("\n");
     const missingForgeIntegration = forge2DAssets.filter(asset => {
       const assetPath = "assets/forge2d/" + asset.kind;
       if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
