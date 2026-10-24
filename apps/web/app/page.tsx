@@ -391,8 +391,15 @@ export default function Home() {
             const previous = byId.get(item.id);
             const currentTime = Date.parse(item.updatedAt || "");
             const previousTime = previous ? Date.parse(previous.updatedAt || "") : -Infinity;
-            // On equal timestamps prefer localStorage, preserving its compatibility behavior.
-            if (!previous || (Number.isFinite(currentTime) && currentTime > previousTime)) byId.set(item.id, item);
+            const currentHasTime = Number.isFinite(currentTime);
+            const previousHasTime = Number.isFinite(previousTime);
+            // On equal timestamps prefer the later localStorage item, preserving its
+            // compatibility behavior. If both timestamps are invalid, prefer localStorage too.
+            if (!previous ||
+              (currentHasTime && (!previousHasTime || currentTime >= previousTime)) ||
+              (!currentHasTime && !previousHasTime)) {
+              byId.set(item.id, item);
+            }
           }
           const localOrder = list.map(item => item.id);
           const merged = [...byId.values()].sort((a, b) => {
