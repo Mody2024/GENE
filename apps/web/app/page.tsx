@@ -2629,14 +2629,14 @@ export default function Home() {
       const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && String(object.type || "").toLowerCase() === "mesh" && typeof object.modelPath === "string" && object.modelPath.length > 0);
       if (assignedMeshes.length) {
         const meshConnected = /getRenderableObject|getMeshData|GENE3D\.parseOBJ|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
-        add("Scene renderer integration", meshConnected ? "pass" : "warn", meshConnected
+        add("Scene renderer integration", meshConnected ? "warn" : "fail", meshConnected
           ? "Game source references the scene/mesh runtime API; visual correctness still requires actual gameplay inspection."
-          : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. The editor manifest alone does not draw them.");
+          : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. Build rejected: the editor manifest alone does not draw them.");
       } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "canvas2d") {
         const sceneDrawn = /GENE_SCENE\.draw2D|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
-        add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
+        add("Scene renderer integration", sceneDrawn ? "warn" : "fail", sceneDrawn
           ? "Game source references the Canvas 2D scene API; verify layering and collision behavior in gameplay."
-          : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API.");
+          : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API. Build rejected: the manifest alone does not draw them.");
       } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "webgl3d") {
         const sceneDrawn = /GENE_SCENE\.(?:createWebGLMeshes|drawWebGLMeshes|getVisibleObjects|getRenderableObject|getMeshData)|GENE3D\.parseOBJ/.test(allRuntimeSource);
         const hasPrimitiveObjects = sceneObjects.some(object => {
