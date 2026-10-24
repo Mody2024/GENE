@@ -131,7 +131,7 @@ test("rejects OBJ faces with out-of-range or invalid vertex indices", () => {
 });
 
 test("accepts valid OBJ face references using slash notation and negative indices", () => {
-  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1/1 2/2 3/3\nf -3 -2 -1\n";
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\nf -3 -2 -1\n";
   const report = inspectSceneManifest(
     { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
     { "assets/mesh.obj": source }
@@ -219,4 +219,23 @@ test("rejects WebGL3D scenes when a required OBJ asset is missing from the build
   assert.equal(report.ok, false);
   assert.equal(report.missingModelAssets.length, 1);
   assert.match(report.errors.join(" "), /required OBJ asset is missing from the build package/i);
+});
+
+test("rejects OBJ face references to missing texture coordinates or normals", () => {
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvn 0 0 1\nf 1/2/1 2/1/1 3/1/1\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /invalid vertex indices/i);
+});
+
+test("accepts valid OBJ vertex, texture and normal indices", () => {
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
 });
