@@ -43,7 +43,7 @@ export function planVisualReferenceQueries({ topic, kind = "game", engine = "aut
 const STOPWORDS = new Set(["a","an","the","and","or","for","with","from","into","game","video","gameplay","design","style","reference","model","models","art","asset","assets","3d","2d","webgl","canvas","make","create","build","like","about","based","using"]);
 function tokenize(value) {
   return new Set(String(value || "").toLowerCase()
-    .split(/[^a-z0-9\\u0600-\\u06ff]+/i)
+    .split(/[^a-z0-9\u0600-\u06ff]+/i)
     .filter(word => word.length >= 2));
 }
 function topicTerms(topic) {
