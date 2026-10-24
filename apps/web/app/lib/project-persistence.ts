@@ -160,3 +160,63 @@ export function mergeDurableProjectSnapshots(
 
   return { projects, activeProjectId, savedAt, deletedProjectIds };
 }
+
+export type ReconciledWorkspace = {
+  projects: GeneProject[];
+  activeProjectId: string;
+};
+
+/** Reconcile legacy localStorage projects with the durable snapshot deterministically. */
+export function reconcileDurableProjectWorkspace(
+  localProjectsValue: unknown,
+  localActiveProjectId: string,
+  durableValue: unknown
+): ReconciledWorkspace {
+  const local = normalizeDurableProjectSnapshot({
+    projects: Array.isArray(localProjectsValue) ? localProjectsValue : [],
+    activeProjectId: localActiveProjectId,
+    savedAt: "",
+    deletedProjectIds: []
+  });
+  const durable = normalizeDurableProjectSnapshot(durableValue);
+  const localProjects = local?.projects || [];
+  const deletedIds = new Set(durable?.deletedProjectIds || []);
+  const localProjectsAllowed = localProjects.filter(project => !deletedIds.has(project.id));
+  const durableProjects = (durable?.projects || []).filter(project => !deletedIds.has(project.id));
+  const byId = new Map<string, GeneProject>();
+
+  // Start with durable data, then let an equal-or-newer local copy win.
+  for (const project of durableProjects) byId.set(project.id, project);
+  for (const project of localProjectsAllowed) {
+    const previous = byId.get(project.id);
+    if (!previous) {
+      byId.set(project.id, project);
+      continue;
+    }
+    const localTime = Date.parse(project.updatedAt || "");
+    const durableTime = Date.parse(previous.updatedAt || "");
+    if (
+      (Number.isFinite(localTime) && (!Number.isFinite(durableTime) || localTime >= durableTime)) ||
+      (!Number.isFinite(localTime) && !Number.isFinite(durableTime))
+    ) byId.set(project.id, project);
+  }
+
+  const localOrder = localProjectsAllowed.map(project => project.id);
+  const projects = [...byId.values()].sort((a, b) => {
+    const ai = localOrder.indexOf(a.id);
+    const bi = localOrder.indexOf(b.id);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    const aTime = Date.parse(a.updatedAt || "");
+    const bTime = Date.parse(b.updatedAt || "");
+    return (Number.isFinite(bTime) ? bTime : -Infinity) - (Number.isFinite(aTime) ? aTime : -Infinity);
+  }).slice(0, 8);
+
+  const activeProjectId = [
+    local?.activeProjectId,
+    durable?.activeProjectId
+  ].find(candidate => Boolean(candidate) && projects.some(project => project.id === candidate)) || projects[0]?.id || "";
+
+  return { projects, activeProjectId };
+}
