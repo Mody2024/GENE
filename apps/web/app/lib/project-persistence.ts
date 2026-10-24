@@ -11,6 +11,26 @@ export type DurableProjectSnapshot = {
   savedAt: string;
 };
 
+/** Normalize untrusted browser data before it reaches workspace hydration. */
+export function normalizeDurableProjectSnapshot(value: unknown): DurableProjectSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<DurableProjectSnapshot>;
+  if (!Array.isArray(candidate.projects)) return null;
+  const projects = candidate.projects.filter((item): item is GeneProject =>
+    Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id.trim())
+  ).map(item => ({
+    ...item,
+    kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" as const : "game" as const,
+    references: Array.isArray(item.references) ? item.references : [],
+    versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
+  }));
+  return {
+    projects: projects.slice(0, 8),
+    activeProjectId: typeof candidate.activeProjectId === "string" ? candidate.activeProjectId : "",
+    savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : ""
+  };
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") return Promise.reject(new Error("IndexedDB is unavailable in this browser."));
   return new Promise((resolve, reject) => {
@@ -36,13 +56,7 @@ export async function readDurableProjectSnapshot(): Promise<DurableProjectSnapsh
       const transaction = database.transaction(STORE, "readonly");
       const request = transaction.objectStore(STORE).get(WORKSPACE_KEY);
       request.onsuccess = () => {
-        const value = request.result as DurableProjectSnapshot | undefined;
-        if (!value || !Array.isArray(value.projects)) return resolve(null);
-        resolve({
-          projects: value.projects,
-          activeProjectId: String(value.activeProjectId || ""),
-          savedAt: String(value.savedAt || "")
-        });
+        resolve(normalizeDurableProjectSnapshot(request.result));
       };
       request.onerror = () => reject(request.error || new Error("Could not read durable project storage."));
     });
