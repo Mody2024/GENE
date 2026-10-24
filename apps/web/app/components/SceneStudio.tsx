@@ -222,20 +222,31 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     return { x:(event.clientX-rect.left)*960/rect.width, y:(event.clientY-rect.top)*540/rect.height };
   };
   const onViewportPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if(readOnly)return;
-    const point=viewportPoint(event);
-    const hit=[...objects].reverse().filter(o=>o.visible).find(o=>{
+    if (readOnly || event.button !== 0) return;
+    const point = viewportPoint(event);
+    const hit = [...objects].reverse().filter(object => object.visible).find(object => {
       if (is2D) {
-        const x = 480 + o.position.x * 32, y = 270 - o.position.y * 32;
-        return Math.abs(point.x - x) < 24 * Math.max(1, Math.abs(o.scale.x)) && Math.abs(point.y - y) < 22 * Math.max(1, Math.abs(o.scale.y));
+        const x = 480 + object.position.x * 32;
+        const y = 270 - object.position.y * 32;
+        const halfWidth = Math.max(24, 15 * Math.abs(object.scale.x) + 8);
+        const halfHeight = Math.max(22, 13 * Math.abs(object.scale.y) + 8);
+        return Math.abs(point.x - x) <= halfWidth && Math.abs(point.y - y) <= halfHeight;
       }
-      const x=480+(o.position.x-o.position.z)*32,y=540*.58+(o.position.x+o.position.z)*16-o.position.y*38;
-      return Math.abs(point.x-x)<32*Math.max(1,Math.abs(o.scale.x))&&Math.abs(point.y-(y-25*o.scale.y))<34*Math.max(1,Math.abs(o.scale.y));
+      const x = 480 + (object.position.x - object.position.z) * 32;
+      const y = 540 * .58 + (object.position.x + object.position.z) * 16 - object.position.y * 38;
+      return Math.abs(point.x - x) <= 32 * Math.max(1, Math.abs(object.scale.x)) &&
+        Math.abs(point.y - (y - 25 * object.scale.y)) <= 34 * Math.max(1, Math.abs(object.scale.y));
     });
-    if(!hit)return;
+    if (!hit) return;
     setSelectedId(hit.id);
-    dragRef.current={id:hit.id,startX:point.x,startY:point.y,original:objects.map(o=>({...o,position:{...o.position},rotation:{...o.rotation},scale:{...o.scale}})),originalPosition:{...hit.position}};
-    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      id: hit.id,
+      startX: point.x,
+      startY: point.y,
+      original: objects.map(object => ({ ...object, position: { ...object.position }, rotation: { ...object.rotation }, scale: { ...object.scale } })),
+      originalPosition: { ...hit.position }
+    };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* Pointer capture may be unavailable in embedded previews. */ }
   };
   const onViewportPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag=dragRef.current;if(!drag||readOnly)return;
