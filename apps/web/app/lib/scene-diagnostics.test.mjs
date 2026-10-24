@@ -210,3 +210,13 @@ test("rejects OBJ vertex records with trailing non-numeric garbage", () => {
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /malformed vertex record/i);
 });
+
+test("rejects WebGL3D scenes when a required OBJ asset is missing from the build package", () => {
+  const report = inspectSceneManifest({
+    engine: "webgl3d",
+    scene: { objects: [{ id: "player", type: "mesh", modelPath: "assets/player.obj" }] }
+  }, {});
+  assert.equal(report.ok, false);
+  assert.equal(report.missingModelAssets.length, 1);
+  assert.match(report.errors.join(" "), /required OBJ asset is missing from the build package/i);
+});
