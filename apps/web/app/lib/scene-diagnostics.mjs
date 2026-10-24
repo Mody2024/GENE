@@ -61,27 +61,40 @@ export function inspectSceneManifest(spec, files = {}) {
         if (!source.trim() || source.length > 2_000_000) {
           errors.push(id + ": OBJ asset is empty or exceeds the 2 MB validation limit");
         } else {
-          const vertexLines = source.match(/^\s*v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/gm) || [];
-          const faceLines = source.match(/^\s*f\s+.+$/gm) || [];
-          const vertices = vertexLines.length;
-          const faces = faceLines.length;
+          let vertices = 0;
+          let faces = 0;
+          let malformedFace = false;
+          // Parse in one pass: negative OBJ indices are relative to vertices already declared,
+          // and repeated identical face lines must not confuse source-position lookups.
+          for (const line of source.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (/^v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/.test(trimmed)) {
+              vertices += 1;
+              if (vertices > 100_000) break;
+            } else if (/^f\s+.+$/.test(trimmed)) {
+              faces += 1;
+              const refs = trimmed.split(/\s+/).slice(1);
+              if (faces > 100_000 || refs.length < 3) {
+                malformedFace = true;
+                break;
+              }
+              if (refs.some(ref => {
+                const vertexRef = ref.split("/")[0];
+                if (!/^-?\d+$/.test(vertexRef)) return true;
+                const n = Number(vertexRef);
+                return n === 0 || n > vertices || n < -vertices;
+              })) {
+                malformedFace = true;
+                break;
+              }
+            }
+          }
           if (!vertices || !faces) {
             errors.push(id + ": OBJ asset must contain at least one valid vertex and face record");
           } else if (vertices > 100_000 || faces > 100_000) {
             errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
-          } else {
-            const malformedFace = faceLines.some(line => {
-              const refs = line.trim().split(/\s+/).slice(1);
-              if (refs.length < 3) return true;
-              const precedingVertices = source.slice(0, source.indexOf(line)).match(/^\s*v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/gm) || [];
-              return refs.some(ref => {
-                const vertexRef = ref.split("/")[0];
-                if (!/^-?\d+$/.test(vertexRef)) return true;
-                const n = Number(vertexRef);
-                return n === 0 || n > precedingVertices.length || n < -precedingVertices.length;
-              });
-            });
-            if (malformedFace) errors.push(id + ": OBJ asset contains a face with invalid vertex indices");
+          } else if (malformedFace) {
+            errors.push(id + ": OBJ asset contains a face with invalid vertex indices or too few vertices");
           }
         }
       }
