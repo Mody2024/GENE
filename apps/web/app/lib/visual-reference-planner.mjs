@@ -41,8 +41,13 @@ export function planVisualReferenceQueries({ topic, kind = "game", engine = "aut
 }
 
 const STOPWORDS = new Set(["a","an","the","and","or","for","with","from","into","game","video","gameplay","design","style","reference","model","models","art","asset","assets","3d","2d","webgl","canvas","make","create","build","like","about","based","using"]);
+function tokenize(value) {
+  return new Set(String(value || "").toLowerCase()
+    .split(/[^a-z0-9\\u0600-\\u06ff]+/i)
+    .filter(word => word.length >= 2));
+}
 function topicTerms(topic) {
-  return cleanTopic(topic).toLowerCase().split(/[^a-z0-9\u0600-\u06ff]+/i)
+  return [...tokenize(cleanTopic(topic))]
     .filter(word => word.length >= 3 && !STOPWORDS.has(word)).slice(0, 12);
 }
 const CATEGORY_TERMS = {
@@ -59,17 +64,25 @@ const CATEGORY_TERMS = {
 export function rankVisualReferenceResults(images, topic) {
   const terms = topicTerms(topic);
   const ranked = (Array.isArray(images) ? images : []).map((image, index) => {
-    const title = String(image?.title || "").toLowerCase();
+    // Search useful image metadata, not title alone: providers often put the subject
+    // in alt text, captions or descriptions while returning a short title.
+    const searchableText = [
+      image?.title, image?.alt, image?.altText, image?.caption,
+      image?.description, image?.snippet, image?.category
+    ].filter(value => typeof value === "string").join(" ").toLowerCase();
+    const words = tokenize(searchableText);
     const category = String(image?.category || "");
     const categoryTerms = CATEGORY_TERMS[category] || [];
-    const topicHits = terms.filter(term => title.includes(term));
-    const categoryHits = categoryTerms.filter(term => title.includes(term));
-    const score = topicHits.length * 4 + (categoryHits.length ? 1 : 0);
+    const topicHits = terms.filter(term => words.has(term));
+    const categoryHits = categoryTerms.filter(term => words.has(term));
+    const score = topicHits.length * 4 + categoryHits.length;
     return { image, index, score, topicHits: topicHits.length, categoryHits: categoryHits.length };
   });
-  // If the query is specific, a generic category match is not enough: reject unrelated
-  // images instead of filling slots with irrelevant material. Keep topic-matching items first.
-  return ranked.filter(item => item.score > 0 && (terms.length === 0 || item.topicHits > 0 || item.categoryHits >= 2))
-    .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || a.index - b.index)
+  // For specific prompts, require a real topic match or several category signals.
+  // Token equality avoids accidental matches such as "car" inside "character".
+  return ranked.filter(item => item.score > 0 && (
+    terms.length === 0 || item.topicHits > 0 || item.categoryHits >= 2
+  ))
+    .sort((a, b) => b.score - a.score || b.topicHits - a.topicHits || b.categoryHits - a.categoryHits || a.index - b.index)
     .map(item => ({ ...item.image, relevanceScore: item.score }));
 }
