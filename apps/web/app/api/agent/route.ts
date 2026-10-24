@@ -1565,10 +1565,8 @@ export async function POST(request: NextRequest) {
       if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
         return !gameScripts.includes("GENE_SPRITES.draw") || !gameScripts.includes(assetPath);
       }
-      return !gameScripts.includes(assetPath + ".svg") &&
-        !gameScripts.includes("GENE_ART") &&
-        !gameScripts.includes("GENE_ART.image") &&
-        !gameScripts.includes("GENE_ART.draw");
+      return !gameScripts.includes(assetPath + ".svg") ||
+        !(gameScripts.includes("GENE_ART") || gameScripts.includes("drawImage") || gameScripts.includes("new Image"));
     });
     if (missingForgeIntegration.length) {
       result.reply += "\\n\\nGENE Forge integration check: these assets are included in the project but could not be confirmed as used by the game's JavaScript: " +
