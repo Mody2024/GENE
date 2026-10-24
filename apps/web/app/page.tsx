@@ -2505,6 +2505,11 @@ export default function Home() {
             }
           }
         }
+        if (String(spec.engine || "").toLowerCase() === "webgl3d" &&
+          String(object.type || "").toLowerCase() === "mesh" &&
+          (typeof object.modelPath !== "string" || !object.modelPath.trim())) {
+          sceneIssues.push((id || "Scene entry " + (index + 1)) + " is a mesh without an assigned OBJ model; the WebGL runtime cannot draw imported geometry for it.");
+        }
         if (String(object.type || "").toLowerCase() === "mesh" && object.modelPath) {
           const modelPath = String(object.modelPath);
           const label = id || "Scene entry " + (index + 1);
