@@ -281,6 +281,20 @@ export function recoverFromCheckpoint(
     ? run.checkpoints.find((item) => item.id === checkpointId)
     : run.checkpoints[run.checkpoints.length - 1];
   if (!checkpoint) throw new Error("No checkpoint is available for recovery.");
+  // A corrupted or partially migrated snapshot must not silently replace newer
+  // project files. Validate every recorded source fingerprint before restoring it.
+  const manifest = checkpoint.fileManifest ?? {};
+  const snapshotFiles = checkpoint.lastKnownGoodFiles ?? {};
+  for (const [path, expectedHash] of Object.entries(manifest)) {
+    if (typeof snapshotFiles[path] !== "string" || hashText(snapshotFiles[path]) !== expectedHash) {
+      throw new Error("Checkpoint " + checkpoint.id + " failed integrity validation for " + path + "; recovery was stopped to protect project files.");
+    }
+  }
+  for (const path of Object.keys(snapshotFiles)) {
+    if (!(path in manifest)) {
+      throw new Error("Checkpoint " + checkpoint.id + " contains an unverified file " + path + "; recovery was stopped to protect project files.");
+    }
+  }
   const completed = new Set(checkpoint.completedTaskIds);
   return {
     run: {
