@@ -71,7 +71,6 @@ export default function VoiceOverStudio({ files, readOnly = false, onSave }: Pro
           const data = String(reader.result || "");
           if (!data.startsWith("data:audio/")) { setError("The recording could not be encoded as audio."); return; }
           saveAsset(data, blob.type.includes("mp4") ? "m4a" : "webm", "recording");
-          setStatus("Recording saved into this project's voice-over assets.");
         };
         reader.onerror = () => setError("Could not read the recorded audio.");
         reader.readAsDataURL(blob);
@@ -86,8 +85,21 @@ export default function VoiceOverStudio({ files, readOnly = false, onSave }: Pro
     if (recorder && recorder.state === "recording") { recorder.stop(); setRecording(false); }
   };
 
-  const saveAsset = (dataUrl: string, extension: string, source: "recording" | "upload") => {
-    if (readOnly) return;
+  const saveAsset = (dataUrl: string, extension: string, source: "recording" | "upload"): boolean => {
+    if (readOnly) return false;
+    // Keep the editor's accepted assets inside the same total budget used by the
+    // runtime bridge. Otherwise later voice lines could be silently omitted at export.
+    const existingVoiceBytes = lines.reduce((total, line) => {
+      const existing = files[line.path];
+      return total + (typeof existing === "string" && existing.startsWith("data:audio/") ? Math.floor(existing.length * 0.75) : 0);
+    }, 0);
+    const incomingVoiceBytes = Math.floor(dataUrl.length * 0.75);
+    if (incomingVoiceBytes > 1_500_000 || existingVoiceBytes + incomingVoiceBytes > 2_000_000) {
+      setError(incomingVoiceBytes > 1_500_000
+        ? "This voice-over exceeds the 1.5 MB per-file limit. Compress or trim it, then retry."
+        : "The project's embedded voice-over budget is 2 MB total. Remove or compress another voice-over before adding this one.");
+      return false;
+    }
     const id = safeId(name) + "-" + Date.now().toString(36);
     const path = "assets/voiceovers/" + id + "." + extension;
     const line: VoiceOver = { id, name: name.trim() || "Voice-over", text: text.trim(), path, source, pitch, rate, voice: voiceName || undefined };
@@ -97,6 +109,7 @@ export default function VoiceOverStudio({ files, readOnly = false, onSave }: Pro
     const nextFiles = { ...files, [path]: dataUrl, "game-spec.json": JSON.stringify({ ...spec, audio: { ...audio, voiceOvers: nextLines } }, null, 2) + "\n" };
     setLines(nextLines); onSave(nextFiles, "Add voice-over: " + line.name);
     setStatus("Added " + line.name + " to the project manifest and asset map.");
+    return true;
   };
 
   const importFile = (file?: File) => {
@@ -123,11 +136,14 @@ export default function VoiceOverStudio({ files, readOnly = false, onSave }: Pro
 
   const removeLine = (id: string) => {
     if (readOnly) return;
+    const removedLine = lines.find(line => line.id === id);
     const nextLines = lines.filter(line => line.id !== id);
     const spec = JSON.parse(files["game-spec.json"] || "{}");
     const audio = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
     const nextFiles = { ...files, "game-spec.json": JSON.stringify({ ...spec, audio: { ...audio, voiceOvers: nextLines } }, null, 2) + "\n" };
-    setLines(nextLines); onSave(nextFiles, "Remove voice-over"); setStatus("Removed voice-over from the manifest.");
+    // Remove the embedded asset too, unless another manifest entry still references it.
+    if (removedLine && !nextLines.some(line => line.path === removedLine.path)) delete nextFiles[removedLine.path];
+    setLines(nextLines); onSave(nextFiles, "Remove voice-over"); setStatus("Removed voice-over and its unused asset from the project.");
   };
 
   return <section className="voiceover-studio" style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--border, #dfe3e8)" }}>
