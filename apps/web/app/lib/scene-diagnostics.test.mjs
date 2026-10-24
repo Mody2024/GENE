@@ -191,3 +191,22 @@ test("rejects scenes that exceed the runtime object limit instead of silently tr
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /runtime limit is 500/i);
 });
+
+test("accepts standard OBJ vertex weights and common vertex-color extensions", () => {
+  const source = "v 0 0 0 1\nv 1 0 0 1 1 0 0\nv 0 1 0\nf 1 2 3\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
+});
+
+test("rejects OBJ vertex records with trailing non-numeric garbage", () => {
+  const source = "v 0 0 0\nv 1 0 0 unexpected\nv 0 1 0\nf 1 2 3\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /malformed vertex record/i);
+});
