@@ -136,3 +136,16 @@ test("workspace reconciliation rejects stale active IDs and falls back to a vali
   );
   assert.equal(result.activeProjectId, "local");
 });
+
+test("durable database opening closes a connection that succeeds after a blocked-open rejection", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  assert.match(source, /request\.onblocked = \(\) => \{[\s\S]*?settled = true;[\s\S]*?Durable project storage is blocked/);
+  assert.match(source, /if \(settled\) \{\s*database\.close\(\);\s*return;\s*\}/);
+});
+
+test("durable reads wait for transaction completion and reject transaction aborts", async () => {
+  const source = await readFile(sourcePath, "utf8");
+  assert.match(source, /Resolve only after the transaction commits/);
+  assert.match(source, /transaction\.oncomplete = \(\) => \{\s*if \(requestFinished\) resolve\(result\);/);
+  assert.match(source, /transaction\.onabort = \(\) => reject\(transaction\.error \|\| new Error\("Durable project read transaction was aborted\."\)\)/);
+});
