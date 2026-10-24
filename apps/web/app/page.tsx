@@ -2563,6 +2563,14 @@ export default function Home() {
         add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
           ? "Game source references the Canvas 2D scene API; verify layering and collision behavior in gameplay."
           : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API.");
+      } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "webgl3d") {
+        const sceneDrawn = /GENE_SCENE\.(?:createWebGLMeshes|drawWebGLMeshes|getVisibleObjects|getRenderableObject|getMeshData)|GENE3D\.parseOBJ/.test(allRuntimeSource);
+        const primitiveOnly = sceneObjects.every(object => object && typeof object === "object" && String(object.type || "").toLowerCase() !== "mesh");
+        add("Scene renderer integration", sceneDrawn ? "warn" : "warn", sceneDrawn
+          ? primitiveOnly
+            ? "The manifest contains primitive scene objects, but the shared scene bridge only supplies imported OBJ meshes to its WebGL mesh builder. Confirm the game implements visible box/sphere/cylinder/cone/plane geometry or add OBJ assets; source references alone do not prove rendering."
+            : "Game source references the shared scene/mesh API; imported geometry, camera, lighting and actual visible output still require runtime verification."
+          : "The WebGL 3D scene has objects, but no recognizable scene-renderer integration was found in game source. The manifest alone does not draw geometry.");
       }
       const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
       if (audioConfig.enabled !== false && !isAppSpec) {
