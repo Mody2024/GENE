@@ -542,6 +542,13 @@ export default function Home() {
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+      if (event.data?.type === "gene-runtime-warning") {
+        const warning = event.data.warning && typeof event.data.warning === "object" ? event.data.warning : {};
+        const message = String(warning.message || "The 3D renderer reported a warning.").slice(0, 600);
+        const objectLabel = String(warning.id || "").slice(0, 100);
+        setNotice("3D runtime warning" + (objectLabel ? " (" + objectLabel + ")" : "") + ": " + message);
+        return;
+      }
       if (event.data?.type === "gene-custom-selection") {
         const tag = String(event.data.tag || "element").toLowerCase();
         const id = String(event.data.id || "");
