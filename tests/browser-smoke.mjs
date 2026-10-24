@@ -240,7 +240,7 @@ try {
   // Select the actual object first, then derive its canvas hit point from the live
   // inspector transform instead of assuming every add/redo path starts at world origin.
   await page.locator(".scene-object-row").first().click();
-  const positionInputs = page.locator(".scene-vector").first().locator("input");
+  const positionInputs = page.locator(".scene-inspector .scene-vector").first().locator("input");
   const initialPositionX = Number(await positionInputs.nth(0).inputValue());
   const initialPositionY = Number(await positionInputs.nth(1).inputValue());
   const positionX = positionInputs.nth(0);
