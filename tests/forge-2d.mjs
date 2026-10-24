@@ -55,7 +55,7 @@ for (const frame of runtimeManifest.frameFiles) {
 assert.equal(Object.keys(packaged.files).length, 6, "character package contains atlas, manifest and four independently addressable frames");
 const packagedTiles = buildNative2DAssetFiles({ prompt: "City street tileset", kind: "tileset" });
 assert.ok(packagedTiles.files["assets/forge2d/tileset.json"], "tileset package includes its manifest");
-assert.equal(Object.keys(packagedTiles.files).filter(path => /\\/frames\\//.test(path)).length, 4, "tileset package includes each separate tile frame");
+assert.equal(Object.keys(packagedTiles.files).filter(path => path.includes("/frames/")).length, 4, "tileset package includes each separate tile frame");
 const stableA = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
 const stableB = buildNative2DAsset({ prompt: "A stable asset", kind: "character", style: "cartoon" });
 assert.equal(stableA.assetId, stableB.assetId, "same brief and style should produce a stable identity");
