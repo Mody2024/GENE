@@ -68,6 +68,8 @@ export function inspectSceneManifest(spec, files = {}) {
           errors.push(id + ": OBJ asset is empty or exceeds the 2 MB validation limit");
         } else {
           let vertices = 0;
+          let textureCoordinates = 0;
+          let normals = 0;
           let faces = 0;
           let malformedVertex = false;
           let malformedFace = false;
@@ -88,6 +90,12 @@ export function inspectSceneManifest(spec, files = {}) {
               }
               vertices += 1;
               if (vertices > 100_000) break;
+            } else if (/^vt(?:\s|$)/.test(trimmed)) {
+              textureCoordinates += 1;
+              if (textureCoordinates > 100_000) break;
+            } else if (/^vn(?:\s|$)/.test(trimmed)) {
+              normals += 1;
+              if (normals > 100_000) break;
             } else if (/^f(?:\s|$)/.test(trimmed)) {
               faces += 1;
               const refs = trimmed.split(/\s+/).slice(1);
@@ -95,11 +103,18 @@ export function inspectSceneManifest(spec, files = {}) {
                 malformedFace = true;
                 break;
               }
+              const invalidIndex = (raw, count) => {
+                if (!/^-?\d+$/.test(raw)) return true;
+                const n = Number(raw);
+                return n === 0 || n > count || n < -count;
+              };
               if (refs.some(ref => {
-                const vertexRef = ref.split("/")[0];
-                if (!/^-?\d+$/.test(vertexRef)) return true;
-                const n = Number(vertexRef);
-                return n === 0 || n > vertices || n < -vertices;
+                const parts = ref.split("/");
+                if (parts.length > 3 || !parts[0] || invalidIndex(parts[0], vertices)) return true;
+                if (parts.length >= 2 && parts[1] !== "" && invalidIndex(parts[1], textureCoordinates)) return true;
+                if (parts.length === 2 && parts[1] === "") return true;
+                if (parts.length === 3 && (parts[2] === "" || invalidIndex(parts[2], normals))) return true;
+                return false;
               })) {
                 malformedFace = true;
                 break;
