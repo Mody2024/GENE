@@ -63,6 +63,7 @@ export function inspectSceneManifest(spec, files = {}) {
         } else {
           let vertices = 0;
           let faces = 0;
+          let malformedVertex = false;
           let malformedFace = false;
           // Parse in one pass: negative OBJ indices are relative to vertices already declared,
           // and repeated identical face lines must not confuse source-position lookups.
@@ -70,7 +71,12 @@ export function inspectSceneManifest(spec, files = {}) {
             // Wavefront OBJ permits comments after geometry records; ignore them before tokenizing.
             const trimmed = line.split("#", 1)[0].trim();
             if (!trimmed) continue;
-            if (/^v\s+[-+0-9.eE]+\s+[-+0-9.eE]+\s+[-+0-9.eE]+(?:\s|$)/.test(trimmed)) {
+            const vertexMatch = trimmed.match(/^v\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)(?:\s|$)/);
+            if (vertexMatch) {
+              if (vertexMatch.slice(1, 4).some(component => !Number.isFinite(Number(component)))) {
+                malformedVertex = true;
+                break;
+              }
               vertices += 1;
               if (vertices > 100_000) break;
             } else if (/^f\s+.+$/.test(trimmed)) {
@@ -95,6 +101,8 @@ export function inspectSceneManifest(spec, files = {}) {
             errors.push(id + ": OBJ asset must contain at least one valid vertex and face record");
           } else if (vertices > 100_000 || faces > 100_000) {
             errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
+          } else if (malformedVertex) {
+            errors.push(id + ": OBJ asset contains a vertex with non-finite coordinates");
           } else if (malformedFace) {
             errors.push(id + ": OBJ asset contains a face with invalid vertex indices or too few vertices");
           }
