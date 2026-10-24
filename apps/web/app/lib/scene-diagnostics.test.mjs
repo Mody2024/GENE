@@ -325,3 +325,14 @@ test("3D build gate rejects a manifest without renderer integration", async () =
   assert.match(page, /add\("Scene renderer integration", sceneDrawn \? "warn" : "fail"/);
   assert.match(page, /Build rejected: the manifest alone cannot draw geometry/);
 });
+
+test("2D and imported-mesh scene builds fail when packaged code lacks renderer hooks", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { fileURLToPath } = await import("node:url");
+  const pagePath = fileURLToPath(new URL("../page.tsx", import.meta.url));
+  const page = await readFile(pagePath, "utf8");
+  assert.match(page, /add\("Scene renderer integration", meshConnected \? "warn" : "fail"/);
+  assert.match(page, /Build rejected: the editor manifest alone does not draw them/);
+  assert.match(page, /add\("Scene renderer integration", sceneDrawn \? "warn" : "fail"/);
+  assert.match(page, /Build rejected: the manifest alone does not draw them/);
+});
