@@ -51,6 +51,10 @@ const PROFILES = [
 
 function chooseProfile(intent) {
   const text = String(intent || "").slice(0, 12000);
+  // Prefer the more specific puzzle profile when prompts combine puzzle and
+  // exploration language (for example, "a puzzle adventure in a dungeon").
+  const puzzle = PROFILES.find(profile => profile.id === "puzzle-strategy");
+  if (puzzle && puzzle.match.test(text)) return puzzle;
   return PROFILES.find(profile => profile.match.test(text)) || {
     id: "general",
     loop: "Give the player a clear goal, a meaningful action, visible consequence and a reason to continue.",
@@ -63,9 +67,11 @@ function chooseProfile(intent) {
 /** Genre-aware design contract: suggestions for a better game, not evidence of completed implementation or playtesting. */
 export function buildGameplayDirector({ intent = "", engine = "canvas2d", platform = "desktop" } = {}) {
   const profile = chooseProfile(intent);
+  const engineId = /webgl|3d|three.?js/i.test(String(engine)) ? "webgl3d" : "canvas2d";
   const mobile = /mobile|android|touch/i.test(String(platform) + " " + String(intent));
   return {
     version: 1,
+    engine: engineId,
     profile: profile.id,
     loop: profile.loop,
     pacing: profile.pacing,
@@ -87,7 +93,7 @@ export function buildGameplayDirector({ intent = "", engine = "canvas2d", platfo
       "Store versioned progress only when needed; handle corrupted saves safely and provide a reset path.",
       "Do not claim online multiplayer, sophisticated AI, rigged animation, physics destruction, or native export unless a real implementation exists and its acceptance path has evidence."
     ],
-    engineGuidance: engine === "webgl3d"
+    engineGuidance: engineId === "webgl3d"
       ? ["Use one world-unit convention and Y-up transforms", "Match colliders to actual object bounds", "Use stable camera follow with wall avoidance when implemented", "Budget meshes, draw calls and lights for the target hardware"]
       : ["Use one world-to-screen transform for drawing, hit-testing and collision", "Separate world coordinates from camera offsets and UI coordinates", "Use swept collision or substeps for fast-moving bodies when needed", "Clamp frame delta after background-tab suspension"],
     platformGuidance: mobile
