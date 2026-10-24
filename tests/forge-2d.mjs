@@ -21,6 +21,9 @@ for (const name of ["runtime", "art", "diagnostics"]) {
 
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 assert.match(agentRoute, /frameFiles:\s*asset\.frameFiles/, "agent bridge preserves native 2D frame files returned by the approved Forge endpoint");
+assert.match(agentRoute, /window\.GENE_SPRITES\.draw\(ctx, "assets\/forge2d\/character", clipName, x, y, width, height, performance\.now\(\)\)/, "agent instructions require drawing character frames through the runtime animation helper");
+assert.match(agentRoute, /window\.GENE_ART\.image\/draw/, "agent instructions direct static Forge art through the local runtime art helper");
+assert.match(agentRoute, /animationClips: Array\.isArray\(asset\.manifest\.animationClips\)/, "agent prompt receives actual animation clip metadata rather than just frame counts");
 assert.match(agentRoute, /asset\.frameFiles && typeof asset\.frameFiles === "object"/, "agent bridge treats absent frame files safely without failing the whole game build");
 
 
