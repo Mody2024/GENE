@@ -17,21 +17,29 @@ export function normalizeDurableProjectSnapshot(value: unknown): DurableProjectS
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<DurableProjectSnapshot>;
   if (!Array.isArray(candidate.projects)) return null;
+  const deletedProjectIds = Array.isArray(candidate.deletedProjectIds)
+    ? [...new Set(candidate.deletedProjectIds.filter((id): id is string => typeof id === "string" && id.trim()).map(id => id.slice(0, 256)))].slice(-500)
+    : [];
+  const deleted = new Set(deletedProjectIds);
+  const seen = new Set<string>();
   const projects = candidate.projects.filter((item): item is GeneProject =>
-    Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id.trim())
-  ).map(item => ({
+    Boolean(item && typeof item === "object" && typeof item.id === "string" && item.id.trim() && item.id.length <= 256)
+  ).filter(item => {
+    if (deleted.has(item.id) || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  }).slice(0, 8).map(item => ({
     ...item,
     kind: item.kind === "app" || item.plan?.engine === "webapp" ? "app" as const : "game" as const,
-    references: Array.isArray(item.references) ? item.references : [],
+    references: Array.isArray(item.references) ? item.references.slice(0, 100) : [],
     versions: Array.isArray(item.versions) ? item.versions.slice(0, 8) : []
   }));
+  const requestedActiveId = typeof candidate.activeProjectId === "string" ? candidate.activeProjectId.slice(0, 256) : "";
   return {
-    projects: projects.slice(0, 8),
-    activeProjectId: typeof candidate.activeProjectId === "string" ? candidate.activeProjectId : "",
-    savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : "",
-    deletedProjectIds: Array.isArray(candidate.deletedProjectIds)
-      ? [...new Set(candidate.deletedProjectIds.filter((id): id is string => typeof id === "string" && id.trim()))].slice(-500)
-      : []
+    projects,
+    activeProjectId: projects.some(project => project.id === requestedActiveId) ? requestedActiveId : "",
+    savedAt: typeof candidate.savedAt === "string" && candidate.savedAt.length <= 64 ? candidate.savedAt : "",
+    deletedProjectIds
   };
 }
 
