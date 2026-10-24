@@ -18,6 +18,14 @@ export function inspectSceneManifest(spec, files = {}) {
     if (ids.has(id)) duplicateIds.add(id);
     ids.add(id);
     if (object.visible !== false) visibleCount += 1;
+    if (String(spec && spec.engine || "").toLowerCase() === "webgl3d") {
+      const type = String(object.type || "mesh").toLowerCase();
+      const supportedTypes = new Set(["mesh", "custom", "box", "cube", "rectangular-prism", "sphere", "cylinder", "cone", "plane", "light", "camera"]);
+      if (!supportedTypes.has(type)) errors.push(id + ": unsupported WebGL scene type " + type);
+      if ((type === "mesh" || type === "custom") && (typeof object.modelPath !== "string" || !object.modelPath.trim())) {
+        errors.push(id + ": mesh/custom object has no OBJ model path");
+      }
+    }
     if (typeof object.modelPath === "string" && object.modelPath) {
       const path = object.modelPath;
       // Accept only normalized project-relative OBJ paths; reject traversal, backslashes,
