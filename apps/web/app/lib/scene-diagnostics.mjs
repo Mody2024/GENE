@@ -55,6 +55,17 @@ export function inspectSceneManifest(spec, files = {}) {
         errors.push(id + ": unsafe or unsupported model path");
       } else if (!Object.prototype.hasOwnProperty.call(files, path) || typeof files[path] !== "string") {
         missingModelAssets.push({ id, path });
+      } else {
+        const source = files[path];
+        const vertices = (source.match(/^\\s*v\\s+[-+0-9.eE]+\\s+[-+0-9.eE]+\\s+[-+0-9.eE]+(?:\\s|$)/gm) || []).length;
+        const faces = (source.match(/^\\s*f\\s+.+$/gm) || []).length;
+        if (!source.trim() || source.length > 2_000_000) {
+          errors.push(id + ": OBJ asset is empty or exceeds the 2 MB validation limit");
+        } else if (!vertices || !faces) {
+          errors.push(id + ": OBJ asset must contain at least one valid vertex and face record");
+        } else if (vertices > 100_000 || faces > 100_000) {
+          errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
+        }
       }
     }
   }
