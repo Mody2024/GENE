@@ -239,3 +239,27 @@ test("accepts valid OBJ vertex, texture and normal indices", () => {
   );
   assert.equal(report.ok, true);
 });
+
+test("rejects non-finite texture coordinates and malformed normal records", () => {
+  const textureReport = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt NaN 0\nf 1 2 3\n" }
+  );
+  const normalReport = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 0\nf 1 2 3\n" }
+  );
+  assert.equal(textureReport.ok, false);
+  assert.equal(normalReport.ok, false);
+  assert.match(textureReport.errors.join(" "), /malformed.*texture-coordinate\/normal/i);
+  assert.match(normalReport.errors.join(" "), /malformed.*texture-coordinate\/normal/i);
+});
+
+test("rejects OBJ texture references that use index zero", () => {
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nf 1/0 2/1 3/1\n" }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /invalid vertex indices/i);
+});
