@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:scene": "node --test app/lib/scene-diagnostics.test.mjs"
+    "test:scene": "node --test app/lib/scene-diagnostics.test.mjs",
+    "test:director": "node --test app/lib/gameplay-director.test.mjs",
+    "test": "node --test app/lib/*.test.mjs"
   },
   "dependencies": {
     "next": "14.2.35",
