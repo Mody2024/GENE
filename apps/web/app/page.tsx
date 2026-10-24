@@ -330,6 +330,7 @@ export default function Home() {
   const [fileDirty, setFileDirty] = useState(false);
   const [notice, setNotice] = useState("");
   const [persistenceWarning, setPersistenceWarning] = useState("");
+  const latestPersistenceSave = useRef("");
   const [persistenceReady, setPersistenceReady] = useState(false);
   const [runtimeState, setRuntimeState] = useState<"idle" | "loaded" | "rendered" | "error">("idle");
   const [buildReport, setBuildReport] = useState<BuildReport | null>(null);
@@ -450,11 +451,16 @@ export default function Home() {
       if (strategy === "active-project-minimal") return "Browser storage is critically low. GENE kept the active source but removed saved versions and checkpoint history. Export the project ZIP now to create a separate backup.";
       return "GENE could not save this change to browser storage. It may be lost if you refresh or close this tab. Export the project ZIP now and free browser storage before continuing.";
     };
+    const saveToken = project.updatedAt + ":" + project.id;
+    latestPersistenceSave.current = saveToken;
     void writeDurableProjectSnapshot(merged, project.id).then(() => {
+      // An older save may settle after a newer render. Only the latest project effect
+      // may update the visible warning state.
+      if (latestPersistenceSave.current !== saveToken) return;
       setPersistenceWarning(savedStrategy === null ? "" : warningForStrategy(savedStrategy));
     }).catch(() => {
+      if (latestPersistenceSave.current !== saveToken) return;
       // A successful localStorage save does not mean the durable IndexedDB backup worked.
-      // Do not let the "full" strategy clear the warning on this failure path.
       const localWarning = warningForStrategy(savedStrategy);
       setPersistenceWarning(
         savedStrategy === "full"
