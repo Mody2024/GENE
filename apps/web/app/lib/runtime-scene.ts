@@ -109,6 +109,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     var type=String(o.type||"mesh").toLowerCase();
     if(type==="light"||type==="camera")return;
     seen++;
+    var meshStart=meshes.length;
     try{
       var groups=[],materials={},modelPath=o.modelPath||"";
       if(modelPath){
@@ -133,7 +134,6 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       }else if(type!=="mesh"){
         groups=[{material:"",positions:primitiveData(type)}];
       }
-      var meshStart=meshes.length;
       groups.forEach(function(g){
         var data=g.positions||[];
         if(data.length<18||data.length%6!==0||data.length/6>180000)return;
@@ -152,7 +152,14 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
         window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:modelPath,message:"OBJ parser produced no usable vertex buffers; a box placeholder is shown. Check mesh groups and triangle data."});
       }
-    }catch(e){}
+    }catch(e){
+      // Roll back partially allocated GPU buffers for this object, then surface the
+      // failure instead of silently turning a runtime error into a missing model.
+      for(var rollback=meshStart;rollback<meshes.length;rollback++){try{gl.deleteBuffer(meshes[rollback].buffer);}catch(cleanupError){}}
+      meshes.splice(meshStart);
+      window.GENE_SCENE.runtimeWarnings=window.GENE_SCENE.runtimeWarnings||[];
+      window.GENE_SCENE.runtimeWarnings.push({id:o.id,modelPath:o.modelPath||"",message:"3D mesh setup failed: "+String(e&&e.message||e||"unknown WebGL error")});
+    }
   });
   return{meshes:meshes,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
 };window.GENE_SCENE.createViewProjection=function(camera,aspect){
