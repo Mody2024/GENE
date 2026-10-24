@@ -453,7 +453,16 @@ export default function Home() {
     void writeDurableProjectSnapshot(merged, project.id).then(() => {
       setPersistenceWarning(savedStrategy === null ? "" : warningForStrategy(savedStrategy));
     }).catch(() => {
-      setPersistenceWarning(warningForStrategy(savedStrategy));
+      // A successful localStorage save does not mean the durable IndexedDB backup worked.
+      // Do not let the "full" strategy clear the warning on this failure path.
+      const localWarning = warningForStrategy(savedStrategy);
+      setPersistenceWarning(
+        savedStrategy === "full"
+          ? "Your current project was saved in local browser storage, but GENE could not update its durable recovery backup. Avoid clearing browser data and export a project ZIP as an extra backup."
+          : savedStrategy === null
+            ? "GENE could not save this change to local browser storage or its durable recovery backup. It may be lost if you refresh or close this tab. Export a project ZIP now and free browser storage before continuing."
+            : localWarning + " The durable recovery backup also failed; export a project ZIP before refreshing."
+      );
     });
 
   }, [project]);
