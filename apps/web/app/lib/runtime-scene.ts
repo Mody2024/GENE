@@ -115,6 +115,11 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         groups=window.GENE3D.parseOBJ(modelPath);
         var mtlPath=modelPath.replace(/\\.obj$/i,".mtl");
         if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+      }else if(type==="mesh"&&!modelPath){
+        // Generic mesh objects without an assigned OBJ should still be visible and testable.
+        // Keep this fallback limited to an absent path: a declared-but-unavailable asset
+        // must remain a build/asset error instead of being silently hidden by a placeholder.
+        groups=[{material:"",positions:primitiveData("box")}];
       }else if(type!=="mesh"){
         groups=[{material:"",positions:primitiveData(type)}];
       }
