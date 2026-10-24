@@ -18,11 +18,14 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       : [];
     const vector = (value: unknown, fallback: { x: number; y: number; z: number }) => {
       const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
-      const axis = (key: "x" | "y" | "z") => {
-        const n = Number(raw[key]);
-        return Number.isFinite(n) ? Math.max(-100000, Math.min(100000, n)) : fallback[key];
+      const axis = (key: "x" | "y" | "z", index: number) => {
+        const candidate = Array.isArray(value) ? value[index] : raw[key];
+        const n = Number(candidate);
+        return candidate !== undefined && candidate !== null && candidate !== "" && Number.isFinite(n)
+          ? Math.max(-100000, Math.min(100000, n))
+          : fallback[key];
       };
-      return { x: axis("x"), y: axis("y"), z: axis("z") };
+      return { x: axis("x", 0), y: axis("y", 1), z: axis("z", 2) };
     };
     scene = {
       version: 1,
