@@ -285,11 +285,19 @@ export default function SceneStudio({ files, readOnly = false, onSave, onWireRun
     // Place new entries in a predictable grid instead of stacking every new object
     // at the origin, where the latest object can hide the others and be hard to pick.
     const slot = objects.length;
-    const column = (slot % 5) - 2;
-    const row = Math.floor(slot / 5);
+    // Keep the first object at the familiar origin; place later objects in a
+    // deterministic expanding grid so newly added entries do not stack together.
+    const layout = [
+      [0, 0], [2.2, 0], [-2.2, 0], [0, 1.8], [0, -1.8],
+      [2.2, 1.8], [-2.2, 1.8], [2.2, -1.8], [-2.2, -1.8]
+    ] as const;
+    const [gridX, gridY] = layout[slot] || [
+      ((Math.floor((slot - 1) / 2) % 5) - 2) * 2.2,
+      (Math.floor((slot - 1) / 10) + 2) * (slot % 2 ? 1 : -1) * 1.8
+    ];
     const position = is2D
-      ? { x: column * 2.2, y: row === 0 ? 0 : -row * 1.8, z: 0 }
-      : { x: column * 1.8, y: 0, z: row * 1.8 };
+      ? { x: gridX, y: gridY, z: 0 }
+      : { x: gridX, y: 0, z: gridY };
     const object: SceneObject = { id, name: is2D ? "New 2D object" : "New object", type: "box", position, rotation: zero(), scale: one(), color: "#8b9bb4", visible: true, material: { roughness: 0.65, metalness: 0, emissive: "#000000" }, light: { intensity: 1, color: "#ffffff" }, camera: { fov: 60 } };
     commitObjects([...objects, object]);
     setSelectedId(id);
