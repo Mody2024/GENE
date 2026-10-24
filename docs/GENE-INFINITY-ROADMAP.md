@@ -10,14 +10,16 @@
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
 - **Wave 2 — 3D scene reliability and playable geometry: 42%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
-- **Wave 3 — persistent workspace, checkpoints, resumable repair: 25%** (durable snapshots now serialize writes and startup reconciles IndexedDB with localStorage; task-level resume semantics and recovery acceptance remain).
+- **Wave 3 — persistent workspace, checkpoints, resumable repair: 30%** (durable snapshots serialize writes; startup reconciles both stores; checkpoint recovery verifies file fingerprints; explicit resume clears stale failure state; end-to-end recovery acceptance remains).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
-- **Wave 5 — evidence-based self-improvement and release acceptance: 12%** (the syntax gate no longer falsely rejects static ES-module imports/exports; module-aware parsing and held-out end-to-end acceptance remain).
+- **Wave 5 — evidence-based self-improvement and release acceptance: 13%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
 
 
 This document records the next implementation sequence for the existing GENE workspace. It is a living plan; a checkbox should be marked complete only after the corresponding code and verification exist.
 
 ## Phase A — Restore reliability
+- [x] Validate checkpoint source fingerprints before recovery; refuse to overwrite project files from corrupted, missing, or unmanifested checkpoint content.
+- [x] Clear stale task/run failure messages when an explicit resume requeues interrupted or failed work.
 - [ ] Reproduce the current 3D-game generation failure from a realistic prompt and inspect the generated project, WebGL output, input bindings, camera, collision, and scene integration.
 - [x] Strengthen static scene checks to recognize scene/sceneObjects/objects aliases and fail when a WebGL scene has no declared objects or every object is hidden.
 - [x] Add a focused Node test suite and `test:scene` command for empty scenes, hidden/duplicate IDs, and missing/present OBJ assets; the five focused tests passed in a local isolated run.
