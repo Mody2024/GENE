@@ -164,3 +164,13 @@ test("accepts OBJ geometry records with inline comments and ignores comment-only
   );
   assert.equal(report.ok, true);
 });
+
+test("rejects OBJ vertices with non-finite numeric coordinates", () => {
+  const source = "v 0 0 0\nv 1e999 0 0\nv 0 1 0\nf 1 2 3\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /non-finite coordinates/i);
+});
