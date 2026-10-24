@@ -184,3 +184,10 @@ test("rejects malformed OBJ vertex records even when other valid vertices exist"
   assert.equal(report.ok, false);
   assert.match(report.errors.join(" "), /non-finite coordinates/i);
 });
+
+test("rejects scenes that exceed the runtime object limit instead of silently truncating them", () => {
+  const objects = Array.from({ length: 501 }, (_, index) => ({ id: "object-" + index, type: "box" }));
+  const report = inspectSceneManifest({ engine: "webgl3d", scene: { objects } });
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /runtime limit is 500/i);
+});
