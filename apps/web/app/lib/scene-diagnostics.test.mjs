@@ -96,3 +96,24 @@ test("warns when a scene object has a zero scale", () => {
   assert.equal(report.ok, true);
   assert.match(report.warnings.join(" "), /zero scale/i);
 });
+
+test("rejects empty and malformed OBJ assets", () => {
+  for (const source of ["", "not an OBJ file", "v 0 0 0\nv 1 0 0\nv 0 1 0\n"]) {
+    const report = inspectSceneManifest(
+      { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+      { "assets/mesh.obj": source }
+    );
+    assert.equal(report.ok, false);
+    assert.match(report.errors.join(" "), /OBJ asset/i);
+  }
+});
+
+test("accepts a small OBJ with vertices and faces", () => {
+  const source = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    { "assets/mesh.obj": source }
+  );
+  assert.equal(report.ok, true);
+  assert.equal(report.missingModelAssets.length, 0);
+});
