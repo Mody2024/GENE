@@ -27,7 +27,7 @@ import { readDurableProjectSnapshot, writeDurableProjectSnapshot } from "./lib/p
 import { analyzeProjectScripts } from "./lib/code-safety.mjs";
 import { inspectProjectFilePaths } from "./lib/project-file-safety.mjs";
 import { orderRuntimeModulePaths } from "./lib/runtime-module-order.mjs";
-import { createToolApproval } from "./lib/tool-permissions.mjs";
+import { approvalPrompt, confirmAndApprove, requestToolApproval } from "./lib/tool-approval-client";
 
 const STORAGE_KEY = "gene.projects.v1";
 const ACTIVE_KEY = "gene.active-project.v1";
@@ -49,13 +49,7 @@ function readText(file: File): Promise<string> {
   });
 }
 
-type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; approval: ReturnType<typeof createToolApproval> };
-function approvalPrompt(tool: string, input: any): string {
-  const label = tool === "research" ? "Research" : tool === "agentResearch" ? "AI web research" : tool === "forge3d" ? "3D Forge generation" : "2D Forge generation";
-  const detail = String(input?.query || input?.prompt || input?.message || input?.project?.initialPrompt || "project request").trim().slice(0, 240);
-  return "Allow this tool call?\n\nTool: " + label + "\nPurpose / exact request: " + detail +
-    "\n\nThis approval applies only to these inputs and this call. Gene will not run it if you choose Cancel.";
-}
+type ToolApprovalEntry = { tool: "forge3d" | "forge2d"; input: Record<string, unknown> };
 function buildNestedToolApprovals(body: any): { entries: ToolApprovalEntry[]; summary: string[] } {
   const entries: ToolApprovalEntry[] = [], summary: string[] = [];
   const prompt = String(body.message || body.project?.initialPrompt || "");
@@ -76,7 +70,7 @@ function buildNestedToolApprovals(body: any): { entries: ToolApprovalEntry[]; su
     const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
     for (const item of requested.slice(0, 3)) {
       const input = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
-      entries.push({ tool: "forge3d", approval: createToolApproval("forge3d", input) });
+      entries.push({ tool: "forge3d", input });
       summary.push("3D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
     }
   } else {
@@ -91,7 +85,7 @@ function buildNestedToolApprovals(body: any): { entries: ToolApprovalEntry[]; su
       ];
       for (const item of requested) {
         const input = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
-        entries.push({ tool: "forge2d", approval: createToolApproval("forge2d", input) });
+        entries.push({ tool: "forge2d", input });
         summary.push("2D Forge: " + item.kind + " — " + input.prompt.slice(0, 110));
       }
     }
@@ -108,21 +102,18 @@ async function fetchWithToolApproval(input: RequestInfo | URL, init?: RequestIni
   else if (/\/api\/forge\/2d(?:\?|$)/.test(url)) tool = "forge2d";
   else if (/\/api\/forge(?:\?|$)/.test(url)) tool = "forge3d";
   if (tool) {
-    if (typeof window !== "undefined" && !window.confirm(approvalPrompt(tool, payload))) throw new DOMException("Tool call canceled by the user.", "AbortError");
-    payload.toolApproval = createToolApproval(tool, payload);
+    payload.toolApproval = await confirmAndApprove(tool, payload, init?.signal ?? undefined);
     return fetch(input, { ...init, body: JSON.stringify(payload) });
   }
   if (/\/api\/agent(?:\?|$)/.test(url)) {
-    if (payload.operation === "research") {
-      if (typeof window !== "undefined" && !window.confirm(approvalPrompt("agentResearch", payload))) throw new DOMException("AI research canceled by the user.", "AbortError");
-      payload.toolApproval = createToolApproval("agentResearch", payload);
-    }
+    if (payload.operation === "research") payload.toolApproval = await confirmAndApprove("agentResearch", payload, init?.signal ?? undefined);
     const batch = buildNestedToolApprovals(payload);
     if (batch.entries.length) {
       const message = "GENE wants to run the following specialist tool calls as one explicit batch:\n\n" + batch.summary.map((item, index) => (index + 1) + ". " + item).join("\n") +
-        "\n\nApprove this exact batch? Each listed call will receive its own call-scoped approval. Cancel skips all Forge calls; the AI build may continue without those generated assets.";
-      if (typeof window !== "undefined" && window.confirm(message)) payload.toolApprovals = batch.entries;
-      else payload.toolApprovals = [];
+        "\n\nApprove this exact batch? Each listed call receives its own single-use, call-scoped approval. Cancel skips all Forge calls; the AI build may continue without those generated assets.";
+      if (typeof window !== "undefined" && window.confirm(message)) {
+        payload.toolApprovals = await Promise.all(batch.entries.map(async entry => ({ tool: entry.tool, approval: await requestToolApproval(entry.tool, entry.input, init?.signal ?? undefined) })));
+      } else payload.toolApprovals = [];
     }
     return fetch(input, { ...init, body: JSON.stringify(payload) });
   }

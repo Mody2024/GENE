@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { DesignDoc } from "../lib/types";
 import { safeArtName, sanitizeSvg } from "../lib/svg-safety.mjs";
 import { RUNTIME_ART_PATH } from "../lib/runtime-assets";
+import { confirmAndApprove, requestToolApproval, type IssuedApproval } from "../lib/tool-approval-client";
 
 type ArtKind = "sprite" | "icon" | "logo" | "background";
 type Generated = { name: string; kind: string; path: string; svg: string; bytes: number; shapes: number };
@@ -45,11 +46,13 @@ export default function ArtStudio({ files, doc, isApp, apiReady, onAddFiles, onR
 
   const art = useMemo(() => Object.keys(files).filter(path => RUNTIME_ART_PATH.test(path)).sort(), [files]);
 
-  async function requestArt(text: string, artKind: ArtKind, name: string): Promise<Generated> {
+  async function requestArt(text: string, artKind: ArtKind, name: string, approval?: IssuedApproval): Promise<Generated> {
+    const payload = { prompt: text, kind: artKind, name, style: doc.art.style, palette: doc.art.palette };
+    const toolApproval = approval ?? await confirmAndApprove("illustrate", payload);
     const response = await fetch("/api/illustrate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: text, kind: artKind, name, style: doc.art.style, palette: doc.art.palette })
+      body: JSON.stringify({ ...payload, toolApproval })
     });
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.ok) throw new Error(String(data?.error?.message || "Illustration failed (HTTP " + response.status + ")."));
@@ -85,6 +88,8 @@ export default function ArtStudio({ files, doc, isApp, apiReady, onAddFiles, onR
   async function generatePack() {
     if (busy) return;
     const plan = doc.assetPlan.slice(0, 5);
+    const pending = plan.filter(item => !Object.keys(files).includes("assets/art/" + safeArtName(item.id) + ".svg"));
+    if (pending.length && typeof window !== "undefined" && !window.confirm("GENE wants to run these AI illustration calls as one explicit batch:\n\n" + pending.map((item, index) => (index + 1) + ". " + item.kind + " — " + item.prompt.slice(0, 110)).join("\n") + "\n\nEach call gets its own single-use approval. Cancel runs none of them.")) return;
     setBusy(true);
     setNotice("");
     const taken = new Set(Object.keys(files));
@@ -97,7 +102,8 @@ export default function ArtStudio({ files, doc, isApp, apiReady, onAddFiles, onR
       if (taken.has(wanted)) continue;
       setProgress("Illustrating " + (i + 1) + " of " + plan.length + ": " + item.id + "…");
       try {
-        const result = await requestArt(item.prompt, item.kind, safeArtName(item.id));
+        const itemPayload = { prompt: item.prompt, kind: item.kind, name: safeArtName(item.id), style: doc.art.style, palette: doc.art.palette };
+        const result = await requestArt(item.prompt, item.kind, safeArtName(item.id), await requestToolApproval("illustrate", itemPayload));
         const path = uniquePath(safeArtName(result.name, item.kind), taken);
         taken.add(path);
         onAddFiles({ [path]: result.svg }, "Art pack: " + item.id, false);
@@ -123,7 +129,9 @@ export default function ArtStudio({ files, doc, isApp, apiReady, onAddFiles, onR
     setResearching(true);
     setNotice("");
     try {
-      const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }) });
+      const researchPayload = { query };
+      const toolApproval = await confirmAndApprove("research", researchPayload);
+      const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...researchPayload, toolApproval }) });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.ok) throw new Error(String(data?.error?.message || "Research failed (HTTP " + response.status + ")."));
       setResearch({ topic: data.topic, notes: data.notes, partial: Boolean(data.partial), models: data.models || [], links: data.links || [] });

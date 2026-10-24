@@ -160,3 +160,25 @@ Verification status: repository files and branch commits were inspected through 
 - Research evidence states (Wave 2, item 6): every research item now carries `state` (`reference-only`, `downloadable`, `built-in`) and `licenseState` (`open`, `restricted`, `unverified`), derived only from the licence text the source reports. Images stay `reference-only`; Poly Haven models and Commons audio are `downloadable` but never marked imported. The bundle gains an `evidence` summary (technical, visual, assets, compatibility) with `imported` fixed at 0 until a real import path exists, builder notes include a compatibility section, and the Research card says nothing was imported.
 - Verification: `npm test` (all contract tests, including new evidence-state assertions) and `npm run typecheck` pass locally. Browser/Playwright suites were not run in this session.
 - Still open from Wave 2: scoring and suppression of weak matches across all four kinds, fetching real asset bytes from trusted sources with validation, and the Forge asset-fidelity trace.
+
+### Wave 1 completion (2026-10-24)
+
+Audit of Wave 1 against the code found three gaps; all are closed with tests.
+
+**1. Permission gateway (item 2).**
+- `/api/illustrate` called an AI provider with no approval; it is now gated (`illustrate`). The Art Studio research button also called `/api/research` without an approval and could never succeed; it now asks first.
+- Approvals were minted in the browser with an unkeyed 32-bit hash, so any script could forge one, and one consent could be replayed. They are now issued by `POST /api/approvals` (same-origin browser requests only), HMAC-SHA256 signed by the server, bound to the tool and the exact canonical inputs, valid five minutes, and **single use**: the executing route consumes the approval, parent routes only pre-check it. `GENE_APPROVAL_SECRET` sets the key; otherwise it is derived from server-only credentials.
+- Every issue, verify, consume and reject decision is written to a bounded audit log containing no inputs, signatures or secrets (also emitted as `[gene-approval]` log lines).
+- Batches: art packs and nested Forge calls list every call before running, and each gets its own approval; declining runs none.
+- Verified over real HTTP against a production build: no approval, forged approval, cross-site and header-less issuance, unknown tool, changed inputs, exact use and replay each behave as specified.
+- Not done: binding an approval to a project version (the project snapshot has no server-side version yet), and `/api/publish` and `/api/builds` rely on their own passwords rather than this gateway.
+
+**2. Runtime truth (item 3) and sprite animation (item 4).**
+- `lib/runtime-diagnostics.mjs` instruments a game in a real browser (draw calls to 2D/WebGL contexts, shader compile/link errors, requestAnimationFrame, audio starts, input listeners, script and console errors) and `scripts/runtime-probe.mjs` runs it on a fake clock with seeded randomness, three times: twice without input and once with input. A frame difference between the no-input and input runs is attributable to the input; runs that differ from each other are reported as *unverified*, never as pass or fail.
+- Verdicts: `playable`, `not-playable`, and `audio-only-ghost` (audio started while nothing visible is rendered). Audio never counts toward visibility. Text and DOM games are judged on visible content and a document that changes after interaction, not on an avatar.
+- Sprite sheets drawn whole as one static image fail; sheets sliced into frames pass only if more than one frame region is actually drawn over time.
+- A pass lists what it did not establish (objective reachable, collisions, menus, performance); it is not a full gameplay test.
+- `npm run test:runtime-truth` runs 13 fixtures in real Chromium (working, ghost, blank, crash, frozen, static/one-frame/animated sprite sheet, WebGL working/bad shader/no draw, text game working/dead) and passed on repeated runs; it is a CI step. The classifier has browser-free unit tests in `npm test`.
+- Not done: the probe is not yet run on every generated build inside the app, so the static source checks in the agent route remain the build-time gate.
+
+**3. Existing issues found, not changed.** `tests/browser-smoke.mjs` fails identically on the untouched foundation commit (quiz game text never appears). The playground "Web app form interaction" test is intermittent on the untouched foundation commit too (about one run in eight there).

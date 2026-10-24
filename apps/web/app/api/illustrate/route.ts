@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "../../lib/providers";
 import { safeArtName, sanitizeSvg } from "../../lib/svg-safety.mjs";
+import { hasToolApproval } from "../../lib/tool-approval-server.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +22,7 @@ const buckets = new Map<string, { count: number; resetAt: number }>();
 export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return fail(400, "BAD_JSON", "Request body must be valid JSON."); }
+  if (!hasToolApproval(body, "illustrate")) return fail(403, "TOOL_APPROVAL_REQUIRED", "GENE did not draw this illustration because explicit approval for these exact inputs is missing, expired or already used.");
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim().slice(0, 700) : "";
   const kind = typeof body?.kind === "string" && KINDS[body.kind] ? body.kind : "sprite";
   if (!prompt) return fail(400, "PROMPT_REQUIRED", "Describe the illustration you want.");

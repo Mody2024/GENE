@@ -11,7 +11,7 @@ import {
   parseWikipediaPages
 } from "../../lib/research-sources.mjs";
 import { planVisualReferenceQueries, rankVisualReferenceResults } from "../../lib/visual-reference-planner.mjs";
-import { hasToolApproval } from "../../lib/tool-permissions.mjs";
+import { hasToolApproval } from "../../lib/tool-approval-server.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildNative2DAsset } from "../../../../lib/forge-2d.mjs";
-import { hasToolApproval } from "../../../lib/tool-permissions.mjs";
+import { hasToolApproval } from "../../../lib/tool-approval-server.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;

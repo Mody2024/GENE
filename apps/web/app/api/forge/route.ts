@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAlternateChain } from "../../lib/providers";
 import { buildNativeForgeRecipe } from "../../../lib/forge-presets.mjs";
 import { analyzeForgeRecipe } from "../../../lib/forge-quality.mjs";
-import { hasToolApproval } from "../../lib/tool-permissions.mjs";
+import { hasToolApproval } from "../../lib/tool-approval-server.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;

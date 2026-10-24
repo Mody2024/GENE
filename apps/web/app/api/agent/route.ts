@@ -8,7 +8,7 @@ import { analyzeProjectScripts } from "../../lib/code-safety.mjs";
 import { normalizeProjectFilePath, inspectProjectFilePaths } from "../../lib/project-file-safety.mjs";
 import { nextInterviewQuestion } from "../../lib/design-doc";
 import { createNativeResult } from "../../../lib/native-generator.mjs";
-import { hasToolApproval } from "../../lib/tool-permissions.mjs";
+import { hasToolApproval } from "../../lib/tool-approval-server.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -868,7 +868,7 @@ export async function POST(request: NextRequest) {
     const projectStyle = String(body.project?.plan?.summary || body.project?.initialPrompt || "").slice(0, 1200);
     const approvedKinds = requestedKinds.filter(item => {
       const toolBody = { prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true };
-      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge3d")) : null;
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge3d", { consume: false })) : null;
       return Boolean(entry);
     });
     const toolResults = await Promise.all(approvedKinds.slice(0, 3).map(async item => {
@@ -881,7 +881,7 @@ export async function POST(request: NextRequest) {
             prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true,
             toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge3d" && hasToolApproval({
               prompt: item.prompt.slice(0, 3900), kind: item.kind, quality, projectStyle, nativeOnly: true, toolApproval: candidate.approval
-            }, "forge3d"))?.approval
+            }, "forge3d", { consume: false }))?.approval
           }),
           signal: request.signal,
           cache: "no-store"
@@ -922,7 +922,7 @@ export async function POST(request: NextRequest) {
     const quality = body.thinking === "fast" ? "performance" : body.thinking === "deep" ? "high" : "standard";
     const approvedKinds = kinds.filter(item => {
       const toolBody = { prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art" };
-      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge2d")) : null;
+      const entry = Array.isArray(body.toolApprovals) ? body.toolApprovals.find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({ ...toolBody, toolApproval: candidate.approval }, "forge2d", { consume: false })) : null;
       return Boolean(entry);
     });
     const results = await Promise.all(approvedKinds.map(async item => {
@@ -934,7 +934,7 @@ export async function POST(request: NextRequest) {
             prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art",
             toolApproval: (body.toolApprovals || []).find((candidate: any) => candidate?.tool === "forge2d" && hasToolApproval({
               prompt: item.prompt.slice(0, 300), kind: item.kind, quality, style: "project-matched stylized game art", toolApproval: candidate.approval
-            }, "forge2d"))?.approval
+            }, "forge2d", { consume: false }))?.approval
           }),
           signal: request.signal,
           cache: "no-store"
