@@ -18,6 +18,27 @@ export function inspectSceneManifest(spec, files = {}) {
     if (ids.has(id)) duplicateIds.add(id);
     ids.add(id);
     if (object.visible !== false) visibleCount += 1;
+    // Catch malformed transforms before they turn into NaN matrices or invisible meshes.
+    for (const field of ["position", "rotation", "scale"]) {
+      if (object[field] === undefined || object[field] === null) continue;
+      const value = object[field];
+      const components = Array.isArray(value)
+        ? value.slice(0, 3)
+        : value && typeof value === "object"
+          ? [value.x, value.y, value.z]
+          : null;
+      if (!components || components.length !== 3 ||
+        components.some(component => component === undefined || component === null || component === "" || !Number.isFinite(Number(component)))) {
+        errors.push(id + ": invalid " + field + " transform; expected three finite numeric components");
+        continue;
+      }
+      if (field === "scale" && components.some(component => Number(component) === 0)) {
+        warnings.push(id + ": zero scale makes this object invisible on at least one axis");
+      }
+      if (field === "scale" && components.some(component => Math.abs(Number(component)) > 10000)) {
+        warnings.push(id + ": unusually large scale may cause camera/clipping problems");
+      }
+    }
     if (String(spec && spec.engine || "").toLowerCase() === "webgl3d") {
       const type = String(object.type || "mesh").toLowerCase();
       const supportedTypes = new Set(["mesh", "custom", "box", "cube", "rectangular-prism", "sphere", "cylinder", "cone", "plane", "light", "camera"]);
