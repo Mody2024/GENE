@@ -1576,6 +1576,27 @@ export async function POST(request: NextRequest) {
       result.reply += "\n\nGENE Forge integration check: generated 2D assets have matching references in the game's JavaScript. This confirms code references only; actual browser visibility and animation still require runtime acceptance.";
     }
   }
+  // Apply the same honest integration check to exported 3D meshes.
+  // File presence and structural QA do not prove that the generated game loads a model.
+  if (Array.isArray(result.files) && forgeToolAssets.length) {
+    const gameScripts = result.files
+      .filter((file: any) => /\.(?:m?js|cjs)$/i.test(file.path))
+      .map((file: any) => String(file.content || ""))
+      .join("\n");
+    const missingModelIntegration = forgeToolAssets.filter(asset => {
+      const modelPath = "assets/models/" + asset.kind + ".obj";
+      const hasPath = gameScripts.includes(modelPath);
+      const hasLoader = /OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(gameScripts);
+      return !hasPath || !hasLoader;
+    });
+    if (missingModelIntegration.length) {
+      result.reply += "\n\nGENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed in game JavaScript: " +
+        missingModelIntegration.map(asset => asset.kind).join(", ") +
+        ". Exported OBJ/MTL files and structural QA do not prove visible 3D gameplay; the game needs a model-loader integration repair and runtime acceptance.";
+    } else {
+      result.reply += "\n\nGENE 3D Forge integration check: model paths and a loader-like code path were found. This is source-level evidence only; successful loading, materials, camera framing and visible gameplay remain unverified until runtime acceptance.";
+    }
+  }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
 }
