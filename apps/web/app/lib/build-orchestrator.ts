@@ -260,7 +260,7 @@ export function resumeBuild(run: BuildRun, now?: string): BuildRun {
   // but has no ready work. Resume is the explicit retry action for failed work.
   const tasks = run.tasks.map((task) =>
     task.status === "running" || task.status === "failed"
-      ? { ...task, status: "queued" as const }
+      ? { ...task, status: "queued" as const, lastError: undefined }
       : task
   );
   return {
@@ -268,6 +268,7 @@ export function resumeBuild(run: BuildRun, now?: string): BuildRun {
     tasks,
     status: "running",
     activeTaskId: undefined,
+    lastError: undefined,
     updatedAt: isoNow(now),
   };
 }
