@@ -77,7 +77,8 @@ export function inspectSceneManifest(spec, files = {}) {
                 const vertexRef = ref.split("/")[0];
                 if (!/^-?\d+$/.test(vertexRef)) return true;
                 const n = Number(vertexRef);
-                return n === 0 || Math.abs(n) > vertices;
+                // Positive indices are absolute; negative indices are relative to the current vertex list.
+                return n === 0 || n > vertices || n < -vertices;
               });
             });
             if (malformedFace) errors.push(id + ": OBJ asset contains a face with invalid vertex indices");
