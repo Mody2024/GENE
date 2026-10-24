@@ -288,3 +288,31 @@ test("accepts an OBJ material library that exists beside the model", () => {
   );
   assert.equal(report.ok, true);
 });
+
+test("rejects material files that reference missing textures", () => {
+  const report = inspectSceneManifest(
+    { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } },
+    {
+      "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib mesh.mtl\n",
+      "assets/mesh.mtl": "newmtl surface\nmap_Kd missing-texture.png\n"
+    }
+  );
+  assert.equal(report.ok, false);
+  assert.match(report.errors.join(" "), /material file references missing texture/i);
+});
+
+test("accepts material files with packaged textures and rejects unsafe texture paths", () => {
+  const manifest = { engine: "webgl3d", scene: { objects: [{ id: "mesh", type: "mesh", modelPath: "assets/mesh.obj" }] } };
+  const valid = inspectSceneManifest(manifest, {
+    "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib mesh.mtl\n",
+    "assets/mesh.mtl": "newmtl surface\nmap_Kd diffuse.png\n",
+    "assets/diffuse.png": "test-image-payload"
+  });
+  const unsafe = inspectSceneManifest(manifest, {
+    "assets/mesh.obj": "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nmtllib mesh.mtl\n",
+    "assets/mesh.mtl": "newmtl surface\nmap_Kd ../diffuse.png\n"
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join(" "), /unsafe or unsupported texture path/i);
+});
