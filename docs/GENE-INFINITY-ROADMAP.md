@@ -10,13 +10,13 @@
 
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
-- **Wave 2 — 3D scene reliability and playable geometry: 89%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
-- **Wave 3 — persistent workspace, checkpoints, resumable repair: 43%**
+- **Wave 2 — 3D scene reliability and playable geometry: 90%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
+- **Wave 3 — persistent workspace, checkpoints, resumable repair: 45%**
 - [x] Project deletion now rewrites both localStorage and the durable IndexedDB workspace snapshot, preventing stale snapshots from resurrecting deleted non-active projects. The active project's freshest in-memory state is preserved in the replacement snapshot; durable cleanup failures raise a visible persistence warning. End-to-end browser verification remains pending.
 - [x] Hardened workspace hydration against malformed localStorage and IndexedDB data: invalid project records are filtered individually, references/versions are normalized to arrays, and durable snapshot reads enforce project/version caps at the storage boundary. Browser-level recovery verification remains pending.
 - [x] Added durable deletion tombstones to the IndexedDB workspace snapshot. Project deletion records the ID in the same serialized read/write transaction as the snapshot update; hydration filters tombstoned IDs from both localStorage and IndexedDB, and ordinary subsequent saves preserve tombstones so stale copies cannot immediately resurrect deleted projects. End-to-end multi-tab/browser verification remains pending. (durable snapshots serialize writes; startup reconciles both stores; checkpoint recovery verifies file fingerprints; explicit resume clears stale failure state; end-to-end recovery acceptance remains).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
-- **Wave 5 — evidence-based self-improvement and release acceptance: 47%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
+- **Wave 5 — evidence-based self-improvement and release acceptance: 48%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
 
 
 This document records the next implementation sequence for the existing GENE workspace. It is a living plan; a checkbox should be marked complete only after the corresponding code and verification exist.
@@ -52,6 +52,7 @@ This document records the next implementation sequence for the existing GENE wor
 - [x] WebGL mesh setup now rolls back GPU buffers allocated by a failing object and records a runtime warning with its ID, model path, and error instead of swallowing exceptions. OBJ groups that produce zero usable vertex buffers get a visible box fallback and a diagnostic. Runtime browser verification remains pending.
 - [x] Runtime diagnostics now use a shared deduplicating helper and cap the in-memory warning list at 100 entries, avoiding repeated identical OBJ/WebGL failures growing without bound during retries. Browser-level verification remains pending.
 - [x] The WebGL runtime warning helper now forwards deduplicated 3D asset/mesh warnings to the parent preview via `gene-runtime-warning`; the workspace listener checks `event.source` against its own preview iframe before showing the message. This closes the gap between renderer diagnostics and visible user feedback. Browser integration verification remains pending.
+- [x] Renderer warnings now persist in the active project's `livingPreview.runtimeErrors` (bounded to the latest 10), update the latest version's test summary, and are written to the durable IndexedDB workspace snapshot. If that durable write fails, the workspace raises an explicit backup warning. Browser-level event-to-recovery verification remains pending.
 - [ ] Preserve a last-known-good revision before any automated repair.
 - [ ] Run the complete CI suite and record the exact failing tests before changing generation logic.
 - [ ] Keep 2D, text-based, and web-app generation as independent regression targets.
