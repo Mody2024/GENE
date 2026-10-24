@@ -72,6 +72,7 @@ export function inspectSceneManifest(spec, files = {}) {
           let normals = 0;
           let faces = 0;
           let malformedVertex = false;
+          let malformedAttribute = false;
           let malformedFace = false;
           // Parse in one pass: negative OBJ indices are relative to vertices already declared,
           // and repeated identical face lines must not confuse source-position lookups.
@@ -91,11 +92,27 @@ export function inspectSceneManifest(spec, files = {}) {
               vertices += 1;
               if (vertices > 100_000) break;
             } else if (/^vt(?:\s|$)/.test(trimmed)) {
+              const parts = trimmed.split(/\s+/);
+              if (parts.length < 2 || parts.length > 4 || parts.slice(1).some(component => !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(component) || !Number.isFinite(Number(component)))) {
+                malformedAttribute = true;
+                break;
+              }
               textureCoordinates += 1;
-              if (textureCoordinates > 100_000) break;
+              if (textureCoordinates > 100_000) {
+                malformedAttribute = true;
+                break;
+              }
             } else if (/^vn(?:\s|$)/.test(trimmed)) {
+              const parts = trimmed.split(/\s+/);
+              if (parts.length !== 4 || parts.slice(1).some(component => !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(component) || !Number.isFinite(Number(component)))) {
+                malformedAttribute = true;
+                break;
+              }
               normals += 1;
-              if (normals > 100_000) break;
+              if (normals > 100_000) {
+                malformedAttribute = true;
+                break;
+              }
             } else if (/^f(?:\s|$)/.test(trimmed)) {
               faces += 1;
               const refs = trimmed.split(/\s+/).slice(1);
@@ -127,6 +144,8 @@ export function inspectSceneManifest(spec, files = {}) {
             errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
           } else if (malformedVertex) {
             errors.push(id + ": OBJ asset contains a malformed vertex record or non-finite coordinates");
+          } else if (malformedAttribute) {
+            errors.push(id + ": OBJ asset contains malformed or excessive texture-coordinate/normal records");
           } else if (malformedFace) {
             errors.push(id + ": OBJ asset contains a face with invalid vertex indices or too few vertices");
           }
