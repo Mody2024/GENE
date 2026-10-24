@@ -37,6 +37,7 @@ This document records the next implementation sequence for the existing GENE wor
 - [x] Fix OBJ validation's escaped regular expressions so standard whitespace-prefixed `v` and `f` records are actually recognized; regression cases cover valid and malformed OBJ data.
 - [x] Align runtime vector normalization with diagnostics: scene transforms can be supplied as either `[x, y, z]` arrays or `{x, y, z}` objects, with finite-value checks and bounded components.
 - [x] Bound OBJ parsing work by rejecting oversized source before scanning; validate face arity and vertex indices, including slash notation and negative relative indices against vertices declared before each face; regression suite expanded to 15 cases (execution still pending).
+- [x] Preserve explicit zero scale in WebGL model matrices instead of silently replacing it with unit scale; finite nonzero scales remain bounded and malformed values fall back safely.
 - [ ] Preserve a last-known-good revision before any automated repair.
 - [ ] Run the complete CI suite and record the exact failing tests before changing generation logic.
 - [ ] Keep 2D, text-based, and web-app generation as independent regression targets.
