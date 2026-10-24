@@ -10,10 +10,10 @@
 
 ## Wave progress estimate
 - **Wave 1 — orchestration, safety contracts, render diagnostics, sprite frames, relevant visual references: 88%** (foundation landed; visual ranking now checks title, alt text, captions, descriptions and exact token matches including Arabic; remaining integration and edge-case verification are tracked below).
-- **Wave 2 — 3D scene reliability and playable geometry: 48%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
+- **Wave 2 — 3D scene reliability and playable geometry: 52%** (stricter runtime contracts and OBJ/WebGL groundwork exist; quality gate now fails empty/fully hidden scene manifests, accepts scene object aliases, and has focused scene-diagnostics tests; real prompt-to-playable-scene acceptance remains).
 - **Wave 3 — persistent workspace, checkpoints, resumable repair: 30%** (durable snapshots serialize writes; startup reconciles both stores; checkpoint recovery verifies file fingerprints; explicit resume clears stale failure state; end-to-end recovery acceptance remains).
 - **Wave 4 — Forge and creative assets/audio/voice-over integration: 40%** (Forge/voice-over foundations exist; end-to-end export and playback acceptance remains).
-- **Wave 5 — evidence-based self-improvement and release acceptance: 17%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
+- **Wave 5 — evidence-based self-improvement and release acceptance: 19%** (the syntax gate avoids false ES-module failures and checkpoint recovery rejects altered snapshots; module-aware parsing and held-out end-to-end acceptance remain).
 
 
 This document records the next implementation sequence for the existing GENE workspace. It is a living plan; a checkbox should be marked complete only after the corresponding code and verification exist.
@@ -27,6 +27,7 @@ This document records the next implementation sequence for the existing GENE wor
 - [x] Harden scene diagnostics against OBJ path traversal, absolute paths, query fragments, and inherited-property asset lookups; add regression cases for these invalid references.
 - [x] Build acceptance rejects unsafe OBJ paths, validates OBJ vertex/face content and safe colocated MTL references, and fails WebGL mesh entries with no assigned model instead of counting empty placeholders as valid geometry.
 - [x] Build checks now warn when WebGL 3D source lacks recognizable scene-renderer integration and when primitive scene objects may not be handled by the imported-OBJ mesh bridge; renderer references are not treated as proof of visible output.
+- [x] Add bounded WebGL primitive mesh generation for box, sphere, cylinder, cone and plane scene objects, while preserving imported OBJ support; orient plane normals toward positive Y.
 - [ ] Preserve a last-known-good revision before any automated repair.
 - [ ] Run the complete CI suite and record the exact failing tests before changing generation logic.
 - [ ] Keep 2D, text-based, and web-app generation as independent regression targets.
