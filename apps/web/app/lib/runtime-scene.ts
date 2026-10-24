@@ -125,6 +125,20 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     }catch(e){}
   });
   return{meshes:meshes,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
+};window.GENE_SCENE.createViewProjection=function(camera,aspect){
+  camera=camera||{};
+  function vec(value,fallback){if(Array.isArray(value))return value.slice(0,3).map(function(n,i){var x=Number(n);return Number.isFinite(x)?x:fallback[i];});value=value&&typeof value==="object"?value:{};return["x","y","z"].map(function(k,i){var x=Number(value[k]);return Number.isFinite(x)?x:fallback[i];});}
+  function normalize(v){var n=Math.hypot(v[0],v[1],v[2])||1;return[v[0]/n,v[1]/n,v[2]/n];}
+  function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+  function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+  var eye=vec(camera.eye||camera.position,[0,5,10]),target=vec(camera.target||camera.lookAt,[0,0,0]),up=normalize(vec(camera.up,[0,1,0]));
+  if(Math.hypot(eye[0]-target[0],eye[1]-target[1],eye[2]-target[2])<0.001)eye=[target[0],target[1]+1,target[2]+10];
+  var z=normalize([eye[0]-target[0],eye[1]-target[1],eye[2]-target[2]]),x=normalize(cross(up,z)),y=cross(z,x);
+  var view=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);
+  var fov=Math.max(10,Math.min(120,Number(camera.fov)||60))*Math.PI/180,ratio=Math.max(0.01,Math.min(100,Number(aspect)||1)),near=Math.max(0.01,Math.min(10,Number(camera.near)||0.1)),far=Math.max(near+1,Math.min(100000,Number(camera.far)||1000)),f=1/Math.tan(fov/2),nf=1/(near-far);
+  var projection=new Float32Array([f/ratio,0,0,0,0,f,0,0,0,0,(far+near)*nf,-1,0,0,2*far*near*nf,0]),out=new Float32Array(16);
+  for(var col=0;col<4;col++)for(var row=0;row<4;row++)out[col*4+row]=projection[row]*view[col*4]+projection[4+row]*view[col*4+1]+projection[8+row]*view[col*4+2]+projection[12+row]*view[col*4+3];
+  return out;
 };window.GENE_SCENE.drawWebGLMeshes=function(gl,program,viewProjection,resources,locations){
   if(!gl||!program||!viewProjection||!resources||!Array.isArray(resources.meshes))return 0;
   locations=locations||{};
