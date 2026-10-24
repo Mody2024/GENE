@@ -39,6 +39,13 @@ const rankedImages = rankVisualReferenceResults([
   { id: "generic", title: "Random photograph", category: "environments" }
 ], "3D skeleton city adventure");
 assert.deepEqual(rankedImages.map(image => image.id), ["good", "city"], "off-topic image results should be filtered and topic matches prioritized");
+const metadataMatchedImages = rankVisualReferenceResults([
+  { id: "metadata-match", title: "asset_0042", alt: "Skeleton exploring a city street", category: "environments" },
+  { id: "unrelated", title: "Garden flowers", alt: "Spring flowers and gardening", category: "environments" }
+], "skeleton city adventure");
+assert.equal(metadataMatchedImages[0].id, "metadata-match", "relevant alt text should rescue assets with opaque filenames");
+assert.ok(!metadataMatchedImages.some(image => image.id === "unrelated"), "unrelated metadata must not pass topic relevance filtering");
+
 const relevanceTie = rankVisualReferenceResults([
   { id: "specific", title: "Skeleton character concept", category: "characters" },
   { id: "generic-category", title: "Environment architecture buildings props", category: "environments" },
