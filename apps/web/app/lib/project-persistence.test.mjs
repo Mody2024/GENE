@@ -11,7 +11,7 @@ const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
 }).outputText;
 const moduleUrl = "data:text/javascript;base64," + Buffer.from(compiled).toString("base64");
-const { normalizeDurableProjectSnapshot, mergeDurableProjectSnapshots } = await import(moduleUrl);
+const { normalizeDurableProjectSnapshot, mergeDurableProjectSnapshots, reconcileDurableProjectWorkspace } = await import(moduleUrl);
 
 function project(id, updatedAt = "2026-10-24T10:00:00.000Z") {
   return { id, name: id, updatedAt, files: {}, versions: [], references: [] };
@@ -99,4 +99,40 @@ test("snapshot merge falls back to a valid recovered active project when current
   const result = mergeDurableProjectSnapshots(current, recovered);
   assert.equal(result.activeProjectId, "recovered");
   assert.deepEqual(result.projects.map(item => item.id), ["current", "recovered"]);
+});
+
+test("workspace reconciliation applies durable deletion tombstones to legacy local data", () => {
+  const local = [project("keep"), project("deleted")];
+  const durable = {
+    projects: [project("durable")],
+    activeProjectId: "durable",
+    savedAt: "2026-10-24T12:00:00.000Z",
+    deletedProjectIds: ["deleted"]
+  };
+  const result = reconcileDurableProjectWorkspace(local, "deleted", durable);
+  assert.deepEqual(result.projects.map(item => item.id), ["keep", "durable"]);
+  assert.equal(result.activeProjectId, "durable");
+});
+
+test("workspace reconciliation prefers the newest duplicate and retains local ordering", () => {
+  const local = [project("second", "2026-10-24T12:00:00.000Z"), project("shared", "2026-10-25T12:00:00.000Z")];
+  const durable = {
+    projects: [project("shared", "2026-10-23T12:00:00.000Z"), project("first")],
+    activeProjectId: "first",
+    savedAt: "2026-10-24T12:00:00.000Z",
+    deletedProjectIds: []
+  };
+  const result = reconcileDurableProjectWorkspace(local, "second", durable);
+  assert.deepEqual(result.projects.map(item => item.id), ["second", "shared", "first"]);
+  assert.equal(result.projects.find(item => item.id === "shared").updatedAt, "2026-10-25T12:00:00.000Z");
+  assert.equal(result.activeProjectId, "second");
+});
+
+test("workspace reconciliation rejects stale active IDs and falls back to a valid project", () => {
+  const result = reconcileDurableProjectWorkspace(
+    [project("local")],
+    "missing",
+    { projects: [project("durable")], activeProjectId: "durable", savedAt: "", deletedProjectIds: [] }
+  );
+  assert.equal(result.activeProjectId, "local");
 });
