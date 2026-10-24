@@ -1,0 +1,60 @@
+import assert from "node:assert/strict";
+import vm from "node:vm";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+
+const sourcePath = fileURLToPath(new URL("../apps/web/app/lib/runtime-assets.ts", import.meta.url));
+let source = await readFile(sourcePath, "utf8");
+source = source.replace('import { buildRuntimeKitScript } from "./runtime-kit.mjs";', 'const buildRuntimeKitScript = () => "";');
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const moduleUrl = "data:text/javascript;base64," + Buffer.from(compiled).toString("base64");
+const { buildRuntimeAssetBootstrap } = await import(moduleUrl);
+
+const files = {
+  "assets/forge2d/character.json": JSON.stringify({
+    animationClips: [
+      { name: "idle", frames: [0], frameDurationMs: 120, loop: true },
+      { name: "walk", frames: [0, 1, 2, 3], frameDurationMs: 100, loop: true },
+      { name: "once", frames: [0, 1], frameDurationMs: 100, loop: false }
+    ]
+  }),
+  "assets/forge2d/character/frames/frame-00.svg": "<svg id='zero'/>",
+  "assets/forge2d/character/frames/frame-01.svg": "<svg id='one'/>",
+  "assets/forge2d/character/frames/frame-02.svg": "<svg id='two'/>",
+  "assets/forge2d/character/frames/frame-03.svg": "<svg id='three'/>",
+  "assets/unapproved/script.js": "alert(1)"
+};
+const bootstrap = buildRuntimeAssetBootstrap(files);
+assert.ok(!bootstrap.includes("alert(1)"), "runtime asset allowlist excludes arbitrary executable files");
+const scripts = Array.from(bootstrap.matchAll(/<script>([\s\S]*?)<\/script>/g));
+assert.ok(scripts.length >= 2, "runtime bootstrap includes storage and game scripts");
+const runtimeScript = scripts[scripts.length - 1][1];
+const draws = [];
+class MockImage {
+  constructor() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; }
+  set src(value) { this._src = value; }
+  get src() { return this._src; }
+}
+const context = { drawImage: (...args) => draws.push(args) };
+const window = { addEventListener() {}, requestAnimationFrame() {}, document: { querySelector() { return null; }, images: [] } };
+const document = {
+  readyState: "complete",
+  querySelectorAll: () => [],
+  querySelector: () => null,
+  images: [],
+  createElement: () => ({ getContext: () => ({ drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }) }) })
+};
+vm.runInNewContext(runtimeScript, { window, document, Image: MockImage, performance: { now: () => 0 }, Date, console, Float32Array, Uint8Array, Math, JSON, Object, Array, String, Number, RegExp });
+assert.deepEqual(Array.from(window.GENE_SPRITES.clips("assets/forge2d/character")), ["idle", "walk", "once"]);
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk", 10, 20, 30, 40, 0), true);
+assert.equal(draws[0][0].src.includes("frame-00.svg"), true, "walk animation starts on its first individual frame");
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk", 10, 20, 30, 40, 200), true);
+assert.equal(draws[1][0].src.includes("frame-02.svg"), true, "elapsed time advances the animation to a different individual frame");
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "missing", 0, 0, 10, 10, 0), true, "unknown clips safely fall back to idle/first clip");
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "once", 0, 0, 10, 10, 900), true);
+assert.equal(draws[3][0].src.includes("frame-01.svg"), true, "non-looping animation stays on its final frame");
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/missing", "walk", 0, 0, 10, 10, 0), false, "missing animation manifests fail safely");
+console.log("Runtime 2D animation behavior passed.\n");
