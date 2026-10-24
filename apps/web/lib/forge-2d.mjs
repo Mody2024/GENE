@@ -77,6 +77,35 @@ function iconSvg(p) {
   const c = p.colors;
   return { width: 128, height: 128, viewBox: "0 0 128 128", frameWidth: 128, frameHeight: 128, frames: 1, frameNames: ["icon"], body: `<rect x="5" y="5" width="118" height="118" rx="28" fill="${c[0]}" stroke="${c[2]}" stroke-width="5"/><path d="M28 75 L50 36 L73 75 Z" fill="${c[3]}" stroke="${c[2]}" stroke-width="4" stroke-linejoin="round"/><circle cx="82" cy="45" r="15" fill="${c[4]}" stroke="${c[2]}" stroke-width="4"/><path d="M30 91 H98" stroke="${c[2]}" stroke-width="7" stroke-linecap="round"/>` };
 }
+/**
+ * Build the canonical project-file layout consumed by the isolated runtime.
+ * The manifest and each frame are separate files so animation never depends on
+ * drawing the complete atlas into a character-sized rectangle.
+ */
+export function buildNative2DAssetFiles(options = {}) {
+  const asset = buildNative2DAsset(options);
+  const base = "assets/forge2d/" + asset.kind;
+  const files = {
+    [base + ".svg"]: asset.svg,
+    [base + ".json"]: JSON.stringify(asset.manifest, null, 2) + "\\n"
+  };
+  for (const [filename, svg] of Object.entries(asset.frameFiles)) {
+    files[base + "/frames/" + filename] = svg;
+  }
+  return {
+    assetId: asset.assetId,
+    version: asset.version,
+    format: asset.format,
+    name: asset.name,
+    kind: asset.kind,
+    style: asset.style,
+    quality: asset.quality,
+    manifest: asset.manifest,
+    qualityReport: asset.qualityReport,
+    files
+  };
+}
+
 export function buildNative2DAsset({ prompt = "", kind = "character", quality = "standard", style = "stylized" } = {}) {
   const cleanPrompt = String(prompt).replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
   if (!safeKind.has(kind)) throw new Error("Unsupported 2D asset kind. Use character, tileset, ui, background, or icon.");
