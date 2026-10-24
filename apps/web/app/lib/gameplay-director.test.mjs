@@ -27,3 +27,13 @@ test("formatted contract does not claim that suggestions are playtest evidence",
   assert.match(text, /not a claim that the game has been tested/i);
   assert.match(text, /Acceptance checklist/);
 });
+
+test("puzzle intent wins over exploration wording in mixed-genre prompts", () => {
+  assert.equal(buildGameplayDirector({ intent: "A puzzle adventure inside a dungeon" }).profile, "puzzle-strategy");
+});
+
+test("engine aliases normalize to the 3D guidance contract", () => {
+  const contract = buildGameplayDirector({ intent: "exploration game", engine: "three.js webgl 3D" });
+  assert.equal(contract.engine, "webgl3d");
+  assert.ok(contract.engineGuidance.some(item => /world-unit convention/i.test(item)));
+});
