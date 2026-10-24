@@ -40,3 +40,17 @@ test("accepts a referenced OBJ file present in project files", () => {
   assert.equal(report.ok, true);
   assert.equal(report.missingModelAssets.length, 0);
 });
+
+test("rejects OBJ path traversal and non-project paths", () => {
+  for (const modelPath of ["../secret.obj", "assets/../secret.obj", "assets\\\\secret.obj", "/assets/player.obj", "assets/player.obj?raw=1"]) {
+    const report = inspectSceneManifest({ scene: { objects: [{ id: "player", modelPath }] } }, {});
+    assert.equal(report.ok, false, "expected unsafe path to fail: " + modelPath);
+    assert.match(report.errors.join(" "), /unsafe|unsupported/i);
+  }
+});
+
+test("does not treat inherited object properties as uploaded assets", () => {
+  const files = Object.create({ "assets/player.obj": "fake inherited asset" });
+  const report = inspectSceneManifest({ scene: { objects: [{ id: "player", modelPath: "assets/player.obj" }] } }, files);
+  assert.equal(report.missingModelAssets.length, 1);
+});
