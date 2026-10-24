@@ -5,6 +5,7 @@
 
 - [x] Serialize IndexedDB workspace snapshot writes so delayed earlier saves cannot overwrite later snapshots.
 - [x] Reconcile localStorage and IndexedDB during startup by project ID and updated timestamp, recovering durable projects even if localStorage still contains an older non-empty snapshot.
+- [x] Handle invalid and equal project timestamps deterministically when reconciling localStorage and IndexedDB, preserving the documented localStorage tie-break behavior.
 - [x] Avoid treating ES-module static import/export syntax as invalid when checked by the classic-script `Function` constructor; report those files as requiring module-aware validation instead.
 
 ## Wave progress estimate
