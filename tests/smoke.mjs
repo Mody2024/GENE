@@ -226,7 +226,7 @@ assert.ok(runtimeScene.includes("roughness") && runtimeScene.includes("metalness
 assert.ok(runtimeScene.includes("window.GENE_SCENE.draw2D") && runtimeScene.includes("getVisibleObjects"), "runtime scene bridge can draw visible authored objects into a Canvas 2D renderer");
 assert.ok(prompts.includes("SCENE STUDIO RUNTIME CONTRACT") && prompts.includes("createWebGLMeshes(gl)") && prompts.includes("draw2D(ctx"), "generation prompts require renderers to consume authored scene transforms through the current runtime APIs");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)"), "live preview receives saved scene manifest at runtime");
-assert.ok(page.includes('GENE_SCENE\\.drawWebGLMeshes\\s*\\(') && page.includes('GENE_SCENE\\.draw2D\\s*\\(') && page.includes('customWebGLDraw') && page.includes('drawArrays|drawElements'), "scene integration checks require recognized draw calls instead of parser or metadata references alone");
+assert.ok(page.includes('const engineName = String(spec.engine || "").toLowerCase();') && page.includes('const canvasDraw') && page.includes('const webglDraw') && page.includes('const customWebGLDraw') && page.includes('declared engine'), "scene integration checks require a draw path compatible with the selected engine instead of parser or metadata references alone");
 assert.ok(playPage.includes("buildRuntimeSceneBootstrap(project?.files)"), "fullscreen playtest receives the same saved scene manifest");
 assert.ok(page.includes("buildRuntimeSceneBootstrap(project.files)") && page.includes("buildRuntimeSceneBootstrap(version.files)"), "standalone and ZIP exports include the scene manifest");
 assert.ok(page.includes("Save as version"), "manual edits create a snapshot");
