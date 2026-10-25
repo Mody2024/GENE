@@ -60,6 +60,8 @@ assert.match(agentRoute, /uniqueRepairPaths\.size === repaired\.files\.length/, 
 assert.match(agentRoute, /typeof file\.path==="string" && allowedPaths\.has\(file\.path\)/, "repair output must validate path type as well as membership in the existing script allowlist");
 assert.match(agentRoute, /validateFiles\(candidates, "build"/, "repaired Forge integration must pass project validation before replacing the original output");
 assert.match(agentRoute, /const remaining2D = missing2D\.filter/, "Forge repair must identify remaining 2D gaps after the attempt");
+assert.match(agentRoute, /GENE_SPRITES\.draw\) \|\| !scriptText\.includes\(base \+ "\.json"\)/, "animated 2D integration must reference the frame manifest, not only the base asset name");
+assert.match(agentRoute, /GENE_SPRITES\.draw\) \|\| !afterText\.includes\(base \+ "\.json"\)/, "partial-repair acceptance must require the animated sprite manifest reference");
 assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair must identify remaining 3D gaps after the attempt");
 assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ remaining3D\.length < missing2D\.length \+ missing3D\.length/, "validated partial repairs should be retained when they reduce the integration gaps");
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
