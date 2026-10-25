@@ -75,6 +75,12 @@ assert.equal(multiMeshes.length, 2, "OBJ groups can use materials from multiple 
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "painted").diffuse), [0.2, 0.4, 0.6], "first declared MTL contributes its material");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "accent").diffuse), [0.9, 0.1, 0.3], "second declared MTL contributes its material");
 multiMeshes.dispose();
+const failedBuffers = [];
+let bufferAttempts = 0;
+const failingGl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, createBuffer() { const buffer = { id: ++bufferAttempts }; failedBuffers.push(buffer); return buffer; }, bindBuffer() {}, bufferData() { if (bufferAttempts === 2) throw new Error("simulated GPU upload failure"); }, deleteBuffer(buffer) { buffer.deleted = true; } };
+assert.throws(() => window.GENE3D.createMeshBuffers(failingGl, "assets/models/multi.obj"), /simulated GPU upload failure/, "mesh loading propagates GPU upload failures");
+assert.equal(failedBuffers.length, 2, "all allocated buffers are tracked before uploads can fail");
+assert.ok(failedBuffers.every(buffer => buffer.deleted), "all allocated GPU buffers are released when a later upload fails");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 1, "runtime diagnostics count created mesh buffers");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtime diagnostics expose prepared mesh vertices");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
