@@ -1678,12 +1678,12 @@ export async function POST(request: NextRequest) {
       return !hasPath || !hasLoader;
     });
     if (missingModelIntegration.length || missingModelMaterials.length) {
-      result.reply += "\\n\\nGENE 3D Forge integration check: " +
+      result.reply += "\n\nGENE 3D Forge integration check: " +
         (missingModelIntegration.length ? "model loading could not be confirmed for " + missingModelIntegration.map(asset => asset.kind).join(", ") + ". " : "") +
         (missingModelMaterials.length ? "the OBJ material library is missing or unresolved for " + missingModelMaterials.map(asset => asset.kind).join(", ") + ". " : "") +
         "Exported files and structural QA do not prove visible 3D gameplay; repair the listed integration gaps and run runtime acceptance.";
     } else {
-      result.reply += "\\n\\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
+      result.reply += "\n\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
     }
     }
   }
