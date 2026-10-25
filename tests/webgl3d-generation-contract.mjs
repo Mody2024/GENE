@@ -15,7 +15,10 @@ for (const requirement of [
   "camera frustum",
   "controls that change player/world state",
   "clear-only loops",
-  "keep the build from being described as gameplay-verified"
+  "keep the build from being described as gameplay-verified",
+  "GENE3D.createMeshBuffers",
+  "GENE3D.drawMeshBuffers",
+  "inside the active frame loop"
 ]) {
   assert.ok(gate.includes(requirement), `3D playability gate must require ${requirement}`);
 }
