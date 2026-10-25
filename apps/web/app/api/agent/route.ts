@@ -1603,18 +1603,21 @@ export async function POST(request: NextRequest) {
             const replacements = new Map<string,string>(repaired.files.map((file:any)=>[file.path,file.content]));
             const candidates = result.files.map((file:any)=>replacements.has(file.path)?{...file,content:replacements.get(file.path)!}:file);
             const afterText = candidates.filter((file:any)=>/\.(?:m?js|cjs)$/i.test(file.path)).map((file:any)=>String(file.content||"")).join("\n");
-            const fixed2D = missing2D.every(asset => {
+            const remaining2D = missing2D.filter(asset => {
               const base="assets/forge2d/"+asset.kind;
               return asset.kind==="character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length
-                ? afterText.includes("GENE_SPRITES.draw") && afterText.includes(base)
-                : afterText.includes(base+".svg") && (afterText.includes("GENE_ART") || afterText.includes("drawImage") || afterText.includes("new Image"));
+                ? !afterText.includes("GENE_SPRITES.draw") || !afterText.includes(base)
+                : !afterText.includes(base+".svg") || !(afterText.includes("GENE_ART") || afterText.includes("drawImage") || afterText.includes("new Image"));
             });
-            const fixed3D = missing3D.every(asset => afterText.includes("assets/models/"+asset.kind+".obj") && /OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(afterText));
-            if (fixed2D && fixed3D) {
+            const remaining3D = missing3D.filter(asset => !afterText.includes("assets/models/"+asset.kind+".obj") || !/OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(afterText));
+            // Keep useful partial repairs: the downstream audit will still list any assets
+            // that remain unintegrated instead of throwing away all progress.
+            const repairMadeProgress = remaining2D.length + remaining3D.length < missing2D.length + missing3D.length;
+            if (repairMadeProgress) {
               try {
                 validateFiles(candidates, "build", result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind, false);
                 result.files = candidates;
-                result.reply += "\n\nGENE repaired missing Forge asset references in the game scripts and revalidated the project structure. Browser rendering and animation still require runtime acceptance.";
+                result.reply += "\n\nGENE made partial progress repairing Forge asset references and revalidated the project structure. Any remaining unintegrated assets are listed below; browser rendering and animation still require runtime acceptance.";
               } catch {
                 // Keep the original, validated project and let the explicit audit below explain the gap.
               }
