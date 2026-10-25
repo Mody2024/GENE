@@ -80,6 +80,8 @@ assert.ok(agentRoute.includes("rawMaterialPath.replace") && agentRoute.includes(
 assert.ok(agentRoute.includes('part === ".."'), "Forge material audit must resolve relative path segments safely");
 assert.ok(agentRoute.includes('!materialPath.startsWith("assets/")'), "Forge material audit must reject material paths that escape the packaged assets directory");
 assert.match(agentRoute, /usedMaterials\.some\(name => !definedMaterials\.has\(name\)\)/, "3D Forge audit must verify every OBJ usemtl name is declared by the packaged MTL");
+assert.ok(agentRoute.includes("declaredLibraries") && agentRoute.includes(".flatMap(match => match[1].trim().split(/\\s+/))"), "3D Forge audit must support multiple mtllib declarations and filenames on one declaration line");
+assert.ok(agentRoute.includes("for (const materialName of materialNames)") && agentRoute.includes("definedMaterials.add(match[1].trim())"), "3D Forge audit must combine material definitions across all declared MTL files");
 assert.match(agentRoute, /newmtl\\s\+\(\.\+\)/, "3D Forge audit must parse declared MTL material names");
 assert.match(agentRoute, /OBJ material library is missing, unresolved, or lacks referenced materials/, "GENE must report missing material libraries and missing material definitions separately from loader gaps");
 assert.match(agentRoute, /packaged OBJ material-library references were found/, "GENE must only report source-level evidence after material references are present");
