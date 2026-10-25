@@ -105,6 +105,7 @@ assert.ok(runtimeScene.includes("drawWebGLMeshes=function(gl,program,viewProject
 assert.match(page, /add\("Scene renderer integration", meshConnected \? "pass" : "fail"/, "assigned scene meshes without an engine-compatible draw path block acceptance instead of being downgraded to a warning");
 assert.match(page, /add\("Scene renderer integration", sceneDrawn \? "pass" : "fail"/, "primitive scene objects without an engine-compatible scene draw path also block acceptance");
 assert.ok(page.includes('typeof object.modelPath === "string" && object.modelPath.trim().length > 0'), "every scene object with an assigned model path is checked for a compatible renderer path regardless of its display type");
+assert.ok(page.includes('if (typeof object.modelPath === "string" && object.modelPath.trim()) {'), "every assigned model path receives OBJ/MTL integrity validation regardless of scene object type");
 assert.ok(prompts.includes("drawWebGLMeshes(gl, program, viewProjection, resources)"), "3D generation contract documents the runtime WebGL mesh draw helper");
 assert.ok(prompts.includes("createWebGLMeshes(gl)") && prompts.includes("normal offset 12 bytes"), "3D generation contract requires renderers to consume Scene Studio OBJ meshes");
 assert.ok(runtimeAssets.includes("parseOBJ=function(path)") && runtimeAssets.includes("MAX_RUNTIME_ASSET_BYTES") && runtimeAssets.includes("(?:obj|mtl)"), "nested OBJ/MTL project assets are exposed to the isolated game runtime with a bounded asset budget");
