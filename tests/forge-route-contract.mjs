@@ -75,7 +75,9 @@ assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair 
 assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ remaining3D\.length < missing2D\.length \+ missing3D\.length/, "validated partial repairs should be retained when they reduce the integration gaps");
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
 assert.match(agentRoute, /Browser rendering and animation still require runtime acceptance/, "repair must not claim visual success without runtime acceptance");
-assert.match(agentRoute, /GENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed/, "GENE must distinguish exported 3D files from confirmed in-game models");
+assert.match(agentRoute, /const missingModelMaterials = forgeToolAssets\.filter/, "3D Forge audit must inspect packaged OBJ material references");
+assert.match(agentRoute, /OBJ material library is missing or unresolved/, "GENE must report missing material libraries separately from missing model loaders");
+assert.match(agentRoute, /packaged OBJ material-library references were found/, "GENE must only report source-level evidence after material references are present");
 assert.match(agentRoute, /visible gameplay remain unverified until runtime acceptance/, "source-level 3D references must not be presented as proof of playable rendered models");
 
 assert.match(prompt, /GENE FORGE — MANDATORY MODELLING COURSE/, "the detailed modelling curriculum must be present in the agent system prompt");
