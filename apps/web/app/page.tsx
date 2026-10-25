@@ -2683,9 +2683,9 @@ export default function Home() {
         const sceneDrawn3D = /GENE_SCENE\.drawWebGLMeshes\s*\(/.test(allRuntimeSource) || (/GENE_SCENE\.(?:createWebGLMeshes|getRenderableObject)\s*\(|GENE3D\.createMeshBuffers\s*\(/.test(allRuntimeSource) && /\.(?:drawArrays|drawElements)\s*\(/.test(allRuntimeSource));
         const sceneDrawn = engineName === "canvas2d" ? sceneDrawn2D : engineName === "webgl3d" ? sceneDrawn3D : sceneDrawn2D || sceneDrawn3D;
         const engineLabel = engineName === "canvas2d" ? "Canvas 2D" : engineName === "webgl3d" ? "3D" : "game";
-        add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
+        add("Scene renderer integration", sceneDrawn ? "pass" : "fail", sceneDrawn
           ? "Game source references the shared scene manifest API; verify object rendering, layering and collision behavior in gameplay."
-          : "Scene objects exist in the manifest, but the " + engineLabel + " source does not reference the shared scene API. Manifest entries alone do not guarantee visible objects.");
+          : "Scene objects exist in the manifest, but the " + engineLabel + " source does not reference the shared scene API. This blocks acceptance until authored scene objects have a renderer path.");
       }
       const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
       if (audioConfig.enabled !== false && !isAppSpec) {
