@@ -545,8 +545,12 @@ export default function Home() {
               : version)
           };
         });
+        if (!project) return;
         void writeDurableProjectSnapshot(
-          [project, ...projects.filter(item => item.id !== project.id)].slice(0, 8).map(item => {
+          [project, ...projects.filter(item => item.id !== project.id)]
+            .filter((item): item is GeneProject => Boolean(item))
+            .slice(0, 8)
+            .map(item => {
             if (item.id !== project.id) return item;
             const existing = item.livingPreview?.runtimeErrors || [];
             return {

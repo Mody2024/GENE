@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const prompts = await readFile(new URL("../apps/web/app/lib/prompts.ts", import.meta.url), "utf8");
+const gateStart = prompts.indexOf("WEBGL3D PLAYABILITY GATE:");
+assert.notEqual(gateStart, -1, "3D generation must include a dedicated visible-gameplay gate");
+const gate = prompts.slice(gateStart, prompts.indexOf("QA BEFORE RETURN:", gateStart));
+for (const requirement of [
+  "shader compile/link status",
+  "non-zero viewport",
+  "depth testing",
+  "non-empty vertex buffers",
+  "projection, view, and model matrices",
+  "visible player/avatar",
+  "camera frustum",
+  "controls that change player/world state",
+  "clear-only loops",
+  "keep the build from being described as gameplay-verified",
+  "GENE3D.createMeshBuffers",
+  "GENE3D.drawMeshBuffers",
+  "inside the active frame loop"
+]) {
+  assert.ok(gate.includes(requirement), `3D playability gate must require ${requirement}`);
+}
+const sceneRuntime = await readFile(new URL("../apps/web/app/lib/runtime-scene.ts", import.meta.url), "utf8");
+assert.ok(sceneRuntime.includes("declared.flatMap(function(match)") && sceneRuntime.includes("mtlPaths.forEach(function(mtlPath)") && sceneRuntime.includes("Object.keys(parsed).forEach(function(name)"), "scene WebGL mesh preparation must merge all MTL libraries declared by the OBJ rather than assuming one sibling .mtl file");
+console.log("WebGL3D generation acceptance contract passed.");

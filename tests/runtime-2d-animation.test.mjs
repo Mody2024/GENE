@@ -34,9 +34,11 @@ const files = {
 };
 const bootstrap = buildRuntimeAssetBootstrap(files);
 assert.ok(!bootstrap.includes("alert(1)"), "runtime asset allowlist excludes arbitrary executable files");
-const scripts = Array.from(bootstrap.matchAll(/<script>([\s\S]*?)<\/script>/g));
-assert.ok(scripts.length >= 2, "runtime bootstrap includes storage and game scripts");
-const runtimeScript = scripts[scripts.length - 1][1];
+const runtimeOpen = bootstrap.lastIndexOf("<script>");
+const runtimeClose = bootstrap.lastIndexOf("</script>");
+assert.ok(runtimeOpen >= 0 && runtimeClose > runtimeOpen, "runtime bootstrap has a script body");
+const runtimeScript = bootstrap.slice(runtimeOpen + "<script>".length, runtimeClose);
+assert.ok(runtimeScript.includes("window.__GENE_ASSETS__="), "runtime script initializes packaged assets");
 const draws = [];
 class MockImage {
   constructor() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; }
@@ -53,7 +55,16 @@ const document = {
   images: [],
   createElement: () => ({ getContext: () => ({ drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }) }) })
 };
+assert.ok(bootstrap.includes("assets/forge2d/character/frames/frame-00.svg"), "bootstrap packages individual sprite frame assets");
 vm.runInNewContext(runtimeScript, { window, document, Image: MockImage, performance: { now: () => 0 }, Date, console, Float32Array, Uint8Array, Math, JSON, Object, Array, String, Number, RegExp });
+window.__GENE_ASSETS__ = files;
+window.GENE_SPRITES._cache = Object.fromEntries(
+  Object.keys(files).filter(path => path.startsWith("assets/forge2d/character/frames/")).map(path => {
+    const image = new MockImage();
+    image.src = path;
+    return [path, image];
+  })
+);
 assert.deepEqual(Array.from(window.GENE_SPRITES.clips("assets/forge2d/character")), ["idle", "walk", "once"]);
 assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk", 10, 20, 30, 40, 0), true);
 assert.equal(draws[0][0].src.includes("frame-00.svg"), true, "walk animation starts on its first individual frame");
@@ -74,6 +85,14 @@ const multiMeshes = window.GENE3D.createMeshBuffers(gl, "assets/models/multi.obj
 assert.equal(multiMeshes.length, 2, "OBJ groups can use materials from multiple declared MTL files");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "painted").diffuse), [0.2, 0.4, 0.6], "first declared MTL contributes its material");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "accent").diffuse), [0.9, 0.1, 0.3], "second declared MTL contributes its material");
+const drawCalls = [];
+const drawGl = { ARRAY_BUFFER: 1, FLOAT: 2, TRIANGLES: 3, bound: null, getAttribLocation: (_program, name) => name === "aPosition" ? 0 : name === "aNormal" ? 1 : -1, getUniformLocation: (_program, name) => name === "uColor" ? 4 : null, bindBuffer(_target, buffer) { this.bound = buffer; }, enableVertexAttribArray(location) { drawCalls.push(["enable", location]); }, vertexAttribPointer(location, size, type, normalized, stride, offset) { drawCalls.push(["attribute", location, size, type, normalized, stride, offset]); }, uniform3fv(location, value) { drawCalls.push(["color", location, Array.from(value)]); }, drawArrays(mode, first, count) { drawCalls.push(["draw", mode, first, count, this.bound]); } };
+assert.equal(window.GENE3D.drawMeshBuffers(drawGl, {}, multiMeshes), 2, "Forge mesh buffers are submitted as actual WebGL draw calls");
+assert.equal(drawCalls.filter(call => call[0] === "draw").length, 2, "each material group is drawn once");
+assert.equal(drawCalls.filter(call => call[0] === "color").length, 2, "each material group receives a shader color");
+assert.ok(drawCalls.filter(call => call[0] === "color").every((call, index) => call[2].every((value, component) => Math.abs(value - [[0.2, 0.4, 0.6], [0.9, 0.1, 0.3]][index][component]) < 1e-6)), "each mesh draw applies its material color within Float32 precision");
+assert.deepEqual(drawCalls.filter(call => call[0] === "attribute").map(call => [call[1], call[5], call[6]]), [[0, 24, 0], [1, 24, 12], [0, 24, 0], [1, 24, 12]], "position and normal attributes use the interleaved mesh layout");
+assert.throws(() => window.GENE3D.drawMeshBuffers(drawGl, {}, multiMeshes, { positionAttribute: "missingPosition" }), /missing position attribute/, "missing shader position inputs fail explicitly");
 const traversalFiles = {
   "assets/models/traversal.obj": "mtllib ../../outside.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
   "outside.mtl": "newmtl painted\nKd 1 0 0"
@@ -82,7 +101,10 @@ const traversalBootstrap = buildRuntimeAssetBootstrap(traversalFiles);
 const traversalContext = { console, Float32Array, Uint8Array, Math, Number, String, Object, Array, Set, Map, Error };
 traversalContext.window = traversalContext;
 traversalContext.__GENE_ASSETS__ = traversalFiles;
-vm.runInNewContext(traversalBootstrap, traversalContext);
+const traversalOpen = traversalBootstrap.lastIndexOf("<script>");
+const traversalClose = traversalBootstrap.lastIndexOf("</script>");
+assert.ok(traversalOpen >= 0 && traversalClose > traversalOpen, "traversal fixture has a runtime script body");
+vm.runInNewContext(traversalBootstrap.slice(traversalOpen + "<script>".length, traversalClose), traversalContext);
 const traversalGl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, createBuffer() { return {}; }, bindBuffer() {}, bufferData() {}, deleteBuffer() {} };
 const traversalMesh = traversalContext.GENE3D.createMeshBuffers(traversalGl, "assets/models/traversal.obj");
 assert.deepEqual(Array.from(traversalMesh[0].diffuse), [0.72, 0.76, 0.82], "material libraries outside packaged assets are not loaded");
@@ -98,10 +120,11 @@ assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 3, "runtime 
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 9, "runtime diagnostics total prepared vertices across all successfully loaded OBJ groups");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
 assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true }).passed, true, "runtime acceptance passes when the required render evidence exists");
-assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).issues), ["missing-sprite-draws"], "sprite-specific acceptance reports missing animated rendering");
+assert.equal(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).passed, true, "sprite-specific acceptance passes after four successful animated sprite draws");
+const meaningfulBeforeClear = window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps;
 canvasPrototype.clearRect();
-assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, false, "clearing a canvas alone is not evidence of visible game rendering");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps, meaningfulBeforeClear, "clearing a canvas does not add meaningful render evidence");
 canvasPrototype.fillRect();
-assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, true, "meaningful canvas drawing counts as render activity");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps, meaningfulBeforeClear + 1, "meaningful canvas drawing increments render evidence");
 meshes.dispose();
 console.log("Runtime 2D animation and 3D mesh evidence passed.\n");

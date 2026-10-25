@@ -1667,7 +1667,7 @@ export async function POST(request: NextRequest) {
       const source = packagedFiles.get(modelPath);
       if (typeof source !== "string") return true;
       const declaredLibraries = Array.from(source.matchAll(/^\s*mtllib\s+(.+)$/gmi))
-        .flatMap(match => match[1].trim().split(/\\s+/))
+        .flatMap(match => match[1].trim().split(/\s+/))
         .filter(Boolean);
       const materialNames = declaredLibraries.length ? declaredLibraries : [asset.kind + ".mtl"];
       const definedMaterials = new Set<string>();
@@ -1709,7 +1709,6 @@ export async function POST(request: NextRequest) {
         "Exported files and structural QA do not prove visible 3D gameplay; repair the listed integration gaps and run runtime acceptance.";
     } else {
       result.reply += "\n\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
-    }
     }
   }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");

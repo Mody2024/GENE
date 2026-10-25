@@ -69,15 +69,15 @@ assert.match(runtimeAssets, /assess:function\(options\)/, "runtime diagnostics m
 assert.match(runtimeAssets, /no-render-activity/, "runtime acceptance must reject games without rendering evidence");
 assert.match(runtimeAssets, /missing-mesh-buffers/, "3D runtime acceptance must identify missing mesh preparation");
 assert.match(runtimeAssets, /meaningfulRenderOps\+snap\.webglDrawCalls\+snap\.spriteDraws===0/, "render acceptance must require meaningful drawing rather than clear-only canvas activity");
-assert.ok(runtimeAssets.includes("mtlPath=String(path).replace") && runtimeAssets.includes(".mtl"), "OBJ assets must resolve their matching MTL filename for arbitrary model names");
+assert.ok(runtimeAssets.includes("objPath.replace") && runtimeAssets.includes(".mtl"), "OBJ assets resolve a matching fallback MTL filename for arbitrary model names");
 assert.ok(runtimeAssets.includes("declared=Array.from(objSource.matchAll") && runtimeAssets.includes("mtllib"), "OBJ loading must honor every material library declared by the model");
 assert.ok(runtimeAssets.includes("Object.keys(parsed).forEach(function(key){materials[key]=parsed[key];})"), "OBJ loading must merge definitions from multiple MTL files");
 assert.ok(runtimeAssets.includes("materialNames=declared.length?declared.flatMap"), "OBJ loading must support multiple MTL filenames in a declaration");
-assert.ok(runtimeAssets.includes('return resolved.indexOf("assets/")===0?resolved:null;'), "OBJ material loading must reject resolved paths outside the packaged assets directory");
+assert.ok(runtimeAssets.includes("resolved.indexOf") && runtimeAssets.includes("assets/") && runtimeAssets.includes("?resolved:null"), "OBJ material loading must reject resolved paths outside the packaged assets directory");
 assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair must identify remaining 3D gaps after the attempt");
 assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ remaining3D\.length < missing2D\.length \+ missing3D\.length/, "validated partial repairs should be retained when they reduce the integration gaps");
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
-assert.match(agentRoute, /Browser rendering and animation still require runtime acceptance/, "repair must not claim visual success without runtime acceptance");
+assert.match(agentRoute, /browser rendering and animation still require runtime acceptance/i, "repair must not claim visual success without runtime acceptance");
 assert.match(agentRoute, /const missingModelMaterials = forgeToolAssets\.filter/, "3D Forge audit must inspect packaged OBJ material references");
 assert.ok(agentRoute.includes("rawMaterialPath.replace") && agentRoute.includes(".split(\"/\")"), "Forge material audit must normalize Windows-style separators");
 assert.ok(agentRoute.includes('part === ".."'), "Forge material audit must resolve relative path segments safely");

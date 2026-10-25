@@ -330,7 +330,7 @@ console.log("GENE build-orchestrator completion and recovery tests passed.");
 // GENE identity: light-first default, persistent explicit theme choice, and restrained genie-inspired accents.
 const themePage = readFileSync(new URL("../apps/web/app/page.tsx", import.meta.url), "utf8");
 assert.ok(themePage.includes("analyzeProjectScripts(safetyFiles, { scopeChecks: true })") && themePage.includes("Runtime identifier safety"), "workspace build checks expose the same conservative runtime identifier analysis used by the build API");
-assert.ok(themePage.includes("/\\.(?:m?js|cjs)$/i.test(path)") && themePage.includes("syntaxFiles.length + \" JavaScript file(s) parse without executing them.\""), "workspace syntax QA checks every JavaScript module rather than only game.js");
+assert.ok(themePage.includes("/\\.(?:m?js|cjs)$/i.test(path") && themePage.includes("moduleSyntaxFiles.length") && themePage.includes("ES module file(s) require module-aware validation"), "workspace syntax QA distinguishes classic scripts from ES modules requiring module-aware validation");
 assert.ok(["Project file paths", "Source size budget", "Self-contained runtime"].every(label => themePage.includes('add("' + label + '"')), "workspace quality gate checks safe paths, source budgets and self-contained runtime constraints");
 assert.ok(themePage.includes("inspectProjectFilePaths(allPaths)"), "workspace and cloud builder use the shared cross-platform file path policy");
 assert.ok(themePage.includes("const allJavaScript = fileEntries.filter(([path, source]) => /\\.(?:m?js|cjs)$/i.test(path)"), "external-runtime and inline-script checks inspect CommonJS modules too");

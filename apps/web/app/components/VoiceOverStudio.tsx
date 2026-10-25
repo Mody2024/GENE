@@ -140,7 +140,7 @@ export default function VoiceOverStudio({ files, readOnly = false, onSave }: Pro
     const nextLines = lines.filter(line => line.id !== id);
     const spec = JSON.parse(files["game-spec.json"] || "{}");
     const audio = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
-    const nextFiles = { ...files, "game-spec.json": JSON.stringify({ ...spec, audio: { ...audio, voiceOvers: nextLines } }, null, 2) + "\n" };
+    const nextFiles: Record<string, string> = { ...files, "game-spec.json": JSON.stringify({ ...spec, audio: { ...audio, voiceOvers: nextLines } }, null, 2) + "\n" };
     // Remove the embedded asset too, unless another manifest entry still references it.
     if (removedLine && !nextLines.some(line => line.path === removedLine.path)) delete nextFiles[removedLine.path];
     setLines(nextLines); onSave(nextFiles, "Remove voice-over"); setStatus("Removed voice-over and its unused asset from the project.");

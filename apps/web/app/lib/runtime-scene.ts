@@ -130,8 +130,11 @@ window.GENE_SCENE.createWebGLMeshes=function(gl){
         try{
           if(window.GENE3D&&typeof window.GENE3D.parseOBJ==="function"){
             groups=window.GENE3D.parseOBJ(modelPath)||[];
-            var mtlPath=modelPath.replace(/\\.obj$/i,".mtl");
-            if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
+            var objSource=window.__GENE_ASSETS__&&window.__GENE_ASSETS__[modelPath]||"";
+            var declared=Array.from(objSource.matchAll(/^\\s*mtllib\\s+(.+)$/gmi));
+            var base=modelPath.slice(0,modelPath.lastIndexOf("/")+1);
+            var mtlPaths=declared.length?declared.flatMap(function(match){return match[1].trim().split(/\\s+/).filter(Boolean).map(function(name){return base+name;});}):[modelPath.replace(/\\.obj$/i,".mtl")];
+            if(window.__GENE_ASSETS__&&window.GENE3D.parseMTL)mtlPaths.forEach(function(mtlPath){if(typeof window.__GENE_ASSETS__[mtlPath]!=="string")return;try{var parsed=window.GENE3D.parseMTL(mtlPath);Object.keys(parsed).forEach(function(name){materials[name]=parsed[name];});}catch(ignore){}});
           }else modelLoadError="GENE3D OBJ parser is unavailable";
         }catch(modelError){modelLoadError=String(modelError&&modelError.message||modelError||"unknown OBJ parser error");groups=[];}
         if(!groups.length){
