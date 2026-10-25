@@ -2669,13 +2669,17 @@ export default function Home() {
       const allRuntimeSource = mainSource + "\n" + moduleSource;
       const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && String(object.type || "").toLowerCase() === "mesh" && typeof object.modelPath === "string" && object.modelPath.length > 0);
       if (assignedMeshes.length) {
-        const meshConnected = /getRenderableObject|getMeshData|GENE3D\.parseOBJ|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
+        const explicitSceneDraw = /GENE_SCENE\.(?:draw2D|drawWebGLMeshes)\s*\(/.test(allRuntimeSource);
+        const customWebGLDraw = /GENE_SCENE\.(?:createWebGLMeshes|getRenderableObject)\s*\(|GENE3D\.createMeshBuffers\s*\(/.test(allRuntimeSource) && /\.(?:drawArrays|drawElements)\s*\(/.test(allRuntimeSource);
+        const meshConnected = explicitSceneDraw || customWebGLDraw;
         add("Scene renderer integration", meshConnected ? "pass" : "warn", meshConnected
-          ? "Game source references the scene/mesh runtime API; visual correctness still requires actual gameplay inspection."
-          : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. The editor manifest alone does not draw them.");
+          ? "Game source contains a recognized scene-draw call or a mesh-resource plus GPU draw path; actual visibility and gameplay still require runtime verification."
+          : assignedMeshes.length + " scene mesh(es) are assigned, but no recognized scene-draw call was found. Parsing an OBJ or reading scene metadata alone does not draw it.");
       } else if (sceneObjects.length) {
-        const sceneDrawn = /GENE_SCENE\.(?:draw2D|drawMesh2D|getVisibleObjects)\s*\(|GENE3D\.(?:parseOBJ|getRenderableObject|getMeshData)\s*\(/.test(allRuntimeSource);
         const engineName = String(spec.engine || "").toLowerCase();
+        const sceneDrawn2D = /GENE_SCENE\.draw2D\s*\(/.test(allRuntimeSource);
+        const sceneDrawn3D = /GENE_SCENE\.drawWebGLMeshes\s*\(/.test(allRuntimeSource) || (/GENE_SCENE\.(?:createWebGLMeshes|getRenderableObject)\s*\(|GENE3D\.createMeshBuffers\s*\(/.test(allRuntimeSource) && /\.(?:drawArrays|drawElements)\s*\(/.test(allRuntimeSource));
+        const sceneDrawn = engineName === "canvas2d" ? sceneDrawn2D : engineName === "webgl3d" ? sceneDrawn3D : sceneDrawn2D || sceneDrawn3D;
         const engineLabel = engineName === "canvas2d" ? "Canvas 2D" : engineName === "webgl3d" ? "3D" : "game";
         add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
           ? "Game source references the shared scene manifest API; verify object rendering, layering and collision behavior in gameplay."
