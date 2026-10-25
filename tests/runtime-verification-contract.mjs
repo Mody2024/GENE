@@ -21,6 +21,9 @@ assert.match(runtimeAssets, /hasRuntimeErrors:state\.errors\.length>0/, "runtime
 
 assert.match(runtimeAssets, /renderAssessment:state\.errors\.length\?'runtime-errors'/, "runtime diagnostics classify observed render/error evidence");
 assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemetry'/, "draw calls and input events never claim gameplay was verified");
+assert.match(runtimeAssets, /playabilityAssessment:state\\.errors\\.length\\?/, "runtime diagnostics provide a preliminary playability classification");
+assert.match(runtimeAssets, /audio-without-visual-evidence/, "audio-only games are flagged when media audio exists without visual render evidence");
+assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemetry'/, "preliminary render diagnostics never claim gameplay was verified");
 
 assert.match(runtimeAssets, /originalGetContext\.apply\(this,arguments\)/, "renderer diagnostics observe existing getContext calls rather than creating a competing context");
 assert.match(runtimeAssets, /contextTypes:state\.contextTypes\.slice\(\)/, "runtime diagnostics report the context types actually requested by the game");
