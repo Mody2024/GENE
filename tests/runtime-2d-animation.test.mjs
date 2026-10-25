@@ -25,7 +25,7 @@ const files = {
   "assets/forge2d/character/frames/frame-01.svg": "<svg id='one'/>",
   "assets/forge2d/character/frames/frame-02.svg": "<svg id='two'/>",
   "assets/forge2d/character/frames/frame-03.svg": "<svg id='three'/>",
-  "assets/models/character.obj": "mtllib model.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
+  "assets/models/character.obj": "mtllib character.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
   "assets/models/character.mtl": "newmtl painted\nKd 0.2 0.4 0.6",
   "assets/unapproved/script.js": "alert(1)"
 };
