@@ -18,7 +18,7 @@ export function normalizeDurableProjectSnapshot(value: unknown): DurableProjectS
   const candidate = value as Partial<DurableProjectSnapshot>;
   if (!Array.isArray(candidate.projects)) return null;
   const deletedProjectIds = Array.isArray(candidate.deletedProjectIds)
-    ? [...new Set(candidate.deletedProjectIds.filter((id): id is string => typeof id === "string" && id.trim()).map(id => id.slice(0, 256)))].slice(-500)
+    ? [...new Set(candidate.deletedProjectIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0).map(id => id.slice(0, 256)))].slice(-500)
     : [];
   const deleted = new Set(deletedProjectIds);
   const seen = new Set<string>();
