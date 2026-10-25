@@ -34,10 +34,11 @@ const files = {
 };
 const bootstrap = buildRuntimeAssetBootstrap(files);
 assert.ok(!bootstrap.includes("alert(1)"), "runtime asset allowlist excludes arbitrary executable files");
-const runtimeStart = bootstrap.indexOf("window.__GENE_ASSETS__=");
+const runtimeStart = bootstrap.indexOf("window.__GENE_ASSETS__={");
 const runtimeEnd = bootstrap.indexOf("</script>", runtimeStart);
 assert.ok(runtimeStart >= 0 && runtimeEnd > runtimeStart, "runtime bootstrap contains a standalone asset initialization script");
 const runtimeScript = bootstrap.slice(runtimeStart, runtimeEnd);
+assert.ok(!runtimeScript.includes("<script>"), "extracted runtime source does not include HTML tags");
 const draws = [];
 class MockImage {
   constructor() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; }
