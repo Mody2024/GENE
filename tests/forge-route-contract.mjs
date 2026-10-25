@@ -79,7 +79,9 @@ assert.match(agentRoute, /const missingModelMaterials = forgeToolAssets\.filter/
 assert.ok(agentRoute.includes("rawMaterialPath.replace") && agentRoute.includes(".split(\"/\")"), "Forge material audit must normalize Windows-style separators");
 assert.ok(agentRoute.includes('part === ".."'), "Forge material audit must resolve relative path segments safely");
 assert.ok(agentRoute.includes('!materialPath.startsWith("assets/")'), "Forge material audit must reject material paths that escape the packaged assets directory");
-assert.match(agentRoute, /OBJ material library is missing or unresolved/, "GENE must report missing material libraries separately from missing model loaders");
+assert.match(agentRoute, /usedMaterials\.some\(name => !definedMaterials\.has\(name\)\)/, "3D Forge audit must verify every OBJ usemtl name is declared by the packaged MTL");
+assert.match(agentRoute, /newmtl\\s\+\(\.\+\)/, "3D Forge audit must parse declared MTL material names");
+assert.match(agentRoute, /OBJ material library is missing, unresolved, or lacks referenced materials/, "GENE must report missing material libraries and missing material definitions separately from loader gaps");
 assert.match(agentRoute, /packaged OBJ material-library references were found/, "GENE must only report source-level evidence after material references are present");
 assert.match(agentRoute, /visible gameplay remain unverified until runtime acceptance/, "source-level 3D references must not be presented as proof of playable rendered models");
 
