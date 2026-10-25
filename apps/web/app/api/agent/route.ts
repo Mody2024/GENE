@@ -1661,18 +1661,30 @@ export async function POST(request: NextRequest) {
       .filter((file: any) => /\.(?:m?js|cjs)$/i.test(file.path))
       .map((file: any) => String(file.content || ""))
       .join("\n");
+    const packagedFiles = new Map(result.files.map((file: any) => [String(file.path), String(file.content || "")]));
+    const missingModelMaterials = forgeToolAssets.filter(asset => {
+      const modelPath = "assets/models/" + asset.kind + ".obj";
+      const source = packagedFiles.get(modelPath);
+      if (typeof source !== "string") return true;
+      const declared = source.match(/^\\s*mtllib\\s+(.+)$/mi);
+      const materialName = declared ? declared[1].trim().split(/\\s+/)[0] : asset.kind + ".mtl";
+      const materialPath = materialName.startsWith("/") ? materialName.slice(1) : modelPath.slice(0, modelPath.lastIndexOf("/") + 1) + materialName;
+      return !packagedFiles.has(materialPath);
+    });
     const missingModelIntegration = forgeToolAssets.filter(asset => {
       const modelPath = "assets/models/" + asset.kind + ".obj";
       const hasPath = gameScripts.includes(modelPath);
-      const hasLoader = /OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(gameScripts);
+      const hasLoader = /OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\\s*\\(/i.test(gameScripts);
       return !hasPath || !hasLoader;
     });
-    if (missingModelIntegration.length) {
-      result.reply += "\n\nGENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed in game JavaScript: " +
-        missingModelIntegration.map(asset => asset.kind).join(", ") +
-        ". Exported OBJ/MTL files and structural QA do not prove visible 3D gameplay; the game needs a model-loader integration repair and runtime acceptance.";
+    if (missingModelIntegration.length || missingModelMaterials.length) {
+      result.reply += "\\n\\nGENE 3D Forge integration check: " +
+        (missingModelIntegration.length ? "model loading could not be confirmed for " + missingModelIntegration.map(asset => asset.kind).join(", ") + ". " : "") +
+        (missingModelMaterials.length ? "the OBJ material library is missing or unresolved for " + missingModelMaterials.map(asset => asset.kind).join(", ") + ". " : "") +
+        "Exported files and structural QA do not prove visible 3D gameplay; repair the listed integration gaps and run runtime acceptance.";
     } else {
-      result.reply += "\n\nGENE 3D Forge integration check: model paths and a loader-like code path were found. This is source-level evidence only; successful loading, materials, camera framing and visible gameplay remain unverified until runtime acceptance.";
+      result.reply += "\\n\\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
+    }
     }
   }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
