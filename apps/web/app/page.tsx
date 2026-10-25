@@ -2674,7 +2674,7 @@ export default function Home() {
           ? "Game source references the scene/mesh runtime API; visual correctness still requires actual gameplay inspection."
           : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. The editor manifest alone does not draw them.");
       } else if (sceneObjects.length) {
-        const sceneDrawn = /GENE_SCENE\.(?:draw2D|draw3D|getVisibleObjects|objects)/.test(allRuntimeSource);
+        const sceneDrawn = /GENE_SCENE\.(?:draw2D|drawMesh2D|getVisibleObjects)\s*\(|GENE3D\.(?:parseOBJ|getRenderableObject|getMeshData)\s*\(/.test(allRuntimeSource);
         const engineName = String(spec.engine || "").toLowerCase();
         const engineLabel = engineName === "canvas2d" ? "Canvas 2D" : engineName === "webgl3d" ? "3D" : "game";
         add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
