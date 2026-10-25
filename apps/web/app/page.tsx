@@ -530,8 +530,12 @@ export default function Home() {
       if (event.data?.type === "gene-runtime") {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         const diagnostics = event.data.diagnostics;
-        if (state !== "rendered" && diagnostics?.playabilityAssessment === "audio-without-visual-evidence" && Number(diagnostics.elapsedMs) >= 1500) {
-          setNotice("Audio is present, but GENE has not observed visible game rendering after startup. The game may be an audio-only or blank build; check the renderer, camera, scene and game loop before treating it as playable.");
+        const missingVisualEvidence = diagnostics?.playabilityAssessment === "audio-without-visual-evidence" || diagnostics?.playabilityAssessment === "no-visual-render-evidence";
+        if (state !== "rendered" && missingVisualEvidence && Number(diagnostics.elapsedMs) >= 1500) {
+          const audioOnly = diagnostics.playabilityAssessment === "audio-without-visual-evidence";
+          setNotice(audioOnly
+            ? "Audio/media is present, but GENE has not observed visible game rendering after startup. This may be an audio-only or blank build; check the renderer, camera, scene and game loop before treating it as playable."
+            : "GENE has not observed visible game rendering after startup. The build may be blank or its renderer may have failed; check the scene, camera, drawing loop and runtime errors before treating it as playable.");
         }
         setRuntimeState(current => current === "rendered" && state === "loaded" ? "rendered" : state);
         if (state === "rendered") {
