@@ -94,8 +94,8 @@ const failingGl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, createBuffer() { const buff
 assert.throws(() => window.GENE3D.createMeshBuffers(failingGl, "assets/models/multi.obj"), /simulated GPU upload failure/, "mesh loading propagates GPU upload failures");
 assert.equal(failedBuffers.length, 2, "all allocated buffers are tracked before uploads can fail");
 assert.ok(failedBuffers.every(buffer => buffer.deleted), "all allocated GPU buffers are released when a later upload fails");
-assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 1, "runtime diagnostics count created mesh buffers");
-assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtime diagnostics expose prepared mesh vertices");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 3, "runtime diagnostics count buffers across the single-material and multi-material OBJ loads");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 9, "runtime diagnostics total prepared vertices across all successfully loaded OBJ groups");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
 assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true }).passed, true, "runtime acceptance passes when the required render evidence exists");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).issues), ["missing-sprite-draws"], "sprite-specific acceptance reports missing animated rendering");
