@@ -1710,7 +1710,6 @@ export async function POST(request: NextRequest) {
     } else {
       result.reply += "\n\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
     }
-    }
   }
   if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
   return NextResponse.json({ ok: true, aiMode: successfulProvider, model: successfulModel, ...(reviewedBy ? { reviewedBy } : {}), result });
