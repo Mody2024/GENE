@@ -94,7 +94,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
         var data=g.positions||[];
         if(data.length<18||data.length%6!==0||data.length/6>180000){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ group has invalid, incomplete, or over-limit position/normal data"});return;}
         var buffer=gl.createBuffer();if(!buffer){errors.push({id:o.id,modelPath:o.modelPath,message:"WebGL could not allocate a GPU buffer for this OBJ group"});return;}
-        gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
+        try{gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);}catch(uploadError){try{gl.deleteBuffer(buffer);}catch(ignore){}errors.push({id:o.id,modelPath:o.modelPath,message:"WebGL failed while uploading OBJ geometry: "+String(uploadError&&uploadError.message||uploadError||"unknown upload error").slice(0,140)});return;}
         meshes.push({id:o.id,name:o.name,modelPath:o.modelPath,materialName:g.material,material:materials[g.material]||null,buffer:buffer,vertexCount:data.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
       });
     }catch(e){errors.push({id:o.id,modelPath:o.modelPath,message:String(e&&e.message||e||"Unknown OBJ loading error").slice(0,180)});}
