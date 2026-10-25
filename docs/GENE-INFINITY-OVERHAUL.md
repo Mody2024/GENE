@@ -270,3 +270,10 @@ The following code changes have been started on `gene-infinity-overhaul` (not ye
 - Added focused regression coverage for sprite slicing, runtime animation, manifest registry behavior, actual Forge manifest paths, visible-renderer contracts, image relevance, AI-only planning recovery, and call-scoped tool approvals.
 
 Verification status: the CI contract suite passed on an earlier commit containing the research-filter correction and runtime asset registry. Subsequent commits add further runtime, sprite, scene, Forge, and provenance work and have not been run through current-head CI/Playground, at the user's request. The user will perform web checks after implementation is finished. Do not interpret this log as a claim that the full overhaul is complete.
+
+
+## Wave 4 increment — early playability classification (2026-10-25)
+
+- Runtime snapshots now include visual-evidence presence, media-element presence, and a preliminary playability assessment. If audio/video elements exist but no visual render evidence is observed, the snapshot labels the case `audio-without-visual-evidence`; absent visual evidence is classified separately, while runtime errors remain explicit.
+- This classification is diagnostic only: draw activity or media presence cannot prove controls, interactions, objective progression, collision, or restart behavior. The gameplay assessment intentionally remains `not-verified-by-runtime-telemetry`.
+- Added source-contract assertions for the new diagnostic fields. Current-head CI and browser execution are still required before treating this increment as verified.
