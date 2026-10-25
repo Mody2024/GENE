@@ -2669,12 +2669,14 @@ export default function Home() {
       const allRuntimeSource = mainSource + "\n" + moduleSource;
       const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && String(object.type || "").toLowerCase() === "mesh" && typeof object.modelPath === "string" && object.modelPath.length > 0);
       if (assignedMeshes.length) {
-        const explicitSceneDraw = /GENE_SCENE\.(?:draw2D|drawWebGLMeshes)\s*\(/.test(allRuntimeSource);
+        const engineName = String(spec.engine || "").toLowerCase();
+        const canvasDraw = /GENE_SCENE\.draw2D\s*\(/.test(allRuntimeSource);
+        const webglDraw = /GENE_SCENE\.drawWebGLMeshes\s*\(/.test(allRuntimeSource);
         const customWebGLDraw = /GENE_SCENE\.(?:createWebGLMeshes|getRenderableObject)\s*\(|GENE3D\.createMeshBuffers\s*\(/.test(allRuntimeSource) && /\.(?:drawArrays|drawElements)\s*\(/.test(allRuntimeSource);
-        const meshConnected = explicitSceneDraw || customWebGLDraw;
+        const meshConnected = engineName === "canvas2d" ? canvasDraw : engineName === "webgl3d" ? (webglDraw || customWebGLDraw) : false;
         add("Scene renderer integration", meshConnected ? "pass" : "warn", meshConnected
-          ? "Game source contains a recognized scene-draw call or a mesh-resource plus GPU draw path; actual visibility and gameplay still require runtime verification."
-          : assignedMeshes.length + " scene mesh(es) are assigned, but no recognized scene-draw call was found. Parsing an OBJ or reading scene metadata alone does not draw it.");
+          ? "Game source contains a draw path compatible with the declared engine; actual visibility and gameplay still require runtime verification."
+          : assignedMeshes.length + " scene mesh(es) are assigned, but no recognized draw path compatible with the declared engine was found. Parsing an OBJ or reading scene metadata alone does not draw it.");
       } else if (sceneObjects.length) {
         const engineName = String(spec.engine || "").toLowerCase();
         const sceneDrawn2D = /GENE_SCENE\.draw2D\s*\(/.test(allRuntimeSource);
