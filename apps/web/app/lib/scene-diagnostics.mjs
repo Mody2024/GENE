@@ -172,16 +172,17 @@ export function inspectSceneManifest(spec, files = {}) {
               }
             }
           }
-          if (!vertices || !faces) {
-            errors.push(id + ": OBJ asset must contain at least one valid vertex and face record");
-          } else if (vertices > 100_000 || faces > 100_000) {
-            errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
-          } else if (malformedVertex) {
+          // Prefer the actionable malformed-record cause over the generic missing-geometry fallback.
+          if (malformedVertex) {
             errors.push(id + ": OBJ asset contains a malformed vertex record or non-finite coordinates");
           } else if (malformedAttribute) {
             errors.push(id + ": OBJ asset contains malformed or excessive texture-coordinate/normal records");
           } else if (malformedFace) {
             errors.push(id + ": OBJ asset contains a face with invalid vertex indices or too few vertices");
+          } else if (!vertices || !faces) {
+            errors.push(id + ": OBJ asset must contain at least one valid vertex and face record");
+          } else if (vertices > 100_000 || faces > 100_000) {
+            errors.push(id + ": OBJ asset exceeds the bounded vertex/face count");
           }
         }
       }
