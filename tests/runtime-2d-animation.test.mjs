@@ -74,6 +74,19 @@ const multiMeshes = window.GENE3D.createMeshBuffers(gl, "assets/models/multi.obj
 assert.equal(multiMeshes.length, 2, "OBJ groups can use materials from multiple declared MTL files");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "painted").diffuse), [0.2, 0.4, 0.6], "first declared MTL contributes its material");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "accent").diffuse), [0.9, 0.1, 0.3], "second declared MTL contributes its material");
+const traversalFiles = {
+  "assets/models/traversal.obj": "mtllib ../../outside.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3",
+  "outside.mtl": "newmtl painted\\nKd 1 0 0"
+};
+const traversalBootstrap = buildRuntimeAssetBootstrap(traversalFiles);
+const traversalContext = { console, Float32Array, Uint8Array, Math, Number, String, Object, Array, Set, Map, Error };
+traversalContext.window = traversalContext;
+traversalContext.__GENE_ASSETS__ = traversalFiles;
+vm.runInNewContext(traversalBootstrap, traversalContext);
+const traversalGl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, createBuffer() { return {}; }, bindBuffer() {}, bufferData() {}, deleteBuffer() {} };
+const traversalMesh = traversalContext.GENE3D.createMeshBuffers(traversalGl, "assets/models/traversal.obj");
+assert.deepEqual(Array.from(traversalMesh[0].diffuse), [0.72, 0.76, 0.82], "material libraries outside packaged assets are not loaded");
+traversalMesh.dispose();
 multiMeshes.dispose();
 const failedBuffers = [];
 let bufferAttempts = 0;
