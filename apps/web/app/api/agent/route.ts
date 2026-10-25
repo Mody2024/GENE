@@ -1666,10 +1666,23 @@ export async function POST(request: NextRequest) {
       const modelPath = "assets/models/" + asset.kind + ".obj";
       const source = packagedFiles.get(modelPath);
       if (typeof source !== "string") return true;
-      const declared = source.match(/^\s*mtllib\s+(.+)$/mi);
-      const materialName = declared ? declared[1].trim().split(/\s+/)[0] : asset.kind + ".mtl";
-      const materialPath = materialName.startsWith("/") ? materialName.slice(1) : modelPath.slice(0, modelPath.lastIndexOf("/") + 1) + materialName;
-      return !packagedFiles.has(materialPath);
+      const declared = source.match(/^\\s*mtllib\\s+(.+)$/mi);
+      const materialName = declared ? declared[1].trim().split(/\\s+/)[0] : asset.kind + ".mtl";
+      const rawMaterialPath = materialName.startsWith("/")
+        ? materialName.slice(1)
+        : modelPath.slice(0, modelPath.lastIndexOf("/") + 1) + materialName;
+      const pathParts: string[] = [];
+      for (const part of rawMaterialPath.replace(/\\\\/g, "/").split("/")) {
+        if (!part || part === ".") continue;
+        if (part === "..") {
+          if (!pathParts.length) return true;
+          pathParts.pop();
+          continue;
+        }
+        pathParts.push(part);
+      }
+      const materialPath = pathParts.join("/");
+      return !materialPath.startsWith("assets/") || !packagedFiles.has(materialPath);
     });
     const missingModelIntegration = forgeToolAssets.filter(asset => {
       const modelPath = "assets/models/" + asset.kind + ".obj";
