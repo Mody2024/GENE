@@ -2637,7 +2637,7 @@ export default function Home() {
             }
           }
         }
-        if (String(object.type || "").toLowerCase() === "mesh" && object.modelPath) {
+        if (typeof object.modelPath === "string" && object.modelPath.trim()) {
           const modelPath = String(object.modelPath);
           if (!Object.prototype.hasOwnProperty.call(files, modelPath)) {
             sceneIssues.push((id || "Scene entry " + (index + 1)) + " references missing model file " + modelPath + ".");
