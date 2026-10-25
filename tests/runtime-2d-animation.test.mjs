@@ -25,11 +25,11 @@ const files = {
   "assets/forge2d/character/frames/frame-01.svg": "<svg id='one'/>",
   "assets/forge2d/character/frames/frame-02.svg": "<svg id='two'/>",
   "assets/forge2d/character/frames/frame-03.svg": "<svg id='three'/>",
-  "assets/models/character.obj": "mtllib materials/character-palette.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3",
-  "assets/models/materials/character-palette.mtl": "newmtl painted\\nKd 0.2 0.4 0.6",
-  "assets/models/multi.obj": "mtllib materials/base.mtl materials/accent.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3\\nusemtl accent\\nf 1 3 2",
-  "assets/models/materials/base.mtl": "newmtl painted\\nKd 0.2 0.4 0.6",
-  "assets/models/materials/accent.mtl": "newmtl accent\\nKd 0.9 0.1 0.3",
+  "assets/models/character.obj": "mtllib materials/character-palette.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
+  "assets/models/materials/character-palette.mtl": "newmtl painted\nKd 0.2 0.4 0.6",
+  "assets/models/multi.obj": "mtllib materials/base.mtl materials/accent.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3\nusemtl accent\nf 1 3 2",
+  "assets/models/materials/base.mtl": "newmtl painted\nKd 0.2 0.4 0.6",
+  "assets/models/materials/accent.mtl": "newmtl accent\nKd 0.9 0.1 0.3",
   "assets/unapproved/script.js": "alert(1)"
 };
 const bootstrap = buildRuntimeAssetBootstrap(files);
@@ -75,8 +75,8 @@ assert.equal(multiMeshes.length, 2, "OBJ groups can use materials from multiple 
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "painted").diffuse), [0.2, 0.4, 0.6], "first declared MTL contributes its material");
 assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "accent").diffuse), [0.9, 0.1, 0.3], "second declared MTL contributes its material");
 const traversalFiles = {
-  "assets/models/traversal.obj": "mtllib ../../outside.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3",
-  "outside.mtl": "newmtl painted\\nKd 1 0 0"
+  "assets/models/traversal.obj": "mtllib ../../outside.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
+  "outside.mtl": "newmtl painted\nKd 1 0 0"
 };
 const traversalBootstrap = buildRuntimeAssetBootstrap(traversalFiles);
 const traversalContext = { console, Float32Array, Uint8Array, Math, Number, String, Object, Array, Set, Map, Error };
