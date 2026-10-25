@@ -1552,6 +1552,78 @@ export async function POST(request: NextRequest) {
     result.files = [...result.files.filter((file: any) => !assetPaths.has(file.path)), ...generatedAssetFiles];
     result.reply += "\n\nGENE Forge — completed stages: building " + forgeToolAssets.map(asset => asset.kind).join(", building ") + "; applying per-part colours and material types; validating geometry and bounds; exporting matching OBJ/MTL/JSON files; passing the generated recipes into the game build.\n\nForge generated " + forgeToolAssets.length + " validated 3D asset recipe(s) (" + forgeToolAssets.map(asset => asset.kind + ": " + asset.partCount + " parts").join(", ") + "). Source assets are included under assets/models/.";
   }
+  // If Forge files were packaged but the generated game does not use them, make one
+  // bounded, source-only repair attempt before returning the integration warning.
+  if (Array.isArray(result.files) && (forge2DAssets.length || forgeToolAssets.length) &&
+      hasAlternateProviderKeys() && Date.now() - startedAt < totalBudgetMs - 9_000) {
+    const scriptFiles = result.files.filter((file: any) => /\.(?:m?js|cjs)$/i.test(file.path));
+    const scriptText = scriptFiles.map((file: any) => String(file.content || "")).join("\n");
+    const missing2D = forge2DAssets.filter(asset => {
+      const base = "assets/forge2d/" + asset.kind;
+      if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
+        return !scriptText.includes("GENE_SPRITES.draw") || !scriptText.includes(base);
+      }
+      return !scriptText.includes(base + ".svg") ||
+        !(scriptText.includes("GENE_ART") || scriptText.includes("drawImage") || scriptText.includes("new Image"));
+    });
+    const missing3D = forgeToolAssets.filter(asset =>
+      !scriptText.includes("assets/models/" + asset.kind + ".obj") ||
+      !/OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(scriptText)
+    );
+    if ((missing2D.length || missing3D.length) && scriptFiles.length) {
+      try {
+        const repair = await runAlternateChain({
+          system: "You are GENE's bounded Forge integration repair tool. Repair only the supplied JavaScript files so the actual playable game loads and visibly uses the exact supplied local Forge assets. For animated 2D characters, load the supplied frame manifest and call window.GENE_SPRITES.draw during the normal render loop; use available idle/walk clips where appropriate. For static 2D art, load the exact local SVG and draw it. For 3D, load the exact local OBJ/MTL assets using the project's available renderer/loader. Preserve gameplay, controls, camera, mechanics and every unrelated file. Do not use remote URLs or CDNs. Return JSON only: {reply:string,files:[{path:string,content:string}]}; include complete replacements only for affected JavaScript paths.",
+          user: "One integration repair attempt is available before the game is returned. Packaged 2D assets not referenced correctly: " +
+            JSON.stringify(missing2D.map(asset => ({kind:asset.kind,svg:"assets/forge2d/"+asset.kind+".svg",manifest:"assets/forge2d/"+asset.kind+".json",clips:asset.manifest.animationClips||[]}))) +
+            "\nPackaged 3D assets not referenced by a plausible loader path: " +
+            JSON.stringify(missing3D.map(asset => ({kind:asset.kind,obj:"assets/models/"+asset.kind+".obj",mtl:"assets/models/"+asset.kind+".mtl"}))) +
+            "\nProject files: " + JSON.stringify(result.files.map((file:any)=>({path:file.path,content:scriptFiles.some((s:any)=>s.path===file.path)?String(file.content||"").slice(0,18000):"[preserve unchanged]"}))) +
+            "\nReturn only changed JavaScript files, using their existing paths. Do not alter packaged asset files.",
+          maxTokens: 7_000,
+          temperature: 0,
+          json: true,
+          deadline: Math.min(startedAt + totalBudgetMs - 500, Date.now() + 7_000),
+          signal: request.signal,
+          perCallMs: 3_500,
+          maxAttempts: 1,
+          groqLimit: 1,
+          openrouterLimit: 1,
+          siteTitle: "GENE Forge Asset Integration Repair",
+          validate: text => extractJsonObjectText(text) !== null
+        });
+        if (repair.ok) {
+          const repaired = JSON.parse(extractJsonObjectText(repair.text) as string);
+          const allowedPaths = new Set(scriptFiles.map((file:any)=>file.path));
+          if (Array.isArray(repaired.files) && repaired.files.length > 0 &&
+              repaired.files.every((file:any)=>file && allowedPaths.has(file.path) && typeof file.content==="string" && file.content.length>0)) {
+            const replacements = new Map<string,string>(repaired.files.map((file:any)=>[file.path,file.content]));
+            const candidates = result.files.map((file:any)=>replacements.has(file.path)?{...file,content:replacements.get(file.path)!}:file);
+            const afterText = candidates.filter((file:any)=>/\.(?:m?js|cjs)$/i.test(file.path)).map((file:any)=>String(file.content||"")).join("\n");
+            const fixed2D = missing2D.every(asset => {
+              const base="assets/forge2d/"+asset.kind;
+              return asset.kind==="character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length
+                ? afterText.includes("GENE_SPRITES.draw") && afterText.includes(base)
+                : afterText.includes(base+".svg") && (afterText.includes("GENE_ART") || afterText.includes("drawImage") || afterText.includes("new Image"));
+            });
+            const fixed3D = missing3D.every(asset => afterText.includes("assets/models/"+asset.kind+".obj") && /OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(afterText));
+            if (fixed2D && fixed3D) {
+              try {
+                validateFiles(candidates, "build", result.plan?.engine || body.project?.plan?.engine, body.mode, projectKind, false);
+                result.files = candidates;
+                result.reply += "\n\nGENE repaired missing Forge asset references in the game scripts and revalidated the project structure. Browser rendering and animation still require runtime acceptance.";
+              } catch {
+                // Keep the original, validated project and let the explicit audit below explain the gap.
+              }
+            }
+          }
+        }
+      } catch {
+        if (request.signal.aborted) return jsonError("Request cancelled by the client.", 499, "GENE_REQUEST_CANCELLED");
+      }
+    }
+  }
+
   // Do not report generated Forge assets as integrated merely because files were packaged.
   // Inspect the submitted JavaScript and clearly distinguish available project assets from
   // assets that the playable game actually references.
