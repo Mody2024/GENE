@@ -16,7 +16,7 @@ const { buildRuntimeAudioBootstrap } = await import(moduleUrl);
 function runAudioManifest(spec, extraFiles = {}) {
   const files = { "game-spec.json": JSON.stringify(spec), ...extraFiles };
   const bootstrap = buildRuntimeAudioBootstrap(files);
-  const scripts = Array.from(bootstrap.matchAll(/<script>([\\s\\S]*?)<\\/script>/g));
+  const scripts = Array.from(bootstrap.matchAll(/<script>([\s\S]*?)<\/script>/g));
   assert.equal(scripts.length, 1, "audio manifest is emitted as one runtime script");
   const calls = { volumes: [], sfx: [], music: [], players: [] };
   const audio = {
