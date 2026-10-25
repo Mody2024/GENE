@@ -1595,8 +1595,11 @@ export async function POST(request: NextRequest) {
         if (repair.ok) {
           const repaired = JSON.parse(extractJsonObjectText(repair.text) as string);
           const allowedPaths = new Set(scriptFiles.map((file:any)=>file.path));
+          const repairedPaths = Array.isArray(repaired.files) ? repaired.files.map((file:any)=>file?.path) : [];
+          const uniqueRepairPaths = new Set(repairedPaths);
           if (Array.isArray(repaired.files) && repaired.files.length > 0 &&
-              repaired.files.every((file:any)=>file && allowedPaths.has(file.path) && typeof file.content==="string" && file.content.length>0)) {
+              uniqueRepairPaths.size === repaired.files.length &&
+              repaired.files.every((file:any)=>file && typeof file.path==="string" && allowedPaths.has(file.path) && typeof file.content==="string" && file.content.length>0)) {
             const replacements = new Map<string,string>(repaired.files.map((file:any)=>[file.path,file.content]));
             const candidates = result.files.map((file:any)=>replacements.has(file.path)?{...file,content:replacements.get(file.path)!}:file);
             const afterText = candidates.filter((file:any)=>/\.(?:m?js|cjs)$/i.test(file.path)).map((file:any)=>String(file.content||"")).join("\n");
