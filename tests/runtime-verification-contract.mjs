@@ -25,7 +25,7 @@ assert.match(runtimeAssets, /playabilityAssessment:state\.errors\.length\?/, "ru
 assert.match(runtimeAssets, /audio-without-visual-evidence/, "audio-only games are flagged when media audio exists without visual render evidence");
 assert.match(page, /renderer:\x27webgl\x27,diagnostics:diag/, "the WebGL preview forwards runtime playability diagnostics to the workspace");
 assert.match(page, /renderer:\x27canvas2d\x27,diagnostics:diag/, "the Canvas2D preview forwards runtime playability diagnostics to the workspace");
-assert.match(page, /Audio is present, but GENE has not observed visible game rendering/, "the workspace warns about audio-only or blank games without calling them playable");
+assert.match(page, /Audio\/media is present, but GENE has not observed visible game rendering/, "the workspace warns about audio-only or blank games without calling them playable");
 assert.match(page, /playabilityAssessment === "no-visual-render-evidence"/, "blank or failed-render previews also trigger a visible warning");
 assert.match(page, /check the scene, camera, drawing loop and runtime errors/, "the blank-game warning gives actionable renderer diagnostics");
 assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemetry'/, "preliminary render diagnostics never claim gameplay was verified");
