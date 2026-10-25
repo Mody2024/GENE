@@ -92,6 +92,22 @@ test("disabled audio gates effects, music, and voice-over playback", () => {
   assert.equal(calls.players.length, 0);
 });
 
+test("audio manifest clamps volume values and safely handles malformed or script-like data", () => {
+  const hostileEvent = "</script><script>alert(1)</script>";
+  const { calls, audio, bootstrap } = runAudioManifest({
+    audio: {
+      enabled: true,
+      volumes: { master: 5, music: -3, sfx: "not-a-number" },
+      events: { jump: hostileEvent }
+    }
+  });
+  assert.deepEqual(calls.volumes, [["master", 1], ["music", 0], ["sfx", 0.8]]);
+  assert.ok(!bootstrap.includes(hostileEvent), "untrusted manifest strings cannot break out of the injected script");
+  assert.equal(audio.sfx("jump"), hostileEvent, "escaped event mappings remain usable after script parsing");
+  const malformed = buildRuntimeAudioBootstrap({ "game-spec.json": "{" });
+  assert.ok(malformed.includes("master"), "malformed project audio settings safely fall back to runtime defaults");
+});
+
 test("audio bootstrap excludes missing, non-audio, and oversized voice-over payloads", () => {
   const oversized = "data:audio/wav;base64," + "A".repeat(2_100_000);
   const { audio } = runAudioManifest({
