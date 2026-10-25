@@ -47,8 +47,11 @@ export function buildRuntimeAudioBootstrap(files: Record<string, string> | undef
     try{
       var player=new Audio(item.src);
       var opts=options&&typeof options==="object"?options:{};
-      player.volume=Math.max(0,Math.min(1,Number(opts.volume==null?1:opts.volume)*cfg.volumes.master));
-      if(typeof opts.playbackRate==="number")player.playbackRate=Math.max(0.5,Math.min(2,opts.playbackRate));
+      var requestedVolume=Number(opts.volume==null?1:opts.volume);
+      if(!Number.isFinite(requestedVolume))requestedVolume=1;
+      player.volume=Math.max(0,Math.min(1,requestedVolume))*cfg.volumes.master;
+      var requestedRate=Number(opts.playbackRate);
+      if(opts.playbackRate!=null&&Number.isFinite(requestedRate))player.playbackRate=Math.max(0.5,Math.min(2,requestedRate));
       var promise=player.play();
       if(promise&&typeof promise.catch==="function")promise.catch(function(){});
       return player;
