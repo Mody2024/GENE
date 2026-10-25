@@ -61,7 +61,9 @@ assert.match(agentRoute, /typeof file\.path==="string" && allowedPaths\.has\(fil
 assert.match(agentRoute, /validateFiles\(candidates, "build"/, "repaired Forge integration must pass project validation before replacing the original output");
 assert.match(agentRoute, /const remaining2D = missing2D\.filter/, "Forge repair must identify remaining 2D gaps after the attempt");
 assert.match(agentRoute, /GENE_SPRITES\.draw\) \|\| !scriptText\.includes\(base \+ "\.json"\)/, "animated 2D integration must reference the frame manifest, not only the base asset name");
-assert.match(agentRoute, /GENE_SPRITES\\\\s\*\\\\\.\\\\s\*draw\\\\s\*\\\\\(/, "sprite integration checks must require an actual callable draw invocation, not a name-only reference");
+assert.ok(agentRoute.includes(String.raw\`!/GENE_SPRITES\s*\.\s*draw\s*\(/.test(scriptText)\`), "initial sprite audit must require a callable draw invocation");
+assert.ok(agentRoute.includes(String.raw\`!/GENE_SPRITES\s*\.\s*draw\s*\(/.test(afterText)\`), "partial repair gate must require a callable draw invocation");
+assert.ok(agentRoute.includes(String.raw\`!/GENE_SPRITES\s*\.\s*draw\s*\(/.test(gameScripts)\`), "final sprite audit must require a callable draw invocation");
 assert.match(agentRoute, /GENE_SPRITES\.draw\) \|\| !gameScripts\.includes\(assetPath \+ "\.json"\)/, "final Forge audit must enforce the same sprite-manifest requirement as the repair gate");
 assert.match(agentRoute, /GENE_SPRITES\.draw\) \|\| !afterText\.includes\(base \+ "\.json"\)/, "partial-repair acceptance must require the animated sprite manifest reference");
 assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair must identify remaining 3D gaps after the attempt");
