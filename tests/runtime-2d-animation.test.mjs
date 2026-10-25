@@ -27,6 +27,9 @@ const files = {
   "assets/forge2d/character/frames/frame-03.svg": "<svg id='three'/>",
   "assets/models/character.obj": "mtllib materials/character-palette.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3",
   "assets/models/materials/character-palette.mtl": "newmtl painted\\nKd 0.2 0.4 0.6",
+  "assets/models/multi.obj": "mtllib materials/base.mtl materials/accent.mtl\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nusemtl painted\\nf 1 2 3\\nusemtl accent\\nf 1 3 2",
+  "assets/models/materials/base.mtl": "newmtl painted\\nKd 0.2 0.4 0.6",
+  "assets/models/materials/accent.mtl": "newmtl accent\\nKd 0.9 0.1 0.3",
   "assets/unapproved/script.js": "alert(1)"
 };
 const bootstrap = buildRuntimeAssetBootstrap(files);
@@ -67,6 +70,11 @@ const meshes = window.GENE3D.createMeshBuffers(gl, "assets/models/character.obj"
 assert.equal(meshes.length, 1, "OBJ mesh groups become one WebGL buffer");
 assert.equal(meshes[0].vertexCount, 3, "mesh buffers preserve triangulated vertex counts");
 assert.deepEqual(Array.from(meshes[0].diffuse), [0.2, 0.4, 0.6], "OBJ material color comes from the paired MTL file");
+const multiMeshes = window.GENE3D.createMeshBuffers(gl, "assets/models/multi.obj");
+assert.equal(multiMeshes.length, 2, "OBJ groups can use materials from multiple declared MTL files");
+assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "painted").diffuse), [0.2, 0.4, 0.6], "first declared MTL contributes its material");
+assert.deepEqual(Array.from(multiMeshes.find(mesh => mesh.material === "accent").diffuse), [0.9, 0.1, 0.3], "second declared MTL contributes its material");
+multiMeshes.dispose();
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 1, "runtime diagnostics count created mesh buffers");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtime diagnostics expose prepared mesh vertices");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
