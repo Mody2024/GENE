@@ -54,7 +54,9 @@ const document = {
   images: [],
   createElement: () => ({ getContext: () => ({ drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray(4) }) }) })
 };
+assert.ok(bootstrap.includes("assets/forge2d/character/frames/frame-00.svg"), "bootstrap packages individual sprite frame assets");
 vm.runInNewContext(runtimeScript, { window, document, Image: MockImage, performance: { now: () => 0 }, Date, console, Float32Array, Uint8Array, Math, JSON, Object, Array, String, Number, RegExp });
+window.__GENE_ASSETS__ = files;
 assert.deepEqual(Array.from(window.GENE_SPRITES.clips("assets/forge2d/character")), ["idle", "walk", "once"]);
 assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk", 10, 20, 30, 40, 0), true);
 assert.equal(draws[0][0].src.includes("frame-00.svg"), true, "walk animation starts on its first individual frame");
