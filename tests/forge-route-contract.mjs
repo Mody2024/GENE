@@ -53,6 +53,11 @@ assert.match(presets, /kind\s*===\s*"weapon"\)\s*throw new Error/, "unsupported 
 assert.match(prompt, /GENE FORGE MANDATORY WORKFLOW/, "the unified agent must be instructed to route 3D requests through Forge");
 const agentRoute = readFileSync(new URL("../apps/web/app/api/agent/route.ts", import.meta.url), "utf8");
 assert.match(agentRoute, /missingModelIntegration = forgeToolAssets\.filter/, "post-generation audit must flag 3D Forge meshes whose loading cannot be confirmed");
+assert.match(agentRoute, /bounded, source-only repair attempt/, "missing Forge asset integration must trigger one bounded repair attempt");
+assert.match(agentRoute, /GENE Forge Asset Integration Repair/, "the repair pass must be explicitly scoped to Forge asset integration");
+assert.match(agentRoute, /const allowedPaths = new Set\(scriptFiles\.map/, "repair output must be restricted to existing JavaScript files");
+assert.match(agentRoute, /validateFiles\(candidates, "build"/, "repaired Forge integration must pass project validation before replacing the original output");
+assert.match(agentRoute, /Browser rendering and animation still require runtime acceptance/, "repair must not claim visual success without runtime acceptance");
 assert.match(agentRoute, /GENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed/, "GENE must distinguish exported 3D files from confirmed in-game models");
 assert.match(agentRoute, /visible gameplay remain unverified until runtime acceptance/, "source-level 3D references must not be presented as proof of playable rendered models");
 
