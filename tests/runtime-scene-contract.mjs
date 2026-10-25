@@ -22,6 +22,8 @@ assert.match(source, /WebGL context or GENE3D OBJ parser is unavailable/, "missi
 assert.match(source, /OBJ group has invalid, incomplete, or over-limit position\/normal data/, "malformed or oversized OBJ groups are reported rather than silently skipped");
 assert.match(source, /WebGL could not allocate a GPU buffer for this OBJ group/, "GPU buffer allocation failures are reported");
 assert.match(source, /WebGL failed while uploading OBJ geometry/, "GPU upload exceptions are reported and their unregistered buffer is released");
+assert.match(source, /WebGL rejected OBJ geometry upload \(error /, "WebGL error flags after bufferData are reported even when the API does not throw");
+assert.match(source, /for\(var stale=0;stale<8&&gl\.getError\(\)!==gl\.NO_ERROR;stale\+\+\)/, "stale WebGL errors are boundedly drained before attributing upload failures");
 assert.match(source, /catch\(uploadError\)\{try\{gl\.deleteBuffer\(buffer\)/, "failed GPU uploads release the allocated buffer instead of leaking it");
 assert.match(source, /No visible scene model produced drawable GPU geometry/, "empty WebGL scene resources receive a diagnostic");
 assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "scene runtime exposes a playable-readiness preflight");
