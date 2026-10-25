@@ -1682,7 +1682,12 @@ export async function POST(request: NextRequest) {
         pathParts.push(part);
       }
       const materialPath = pathParts.join("/");
-      return !materialPath.startsWith("assets/") || !packagedFiles.has(materialPath);
+      if (!materialPath.startsWith("assets/")) return true;
+      const materialSource = packagedFiles.get(materialPath);
+      if (typeof materialSource !== "string") return true;
+      const usedMaterials = Array.from(source.matchAll(/^\\s*usemtl\\s+(.+)$/gmi)).map(match => match[1].trim());
+      const definedMaterials = new Set(Array.from(materialSource.matchAll(/^\\s*newmtl\\s+(.+)$/gmi)).map(match => match[1].trim()));
+      return usedMaterials.some(name => !definedMaterials.has(name));
     });
     const missingModelIntegration = forgeToolAssets.filter(asset => {
       const modelPath = "assets/models/" + asset.kind + ".obj";
@@ -1693,7 +1698,7 @@ export async function POST(request: NextRequest) {
     if (missingModelIntegration.length || missingModelMaterials.length) {
       result.reply += "\n\nGENE 3D Forge integration check: " +
         (missingModelIntegration.length ? "model loading could not be confirmed for " + missingModelIntegration.map(asset => asset.kind).join(", ") + ". " : "") +
-        (missingModelMaterials.length ? "the OBJ material library is missing or unresolved for " + missingModelMaterials.map(asset => asset.kind).join(", ") + ". " : "") +
+        (missingModelMaterials.length ? "the OBJ material library is missing, unresolved, or lacks referenced materials for " + missingModelMaterials.map(asset => asset.kind).join(", ") + ". " : "") +
         "Exported files and structural QA do not prove visible 3D gameplay; repair the listed integration gaps and run runtime acceptance.";
     } else {
       result.reply += "\n\nGENE 3D Forge integration check: model paths, a loader-like code path, and packaged OBJ material-library references were found. This is source-level evidence only; successful loading, camera framing and visible gameplay remain unverified until runtime acceptance.";
