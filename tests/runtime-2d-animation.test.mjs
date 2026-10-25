@@ -68,5 +68,8 @@ assert.equal(meshes[0].vertexCount, 3, "mesh buffers preserve triangulated verte
 assert.deepEqual(Array.from(meshes[0].diffuse), [0.2, 0.4, 0.6], "OBJ material color comes from the paired MTL file");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 1, "runtime diagnostics count created mesh buffers");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtime diagnostics expose prepared mesh vertices");
+assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
+assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true }).passed, true, "runtime acceptance passes when the required render evidence exists");
+assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).issues), ["missing-sprite-draws"], "sprite-specific acceptance reports missing animated rendering");
 meshes.dispose();
 console.log("Runtime 2D animation and 3D mesh evidence passed.\n");
