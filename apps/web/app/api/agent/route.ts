@@ -1667,7 +1667,7 @@ export async function POST(request: NextRequest) {
       const source = packagedFiles.get(modelPath);
       if (typeof source !== "string") return true;
       const declaredLibraries = Array.from(source.matchAll(/^\s*mtllib\s+(.+)$/gmi))
-        .flatMap(match => match[1].trim().split(/\\s+/))
+        .flatMap(match => match[1].trim().split(/\s+/))
         .filter(Boolean);
       const materialNames = declaredLibraries.length ? declaredLibraries : [asset.kind + ".mtl"];
       const definedMaterials = new Set<string>();
