@@ -99,8 +99,8 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       });
     }catch(e){errors.push({id:o.id,modelPath:o.modelPath,message:String(e&&e.message||e||"Unknown OBJ loading error").slice(0,180)});}
   });
-  if(!meshes.length&&seen>0&&!errors.some(function(e){return e.id!=null;}))errors.push({id:null,modelPath:null,message:"No visible scene model produced drawable GPU geometry"});return{meshes:meshes,errors:errors,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
-};window.GENE_SCENE.drawWebGLMeshes=function(gl,program,viewProjection,resources,locations){
+  if(!meshes.length&&seen>0&&!errors.some(function(e){return e.id!=null;}))errors.push({id:null,modelPath:null,message:"No visible scene model produced drawable GPU geometry"});window.GENE_SCENE.lastWebGLDiagnostics=errors.slice(0,100);return{meshes:meshes,errors:errors,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
+};window.GENE_SCENE.getWebGLDiagnostics=function(){return Array.isArray(this.lastWebGLDiagnostics)?this.lastWebGLDiagnostics.slice(0,100):[];};window.GENE_SCENE.drawWebGLMeshes=function(gl,program,viewProjection,resources,locations){
   if(!gl||!program||!viewProjection||!resources||!Array.isArray(resources.meshes))return 0;
   locations=locations||{};
   var pos=locations.position==null?gl.getAttribLocation(program,"aPosition"):locations.position;
