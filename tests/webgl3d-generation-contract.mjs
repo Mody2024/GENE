@@ -22,4 +22,6 @@ for (const requirement of [
 ]) {
   assert.ok(gate.includes(requirement), `3D playability gate must require ${requirement}`);
 }
+const sceneRuntime = await readFile(new URL("../apps/web/app/lib/runtime-scene.ts", import.meta.url), "utf8");
+assert.ok(sceneRuntime.includes("declared.flatMap(function(match)") && sceneRuntime.includes("mtlPaths.forEach(function(mtlPath)") && sceneRuntime.includes("Object.keys(parsed).forEach(function(name)"), "scene WebGL mesh preparation must merge all MTL libraries declared by the OBJ rather than assuming one sibling .mtl file");
 console.log("WebGL3D generation acceptance contract passed.");
