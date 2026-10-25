@@ -2673,11 +2673,13 @@ export default function Home() {
         add("Scene renderer integration", meshConnected ? "pass" : "warn", meshConnected
           ? "Game source references the scene/mesh runtime API; visual correctness still requires actual gameplay inspection."
           : assignedMeshes.length + " scene mesh(es) are assigned, but game source does not reference the scene mesh API. The editor manifest alone does not draw them.");
-      } else if (sceneObjects.length && String(spec.engine || "").toLowerCase() === "canvas2d") {
-        const sceneDrawn = /GENE_SCENE\.draw2D|GENE_SCENE\.getVisibleObjects/.test(allRuntimeSource);
+      } else if (sceneObjects.length) {
+        const sceneDrawn = /GENE_SCENE\.(?:draw2D|draw3D|getVisibleObjects|objects)/.test(allRuntimeSource);
+        const engineName = String(spec.engine || "").toLowerCase();
+        const engineLabel = engineName === "canvas2d" ? "Canvas 2D" : engineName === "webgl3d" ? "3D" : "game";
         add("Scene renderer integration", sceneDrawn ? "pass" : "warn", sceneDrawn
-          ? "Game source references the Canvas 2D scene API; verify layering and collision behavior in gameplay."
-          : "Scene objects exist in the manifest, but the Canvas 2D source does not reference the scene drawing API.");
+          ? "Game source references the shared scene manifest API; verify object rendering, layering and collision behavior in gameplay."
+          : "Scene objects exist in the manifest, but the " + engineLabel + " source does not reference the shared scene API. Manifest entries alone do not guarantee visible objects.");
       }
       const audioConfig = spec.audio && typeof spec.audio === "object" ? spec.audio : {};
       if (audioConfig.enabled !== false && !isAppSpec) {
