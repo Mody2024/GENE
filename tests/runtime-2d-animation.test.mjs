@@ -57,6 +57,8 @@ assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk
 assert.equal(draws[1][0].src.includes("frame-02.svg"), true, "elapsed time advances the animation to a different individual frame");
 assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "missing", 0, 0, 10, 10, 0), true, "unknown clips safely fall back to idle/first clip");
 assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "once", 0, 0, 10, 10, 900), true);
+assert.equal(draws[3][0].src.includes("frame-01.svg"), true, "non-looping animation stays on its final frame");
+assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/missing", "walk", 0, 0, 10, 10, 0), false, "missing animation manifests fail safely");
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().spriteDraws, 4, "runtime diagnostics count only successful animated sprite draws");
 
 const gl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, next: 0, created: [], createBuffer() { const b = { id: ++this.next }; this.created.push(b); return b; }, bindBuffer() {}, bufferData() {}, deleteBuffer() {} };
@@ -68,6 +70,3 @@ assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshBuffersCreated, 1, "runtime 
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtime diagnostics expose prepared mesh vertices");
 meshes.dispose();
 console.log("Runtime 2D animation and 3D mesh evidence passed.\n");
-assert.equal(draws[3][0].src.includes("frame-01.svg"), true, "non-looping animation stays on its final frame");
-assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/missing", "walk", 0, 0, 10, 10, 0), false, "missing animation manifests fail safely");
-console.log("Runtime 2D animation behavior passed.\n");
