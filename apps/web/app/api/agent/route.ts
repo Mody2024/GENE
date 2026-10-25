@@ -1672,7 +1672,7 @@ export async function POST(request: NextRequest) {
         ? materialName.slice(1)
         : modelPath.slice(0, modelPath.lastIndexOf("/") + 1) + materialName;
       const pathParts: string[] = [];
-      for (const part of rawMaterialPath.replace(/\\\\/g, "/").split("/")) {
+      for (const part of rawMaterialPath.replace(/\\/g, "/").split("/")) {
         if (!part || part === ".") continue;
         if (part === "..") {
           if (!pathParts.length) return true;
