@@ -25,8 +25,8 @@ const files = {
   "assets/forge2d/character/frames/frame-01.svg": "<svg id='one'/>",
   "assets/forge2d/character/frames/frame-02.svg": "<svg id='two'/>",
   "assets/forge2d/character/frames/frame-03.svg": "<svg id='three'/>",
-  "assets/models/model.obj": "mtllib model.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
-  "assets/models/model.mtl": "newmtl painted\nKd 0.2 0.4 0.6",
+  "assets/models/character.obj": "mtllib model.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl painted\nf 1 2 3",
+  "assets/models/character.mtl": "newmtl painted\nKd 0.2 0.4 0.6",
   "assets/unapproved/script.js": "alert(1)"
 };
 const bootstrap = buildRuntimeAssetBootstrap(files);
@@ -41,7 +41,8 @@ class MockImage {
   get src() { return this._src; }
 }
 const context = { drawImage: (...args) => draws.push(args) };
-const window = { addEventListener() {}, requestAnimationFrame() {}, document: { querySelector() { return null; }, images: [] } };
+const canvasPrototype = { clearRect() {}, fillRect() {} };
+const window = { addEventListener() {}, requestAnimationFrame() {}, CanvasRenderingContext2D: { prototype: canvasPrototype }, document: { querySelector() { return null; }, images: [] } };
 const document = {
   readyState: "complete",
   querySelectorAll: () => [],
@@ -62,7 +63,7 @@ assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/missing", "walk",
 assert.equal(window.GENE_DIAGNOSTICS.snapshot().spriteDraws, 4, "runtime diagnostics count only successful animated sprite draws");
 
 const gl = { ARRAY_BUFFER: 1, STATIC_DRAW: 2, next: 0, created: [], createBuffer() { const b = { id: ++this.next }; this.created.push(b); return b; }, bindBuffer() {}, bufferData() {}, deleteBuffer() {} };
-const meshes = window.GENE3D.createMeshBuffers(gl, "assets/models/model.obj");
+const meshes = window.GENE3D.createMeshBuffers(gl, "assets/models/character.obj");
 assert.equal(meshes.length, 1, "OBJ mesh groups become one WebGL buffer");
 assert.equal(meshes[0].vertexCount, 3, "mesh buffers preserve triangulated vertex counts");
 assert.deepEqual(Array.from(meshes[0].diffuse), [0.2, 0.4, 0.6], "OBJ material color comes from the paired MTL file");
@@ -71,5 +72,9 @@ assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 3, "runtim
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
 assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true }).passed, true, "runtime acceptance passes when the required render evidence exists");
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).issues), ["missing-sprite-draws"], "sprite-specific acceptance reports missing animated rendering");
+canvasPrototype.clearRect();
+assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, false, "clearing a canvas alone is not evidence of visible game rendering");
+canvasPrototype.fillRect();
+assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, true, "meaningful canvas drawing counts as render activity");
 meshes.dispose();
 console.log("Runtime 2D animation and 3D mesh evidence passed.\n");
