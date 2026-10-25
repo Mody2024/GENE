@@ -56,6 +56,8 @@ assert.match(agentRoute, /missingModelIntegration = forgeToolAssets\.filter/, "p
 assert.match(agentRoute, /bounded, source-only repair attempt/, "missing Forge asset integration must trigger one bounded repair attempt");
 assert.match(agentRoute, /GENE Forge Asset Integration Repair/, "the repair pass must be explicitly scoped to Forge asset integration");
 assert.match(agentRoute, /const allowedPaths = new Set\(scriptFiles\.map/, "repair output must be restricted to existing JavaScript files");
+assert.match(agentRoute, /uniqueRepairPaths\.size === repaired\.files\.length/, "repair output must reject duplicate paths instead of allowing ambiguous replacements");
+assert.match(agentRoute, /typeof file\.path==="string" && allowedPaths\.has\(file\.path\)/, "repair output must validate path type as well as membership in the existing script allowlist");
 assert.match(agentRoute, /validateFiles\(candidates, "build"/, "repaired Forge integration must pass project validation before replacing the original output");
 assert.match(agentRoute, /Browser rendering and animation still require runtime acceptance/, "repair must not claim visual success without runtime acceptance");
 assert.match(agentRoute, /GENE 3D Forge integration check: these mesh files are packaged but model loading could not be confirmed/, "GENE must distinguish exported 3D files from confirmed in-game models");
