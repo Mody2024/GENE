@@ -75,7 +75,11 @@ test("saved voice-over assets play with bounded volume and playback rate", () =>
   assert.equal(player.volume, 0.4);
   assert.equal(player.playbackRate, 1.5);
   assert.equal(player.played, true);
-  assert.equal(calls.players.length, 1);
+  const invalidOptionsPlayer = audio.playVoiceOver("intro", { volume: Number.NaN, playbackRate: Number.NaN });
+  assert.ok(invalidOptionsPlayer, "invalid optional playback values fall back safely");
+  assert.equal(invalidOptionsPlayer.volume, 0.5, "non-finite voice-over volume falls back to full clip volume before master gain");
+  assert.equal(invalidOptionsPlayer.playbackRate, 1, "non-finite playback rate leaves the browser default unchanged");
+  assert.equal(calls.players.length, 2);
 });
 
 test("disabled audio gates effects, music, and voice-over playback", () => {
