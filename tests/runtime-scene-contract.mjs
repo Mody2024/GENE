@@ -14,6 +14,8 @@ assert.match(source, /Heuristic checks are advisory/, "layout analysis explicitl
 console.log("Runtime scene contract passed (callback binding and OBJ draw dispatch).");
 
 assert.match(source, /getIntegrityReport=function\(\)/, "scene runtime exposes a unified manifest integrity report");
+assert.match(source, /OBJ parser returned no mesh groups/, "3D model parser failures are retained as actionable scene resource diagnostics");
+assert.match(source, /return\{meshes:meshes,errors:errors,dispose:function\(/, "WebGL scene resource creation returns model-loading errors instead of swallowing them");
 assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "scene runtime exposes a playable-readiness preflight");
 assert.match(source, /SPAWN_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested spawn marker");
 assert.match(source, /GOAL_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested goal marker");
