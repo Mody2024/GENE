@@ -1561,7 +1561,7 @@ export async function POST(request: NextRequest) {
     const missing2D = forge2DAssets.filter(asset => {
       const base = "assets/forge2d/" + asset.kind;
       if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
-        return !scriptText.includes("GENE_SPRITES.draw") || !scriptText.includes(base + ".json");
+        return !/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(scriptText) || !scriptText.includes(base + ".json");
       }
       return !scriptText.includes(base + ".svg") ||
         !(scriptText.includes("GENE_ART") || scriptText.includes("drawImage") || scriptText.includes("new Image"));
@@ -1606,7 +1606,7 @@ export async function POST(request: NextRequest) {
             const remaining2D = missing2D.filter(asset => {
               const base="assets/forge2d/"+asset.kind;
               return asset.kind==="character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length
-                ? !afterText.includes("GENE_SPRITES.draw") || !afterText.includes(base + ".json")
+                ? !/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(afterText) || !afterText.includes(base + ".json")
                 : !afterText.includes(base+".svg") || !(afterText.includes("GENE_ART") || afterText.includes("drawImage") || afterText.includes("new Image"));
             });
             const remaining3D = missing3D.filter(asset => !afterText.includes("assets/models/"+asset.kind+".obj") || !/OBJLoader|loadOBJ|parseOBJ|GENE_MODELS|loadModel|fetch\s*\(/i.test(afterText));
@@ -1641,7 +1641,7 @@ export async function POST(request: NextRequest) {
     const missingForgeIntegration = forge2DAssets.filter(asset => {
       const assetPath = "assets/forge2d/" + asset.kind;
       if (asset.kind === "character" && Array.isArray(asset.manifest.animationClips) && asset.manifest.animationClips.length) {
-        return !gameScripts.includes("GENE_SPRITES.draw") || !gameScripts.includes(assetPath + ".json");
+        return !/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(gameScripts) || !gameScripts.includes(assetPath + ".json");
       }
       return !gameScripts.includes(assetPath + ".svg") ||
         !(gameScripts.includes("GENE_ART") || gameScripts.includes("drawImage") || gameScripts.includes("new Image"));
