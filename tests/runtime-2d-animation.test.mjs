@@ -121,9 +121,10 @@ assert.equal(window.GENE_DIAGNOSTICS.snapshot().meshVerticesPrepared, 9, "runtim
 assert.deepEqual(Array.from(window.GENE_DIAGNOSTICS.assess({ requireCanvas: true, requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true, failOnRuntimeErrors: true }).issues), ["missing-canvas"], "acceptance assessment reports missing evidence rather than falsely passing a blank document");
 assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true, requireSpriteDraws: true, requireMeshBuffers: true }).passed, true, "runtime acceptance passes when the required render evidence exists");
 assert.equal(window.GENE_DIAGNOSTICS.assess({ requireSpriteDraws: true }).passed, true, "sprite-specific acceptance passes after four successful animated sprite draws");
+const meaningfulBeforeClear = window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps;
 canvasPrototype.clearRect();
-assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, false, "clearing a canvas alone is not evidence of visible game rendering");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps, meaningfulBeforeClear, "clearing a canvas does not add meaningful render evidence");
 canvasPrototype.fillRect();
-assert.equal(window.GENE_DIAGNOSTICS.assess({ requireRenderActivity: true }).passed, true, "meaningful canvas drawing counts as render activity");
+assert.equal(window.GENE_DIAGNOSTICS.snapshot().meaningfulRenderOps, meaningfulBeforeClear + 1, "meaningful canvas drawing increments render evidence");
 meshes.dispose();
 console.log("Runtime 2D animation and 3D mesh evidence passed.\n");
