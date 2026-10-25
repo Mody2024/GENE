@@ -21,6 +21,8 @@ assert.match(source, /getWebGLDiagnostics=function\(\)/, "preview can read struc
 assert.match(source, /WebGL context or GENE3D OBJ parser is unavailable/, "missing WebGL/OBJ dependencies are returned as actionable diagnostics");
 assert.match(source, /OBJ group has invalid, incomplete, or over-limit position\/normal data/, "malformed or oversized OBJ groups are reported rather than silently skipped");
 assert.match(source, /WebGL could not allocate a GPU buffer for this OBJ group/, "GPU buffer allocation failures are reported");
+assert.match(source, /WebGL failed while uploading OBJ geometry/, "GPU upload exceptions are reported and their unregistered buffer is released");
+assert.match(source, /catch\(uploadError\)\{try\{gl\.deleteBuffer\(buffer\)/, "failed GPU uploads release the allocated buffer instead of leaking it");
 assert.match(source, /No visible scene model produced drawable GPU geometry/, "empty WebGL scene resources receive a diagnostic");
 assert.match(source, /getPlayableReadinessReport=async function\(options\)/, "scene runtime exposes a playable-readiness preflight");
 assert.match(source, /SPAWN_MARKER_NOT_FOUND/, "readiness preflight can enforce a requested spawn marker");
