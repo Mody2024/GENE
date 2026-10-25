@@ -82,7 +82,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     triangles.sort(function(a,b){return a.z-b.z;});ctx.save();ctx.globalAlpha=1;triangles.forEach(function(t){ctx.beginPath();ctx.moveTo(t.v[0].x,t.v[0].y);ctx.lineTo(t.v[1].x,t.v[1].y);ctx.lineTo(t.v[2].x,t.v[2].y);ctx.closePath();ctx.fillStyle=t.c;ctx.fill();});ctx.restore();return triangles.length>0;
   }catch(e){return false;}
 };window.GENE_SCENE.createWebGLMeshes=function(gl){
-  if(!gl||!window.GENE3D||!window.GENE3D.parseOBJ)return{meshes:[],dispose:function(){}};
+  if(!gl||!window.GENE3D||!window.GENE3D.parseOBJ)return{meshes:[],errors:[{id:null,modelPath:null,message:"WebGL context or GENE3D OBJ parser is unavailable"}],dispose:function(){}};
   var meshes=[],seen=0,errors=[];
   this.getVisibleObjects().forEach(function(o){
     if(!o.modelPath||seen>=500)return;
@@ -92,14 +92,14 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
       if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
       if(!Array.isArray(groups)||!groups.length){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ parser returned no mesh groups"});return;}groups.forEach(function(g){
         var data=g.positions||[];
-        if(data.length<18||data.length%6!==0||data.length/6>180000)return;
-        var buffer=gl.createBuffer();if(!buffer)return;
+        if(data.length<18||data.length%6!==0||data.length/6>180000){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ group has invalid, incomplete, or over-limit position/normal data"});return;}
+        var buffer=gl.createBuffer();if(!buffer){errors.push({id:o.id,modelPath:o.modelPath,message:"WebGL could not allocate a GPU buffer for this OBJ group"});return;}
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
         meshes.push({id:o.id,name:o.name,modelPath:o.modelPath,materialName:g.material,material:materials[g.material]||null,buffer:buffer,vertexCount:data.length/6,stride:24,positionOffset:0,normalOffset:12,position:Object.assign({},o.position),rotation:Object.assign({},o.rotation),scale:Object.assign({},o.scale),color:o.color,roughness:o.material&&o.material.roughness,metalness:o.material&&o.material.metalness,light:Object.assign({},o.light||{}),camera:Object.assign({},o.camera||{})});
       });
     }catch(e){errors.push({id:o.id,modelPath:o.modelPath,message:String(e&&e.message||e||"Unknown OBJ loading error").slice(0,180)});}
   });
-  return{meshes:meshes,errors:errors,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
+  if(!meshes.length&&seen>0&&!errors.some(function(e){return e.id!=null;}))errors.push({id:null,modelPath:null,message:"No visible scene model produced drawable GPU geometry"});return{meshes:meshes,errors:errors,dispose:function(){meshes.forEach(function(m){try{gl.deleteBuffer(m.buffer);}catch(e){}});meshes.length=0;}};
 };window.GENE_SCENE.drawWebGLMeshes=function(gl,program,viewProjection,resources,locations){
   if(!gl||!program||!viewProjection||!resources||!Array.isArray(resources.meshes))return 0;
   locations=locations||{};
