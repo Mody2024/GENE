@@ -128,13 +128,13 @@ test("workspace reconciliation prefers the newest duplicate and retains local or
   assert.equal(result.activeProjectId, "second");
 });
 
-test("workspace reconciliation rejects stale active IDs and falls back to a valid project", () => {
+test("workspace reconciliation falls back to the durable active project when the local ID is stale", () => {
   const result = reconcileDurableProjectWorkspace(
     [project("local")],
     "missing",
     { projects: [project("durable")], activeProjectId: "durable", savedAt: "", deletedProjectIds: [] }
   );
-  assert.equal(result.activeProjectId, "local");
+  assert.equal(result.activeProjectId, "durable");
 });
 
 test("durable database opening closes a connection that succeeds after a blocked-open rejection", async () => {
