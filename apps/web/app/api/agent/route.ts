@@ -1666,7 +1666,7 @@ export async function POST(request: NextRequest) {
       const modelPath = "assets/models/" + asset.kind + ".obj";
       const source = packagedFiles.get(modelPath);
       if (typeof source !== "string") return true;
-      const declaredLibraries = Array.from(source.matchAll(/^\\s*mtllib\\s+(.+)$/gmi))
+      const declaredLibraries = Array.from(source.matchAll(/^\s*mtllib\s+(.+)$/gmi))
         .flatMap(match => match[1].trim().split(/\\s+/))
         .filter(Boolean);
       const materialNames = declaredLibraries.length ? declaredLibraries : [asset.kind + ".mtl"];
@@ -1676,7 +1676,7 @@ export async function POST(request: NextRequest) {
           ? materialName.slice(1)
           : modelPath.slice(0, modelPath.lastIndexOf("/") + 1) + materialName;
         const pathParts: string[] = [];
-        for (const part of rawMaterialPath.replace(/\\\\/g, "/").split("/")) {
+        for (const part of rawMaterialPath.replace(/\\/g, "/").split("/")) {
           if (!part || part === ".") continue;
           if (part === "..") {
             if (!pathParts.length) return true;
@@ -1689,11 +1689,11 @@ export async function POST(request: NextRequest) {
         if (!materialPath.startsWith("assets/")) return true;
         const materialSource = packagedFiles.get(materialPath);
         if (typeof materialSource !== "string") return true;
-        for (const match of materialSource.matchAll(/^\\s*newmtl\\s+(.+)$/gmi)) {
+        for (const match of materialSource.matchAll(/^\s*newmtl\s+(.+)$/gmi)) {
           definedMaterials.add(match[1].trim());
         }
       }
-      const usedMaterials = Array.from(source.matchAll(/^\\s*usemtl\\s+(.+)$/gmi)).map(match => match[1].trim());
+      const usedMaterials = Array.from(source.matchAll(/^\s*usemtl\s+(.+)$/gmi)).map(match => match[1].trim());
       return usedMaterials.some(name => !definedMaterials.has(name));
     });
     const missingModelIntegration = forgeToolAssets.filter(asset => {
