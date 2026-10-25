@@ -545,6 +545,7 @@ export default function Home() {
               : version)
           };
         });
+        if (!project) return;
         void writeDurableProjectSnapshot(
           [project, ...projects.filter(item => item.id !== project.id)]
             .filter((item): item is GeneProject => Boolean(item))
