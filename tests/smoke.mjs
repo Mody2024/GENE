@@ -105,6 +105,7 @@ assert.ok(runtimeScene.includes("drawWebGLMeshes=function(gl,program,viewProject
 assert.match(page, /add\("Scene renderer integration", meshConnected \? "pass" : "fail"/, "assigned scene meshes without an engine-compatible draw path block acceptance instead of being downgraded to a warning");
 assert.match(page, /add\("Scene renderer integration", sceneDrawn \? "pass" : "fail"/, "primitive scene objects without an engine-compatible scene draw path also block acceptance");
 assert.ok(page.includes("getWebGLDiagnostics") && page.includes("diagnostics.sceneModelErrors") && page.includes("3D scene diagnostics:"), "preview surfaces structured 3D model load errors instead of leaving them hidden in runtime resources");
+assert.ok(page.includes("if (sceneModelErrors.length) {") && page.includes("Some content rendered, but one or more scene models may be missing."), "preview continues surfacing partial 3D model failures even when other content rendered");
 assert.ok(page.includes('typeof object.modelPath === "string" && object.modelPath.trim().length > 0'), "every scene object with an assigned model path is checked for a compatible renderer path regardless of its display type");
 assert.ok(page.includes('if (typeof object.modelPath === "string" && object.modelPath.trim()) {'), "every assigned model path receives OBJ/MTL integrity validation regardless of scene object type");
 assert.ok(prompts.includes("drawWebGLMeshes(gl, program, viewProjection, resources)"), "3D generation contract documents the runtime WebGL mesh draw helper");
