@@ -2667,7 +2667,7 @@ export default function Home() {
       const mainSource = typeof files["game.js"] === "string" ? files["game.js"] : "";
       const moduleSource = Object.entries(files).filter(([path, source]) => /\.(?:m?js|cjs)$/i.test(path) && typeof source === "string").map(([, source]) => source).join("\n");
       const allRuntimeSource = mainSource + "\n" + moduleSource;
-      const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && String(object.type || "").toLowerCase() === "mesh" && typeof object.modelPath === "string" && object.modelPath.length > 0);
+      const assignedMeshes = sceneObjects.filter(object => object && typeof object === "object" && /^(?:mesh|model)$/i.test(String(object.type || "")) && typeof object.modelPath === "string" && object.modelPath.length > 0);
       if (assignedMeshes.length) {
         const engineName = String(spec.engine || "").toLowerCase();
         const canvasDraw = /GENE_SCENE\.draw2D\s*\(/.test(allRuntimeSource);
