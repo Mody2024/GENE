@@ -69,7 +69,7 @@ assert.match(runtimeAssets, /assess:function\(options\)/, "runtime diagnostics m
 assert.match(runtimeAssets, /no-render-activity/, "runtime acceptance must reject games without rendering evidence");
 assert.match(runtimeAssets, /missing-mesh-buffers/, "3D runtime acceptance must identify missing mesh preparation");
 assert.match(runtimeAssets, /meaningfulRenderOps\+snap\.webglDrawCalls\+snap\.spriteDraws===0/, "render acceptance must require meaningful drawing rather than clear-only canvas activity");
-assert.ok(runtimeAssets.includes("mtlPath=String(path).replace") && runtimeAssets.includes(".mtl"), "OBJ assets must resolve their matching MTL filename for arbitrary model names");
+assert.ok(runtimeAssets.includes("objPath.replace") && runtimeAssets.includes(".mtl"), "OBJ assets resolve a matching fallback MTL filename for arbitrary model names");
 assert.ok(runtimeAssets.includes("declared=Array.from(objSource.matchAll") && runtimeAssets.includes("mtllib"), "OBJ loading must honor every material library declared by the model");
 assert.ok(runtimeAssets.includes("Object.keys(parsed).forEach(function(key){materials[key]=parsed[key];})"), "OBJ loading must merge definitions from multiple MTL files");
 assert.ok(runtimeAssets.includes("materialNames=declared.length?declared.flatMap"), "OBJ loading must support multiple MTL filenames in a declaration");
