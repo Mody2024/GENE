@@ -31,6 +31,9 @@ assert.match(page, /check the scene, camera, drawing loop and runtime errors/, "
 assert.match(runtimeAssets, /gameplayAssessment:'not-verified-by-runtime-telemetry'/, "preliminary render diagnostics never claim gameplay was verified");
 
 assert.match(runtimeAssets, /originalGetContext\.apply\(this,arguments\)/, "renderer diagnostics observe existing getContext calls rather than creating a competing context");
+assert.match(runtimeAssets, /result&&!w\.__geneRuntimeMonitorProbe/, "preview monitor context probes are excluded from game renderer telemetry");
+assert.match(page, /__geneRuntimeMonitorProbe=true;try\{gl=c\.getContext/, "WebGL visibility probes explicitly identify themselves as monitor activity");
+assert.match(page, /__geneRuntimeMonitorProbe=true;try\{ctx=c\.getContext/, "Canvas 2D visibility probes explicitly identify themselves as monitor activity");
 assert.match(runtimeAssets, /contextTypes:state\.contextTypes\.slice\(\)/, "runtime diagnostics report the context types actually requested by the game");
 assert.doesNotMatch(runtimeAssets, /hasWebGLContext:Array\.prototype\.some\.call\(w\.document\.querySelectorAll\('canvas'\),function\(c\)\{try\{return !!\(c\.getContext\('webgl'\)/, "diagnostics must not create a WebGL context just to probe for one");
 
