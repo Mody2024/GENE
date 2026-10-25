@@ -36,7 +36,8 @@ const bootstrap = buildRuntimeAssetBootstrap(files);
 assert.ok(!bootstrap.includes("alert(1)"), "runtime asset allowlist excludes arbitrary executable files");
 const scripts = Array.from(bootstrap.matchAll(/<script>([\s\S]*?)<\/script>/g));
 assert.ok(scripts.length >= 2, "runtime bootstrap includes storage and game scripts");
-const runtimeScript = scripts[scripts.length - 1][1];
+const runtimeScript = scripts.map(match => match[1]).find(script => script.includes("S.draw=function") && script.includes("GENE_SPRITES"));
+assert.ok(runtimeScript, "runtime bootstrap includes the sprite animation controller");
 const draws = [];
 class MockImage {
   constructor() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; }
