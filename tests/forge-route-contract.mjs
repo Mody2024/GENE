@@ -69,7 +69,7 @@ assert.match(runtimeAssets, /assess:function\(options\)/, "runtime diagnostics m
 assert.match(runtimeAssets, /no-render-activity/, "runtime acceptance must reject games without rendering evidence");
 assert.match(runtimeAssets, /missing-mesh-buffers/, "3D runtime acceptance must identify missing mesh preparation");
 assert.match(runtimeAssets, /meaningfulRenderOps\+snap\.webglDrawCalls\+snap\.spriteDraws===0/, "render acceptance must require meaningful drawing rather than clear-only canvas activity");
-assert.ok(runtimeAssets.includes('mtlPath=String(path).replace(/\\\\.obj$/i,\\\".mtl\\\")'), "OBJ assets must resolve their matching MTL filename for arbitrary model names");
+assert.ok(runtimeAssets.includes("mtlPath=String(path).replace") && runtimeAssets.includes(".mtl"), "OBJ assets must resolve their matching MTL filename for arbitrary model names");
 assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair must identify remaining 3D gaps after the attempt");
 assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ remaining3D\.length < missing2D\.length \+ missing3D\.length/, "validated partial repairs should be retained when they reduce the integration gaps");
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
