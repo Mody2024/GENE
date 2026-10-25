@@ -531,10 +531,13 @@ export default function Home() {
         const state = event.data.state === "rendered" ? "rendered" : event.data.state === "error" ? "error" : "loaded";
         const diagnostics = event.data.diagnostics;
         const sceneModelErrors = Array.isArray(diagnostics?.sceneModelErrors) ? diagnostics.sceneModelErrors : [];
-        if (sceneModelErrors.length && state !== "rendered") {
+        if (sceneModelErrors.length) {
           const first = sceneModelErrors[0];
           const detail = String(first?.message || "3D scene model failed to load").slice(0, 220);
-          setNotice("3D scene diagnostics: " + detail + (sceneModelErrors.length > 1 ? " (+" + (sceneModelErrors.length - 1) + " more). " : ". ") + "The preview remains unverified until visible rendering is confirmed.");
+          const impact = state === "rendered"
+            ? "Some content rendered, but one or more scene models may be missing."
+            : "The preview remains unverified until visible rendering is confirmed.";
+          setNotice("3D scene diagnostics: " + detail + (sceneModelErrors.length > 1 ? " (+" + (sceneModelErrors.length - 1) + " more). " : ". ") + impact);
         }
         const missingVisualEvidence = diagnostics?.playabilityAssessment === "audio-without-visual-evidence" || diagnostics?.playabilityAssessment === "no-visual-render-evidence";
         if (state !== "rendered" && missingVisualEvidence && Number(diagnostics.elapsedMs) >= 1500) {
