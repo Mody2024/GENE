@@ -65,6 +65,9 @@ assert.ok(agentRoute.includes("!/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(script
 assert.ok(agentRoute.includes("!/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(afterText)"), "partial repair gate must require a callable draw invocation");
 assert.ok(agentRoute.includes("!/GENE_SPRITES\\s*\\.\\s*draw\\s*\\(/.test(gameScripts)"), "final sprite audit must require a callable draw invocation");
 assert.ok(agentRoute.includes('!gameScripts.includes(assetPath + ".json")'), "final Forge audit must require the frame manifest");
+assert.match(runtimeAssets, /assess:function\(options\)/, "runtime diagnostics must expose an evidence-based acceptance assessment");
+assert.match(runtimeAssets, /no-render-activity/, "runtime acceptance must reject games without rendering evidence");
+assert.match(runtimeAssets, /missing-mesh-buffers/, "3D runtime acceptance must identify missing mesh preparation");
 assert.match(agentRoute, /const remaining3D = missing3D\.filter/, "Forge repair must identify remaining 3D gaps after the attempt");
 assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ remaining3D\.length < missing2D\.length \+ missing3D\.length/, "validated partial repairs should be retained when they reduce the integration gaps");
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
