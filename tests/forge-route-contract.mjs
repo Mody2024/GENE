@@ -76,6 +76,9 @@ assert.match(agentRoute, /const repairMadeProgress = remaining2D\.length \+ rema
 assert.match(agentRoute, /Any remaining unintegrated assets are listed below/, "partial repair success must not hide unresolved assets");
 assert.match(agentRoute, /Browser rendering and animation still require runtime acceptance/, "repair must not claim visual success without runtime acceptance");
 assert.match(agentRoute, /const missingModelMaterials = forgeToolAssets\.filter/, "3D Forge audit must inspect packaged OBJ material references");
+assert.match(agentRoute, /rawMaterialPath\.replace\(\/\\\\\\\\\/g, "\/"\)/, "Forge material audit must normalize Windows-style separators");
+assert.match(agentRoute, /part === "\.\."/, "Forge material audit must resolve relative path segments safely");
+assert.match(agentRoute, /!materialPath\.startsWith\("assets\/"\)/, "Forge material audit must reject material paths that escape the packaged assets directory");
 assert.match(agentRoute, /OBJ material library is missing or unresolved/, "GENE must report missing material libraries separately from missing model loaders");
 assert.match(agentRoute, /packaged OBJ material-library references were found/, "GENE must only report source-level evidence after material references are present");
 assert.match(agentRoute, /visible gameplay remain unverified until runtime acceptance/, "source-level 3D references must not be presented as proof of playable rendered models");
