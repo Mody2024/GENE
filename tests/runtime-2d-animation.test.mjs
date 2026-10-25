@@ -57,6 +57,13 @@ const document = {
 assert.ok(bootstrap.includes("assets/forge2d/character/frames/frame-00.svg"), "bootstrap packages individual sprite frame assets");
 vm.runInNewContext(runtimeScript, { window, document, Image: MockImage, performance: { now: () => 0 }, Date, console, Float32Array, Uint8Array, Math, JSON, Object, Array, String, Number, RegExp });
 window.__GENE_ASSETS__ = files;
+window.GENE_SPRITES._cache = Object.fromEntries(
+  Object.keys(files).filter(path => path.startsWith("assets/forge2d/character/frames/")).map(path => {
+    const image = new MockImage();
+    image.src = path;
+    return [path, image];
+  })
+);
 assert.deepEqual(Array.from(window.GENE_SPRITES.clips("assets/forge2d/character")), ["idle", "walk", "once"]);
 assert.equal(window.GENE_SPRITES.draw(context, "assets/forge2d/character", "walk", 10, 20, 30, 40, 0), true);
 assert.equal(draws[0][0].src.includes("frame-00.svg"), true, "walk animation starts on its first individual frame");
