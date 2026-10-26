@@ -108,7 +108,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
   var mvpLoc=locations.mvp==null?gl.getUniformLocation(program,"uMVP"):locations.mvp;
   var modelLoc=locations.model==null?gl.getUniformLocation(program,"uModel"):locations.model;
   var colorLoc=locations.color==null?gl.getUniformLocation(program,"uColor"):locations.color;
-  if(pos<0||normal<0||!mvpLoc)return 0;
+  if(pos<0||normal<0||!mvpLoc){var shaderIssue={id:null,modelPath:null,message:"WebGL scene shader is missing required aPosition/aNormal attributes or uMVP uniform; scene meshes cannot be drawn"};if(Array.isArray(resources.errors))resources.errors.push(shaderIssue);if(Array.isArray(window.GENE_SCENE.lastWebGLDiagnostics))window.GENE_SCENE.lastWebGLDiagnostics.push(shaderIssue);else window.GENE_SCENE.lastWebGLDiagnostics=[shaderIssue];window.GENE_SCENE.lastWebGLDiagnostics=window.GENE_SCENE.lastWebGLDiagnostics.slice(-100);return 0;}
   function model(o){
     var r=o.rotation||{},p=o.position||{},s=o.scale||{},rx=(Number(r.x)||0)*Math.PI/180,ry=(Number(r.y)||0)*Math.PI/180,rz=(Number(r.z)||0)*Math.PI/180;
     var sx=Math.max(.001,Math.min(100,Math.abs(Number(s.x)||1))),sy=Math.max(.001,Math.min(100,Math.abs(Number(s.y)||1))),sz=Math.max(.001,Math.min(100,Math.abs(Number(s.z)||1))),cx=Math.cos(rx),sxr=Math.sin(rx),cy=Math.cos(ry),syr=Math.sin(ry),cz=Math.cos(rz),szr=Math.sin(rz);
