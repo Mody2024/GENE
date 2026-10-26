@@ -19,6 +19,8 @@ assert.match(source, /return\{meshes:meshes,errors:errors,dispose:function\(/, "
 assert.match(source, /lastWebGLDiagnostics=errors\.slice\(0,100\)/, "WebGL model errors are retained for preview telemetry");
 assert.match(source, /getWebGLDiagnostics=function\(\)/, "preview can read structured WebGL model diagnostics");
 assert.match(source, /WebGL rejected mesh draw \(error /, "runtime draw-call WebGL errors are attributed to the affected model");
+assert.match(source, /catch\(meshDrawException\)/, "exceptions from an individual mesh do not abort rendering of later scene meshes");
+assert.match(source, /WebGL mesh draw threw an exception:/, "per-mesh draw exceptions become preview-readable diagnostics");
 assert.match(source, /WebGL scene shader is missing required aPosition\/aNormal attributes or uMVP uniform/, "missing shader inputs become visible diagnostics instead of silently returning zero draws");
 assert.match(source, /if\(Array\.isArray\(resources\.errors\)\)resources\.errors\.push\(shaderIssue\)/, "shader contract failures are added to preview-readable resource diagnostics");
 assert.match(source, /if\(Array\.isArray\(resources\.errors\)\)resources\.errors\.push\(drawError\)/, "draw failures are appended to resource diagnostics consumed by preview");
