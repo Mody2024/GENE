@@ -90,7 +90,7 @@ export function buildRuntimeSceneBootstrap(files: Record<string, string> | undef
     try{
       var groups=window.GENE3D.parseOBJ(o.modelPath),mtlPath=o.modelPath.replace(/\\.obj$/i,".mtl"),materials={};
       if(window.__GENE_ASSETS__&&typeof window.__GENE_ASSETS__[mtlPath]==="string"&&window.GENE3D.parseMTL)materials=window.GENE3D.parseMTL(mtlPath);
-      if(!Array.isArray(groups)||!groups.length){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ parser returned no mesh groups"});return;}groups.forEach(function(g){
+      if(!Array.isArray(groups)||!groups.length){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ parser returned no mesh groups"});return;}if(groups.length>128){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ contains more than 128 mesh groups; remaining groups were skipped to protect preview stability"});groups=groups.slice(0,128);}groups.forEach(function(g){
         var data=g.positions||[];
         if(data.length<18||data.length%6!==0||data.length/6>180000){errors.push({id:o.id,modelPath:o.modelPath,message:"OBJ group has invalid, incomplete, or over-limit position/normal data"});return;}
         var buffer=gl.createBuffer();if(!buffer){errors.push({id:o.id,modelPath:o.modelPath,message:"WebGL could not allocate a GPU buffer for this OBJ group"});return;}
