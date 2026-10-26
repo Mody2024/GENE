@@ -18,6 +18,9 @@ assert.match(source, /OBJ parser returned no mesh groups/, "3D model parser fail
 assert.match(source, /return\{meshes:meshes,errors:errors,dispose:function\(/, "WebGL scene resource creation returns model-loading errors instead of swallowing them");
 assert.match(source, /lastWebGLDiagnostics=errors\.slice\(0,100\)/, "WebGL model errors are retained for preview telemetry");
 assert.match(source, /getWebGLDiagnostics=function\(\)/, "preview can read structured WebGL model diagnostics");
+assert.match(source, /WebGL rejected mesh draw \(error /, "runtime draw-call WebGL errors are attributed to the affected model");
+assert.match(source, /if\(Array\.isArray\(resources\.errors\)\)resources\.errors\.push\(drawError\)/, "draw failures are appended to resource diagnostics consumed by preview");
+assert.match(source, /else\{drawn\+\+;\}/, "draw counts only include meshes accepted by WebGL");
 assert.match(source, /WebGL context or GENE3D OBJ parser is unavailable/, "missing WebGL/OBJ dependencies are returned as actionable diagnostics");
 assert.match(source, /OBJ group has invalid, incomplete, or over-limit position\/normal data/, "malformed or oversized OBJ groups are reported rather than silently skipped");
 assert.match(source, /WebGL could not allocate a GPU buffer for this OBJ group/, "GPU buffer allocation failures are reported");
