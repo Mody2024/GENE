@@ -15,6 +15,8 @@ console.log("Runtime scene contract passed (callback binding and OBJ draw dispat
 
 assert.match(source, /getIntegrityReport=function\(\)/, "scene runtime exposes a unified manifest integrity report");
 assert.match(source, /OBJ parser returned no mesh groups/, "3D model parser failures are retained as actionable scene resource diagnostics");
+assert.match(source, /groups\.length>128/, "untrusted OBJ group counts are capped before allocating GPU buffers");
+assert.match(source, /groups=groups\.slice\(0,128\)/, "oversized OBJ assets retain a bounded drawable subset instead of exhausting preview resources");
 assert.match(source, /return\{meshes:meshes,errors:errors,dispose:function\(/, "WebGL scene resource creation returns model-loading errors instead of swallowing them");
 assert.match(source, /lastWebGLDiagnostics=errors\.slice\(0,100\)/, "WebGL model errors are retained for preview telemetry");
 assert.match(source, /getWebGLDiagnostics=function\(\)/, "preview can read structured WebGL model diagnostics");
